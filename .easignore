@@ -1,0 +1,16 @@
+# Ignoriši sve iznad ovog foldera (da ne povuče web projekat)
+../node_modules/
+../../node_modules/
+
+# Ignoriši sve lokalno
+node_modules/
+**/node_modules/
+.expo/
+android/
+ios/
+bin/
+obj/
+
+# Ignoriši logove i privremene fajlove
+*.log
+.npm/
