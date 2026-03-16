@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useCallback, useRef } from 'react';
 import { User, AuthResponse, UserSocial } from '../types/auth';
-import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch } from '../lib/api';
+import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToLogout } from '../lib/api';
+import * as SecureStore from 'expo-secure-store';
 
 interface AuthContextType {
     user: User | null;
@@ -26,16 +27,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             _setUser(prev => {
                 const val = (newUser as (prev: User | null) => User | null)(prev);
                 console.log(`[AuthContext] setUser (functional) - New User: ${val?.username}, Auth: ${!!val}`);
+                if (val) SecureStore.setItemAsync('user_meta', JSON.stringify(val)).catch(() => {});
+                else SecureStore.deleteItemAsync('user_meta').catch(() => {});
                 return val;
             });
         } else {
             console.log(`[AuthContext] setUser (direct) - New User: ${newUser?.username}, Auth: ${!!newUser}`);
+            if (newUser) SecureStore.setItemAsync('user_meta', JSON.stringify(newUser)).catch(() => {});
+            else SecureStore.deleteItemAsync('user_meta').catch(() => {});
             _setUser(newUser);
         }
     };
     const [token, setToken] = useState<string | null>(null);
     const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isAppReady, setIsAppReady] = useState(false);
+
+    useEffect(() => {
+        const loadStoredAuth = async () => {
+            try {
+                const storedAccess = await SecureStore.getItemAsync('access_token');
+                const storedRefresh = await SecureStore.getItemAsync('refresh_token');
+                if (storedAccess && storedRefresh) {
+                    setToken(storedAccess);
+                    setAuthToken(storedAccess);
+                    setRefreshToken(storedRefresh);
+                    
+                    const storedUserStr = await SecureStore.getItemAsync('user_meta');
+                    if (storedUserStr) {
+                        try {
+                            const parsed = JSON.parse(storedUserStr);
+                            if (parsed) _setUser(parsed);
+                        } catch (e) {}
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading stored auth:', error);
+            } finally {
+                setIsAppReady(true);
+            }
+        };
+        
+        loadStoredAuth();
+
+        const unsubscribe = subscribeToLogout(() => {
+            _setUser(null);
+            setToken(null);
+            setRefreshToken(null);
+            setAuthToken(null);
+            SecureStore.deleteItemAsync('user_meta').catch(() => {});
+        });
+        
+        return () => unsubscribe();
+    }, []);
 
     // Helpers
     const normalizeUser = (apiUser: any): User => {
@@ -91,9 +135,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             if (data.isSuccessful && data.accessToken?.token) {
-                setToken(data.accessToken.token);
-                setAuthToken(data.accessToken.token);
-                setRefreshToken(data.refreshToken);
+                const newAcc = data.accessToken.token;
+                const newRef = data.refreshToken;
+                
+                await SecureStore.setItemAsync('access_token', newAcc);
+                if (newRef) {
+                    await SecureStore.setItemAsync('refresh_token', newRef);
+                }
+
+                setToken(newAcc);
+                setAuthToken(newAcc);
+                setRefreshToken(newRef);
                 setUser(normalizeUser(data.user));
                 return true;
             } else {
@@ -271,6 +323,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.error('[AuthContext] Logout API error:', error);
             }
         }
+        await SecureStore.deleteItemAsync('access_token');
+        await SecureStore.deleteItemAsync('refresh_token');
+        await SecureStore.deleteItemAsync('user_meta');
+
         setUser(null);
         setToken(null);
         setRefreshToken(null);
@@ -285,6 +341,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (response.ok) {
+                await SecureStore.deleteItemAsync('access_token');
+                await SecureStore.deleteItemAsync('refresh_token');
+                await SecureStore.deleteItemAsync('user_meta');
                 setUser(null);
                 setToken(null);
                 setRefreshToken(null);
@@ -321,7 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <AuthContext.Provider value={authContextValue}>
-            {children}
+            {isAppReady ? children : null}
         </AuthContext.Provider>
     );
 }

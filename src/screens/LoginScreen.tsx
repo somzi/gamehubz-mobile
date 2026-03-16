@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
@@ -54,87 +54,84 @@ export default function LoginScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <StatusBar style="light" />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                className="flex-1"
-            >
-                <ScrollView
-                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
-                    className="px-6"
-                >
-                    <View className="items-center mb-12 mt-10">
-                        {/* Premium Logo Design */}
-                        <View className="relative mb-8">
-                            <View 
-                                className="absolute -inset-4 bg-primary opacity-20 rounded-full" 
-                                style={{ transform: [{ scale: 1.2 }] }}
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                <View style={{ flex: 1 }}>
+                    <ScrollView
+                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 40 }}
+                        className="px-6"
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                    >
+                        <View className="items-center mb-10 mt-6">
+                            {/* App Icon */}
+                            <View className="mb-6">
+                                <Image
+                                    source={require('../../assets/icon.png')}
+                                    style={{ width: 175, height: 175, borderRadius: 28 }}
+                                    resizeMode="contain"
+                                />
+                            </View>
+
+                            <Text className="text-3xl font-black text-white mb-2 tracking-tight">Welcome Back!</Text>
+                            <Text className="text-slate-400 text-center px-8 text-sm leading-5">
+                                Sign in to continue your gaming journey with{' '}
+                                <Text className="text-primary font-bold">GameHubz</Text>
+                            </Text>
+                        </View>
+
+                        <View className="gap-4 w-full max-w-sm self-center">
+                            <Input
+                                label="EMAIL ADDRESS"
+                                placeholder="entered@email.com"
+                                value={email}
+                                onChangeText={setEmail}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                leftIcon="mail-outline"
+                                error={errors.email}
                             />
-                            <View className="w-24 h-24 bg-[#131B2E] rounded-[32px] items-center justify-center border border-white/10 shadow-2xl shadow-primary/40">
-                                <View className="w-16 h-16 bg-primary/10 rounded-[24px] items-center justify-center">
-                                    <Ionicons name="game-controller" size={42} color="#10B981" />
-                                </View>
-                            </View>
-                        </View>
 
-                        <Text className="text-3xl font-black text-white mb-2 tracking-tight">Welcome Back!</Text>
-                        <Text className="text-slate-400 text-center px-8 text-sm leading-5">
-                            Sign in to continue your gaming journey with{' '}
-                            <Text className="text-primary font-bold">GameHubz</Text>
-                        </Text>
-                    </View>
+                            <Input
+                                label="PASSWORD"
+                                placeholder="••••••••"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                                leftIcon="lock-closed-outline"
+                                rightIcon={showPassword ? "eye-off-outline" : "eye-outline"}
+                                onRightIconPress={() => setShowPassword(!showPassword)}
+                                error={errors.password}
+                            />
 
-                    <View className="gap-4 w-full max-w-sm self-center">
-                        <Input
-                            label="EMAIL ADDRESS"
-                            placeholder="entered@email.com"
-                            value={email}
-                            onChangeText={setEmail}
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            leftIcon="mail-outline"
-                            error={errors.email}
-                        />
-
-                        <Input
-                            label="PASSWORD"
-                            placeholder="••••••••"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry={!showPassword}
-                            leftIcon="lock-closed-outline"
-                            rightIcon={showPassword ? "eye-off-outline" : "eye-outline"}
-                            onRightIconPress={() => setShowPassword(!showPassword)}
-                            error={errors.password}
-                        />
-
-                        <TouchableOpacity
-                            className="self-end"
-                            onPress={() => navigation.navigate('ForgotPassword' as any)}
-                        >
-                            <Text className="text-primary text-sm font-medium">Forgot Password?</Text>
-                        </TouchableOpacity>
-
-                        <Button
-                            onPress={handleLogin}
-                            loading={isLoading}
-                            className="mt-2 h-16 rounded-2xl shadow-lg shadow-primary/30"
-                            size="lg"
-                        >
-                            <View className="flex-row items-center justify-center gap-2">
-                                <Text className="text-primary-foreground font-black text-lg">Log In</Text>
-                                <Ionicons name="chevron-forward" size={18} color="#0F172A" />
-                            </View>
-                        </Button>
-
-                        <View className="flex-row items-center justify-center mt-6">
-                            <Text className="text-muted-foreground">Don't have an account? </Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('Register' as any)}>
-                                <Text className="text-primary font-bold">Sign Up</Text>
+                            <TouchableOpacity
+                                className="self-end"
+                                onPress={() => navigation.navigate('ForgotPassword' as any)}
+                            >
+                                <Text className="text-primary text-sm font-medium">Forgot Password?</Text>
                             </TouchableOpacity>
+
+                            <Button
+                                onPress={handleLogin}
+                                loading={isLoading}
+                                className="mt-2 h-16 rounded-2xl shadow-lg shadow-primary/30"
+                                size="lg"
+                            >
+                                <View className="flex-row items-center justify-center gap-2">
+                                    <Text className="text-primary-foreground font-black text-lg">Log In</Text>
+                                    <Ionicons name="chevron-forward" size={18} color="#0F172A" />
+                                </View>
+                            </Button>
+
+                            <View className="flex-row items-center justify-center mt-6">
+                                <Text className="text-muted-foreground">Don't have an account? </Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('Register' as any)}>
+                                    <Text className="text-primary font-bold">Sign Up</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    </ScrollView>
+                </View>
+            </TouchableWithoutFeedback>
 
             <StatusModal
                 visible={showStatusModal}
