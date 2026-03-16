@@ -37,12 +37,12 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (!validate()) return;
 
-        const success = await login(email, password);
-        if (!success) {
+        const result = await login(email, password);
+        if (!result.success) {
             setStatusModalConfig({
                 type: 'error',
                 title: 'Login Failed',
-                message: 'Please check your credentials and try again.'
+                message: result.message || 'Please check your credentials and try again.'
             });
             setShowStatusModal(true);
         }

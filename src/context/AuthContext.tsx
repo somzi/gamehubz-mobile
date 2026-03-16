@@ -8,7 +8,7 @@ interface AuthContextType {
     token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<boolean>;
+    login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
     register: (data: any) => Promise<boolean>;
     logout: () => void;
     updateProfile: (data: any) => Promise<boolean>;
@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [user?.id]);
 
-    const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
         setIsLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/api/Auth/login`, {
@@ -125,13 +125,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             const text = await response.text();
-            let data: AuthResponse;
+            let data: any;
 
             try {
                 data = JSON.parse(text);
             } catch (e) {
                 console.error('Failed to parse login response:', text);
-                return false;
+                return { success: false, message: 'Invalid server response' };
             }
 
             if (data.isSuccessful && data.accessToken?.token) {
@@ -147,14 +147,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAuthToken(newAcc);
                 setRefreshToken(newRef);
                 setUser(normalizeUser(data.user));
-                return true;
+                return { success: true };
             } else {
-                console.error('Login failed:', data.messages);
-                return false;
+                // Determine error message from body
+                let msg = 'Invalid credentials';
+                if (Array.isArray(data) && data.length > 0) {
+                    msg = data[0];
+                } else if (data && typeof data === 'object') {
+                    const messages = (data as any).messages || (data as any).Messages;
+                    if (Array.isArray(messages) && messages.length > 0) {
+                        msg = messages[0];
+                    } else if (typeof messages === 'string') {
+                        msg = messages;
+                    }
+                } else if (typeof data === 'string' && data.length > 0) {
+                    msg = data;
+                }
+
+                console.error('Login failed:', msg, '- Raw data:', data);
+                return { success: false, message: msg };
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Login error:', error);
-            return false;
+            return { success: false, message: error.message || 'Network error' };
         } finally {
             setIsLoading(false);
         }
