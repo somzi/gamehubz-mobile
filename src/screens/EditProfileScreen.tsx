@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { ActivityIndicator, TouchableOpacity } from 'react-native';
 import { StatusModal } from '../components/modals/StatusModal';
+import Constants from 'expo-constants';
 
 type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -245,7 +246,7 @@ export default function EditProfileScreen() {
                 </View>
 
                 <View className="py-12 items-center opacity-30">
-                    <Text className="text-white text-xs">GameHubz Mobile v1.0.0</Text>
+                    <Text className="text-white text-xs">GameHubz Mobile v{Constants.expoConfig?.version || '1.0.0'}</Text>
                 </View>
             </ScrollView>
 

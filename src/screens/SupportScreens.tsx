@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
 export function HelpCenterScreen() {
     return (
@@ -102,7 +103,7 @@ export function AboutUsScreen() {
                 </View>
 
                 <View className="mt-12 items-center">
-                    <Text className="text-gray-500 text-xs tracking-widest uppercase">Version 1.0.0</Text>
+                    <Text className="text-gray-500 text-xs tracking-widest uppercase">Version {Constants.expoConfig?.version || '1.0.0'}</Text>
                     <Text className="text-gray-500 text-xs mt-2">© 2026 CodeSphere Solutions</Text>
                 </View>
             </ScrollView>

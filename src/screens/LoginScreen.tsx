@@ -46,39 +46,48 @@ export default function LoginScreen() {
             });
             setShowStatusModal(true);
         }
-        // Navigation is handled by RootNavigator observing user state usually, 
-        // or we can manually navigate if not using conditional rendering for stacks.
-        // But with Context Auth, usually we rely on conditional rendering.
     };
 
     return (
         <SafeAreaView className="flex-1 bg-background">
             <StatusBar style="light" />
             <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                <View style={{ flex: 1 }}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={{ flex: 1 }}
+                >
                     <ScrollView
-                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 40 }}
+                        contentContainerStyle={{
+                            flexGrow: 1,
+                            justifyContent: 'flex-start',
+                            paddingTop: Platform.OS === 'android' ? 40 : 20,
+                            paddingBottom: 40
+                        }}
                         className="px-6"
                         keyboardShouldPersistTaps="handled"
                         showsVerticalScrollIndicator={false}
                     >
-                        <View className="items-center mb-10 mt-6">
-                            {/* App Icon */}
-                            <View className="mb-6">
+                        {/* HEADER SEKCIJA: Logo i Welcome Text gurnuti gore */}
+                        <View className="items-center mb-10 mt-4">
+                            <View className="mb-5 shadow-2xl shadow-primary/20">
                                 <Image
                                     source={require('../../assets/icon.png')}
-                                    style={{ width: 175, height: 175, borderRadius: 28 }}
+                                    style={{ width: 110, height: 110, borderRadius: 28 }}
                                     resizeMode="contain"
                                 />
                             </View>
 
-                            <Text className="text-3xl font-black text-white mb-2 tracking-tight">Welcome Back!</Text>
-                            <Text className="text-slate-400 text-center px-8 text-sm leading-5">
+                            <Text className="text-3xl font-black text-white mb-1 tracking-tight">
+                                Welcome Back!
+                            </Text>
+
+                            <Text className="text-slate-400 text-center px-10 text-xs leading-4">
                                 Sign in to continue your gaming journey with{' '}
                                 <Text className="text-primary font-bold">GameHubz</Text>
                             </Text>
                         </View>
 
+                        {/* FORMA SEKCIJA */}
                         <View className="gap-4 w-full max-w-sm self-center">
                             <Input
                                 label="EMAIL ADDRESS"
@@ -104,7 +113,7 @@ export default function LoginScreen() {
                             />
 
                             <TouchableOpacity
-                                className="self-end"
+                                className="self-end -mt-2"
                                 onPress={() => navigation.navigate('ForgotPassword' as any)}
                             >
                                 <Text className="text-primary text-sm font-medium">Forgot Password?</Text>
@@ -113,7 +122,7 @@ export default function LoginScreen() {
                             <Button
                                 onPress={handleLogin}
                                 loading={isLoading}
-                                className="mt-2 h-16 rounded-2xl shadow-lg shadow-primary/30"
+                                className="mt-4 h-16 rounded-2xl shadow-lg shadow-primary/30"
                                 size="lg"
                             >
                                 <View className="flex-row items-center justify-center gap-2">
@@ -122,7 +131,7 @@ export default function LoginScreen() {
                                 </View>
                             </Button>
 
-                            <View className="flex-row items-center justify-center mt-6">
+                            <View className="flex-row items-center justify-center mt-8">
                                 <Text className="text-muted-foreground">Don't have an account? </Text>
                                 <TouchableOpacity onPress={() => navigation.navigate('Register' as any)}>
                                     <Text className="text-primary font-bold">Sign Up</Text>
@@ -130,7 +139,7 @@ export default function LoginScreen() {
                             </View>
                         </View>
                     </ScrollView>
-                </View>
+                </KeyboardAvoidingView>
             </TouchableWithoutFeedback>
 
             <StatusModal
