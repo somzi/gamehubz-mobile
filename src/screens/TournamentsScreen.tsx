@@ -205,7 +205,7 @@ export default function TournamentsScreen() {
         }
 
         return (
-            <View className="pb-24 mt-2">
+            <View className="mt-2">
                 {tournaments.map((tournament: any, index: number) => (
                     <View key={tournament.Id || tournament.id || `t-${index}`} className="mb-5">
                         <TournamentCard
@@ -244,6 +244,7 @@ export default function TournamentsScreen() {
             />
             <ScrollView
                 className="flex-1"
+                contentContainerStyle={{ paddingBottom: 20 }}
                 refreshControl={
                     <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#10B981" />
                 }

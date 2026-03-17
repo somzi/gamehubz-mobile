@@ -208,7 +208,7 @@ export default function HubsScreen() {
     ];
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]">
+        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
             <PageHeader
                 title="Hubs"
                 rightElement={
@@ -247,13 +247,14 @@ export default function HubsScreen() {
                 ) : (
                     <ScrollView
                         className="flex-1"
+                        contentContainerStyle={{ paddingBottom: 20 }}
                         refreshControl={
                             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#8B5CF6" />
                         }
                         onScroll={handleScroll}
                         scrollEventThrottle={16}
                     >
-                        <View className="pb-24 mt-2">
+                        <View className="mt-2">
                             {filteredHubs.length === 0 ? (
                                 <View className="items-center py-12 opacity-50">
                                     <Ionicons name="people-outline" size={48} color="#71717A" />

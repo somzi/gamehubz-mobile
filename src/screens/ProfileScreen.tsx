@@ -248,7 +248,7 @@ export default function ProfileScreen() {
             <ScrollView
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 150 }}
+                contentContainerStyle={{ paddingBottom: 20 }}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
             >
