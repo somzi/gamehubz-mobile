@@ -80,7 +80,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [groupsCount, setGroupsCount] = useState('4');
     const [qualifiersPerGroup, setQualifiersPerGroup] = useState('2');
     const [inviteFollowers, setInviteFollowers] = useState(false);
-    
+
     // Round Duration
     const [roundDurationValue, setRoundDurationValue] = useState('');
     const [roundDurationUnit, setRoundDurationUnit] = useState('Minutes'); // Minutes | Hours | Days
@@ -218,7 +218,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     return new Date().toISOString();
                 }
             };
-            
+
             let roundDurationMinutes: number | null = null;
             if ((selectedFormat === '0' || selectedFormat === '5') && roundDurationValue) {
                 const val = parseInt(roundDurationValue);
@@ -551,26 +551,6 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     </View>
                                 </View>
                             </View>
-
-                            {/* Invite Followers */}
-                            <View className="flex-row items-center bg-[#131B2E] p-4 rounded-2xl border border-white/5">
-                                <View className="h-10 w-10 bg-primary/10 rounded-xl justify-center items-center mr-4">
-                                    <Ionicons name="people" size={20} color="#10B981" />
-                                </View>
-
-                                <View className="flex-1 mr-4">
-                                    <Text className="text-base font-bold text-white">Invite Hub Followers</Text>
-                                    <Text className="text-xs text-slate-500">Notify everyone in your hub</Text>
-                                </View>
-
-                                <TouchableOpacity
-                                    onPress={() => setInviteFollowers(!inviteFollowers)}
-                                    className={`h-6 w-6 rounded-lg border ${inviteFollowers ? 'bg-[#10B981] border-[#10B981]' : 'border-slate-500'} justify-center items-center`}
-                                >
-                                    {inviteFollowers && <Ionicons name="checkmark" size={16} color="#000" />}
-                                </TouchableOpacity>
-                            </View>
-
                         </View>
                     </ScrollView>
 
