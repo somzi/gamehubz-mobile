@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
-import { TournamentFormat, TournamentRegion } from '../../types/tournament';
+import { TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { DateTimePickerModal } from './DateTimePickerModal';
 
 interface EditTournamentModalProps {
@@ -24,12 +24,6 @@ interface EditTournamentModalProps {
     tournament: any;
     onSaveSuccess: () => void;
 }
-
-const tournamentFormats = [
-    { value: '0', label: 'League' },
-    { value: '3', label: 'Single Elimination' },
-    { value: '5', label: 'Group Stage + Knockout' },
-];
 
 const durationUnits = [
     { value: 'Minutes', label: 'Minutes' },
@@ -69,6 +63,7 @@ const regionReverseMapping: Record<number, string> = Object.entries(regionMappin
 export function EditTournamentModal({ visible, onClose, tournament, onSaveSuccess }: EditTournamentModalProps) {
     const insets = useSafeAreaInsets();
     const tStatus = Number(tournament?.status !== undefined ? tournament.status : tournament?.Status);
+    const isTeamTournament = Boolean(tournament?.isTeamTournament ?? tournament?.IsTeamTournament);
     const canEditAll = tStatus === 0 || tStatus === 1 || tStatus === 2; // Editable while Open, Upcoming, or Reg. Closed
     const canEditDeadline = tStatus === 0 || tStatus === 1; // Deadline cannot be changed if Reg is Closed (status 2)
 
@@ -112,8 +107,21 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [error, setError] = useState<string | null>(null);
 
     const getFormatLabel = () => {
-        return tournamentFormats.find(f => f.value === selectedFormat)?.label || 'Select Format';
+        return TOURNAMENT_FORMAT_OPTIONS.find(f => f.value === selectedFormat)?.label || 'Select Format';
     };
+
+    useEffect(() => {
+        if (!isTeamTournament) {
+            return;
+        }
+
+        const selectedFormatValue = Number(selectedFormat);
+        const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
+
+        if (!isAllowedTeamFormat) {
+            setSelectedFormat(String(TournamentFormat.SingleElimination));
+        }
+    }, [isTeamTournament, selectedFormat]);
 
     const getRegionLabel = () => {
         return regions.find(r => r.value === selectedRegion)?.label || 'Region';
@@ -132,6 +140,15 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         if (!maxPlayers || isNaN(parseInt(maxPlayers)) || parseInt(maxPlayers) <= 0) {
             setError('Valid Max Players count is required (must be greater than 0)');
             return;
+        }
+
+        if (isTeamTournament) {
+            const selectedFormatValue = Number(selectedFormat);
+            const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
+            if (!isAllowedTeamFormat) {
+                setError('Team tournaments only support Single Bracket');
+                return;
+            }
         }
 
         setIsSubmitting(true);
@@ -363,7 +380,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     />
                                 </View>
                                 <View className="flex-1">
-                                    {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
+                                    {!isTeamTournament && renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
                                         setShowFormatPicker(true)
                                         , !canEditAll)}
                                 </View>
@@ -474,7 +491,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 {renderOptionsModal(
                     showFormatPicker,
                     () => setShowFormatPicker(false),
-                    tournamentFormats,
+                    TOURNAMENT_FORMAT_OPTIONS,
                     selectedFormat,
                     setSelectedFormat
                 )}

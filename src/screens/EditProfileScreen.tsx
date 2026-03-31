@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { ActivityIndicator, TouchableOpacity } from 'react-native';
 import { StatusModal } from '../components/modals/StatusModal';
+import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import Constants from 'expo-constants';
 
 type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -70,6 +71,18 @@ export default function EditProfileScreen() {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 const selectedAsset = result.assets[0];
+                
+                // File size check
+                if (!isFileSizeValid(selectedAsset)) {
+                    setStatusModalConfig({
+                        type: 'error',
+                        title: 'File Too Large',
+                        message: `Maximum allowed image size is ${formatFileSize(MAX_FILE_SIZE)}. Your image is ${formatFileSize(selectedAsset.fileSize || 0)}.`
+                    });
+                    setShowStatusModal(true);
+                    return;
+                }
+
                 setAvatarUri(selectedAsset.uri);
                 handleUploadAvatar(selectedAsset);
             }

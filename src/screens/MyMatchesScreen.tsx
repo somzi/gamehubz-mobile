@@ -16,6 +16,7 @@ interface MatchOverviewDto {
     hubName: string;
     scheduledTime: string | null;
     opponentName: string;
+    opponentAvatarUrl?: string;
     status: number;
     isRoundLocked?: boolean;
 }
@@ -41,6 +42,7 @@ export default function MyMatchesScreen() {
                     hubName: m.hubName || m.HubName,
                     scheduledTime: m.scheduledTime || m.ScheduledTime || null,
                     opponentName: m.opponentName || m.OpponentName,
+                    opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
                     status: m.status !== undefined ? m.status : m.Status,
                     isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked
                 }));
@@ -117,6 +119,7 @@ export default function MyMatchesScreen() {
                                 tournamentName={match.tournamentName}
                                 roundName={match.hubName}
                                 opponentName={match.opponentName}
+                                opponentAvatarUrl={match.opponentAvatarUrl}
                                 status={!match.scheduledTime ? 'pending_availability' : match.status === 3 ? 'completed' : 'scheduled'}
                                 scheduledTime={match.scheduledTime ? new Date(match.scheduledTime).toLocaleString() : undefined}
                                 onMatchUpdate={fetchMatches}

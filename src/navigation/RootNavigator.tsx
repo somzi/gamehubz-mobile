@@ -22,6 +22,7 @@ import ManageHubScreen from '../screens/ManageHubScreen';
 import HubMembersScreen from '../screens/HubMembersScreen';
 import ManageHubSocialsScreen from '../screens/ManageHubSocialsScreen';
 import ManageTournamentScreen from '../screens/ManageTournamentScreen';
+import TeamDashboardScreen from '../screens/TeamDashboardScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import { HelpCenterScreen, AboutUsScreen, ContactUsScreen } from '../screens/SupportScreens';
 import { View, ActivityIndicator } from 'react-native';
@@ -118,6 +119,10 @@ export function RootNavigator() {
                     <Stack.Screen
                         name="MyMatches"
                         component={MyMatchesScreen}
+                    />
+                    <Stack.Screen
+                        name="TeamDashboard"
+                        component={TeamDashboardScreen}
                     />
                 </>
             )}

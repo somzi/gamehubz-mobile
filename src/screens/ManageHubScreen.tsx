@@ -13,6 +13,7 @@ import { EditHubModal } from '../components/modals/EditHubModal';
 import { CreateTournamentModal } from '../components/modals/CreateTournamentModal';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { StatusModal } from '../components/modals/StatusModal';
+import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 
 type ManageHubScreenRouteProp = RouteProp<RootStackParamList, 'ManageHub'>;
 type ManageHubScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -30,10 +31,16 @@ function MenuItem({ icon, label, onPress, color = "#71717A", showChevron = true 
         <Pressable
             onPress={onPress}
             className="flex-row items-center justify-between py-4 border-b border-white/5"
+            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
         >
             <View className="flex-row items-center gap-4">
                 <Ionicons name={icon} size={22} color={color} />
-                <Text className="text-white font-medium text-base">{label}</Text>
+                <Text 
+                    className="font-medium text-base"
+                    style={{ color: color === "#71717A" ? "#FFFFFF" : color }}
+                >
+                    {label}
+                </Text>
             </View>
             {showChevron && <Ionicons name="chevron-forward" size={18} color="#3F3F46" />}
         </Pressable>
@@ -96,6 +103,18 @@ export default function ManageHubScreen() {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 const selectedAsset = result.assets[0];
+                
+                // File size check
+                if (!isFileSizeValid(selectedAsset)) {
+                    setStatusModalConfig({
+                        type: 'error',
+                        title: 'File Too Large',
+                        message: `Maximum allowed image size is ${formatFileSize(MAX_FILE_SIZE)}. Your image is ${formatFileSize(selectedAsset.fileSize || 0)}.`
+                    });
+                    setShowStatusModal(true);
+                    return;
+                }
+
                 setAvatarUri(selectedAsset.uri);
                 handleUploadAvatar(selectedAsset);
             }
@@ -171,6 +190,53 @@ export default function ManageHubScreen() {
         }
     };
 
+    const handleDeleteHub = async () => {
+        Alert.alert(
+            "Delete Hub",
+            "Are you sure you want to delete this hub? This action is permanent and cannot be undone.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            const response = await authenticatedFetch(ENDPOINTS.DELETE_HUB(hubId), {
+                                method: 'DELETE',
+                            });
+
+                            if (response.ok) {
+                                setStatusModalConfig({
+                                    type: 'success',
+                                    title: 'Hub Deleted',
+                                    message: 'The hub has been successfully deleted.'
+                                });
+                                setShowStatusModal(true);
+                                
+                                // Reset loading since we stay on screen for a bit to show success modal
+                                setIsLoading(false);
+                                
+                                // Auto-navigate after a short delay
+                                setTimeout(() => {
+                                    // @ts-ignore
+                                    navigation.navigate('MainTabs', { screen: 'Hubs' });
+                                }, 1500);
+                            } else {
+                                setIsLoading(false);
+                                Alert.alert('Error', 'Failed to delete hub. Please try again.');
+                            }
+                        } catch (error) {
+                            setIsLoading(false);
+                            console.error('Error deleting hub:', error);
+                            Alert.alert('Error', 'An unexpected error occurred during hub deletion.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background">
@@ -236,7 +302,17 @@ export default function ManageHubScreen() {
                         label="Create Tournament"
                         onPress={() => setShowCreateTournamentModal(true)}
                     />
+                    <MenuItem
+                        icon="trash-outline"
+                        label="Delete Hub"
+                        onPress={handleDeleteHub}
+                        color="#EF4444"
+                        showChevron={false}
+                    />
                 </View>
+
+                {/* Extra space at bottom */}
+                <View className="h-20" />
             </ScrollView>
 
             <EditHubModal

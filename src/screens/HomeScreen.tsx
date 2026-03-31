@@ -12,7 +12,7 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
-import { cn } from '../lib/utils';
+import { cn, parseUtcDate } from '../lib/utils';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -25,6 +25,8 @@ interface MatchOverviewDto {
     scheduledTime: string | null;
     opponentName: string;
     opponentAvatarUrl?: string;
+    opponentNickname?: string;
+    userNickname?: string;
     status: number;
     isRoundLocked?: boolean;
 }
@@ -56,6 +58,8 @@ export default function HomeScreen() {
                     scheduledTime: m.scheduledTime || m.ScheduledTime || null,
                     opponentName: m.opponentName || m.OpponentName,
                     opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
+                    opponentNickname: m.opponentNickname || m.OpponentNickname,
+                    userNickname: m.userNickname || m.UserNickname,
                     status: m.status !== undefined ? m.status : m.Status,
                     isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked
                 }));
@@ -192,6 +196,8 @@ export default function HomeScreen() {
                                             roundName={match.hubName}
                                             opponentName={match.opponentName}
                                             opponentAvatarUrl={match.opponentAvatarUrl}
+                                            opponentNickname={match.opponentNickname}
+                                            userNickname={match.userNickname}
                                             status="pending_availability"
                                             onMatchUpdate={fetchMatches}
                                         />
@@ -236,9 +242,11 @@ export default function HomeScreen() {
                                             roundName={match.hubName}
                                             opponentName={match.opponentName}
                                             opponentAvatarUrl={match.opponentAvatarUrl}
+                                            opponentNickname={match.opponentNickname}
+                                            userNickname={match.userNickname}
                                             status="scheduled"
                                             scheduledTime={match.scheduledTime
-                                                ? new Date(match.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                ? parseUtcDate(match.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                                                 : 'TBD'}
                                             onMatchUpdate={fetchMatches}
                                         />

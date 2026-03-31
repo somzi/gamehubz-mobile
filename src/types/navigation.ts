@@ -20,6 +20,7 @@ export type RootStackParamList = {
     ManageHubSocials: { hubId: string };
     ManageTournament: { id: string };
     MyMatches: undefined;
+    TeamDashboard: { teamId: string; tournamentId: string; teamSize?: number; tournamentStatus?: number };
 };
 
 export type MainTabParamList = {

@@ -1,16 +1,17 @@
 import React from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
+import { View, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
 
 interface SearchInputProps {
     value: string;
     onChange: (text: string) => void;
+    onSubmit?: () => void;
     placeholder?: string;
     className?: string;
 }
 
-export function SearchInput({ value, onChange, placeholder, className }: SearchInputProps) {
+export function SearchInput({ value, onChange, onSubmit, placeholder, className }: SearchInputProps) {
     return (
         <View className={cn("relative flex-row items-center", className)}>
             <View className="absolute left-3 z-10">
@@ -19,10 +20,20 @@ export function SearchInput({ value, onChange, placeholder, className }: SearchI
             <TextInput
                 value={value}
                 onChangeText={onChange}
+                onSubmitEditing={onSubmit}
                 placeholder={placeholder || "Search..."}
                 placeholderTextColor="#71717A"
-                className="flex-1 bg-secondary text-foreground py-3 pl-10 pr-4 rounded-xl border border-border/30"
+                className="flex-1 bg-secondary text-foreground py-3 pl-10 pr-12 rounded-xl border border-border/30"
+                returnKeyType="search"
             />
+            {onSubmit && (
+                <Pressable 
+                    onPress={onSubmit}
+                    className="absolute right-3 p-1 rounded-lg bg-primary/20"
+                >
+                    <Ionicons name="arrow-forward" size={18} color="#8B5CF6" />
+                </Pressable>
+            )}
         </View>
     );
 }

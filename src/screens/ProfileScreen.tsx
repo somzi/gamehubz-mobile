@@ -13,7 +13,7 @@ import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerMatchesDto } from '../types/user';
 import { SocialType } from '../types/auth';
-import { cn } from '../lib/utils';
+import { cn, parseUtcDate } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { Tabs } from '../components/ui/Tabs';
@@ -51,11 +51,7 @@ export default function ProfileScreen() {
         setMatchesPage(0);
         setHasMoreMatches(true);
         try {
-            const [statsRes, tournamentsRes, matchesRes] = await Promise.all([
-                authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(user.id)),
-                authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(user.id, 0)),
-                authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(user.id, 0))
-            ]);
+            const statsRes = await authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(user.id));
 
             if (statsRes.ok) {
                 const statsData = await statsRes.json();
@@ -76,24 +72,9 @@ export default function ProfileScreen() {
                 setPlayerMatches(normalizedStats);
             }
 
-            if (tournamentsRes.ok) {
-                const tournamentsData = await tournamentsRes.json();
-                const items = tournamentsData.items || tournamentsData.Items || tournamentsData.result || tournamentsData;
-                const itemsArray = Array.isArray(items) ? items : [];
-                setUserTournaments(itemsArray);
-                setHasMoreTournaments(itemsArray.length === 10); // Assume 10 is page size
-            }
-
-            if (matchesRes.ok) {
-                const matchesData = await matchesRes.json();
-                const items = matchesData.items || matchesData.Items || matchesData.result || matchesData;
-                const itemsArray = Array.isArray(items) ? items : [];
-                setUserMatches(itemsArray);
-                setHasMoreMatches(itemsArray.length === 10);
-            }
         } catch (error: any) {
             console.error('Error fetching profile detailed data:', error);
-            setError('Failed to refresh stats/tournaments/matches');
+            setError('Failed to refresh stats');
         } finally {
             setIsLoadingData(false);
         }
@@ -103,17 +84,16 @@ export default function ProfileScreen() {
         if (!user?.id || isLoadingMoreTournaments || !hasMoreTournaments) return;
 
         setIsLoadingMoreTournaments(true);
-        const nextPage = tournamentsPage + 1;
 
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(user.id, nextPage));
+            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(user.id, tournamentsPage));
             if (response.ok) {
                 const data = await response.json();
                 const items = data.items || data.Items || data.result || data;
                 const itemsArray = Array.isArray(items) ? items : [];
 
                 setUserTournaments(prev => [...prev, ...itemsArray]);
-                setTournamentsPage(nextPage);
+                setTournamentsPage(prev => prev + 1);
                 setHasMoreTournaments(itemsArray.length === 10);
             } else {
                 setHasMoreTournaments(false);
@@ -130,17 +110,16 @@ export default function ProfileScreen() {
         if (!user?.id || isLoadingMoreMatches || !hasMoreMatches) return;
 
         setIsLoadingMoreMatches(true);
-        const nextPage = matchesPage + 1;
 
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(user.id, nextPage));
+            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(user.id, matchesPage));
             if (response.ok) {
                 const data = await response.json();
                 const items = data.items || data.Items || data.result || data;
                 const itemsArray = Array.isArray(items) ? items : [];
 
                 setUserMatches(prev => [...prev, ...itemsArray]);
-                setMatchesPage(nextPage);
+                setMatchesPage(prev => prev + 1);
                 setHasMoreMatches(itemsArray.length === 10);
             } else {
                 setHasMoreMatches(false);
@@ -157,12 +136,27 @@ export default function ProfileScreen() {
         fetchDetailedData();
     }, [fetchDetailedData]);
 
+    useEffect(() => {
+        if (activeTab === 'tournaments' && userTournaments.length === 0 && hasMoreTournaments && !isLoadingMoreTournaments) {
+            loadMoreTournaments();
+        } else if (activeTab === 'matches' && userMatches.length === 0 && hasMoreMatches && !isLoadingMoreMatches) {
+            loadMoreMatches();
+        }
+    }, [activeTab, userMatches.length, userTournaments.length]);
+
     useFocusEffect(
         useCallback(() => {
             if (user?.id) {
                 refreshUser();
+                fetchDetailedData();
+                setUserMatches([]);
+                setMatchesPage(0);
+                setHasMoreMatches(true);
+                setUserTournaments([]);
+                setTournamentsPage(0);
+                setHasMoreTournaments(true);
             }
-        }, [user?.id, refreshUser])
+        }, [user?.id, refreshUser, fetchDetailedData])
     );
 
     const getRegionName = (region?: number) => {
@@ -451,7 +445,7 @@ export default function ProfileScreen() {
                                                 key={t.id}
                                                 name={t.name || t.title}
                                                 status={getTournamentStatus(t.status)}
-                                                date={t.startDate ? new Date(t.startDate).toLocaleDateString() : 'N/A'}
+                                                date={t.startDate ? parseUtcDate(t.startDate).toLocaleDateString() : 'N/A'}
                                                 region="Global"
                                                 prizePool={`${t.prizeCurrency === 1 ? '$' : t.prizeCurrency === 2 ? '€' : ''}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
@@ -491,7 +485,7 @@ export default function ProfileScreen() {
                                                 result={match.isWin === true || match.IsWin === true ? 'win' : match.isWin === false || match.IsWin === false ? 'loss' : 'draw'}
                                                 userScore={match.userScore ?? match.UserScore ?? undefined}
                                                 opponentScore={match.opponentScore ?? match.OpponentScore ?? undefined}
-                                                date={match.scheduledTime || match.ScheduledTime ? new Date(match.scheduledTime || match.ScheduledTime).toLocaleDateString() : 'N/A'}
+                                                date={match.scheduledTime || match.ScheduledTime ? parseUtcDate(match.scheduledTime || match.ScheduledTime).toLocaleDateString() : 'N/A'}
                                             />
                                         ))}
                                         {hasMoreMatches && isLoadingMoreMatches && (

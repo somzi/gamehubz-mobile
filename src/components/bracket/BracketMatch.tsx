@@ -25,11 +25,12 @@ interface BracketMatchProps {
     currentUserId?: string;
     currentUsername?: string;
     isAdmin?: boolean;
+    isTeamTournament?: boolean;
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin }: BracketMatchProps) {
+export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament }: BracketMatchProps) {
     const navigation = useNavigation<NavigationProp>();
 
     const handlePlayerClick = (userId: string) => {
@@ -58,7 +59,11 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                 onPress={() => handlePlayerClick(participant.userId)}
                 className="flex-row items-center gap-2 px-3 py-2 rounded-lg h-10 bg-muted/30"
             >
-                <PlayerAvatar name={participant.username} size="sm" className="w-6 h-6" />
+                {isTeamTournament ? (
+                    <Ionicons name="people" size={16} color={isWinner ? '#10B981' : '#94A3B8'} />
+                ) : (
+                    <PlayerAvatar name={participant.username} size="sm" className="w-6 h-6" />
+                )}
                 <Text
                     className={cn("text-sm font-medium flex-1", isWinner ? "text-primary" : "text-foreground")}
                     numberOfLines={1}

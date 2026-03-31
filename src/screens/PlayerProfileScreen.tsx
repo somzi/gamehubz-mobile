@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
@@ -13,6 +13,7 @@ import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
 import { cn } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
+import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { Button } from '../components/ui/Button';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { Tabs } from '../components/ui/Tabs';
@@ -58,11 +59,9 @@ export default function PlayerProfileScreen() {
             setMatchesPage(0);
             setHasMoreMatches(true);
             try {
-                const [infoRes, statsRes, tournamentsRes, matchesRes] = await Promise.all([
+                const [infoRes, statsRes] = await Promise.all([
                     authenticatedFetch(ENDPOINTS.GET_USER_INFO(id)),
-                    authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(id)),
-                    authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(id, 0)),
-                    authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(id, 0))
+                    authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(id))
                 ]);
 
                 if (infoRes.ok) {
@@ -96,22 +95,6 @@ export default function PlayerProfileScreen() {
                     setPlayerMatches(normalizedStats);
                 }
 
-                if (tournamentsRes.ok) {
-                    const tournamentsData = await tournamentsRes.json();
-                    const items = tournamentsData.items || tournamentsData.Items || tournamentsData.result || tournamentsData;
-                    const itemsArray = Array.isArray(items) ? items : [];
-                    setUserTournaments(itemsArray);
-                    setHasMoreTournaments(itemsArray.length === 10);
-                }
-
-                if (matchesRes.ok) {
-                    const matchesData = await matchesRes.json();
-                    const items = matchesData.items || matchesData.Items || matchesData.result || matchesData;
-                    const itemsArray = Array.isArray(items) ? items : [];
-                    setUserMatches(itemsArray);
-                    setHasMoreMatches(itemsArray.length === 10);
-                }
-
                 if (!infoRes.ok && !statsRes.ok) {
                     throw new Error('Could not load player data');
                 }
@@ -126,21 +109,39 @@ export default function PlayerProfileScreen() {
         fetchPlayerData();
     }, [id]);
 
+    useEffect(() => {
+        if (activeTab === 'tournaments' && userTournaments.length === 0 && hasMoreTournaments && !isLoadingMoreTournaments) {
+            loadMoreTournaments();
+        } else if (activeTab === 'matches' && userMatches.length === 0 && hasMoreMatches && !isLoadingMoreMatches) {
+            loadMoreMatches();
+        }
+    }, [activeTab, userMatches.length, userTournaments.length]);
+
+    useFocusEffect(
+        useCallback(() => {
+            setUserMatches([]);
+            setMatchesPage(0);
+            setHasMoreMatches(true);
+            setUserTournaments([]);
+            setTournamentsPage(0);
+            setHasMoreTournaments(true);
+        }, [id])
+    );
+
     const loadMoreTournaments = async () => {
         if (!id || isLoadingMoreTournaments || !hasMoreTournaments) return;
 
         setIsLoadingMoreTournaments(true);
-        const nextPage = tournamentsPage + 1;
 
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(id, nextPage));
+            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(id, tournamentsPage));
             if (response.ok) {
                 const data = await response.json();
                 const items = data.items || data.Items || data.result || data;
                 const itemsArray = Array.isArray(items) ? items : [];
 
                 setUserTournaments(prev => [...prev, ...itemsArray]);
-                setTournamentsPage(nextPage);
+                setTournamentsPage(prev => prev + 1);
                 setHasMoreTournaments(itemsArray.length === 10);
             } else {
                 setHasMoreTournaments(false);
@@ -157,17 +158,16 @@ export default function PlayerProfileScreen() {
         if (!id || isLoadingMoreMatches || !hasMoreMatches) return;
 
         setIsLoadingMoreMatches(true);
-        const nextPage = matchesPage + 1;
 
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(id, nextPage));
+            const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(id, matchesPage));
             if (response.ok) {
                 const data = await response.json();
                 const items = data.items || data.Items || data.result || data;
                 const itemsArray = Array.isArray(items) ? items : [];
 
                 setUserMatches(prev => [...prev, ...itemsArray]);
-                setMatchesPage(nextPage);
+                setMatchesPage(prev => prev + 1);
                 setHasMoreMatches(itemsArray.length === 10);
             } else {
                 setHasMoreMatches(false);
@@ -280,6 +280,19 @@ export default function PlayerProfileScreen() {
         }
     };
 
+    const handleShare = async () => {
+        try {
+            const playerName = userInfo?.username || userInfo?.nickName || 'this player';
+            await shareDeepLink({
+                title: userInfo?.username || 'Player Profile',
+                description: `View ${playerName} on GameHubz.`,
+                deepLink: buildDeepLink('player', id),
+            });
+        } catch (error) {
+            console.error('Share error:', error);
+        }
+    };
+
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
             {/* Top Bar with Back Button */}
@@ -291,7 +304,7 @@ export default function PlayerProfileScreen() {
                     <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                 </Pressable>
                 <Text className="text-lg font-black text-white tracking-tight">Player Profile</Text>
-                <View className="w-10" />
+{/* Share button hidden - coming soon */}
             </View>
 
             <ScrollView

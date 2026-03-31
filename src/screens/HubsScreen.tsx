@@ -65,9 +65,9 @@ export default function HubsScreen() {
 
             if (user?.id) {
                 if (activeTab === 'joined') {
-                    apiUrl = ENDPOINTS.GET_USER_HUBS(user.id, 0);
+                    apiUrl = ENDPOINTS.GET_USER_HUBS(user.id, 0, searchQuery);
                 } else if (activeTab === 'discovery') {
-                    apiUrl = ENDPOINTS.GET_DISCOVERY_HUBS(user.id, 0);
+                    apiUrl = ENDPOINTS.GET_DISCOVERY_HUBS(user.id, 0, searchQuery);
                 }
             }
 
@@ -121,9 +121,9 @@ export default function HubsScreen() {
         try {
             let apiUrl = "";
             if (activeTab === 'joined') {
-                apiUrl = ENDPOINTS.GET_USER_HUBS(user.id, nextPage);
+                apiUrl = ENDPOINTS.GET_USER_HUBS(user.id, nextPage, searchQuery);
             } else if (activeTab === 'discovery') {
-                apiUrl = ENDPOINTS.GET_DISCOVERY_HUBS(user.id, nextPage);
+                apiUrl = ENDPOINTS.GET_DISCOVERY_HUBS(user.id, nextPage, searchQuery);
             } else {
                 setHasMoreHubs(false);
                 return;
@@ -197,10 +197,9 @@ export default function HubsScreen() {
         }
     };
 
-    const filteredHubs = hubs.filter((hub) =>
-        hub.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (hub.description && hub.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const handleSearch = () => {
+        fetchHubs(true);
+    };
 
     const tabs = [
         { label: 'Joined', value: 'joined' },
@@ -225,6 +224,7 @@ export default function HubsScreen() {
                     <SearchInput
                         value={searchQuery}
                         onChange={setSearchQuery}
+                        onSubmit={handleSearch}
                         placeholder="Search hubs..."
                     />
 
@@ -255,7 +255,7 @@ export default function HubsScreen() {
                         scrollEventThrottle={16}
                     >
                         <View className="mt-2">
-                            {filteredHubs.length === 0 ? (
+                            {hubs.length === 0 ? (
                                 <View className="items-center py-12 opacity-50">
                                     <Ionicons name="people-outline" size={48} color="#71717A" />
                                     <Text className="text-muted-foreground mt-4 font-medium text-center">
@@ -276,7 +276,7 @@ export default function HubsScreen() {
                                 </View>
                             ) : (
                                 <>
-                                    {filteredHubs.map((hub, idx) => (
+                                    {hubs.map((hub, idx) => (
                                         <View key={`${hub.id}-${idx}`} className="mb-5">
                                             <HubCard
                                                 name={hub.name}

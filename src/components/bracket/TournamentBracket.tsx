@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { BracketMatch } from './BracketMatch';
+import { parseUtcDate } from '../../lib/utils';
 
 interface Participant {
     participantId: string;
@@ -37,9 +38,10 @@ interface TournamentBracketProps {
     isAdmin?: boolean;
     onEditDeadline?: (round: Round) => void;
     tournamentStatus?: number;
+    isTeamTournament?: boolean;
 }
 
-export function TournamentBracket({ rounds, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus }: TournamentBracketProps) {
+export function TournamentBracket({ rounds, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, isTeamTournament }: TournamentBracketProps) {
     return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View className="flex-row gap-8 p-4">
@@ -51,7 +53,7 @@ export function TournamentBracket({ rounds, onMatchPress, currentUserId, current
                             </Text>
                             {round.roundDeadline && (
                                 <Text className="text-[10px] text-red-400 mt-1">
-                                    End: {new Date(round.roundDeadline).toLocaleDateString()} {new Date(round.roundDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                    End: {parseUtcDate(round.roundDeadline).toLocaleDateString()} {parseUtcDate(round.roundDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                                 </Text>
                             )}
                             {isAdmin && tournamentStatus !== 4 && !(round.matches.length > 0 && round.matches.every(m => m.status === 3 || m.status === 4)) && (
@@ -77,6 +79,7 @@ export function TournamentBracket({ rounds, onMatchPress, currentUserId, current
                                         currentUserId={currentUserId}
                                         currentUsername={currentUsername}
                                         isAdmin={isAdmin}
+                                        isTeamTournament={isTeamTournament}
                                     />
                                     {match.nextMatchId && (
                                         <View className="w-8 h-[1px] bg-border" />

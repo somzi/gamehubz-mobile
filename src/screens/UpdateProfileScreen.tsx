@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { ActivityIndicator } from 'react-native';
+import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 
 type UpdateProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -70,6 +71,18 @@ export default function UpdateProfileScreen() {
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
                 const selectedAsset = result.assets[0];
+                
+                // File size check
+                if (!isFileSizeValid(selectedAsset)) {
+                    setStatusModalConfig({
+                        type: 'error',
+                        title: 'File Too Large',
+                        message: `Maximum allowed image size is ${formatFileSize(MAX_FILE_SIZE)}. Your image is ${formatFileSize(selectedAsset.fileSize || 0)}.`
+                    });
+                    setShowStatusModal(true);
+                    return;
+                }
+
                 setAvatarUri(selectedAsset.uri);
                 handleUploadAvatar(selectedAsset);
             }

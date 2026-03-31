@@ -6,7 +6,7 @@ const LOCAL_IP = '192.168.0.3';
 const LOCAL_PORT = '5057';
 const LOCAL_URL = `http://${LOCAL_IP}:${LOCAL_PORT}`;
 
-export const API_BASE_URL = PROD_URL;
+export const API_BASE_URL = IS_PROD ? PROD_URL : LOCAL_URL;
 
 console.log(`[API] Environment: ${IS_PROD ? 'Production' : 'Development'}`);
 console.log(`[API] Base URL: ${API_BASE_URL}`);
@@ -20,8 +20,8 @@ export const ENDPOINTS = {
     GET_PLAYER_STATS: (id: string) => `${API_BASE_URL}/api/userProfile/${id}/stats`,
     USER_SOCIAL: `${API_BASE_URL}/api/UserSocial`,
     GET_USER_INFO: (id: string) => `${API_BASE_URL}/api/UserProfile/${id}/info`,
-    GET_USER_HUBS: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/Hub/user/${userId}/joined?pageNumber=${pageNumber}`,
-    GET_DISCOVERY_HUBS: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/Hub/user/${userId}/discovery?pageNumber=${pageNumber}`,
+    GET_USER_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/joined?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    GET_DISCOVERY_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/discovery?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     GET_PROFILE_TOURNAMENTS: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/UserProfile/${userId}/tournaments?pageNumber=${pageNumber}`,
     GET_PROFILE_MATCHES: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/UserProfile/${userId}/matches?pageNumber=${pageNumber}`,
     CREATE_TOURNAMENT: `${API_BASE_URL}/api/tournament`,
@@ -30,6 +30,7 @@ export const ENDPOINTS = {
     GET_TOURNAMENT: (id: string) => `${API_BASE_URL}/api/tournament/${id}`,
     GET_TOURNAMENT_OVERVIEW: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview`,
     REGISTER_TOURNAMENT: `${API_BASE_URL}/api/tournamentRegistration`,
+    REGISTER_TEAM_IN_TOURNAMENT: (tournamentId: string, teamId: string) => `${API_BASE_URL}/api/tournamentRegistration/tournament/${tournamentId}/team/${teamId}/register`,
     GET_PENDING_REGISTRATIONS: (tournamentId: string) => `${API_BASE_URL}/api/tournamentRegistration/tournament/${tournamentId}/pending`,
     APPROVE_REGISTRATION: `${API_BASE_URL}/api/tournamentRegistration/approve`,
     APPROVE_ALL_REGISTRATIONS: `${API_BASE_URL}/api/tournamentRegistration/approveAll`,
@@ -66,10 +67,13 @@ export const ENDPOINTS = {
     POST_MATCH_COMMENT: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}`,
     UPLOAD_AVATAR: `${API_BASE_URL}/api/userProfile/avatar`,
     UPLOAD_HUB_AVATAR: (id: string) => `${API_BASE_URL}/api/hub/${id}/avatar`,
+    DELETE_HUB: (id: string) => `${API_BASE_URL}/api/hub/${id}`,
+    REMOVE_TEAM_FROM_TOURNAMENT: (tournamentId: string, teamId: string) => `${API_BASE_URL}/api/tournamentParticipant/tournament/${tournamentId}/team/${teamId}`,
     DELETE_ACCOUNT: `${API_BASE_URL}/api/Auth`,
     FORGOT_PASSWORD: `${API_BASE_URL}/api/Auth/forgotPassword`,
     RESET_PASSWORD: `${API_BASE_URL}/api/Auth/resetPassword`,
     GET_ALL_HUB_ACTIVITY: (pageNumber: number) => `${API_BASE_URL}/api/hubActivity/all?pageNumber=${pageNumber}`,
+    EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
 };
 
 import axios from 'axios';
@@ -120,7 +124,7 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
     if (error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {
             return new Promise((resolve, reject) => {
-                failedQueue.push({resolve, reject});
+                failedQueue.push({ resolve, reject });
             }).then(token => {
                 originalRequest.headers.Authorization = 'Bearer ' + token;
                 return apiClient(originalRequest);
@@ -143,7 +147,7 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
                 if (refreshResponse.data) {
                     const newAccess = refreshResponse.data.accessToken?.token || refreshResponse.data.accessToken || refreshResponse.data.AccessToken;
                     const newRefresh = refreshResponse.data.refreshToken || refreshResponse.data.RefreshToken;
-                    
+
                     if (newAccess && newRefresh) {
                         await SecureStore.setItemAsync('access_token', newAccess);
                         await SecureStore.setItemAsync('refresh_token', newRefresh);
@@ -173,13 +177,13 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
 export const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     try {
         const isFormData = options.body instanceof FormData;
-        
+
         let headers: Record<string, string> = {};
         if (options.headers) {
             if (options.headers instanceof Headers) {
-                 options.headers.forEach((value, key) => { headers[key] = value; });
+                options.headers.forEach((value, key) => { headers[key] = value; });
             } else {
-                 headers = { ...(options.headers as any) };
+                headers = { ...(options.headers as any) };
             }
         }
 
@@ -190,11 +194,8 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
         let routeUrl = url;
         if (routeUrl.startsWith(API_BASE_URL)) routeUrl = routeUrl.replace(API_BASE_URL, '');
 
-        let bodyData = options.body;
-        if (typeof bodyData === 'string' && !isFormData) {
-             try { bodyData = JSON.parse(bodyData); } catch(e) {}
-        }
-        
+        const bodyData = options.body;
+
         const response = await apiClient({
             method: options.method || 'GET',
             url: routeUrl,
@@ -216,11 +217,95 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             ok: false,
             status: response ? response.status : 500,
             statusText: response ? response.statusText : error.message,
-            json: async () => { throw new Error(response?.data?.messages || response?.data || 'API Error'); },
-            text: async () => { 
+            json: async () => {
+                const errData = response?.data?.messages || response?.data || 'API Error';
+                throw new Error(typeof errData === 'string' ? errData : JSON.stringify(errData));
+            },
+            text: async () => {
                 if (!response) return error.message;
                 return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
             },
         } as unknown as Response;
     }
 };
+/**
+ * Extract a human-readable error message from an API error
+ */
+export function getErrorMessage(error: any): string {
+    if (!error) return 'An unexpected error occurred';
+
+    // If it's a string, try to parse it as JSON first
+    if (typeof error === 'string') {
+        if (error.startsWith('{') || error.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(error);
+                return getErrorMessage(parsed);
+            } catch (e) {
+                return error;
+            }
+        }
+        return error;
+    }
+
+    // Handle Axios Errors
+    if (axios.isAxiosError(error)) {
+        const data = error.response?.data;
+
+        console.log('[API Error Debug] Axios error data:', JSON.stringify(data));
+
+        if (data) return getErrorMessage(data);
+
+        return error.message;
+    }
+
+    // Handle generic Error objects
+    if (error instanceof Error) {
+        // If the message is JSON, parse it
+        if (error.message.startsWith('{') || error.message.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(error.message);
+                return getErrorMessage(parsed);
+            } catch (e) {
+                return error.message;
+            }
+        }
+        return error.message;
+    }
+
+    // Handle data objects (from axios.response.data or JSON.parse)
+    if (typeof error === 'object') {
+        const getField = (obj: any, field: string) => obj[field] || obj[field.charAt(0).toUpperCase() + field.slice(1)];
+
+        const detail = getField(error, 'detail');
+        if (detail && typeof detail === 'string') return detail;
+
+        const message = getField(error, 'message');
+        if (message && typeof message === 'string') return message;
+
+        const err = getField(error, 'error');
+        if (err && typeof err === 'string') return err;
+
+        const messages = getField(error, 'messages');
+        if (messages) {
+            return Array.isArray(messages) ? messages.join(', ') : (typeof messages === 'string' ? messages : JSON.stringify(messages));
+        }
+
+        // Specifically handle ASP.NET un-named exceptions that might come as a JSON object with just one message key
+        const values = Object.values(error);
+        if (values.length === 1 && typeof values[0] === 'string') {
+            return values[0] as string;
+        }
+
+        // Fallback for objects with many fields - look for anything that looks like a message
+        for (const key in error) {
+            if (key.toLowerCase().includes('message') && typeof error[key] === 'string') {
+                return error[key];
+            }
+        }
+
+        // If it's just an object we can't digest, stringify it
+        return JSON.stringify(error);
+    }
+
+    return String(error);
+}

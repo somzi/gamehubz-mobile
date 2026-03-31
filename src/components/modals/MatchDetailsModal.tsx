@@ -5,13 +5,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
+import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { getOptimizedCloudinaryUrl } from '../../lib/image';
+import { getOptimizedCloudinaryUrl, MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../../lib/image';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
-import { cn } from '../../lib/utils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { cn, parseUtcDate } from '../../lib/utils';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -25,6 +26,10 @@ export interface MatchResultDetailDto {
     evidences: string[];
     hubOwnerId?: string;
     scheduledTime?: string;
+    homeUserAvatarUrl?: string;
+    HomeUserAvatarUrl?: string;
+    awayUserAvatarUrl?: string;
+    AwayUserAvatarUrl?: string;
 }
 
 interface MatchDetailsModalProps {
@@ -70,9 +75,10 @@ export function MatchDetailsModal({
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+    const insets = useSafeAreaInsets();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Availability state (migrated from MatchScheduleCard if needed)
+    // Availability state
     const [mySlots, setMySlots] = useState<string[]>(myAvailability);
     const [opponentSlots, setOpponentSlots] = useState<string[]>(opponentAvailability);
     const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
@@ -96,11 +102,20 @@ export function MatchDetailsModal({
     // Edit mode state
     const [isEditMode, setIsEditMode] = useState(false);
 
+    // Evidence collapse state
+    const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
+
+    const formatAvatarUrl = (url?: string) => {
+        if (!url) return '';
+        if (url.startsWith('http')) return url;
+        const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+        const path = url.startsWith('/') ? url : `/${url}`;
+        return `${baseUrl}${path}`;
+    };
+
     useEffect(() => {
         if (visible && matchId) {
-            // Fetch match details to get evidence even for non-completed matches
             fetchMatchDetails();
-
             if (status === 'pending_availability') {
                 fetchAvailability();
             }
@@ -115,14 +130,22 @@ export function MatchDetailsModal({
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
             if (response.ok) {
                 const data = await response.json();
-                // Normalize casing if needed, though usually handled by serializer
-                const normalizedData = {
+                const normalizedData: MatchResultDetailDto = {
                     ...data,
-                    scheduledTime: data.scheduledTime || data.ScheduledTime
+                    homeUser: data.homeUser || data.HomeUser || '',
+                    homeUserId: data.homeUserId || data.HomeUserId || '',
+                    awayUser: data.awayUser || data.AwayUser || '',
+                    awayUserId: data.awayUserId || data.AwayUserId || '',
+                    homeUserScore: data.homeUserScore ?? data.HomeUserScore ?? 0,
+                    awayUserScore: data.awayUserScore ?? data.AwayUserScore ?? 0,
+                    evidences: data.evidences || data.Evidences || [],
+                    scheduledTime: data.scheduledTime || data.ScheduledTime,
+                    homeUserAvatarUrl: formatAvatarUrl(data.homeUserAvatarUrl || data.HomeUserAvatarUrl),
+                    awayUserAvatarUrl: formatAvatarUrl(data.awayUserAvatarUrl || data.AwayUserAvatarUrl),
                 };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
-                    const date = new Date(normalizedData.scheduledTime);
+                    const date = parseUtcDate(normalizedData.scheduledTime);
                     setConfirmedTime(date.toLocaleString(undefined, {
                         day: 'numeric',
                         month: 'short',
@@ -156,7 +179,7 @@ export function MatchDetailsModal({
                     setLocalDeadline(data.matchDeadline);
                 }
                 if (data.confirmedTime) {
-                    const confirmedDate = new Date(data.confirmedTime);
+                    const confirmedDate = parseUtcDate(data.confirmedTime);
                     setConfirmedTime(confirmedDate.toLocaleString());
                     setCurrentStatus('scheduled');
                 }
@@ -183,6 +206,19 @@ export function MatchDetailsModal({
             });
 
             if (!result.canceled) {
+                const oversized = result.assets.filter(asset => !isFileSizeValid(asset));
+
+                if (oversized.length > 0) {
+                    const oversizedNames = oversized.map(a => a.fileName || 'Image').join(', ');
+                    setError(`Some images are too large: ${oversizedNames}. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`);
+
+                    const validAssets = result.assets.filter(asset => isFileSizeValid(asset));
+                    if (validAssets.length > 0) {
+                        setSelectedImages(prev => [...prev, ...validAssets]);
+                    }
+                    return;
+                }
+
                 setSelectedImages(prev => [...prev, ...result.assets]);
             }
         } catch (err) {
@@ -199,10 +235,10 @@ export function MatchDetailsModal({
 
     const handleUploadOnly = async () => {
         if (!matchId || selectedImages.length === 0) return;
-        
+
         setIsUploadingEvidence(true);
         setError(null);
-        
+
         try {
             const formData = new FormData();
             selectedImages.forEach((img, index) => {
@@ -225,9 +261,8 @@ export function MatchDetailsModal({
 
             setSelectedImages([]);
             if (onMatchUpdate) onMatchUpdate();
-            // Always refresh details to show new evidence regardless of status
             fetchMatchDetails();
-            
+
         } catch (err: any) {
             console.error('Upload evidence error:', err);
             setError(err.message || 'An error occurred while uploading evidence');
@@ -264,7 +299,6 @@ export function MatchDetailsModal({
                 throw new Error(text || 'Failed to report result');
             }
 
-            // Still support auto-upload if they just hit submit with images
             if (selectedImages.length > 0) {
                 await handleUploadOnly();
             }
@@ -307,10 +341,516 @@ export function MatchDetailsModal({
     const isHome = (home?.userId || matchDetails?.homeUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isAway = (away?.userId || matchDetails?.awayUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isParticipant = !!(isHome || isAway);
-    
-    // User requirement: Admin only if startTime is null, players only if startTime is not null
+
     const hasStartTime = !!scheduledTime || !!matchDetails?.scheduledTime;
     const canSubmit = hasStartTime ? isParticipant : isHubOwner;
+
+    // Determine winner for completed matches
+    const getWinnerSide = () => {
+        if (!matchDetails) return null;
+        if (matchDetails.homeUserScore > matchDetails.awayUserScore) return 'home';
+        if (matchDetails.awayUserScore > matchDetails.homeUserScore) return 'away';
+        return 'draw';
+    };
+
+    const renderCompletedMatch = () => {
+        if (isLoadingDetails) {
+            return (
+                <View className="flex-1 items-center justify-center py-20">
+                    <ActivityIndicator size="large" color="#10B981" />
+                    <Text className="text-slate-500 mt-4 font-bold uppercase tracking-widest text-[10px]">Loading match data...</Text>
+                </View>
+            );
+        }
+
+        if (!matchDetails) {
+            return (
+                <View className="py-20 items-center">
+                    <Ionicons name="alert-circle-outline" size={48} color="#71717A" />
+                    <Text className="text-muted-foreground mt-2">{error || 'No details available'}</Text>
+                </View>
+            );
+        }
+
+        if (isEditMode) {
+            return renderEditMode();
+        }
+
+        const winner = getWinnerSide();
+        const homeAvatar = matchDetails.homeUserAvatarUrl || matchDetails.HomeUserAvatarUrl || '';
+        const awayAvatar = matchDetails.awayUserAvatarUrl || matchDetails.AwayUserAvatarUrl || '';
+
+        return (
+            <View>
+                {/* Score Card */}
+                <View className="mx-5 mt-4 mb-5">
+                    <View className="bg-[#111827]/60 rounded-[32px] border border-white/[0.06] p-6 overflow-hidden">
+                        {/* Status Badge */}
+                        <View className="items-center mb-5">
+                            <View className="bg-[#10B981]/10 px-4 py-1.5 rounded-full border border-[#10B981]/20">
+                                <Text className="text-[9px] font-black text-[#10B981] uppercase tracking-[3px]">Final Score</Text>
+                            </View>
+                        </View>
+
+                        {/* Players & Score - fixed alignment */}
+                        <View className="flex-row items-start justify-between">
+                            {/* Home Player */}
+                            <Pressable onPress={() => navigateToProfile(matchDetails.homeUserId)} className="flex-1 items-center">
+                                {/* Avatar with winner ring — fixed size wrapper so border doesn't shift layout */}
+                                <View
+                                    style={{
+                                        width: 60,
+                                        height: 60,
+                                        borderRadius: 16,
+                                        borderWidth: 2,
+                                        borderColor: winner === 'home' ? 'rgba(16,185,129,0.4)' : 'transparent',
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    <PlayerAvatar
+                                        src={homeAvatar}
+                                        name={matchDetails.homeUser}
+                                        size="lg"
+                                        className="rounded-2xl border-0"
+                                    />
+                                </View>
+                                <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
+                                    {matchDetails.homeUser}
+                                </Text>
+                                {/* Always render winner space to keep names at same height */}
+                                <View className="mt-1.5 h-5 items-center justify-center">
+                                    {winner === 'home' && (
+                                        <View className="bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20">
+                                            <Text className="text-[8px] font-black text-[#10B981] uppercase tracking-widest">Winner</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </Pressable>
+
+                            {/* Score Center */}
+                            <View className="items-center px-2 pt-1">
+                                <View className="flex-row items-baseline">
+                                    <Text className={`text-5xl font-black ${winner === 'home' ? 'text-[#10B981]' : 'text-white/20'}`}>
+                                        {matchDetails.homeUserScore}
+                                    </Text>
+                                    <Text className="text-2xl font-black text-white/10 mx-2">:</Text>
+                                    <Text className={`text-5xl font-black ${winner === 'away' ? 'text-[#10B981]' : 'text-white/20'}`}>
+                                        {matchDetails.awayUserScore}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Away Player */}
+                            <Pressable onPress={() => navigateToProfile(matchDetails.awayUserId)} className="flex-1 items-center">
+                                <View
+                                    style={{
+                                        width: 60,
+                                        height: 60,
+                                        borderRadius: 16,
+                                        borderWidth: 2,
+                                        borderColor: winner === 'away' ? 'rgba(16,185,129,0.4)' : 'transparent',
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    <PlayerAvatar
+                                        src={awayAvatar}
+                                        name={matchDetails.awayUser}
+                                        size="lg"
+                                        className="rounded-2xl border-0"
+                                    />
+                                </View>
+                                <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
+                                    {matchDetails.awayUser}
+                                </Text>
+                                <View className="mt-1.5 h-5 items-center justify-center">
+                                    {winner === 'away' && (
+                                        <View className="bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20">
+                                            <Text className="text-[8px] font-black text-[#10B981] uppercase tracking-widest">Winner</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Evidence Gallery — collapsible */}
+                <View className="mx-5 mb-5">
+                    <Pressable
+                        onPress={() => setIsEvidenceOpen(prev => !prev)}
+                        className="flex-row items-center justify-between py-1 active:opacity-70"
+                    >
+                        <View className="flex-row items-center gap-2.5">
+                            <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
+                                <Ionicons name="images-outline" size={14} color="#818CF8" />
+                            </View>
+                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Evidence</Text>
+                            {matchDetails.evidences && matchDetails.evidences.length > 0 && (
+                                <View className="bg-white/5 px-2 py-0.5 rounded-full">
+                                    <Text className="text-[9px] font-bold text-slate-500">{matchDetails.evidences.length}</Text>
+                                </View>
+                            )}
+                        </View>
+                        <View className="w-7 h-7 rounded-full bg-white/5 items-center justify-center">
+                            <Ionicons
+                                name={isEvidenceOpen ? 'chevron-up' : 'chevron-down'}
+                                size={14}
+                                color="#475569"
+                            />
+                        </View>
+                    </Pressable>
+
+                    {isEvidenceOpen && (
+                        <View className="mt-3">
+                            {matchDetails.evidences && matchDetails.evidences.length > 0 ? (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {matchDetails.evidences.map((url, idx) => (
+                                        <Pressable
+                                            key={idx}
+                                            className="mr-3"
+                                            onPress={() => setPreviewImage(url)}
+                                        >
+                                            <View className="rounded-2xl overflow-hidden border border-white/5">
+                                                <Image
+                                                    source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
+                                                    className="w-36 h-48 bg-muted"
+                                                    resizeMode="cover"
+                                                />
+                                            </View>
+                                        </Pressable>
+                                    ))}
+                                </ScrollView>
+                            ) : (
+                                <View className="bg-white/5 rounded-2xl py-6 items-center justify-center border border-white/10 border-dashed">
+                                    <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
+                                        <Ionicons name="images-outline" size={18} color="#818CF8" />
+                                    </View>
+                                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest">No Evidence Attached</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
+
+                {/* Edit Result Button */}
+                {canEditResult && (
+                    <View className="mx-5 mb-6">
+                        <Pressable
+                            onPress={handleEditResult}
+                            className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 flex-row items-center justify-center gap-2.5 active:opacity-70"
+                        >
+                            <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
+                                <Ionicons name="create-outline" size={16} color="#10B981" />
+                            </View>
+                            <Text className="text-sm font-black text-[#10B981] uppercase tracking-widest">Edit Result</Text>
+                        </Pressable>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    const renderEditMode = () => {
+        if (!matchDetails) return null;
+
+        const homeAvatar = matchDetails.homeUserAvatarUrl || matchDetails.HomeUserAvatarUrl || '';
+        const awayAvatar = matchDetails.awayUserAvatarUrl || matchDetails.AwayUserAvatarUrl || '';
+
+        return (
+            <View className="mx-5 mt-4">
+                {/* Edit Header */}
+                <View className="items-center mb-5">
+                    <View className="bg-[#F59E0B]/10 px-4 py-1.5 rounded-full border border-[#F59E0B]/20">
+                        <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-[3px]">Editing Result</Text>
+                    </View>
+                    <Text className="text-[10px] text-slate-500 mt-2 font-bold">Hub Owner Privileges</Text>
+                </View>
+
+                {error && (
+                    <View className="bg-red-500/10 p-4 rounded-2xl mb-4 border border-red-500/20">
+                        <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
+                    </View>
+                )}
+
+                {/* Score Input Card */}
+                <View className="bg-[#111827]/60 rounded-[28px] border border-white/[0.06] p-5 mb-5">
+                    <View className="flex-row items-center justify-center gap-4">
+                        <View className="flex-1 items-center gap-3">
+                            <PlayerAvatar src={homeAvatar} name={matchDetails.homeUser} size="lg" className="rounded-2xl border-0" />
+                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
+                                {matchDetails.homeUser}
+                            </Text>
+                            <TextInput
+                                className="bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10"
+                                placeholder="0"
+                                placeholderTextColor="#334155"
+                                keyboardType="numeric"
+                                value={homeScore}
+                                onChangeText={(val) => setHomeScore(val.replace(/[^0-9]/g, ''))}
+                            />
+                        </View>
+                        <View className="w-10 items-center justify-center mt-8">
+                            <View className="bg-white/5 py-1 px-2.5 rounded-lg border border-white/10">
+                                <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest">VS</Text>
+                            </View>
+                        </View>
+                        <View className="flex-1 items-center gap-3">
+                            <PlayerAvatar src={awayAvatar} name={matchDetails.awayUser} size="lg" className="rounded-2xl border-0" />
+                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
+                                {matchDetails.awayUser}
+                            </Text>
+                            <TextInput
+                                className="bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10"
+                                placeholder="0"
+                                placeholderTextColor="#334155"
+                                keyboardType="numeric"
+                                value={awayScore}
+                                onChangeText={(val) => setAwayScore(val.replace(/[^0-9]/g, ''))}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Evidence Section */}
+                <View className="mb-5">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <View className="flex-row items-center gap-2">
+                            <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
+                                <Ionicons name="images-outline" size={14} color="#818CF8" />
+                            </View>
+                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Evidence</Text>
+                        </View>
+                        <Pressable onPress={pickImages} className="flex-row items-center bg-[#10B981]/10 px-3 py-2 rounded-xl border border-[#10B981]/20 active:opacity-70">
+                            <Ionicons name="add" size={14} color="#10B981" />
+                            <Text className="text-[10px] font-black text-[#10B981] ml-1.5 uppercase tracking-wider">Add</Text>
+                        </Pressable>
+                    </View>
+                    {selectedImages.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            {selectedImages.map((img, index) => (
+                                <View key={img.uri + index} className="mr-3 mb-2">
+                                    <View className="rounded-2xl overflow-hidden border border-white/5">
+                                        <Image source={{ uri: img.uri }} className="w-20 h-20" />
+                                    </View>
+                                    <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#0B1120] shadow-sm">
+                                        <Ionicons name="close" size={10} color="white" />
+                                    </Pressable>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
+                            <Ionicons name="images-outline" size={22} color="#334155" />
+                            <Text className="text-[10px] text-slate-600 mt-1 font-bold">No photos selected</Text>
+                        </Pressable>
+                    )}
+                </View>
+
+                {/* Action Buttons */}
+                <View className="flex-row gap-3 mb-6">
+                    <Pressable
+                        onPress={handleCancelEdit}
+                        className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
+                    >
+                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={handleSubmitResult}
+                        className="flex-1 bg-[#10B981] rounded-2xl py-4 items-center active:opacity-80"
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator size="small" color="#0F172A" />
+                        ) : (
+                            <Text className="text-sm font-black text-[#0F172A] uppercase tracking-wider">Save</Text>
+                        )}
+                    </Pressable>
+                </View>
+            </View>
+        );
+    };
+
+    const renderScheduledMatch = () => {
+        const homeAvatar = matchDetails?.homeUserAvatarUrl || matchDetails?.HomeUserAvatarUrl || '';
+        const awayAvatar = matchDetails?.awayUserAvatarUrl || matchDetails?.AwayUserAvatarUrl || '';
+
+        return (
+            <View className="mx-5 mt-4">
+                {/* Scheduled Time */}
+                <View className="bg-[#111827]/60 rounded-[28px] border border-white/[0.06] p-5 mb-5">
+                    <View className="items-center mb-5">
+                        <View className="flex-row items-center gap-2 bg-[#3B82F6]/10 px-4 py-1.5 rounded-full border border-[#3B82F6]/20">
+                            <Ionicons name="time-outline" size={12} color="#3B82F6" />
+                            <Text className="text-[9px] font-black text-[#3B82F6] uppercase tracking-[3px]">Match Time</Text>
+                        </View>
+                        <Text className="text-base font-black text-[#10B981] mt-3">
+                            {confirmedTime || scheduledTime || 'TBD'}
+                        </Text>
+                    </View>
+
+                    {error && (
+                        <View className="bg-red-500/10 p-3 rounded-2xl mb-4 border border-red-500/20">
+                            <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
+                        </View>
+                    )}
+
+                    {/* Players & Score Input */}
+                    <View className="flex-row items-center justify-center gap-4">
+                        <View className="flex-1 items-center gap-3">
+                            <PlayerAvatar src={homeAvatar} name={home?.username || 'Home'} size="lg" className="rounded-2xl border-0" />
+                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
+                                {home?.username || 'Home'}
+                            </Text>
+                            <TextInput
+                                className={cn("bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10", !canSubmit && "opacity-40")}
+                                placeholder="0"
+                                placeholderTextColor="#334155"
+                                keyboardType="numeric"
+                                value={homeScore}
+                                onChangeText={(val) => setHomeScore(val.replace(/[^0-9]/g, ''))}
+                                editable={canSubmit}
+                            />
+                        </View>
+                        <View className="w-10 items-center justify-center mt-8">
+                            <View className="bg-white/5 py-1 px-2.5 rounded-lg border border-white/10">
+                                <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest">VS</Text>
+                            </View>
+                        </View>
+                        <View className="flex-1 items-center gap-3">
+                            <PlayerAvatar src={awayAvatar} name={away?.username || opponentName || 'Away'} size="lg" className="rounded-2xl border-0" />
+                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
+                                {away?.username || opponentName || 'Away'}
+                            </Text>
+                            <TextInput
+                                className={cn("bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10", !canSubmit && "opacity-40")}
+                                placeholder="0"
+                                placeholderTextColor="#334155"
+                                keyboardType="numeric"
+                                value={awayScore}
+                                onChangeText={(val) => setAwayScore(val.replace(/[^0-9]/g, ''))}
+                                editable={canSubmit}
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* Previously Uploaded Evidence */}
+                {matchDetails?.evidences && matchDetails.evidences.length > 0 && (
+                    <View className="mb-5">
+                        <View className="flex-row items-center gap-2.5 mb-3.5 ml-1">
+                            <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
+                                <Ionicons name="images-outline" size={14} color="#818CF8" />
+                            </View>
+                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Uploaded Evidence</Text>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            {matchDetails.evidences.map((url, idx) => (
+                                <Pressable key={idx} className="mr-3" onPress={() => setPreviewImage(url)}>
+                                    <View className="rounded-2xl overflow-hidden border border-white/5">
+                                        <Image
+                                            source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
+                                            className="w-28 h-40 bg-muted"
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
+
+                {/* Evidence Upload */}
+                <View className="mb-5">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <View className="flex-row items-center gap-2">
+                            <View className="w-7 h-7 rounded-xl bg-[#10B981]/10 items-center justify-center">
+                                <Ionicons name="camera-outline" size={14} color="#10B981" />
+                            </View>
+                            <View>
+                                <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Add Evidence</Text>
+                                <Text className="text-[9px] text-slate-500 mt-0.5 font-medium">Match result screenshots</Text>
+                            </View>
+                        </View>
+                        <Pressable onPress={pickImages} className="flex-row items-center bg-[#10B981]/10 px-3 py-2 rounded-xl border border-[#10B981]/20 active:opacity-70">
+                            <Ionicons name="add" size={14} color="#10B981" />
+                            <Text className="text-[10px] font-black text-[#10B981] ml-1.5 uppercase tracking-wider">Add</Text>
+                        </Pressable>
+                    </View>
+                    {selectedImages.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            {selectedImages.map((img, index) => (
+                                <View key={img.uri + index} className="mr-3 mb-2">
+                                    <View className="rounded-2xl overflow-hidden border border-white/5">
+                                        <Image source={{ uri: img.uri }} className="w-20 h-20" />
+                                    </View>
+                                    <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#0B1120] shadow-sm">
+                                        <Ionicons name="close" size={10} color="white" />
+                                    </Pressable>
+                                </View>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
+                            <Ionicons name="images-outline" size={22} color="#334155" />
+                            <Text className="text-[10px] text-slate-600 mt-1 font-bold">No photos selected</Text>
+                        </Pressable>
+                    )}
+                </View>
+
+                {/* Action Buttons */}
+                <View className="flex-row gap-3 mb-4">
+                    <Pressable
+                        onPress={() => { setHomeScore(''); setAwayScore(''); setError(null); setSelectedImages([]); }}
+                        className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
+                    >
+                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Clear</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={handleSubmitResult}
+                        disabled={isRoundLocked || !canSubmit}
+                        className={cn(
+                            "flex-1 rounded-2xl py-4 items-center active:opacity-80",
+                            (isRoundLocked || !canSubmit) ? "bg-white/5 border border-white/[0.06]" : "bg-[#10B981]"
+                        )}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator size="small" color={canSubmit ? "#0F172A" : "#71717A"} />
+                        ) : (
+                            <Text className={cn(
+                                "text-sm font-black uppercase tracking-wider",
+                                (isRoundLocked || !canSubmit) ? "text-slate-500" : "text-[#0F172A]"
+                            )}>
+                                {isRoundLocked ? "Locked" : !canSubmit ? (hasStartTime ? "Players Only" : "Admin Only") : "Submit"}
+                            </Text>
+                        )}
+                    </Pressable>
+                </View>
+
+                {selectedImages.length > 0 && !canSubmit && isParticipant && (
+                    <Pressable
+                        onPress={handleUploadOnly}
+                        className="bg-indigo-500/10 rounded-2xl py-4 items-center border border-indigo-500/20 mb-4 flex-row justify-center gap-2 active:opacity-70"
+                    >
+                        {isUploadingEvidence ? (
+                            <ActivityIndicator size="small" color="#818CF8" />
+                        ) : (
+                            <>
+                                <Ionicons name="cloud-upload-outline" size={16} color="#818CF8" />
+                                <Text className="text-sm font-black text-indigo-400 uppercase tracking-wider">Upload Evidence</Text>
+                            </>
+                        )}
+                    </Pressable>
+                )}
+
+                {!canSubmit && (
+                    <Text className="text-[10px] text-slate-600 text-center mb-4 font-medium">
+                        {hasStartTime ? "Only match participants can report results once scheduled" : "Only administrators can report results for unscheduled matches"}
+                    </Text>
+                )}
+            </View>
+        );
+    };
+
+    if (!visible) return null;
 
     return (
         <Modal
@@ -319,358 +859,88 @@ export function MatchDetailsModal({
             visible={visible}
             onRequestClose={onClose}
         >
-            <View className="flex-1 bg-card">
-                <View className="flex-1 p-6 pt-12">
-                    {/* Header */}
-                    <View className="flex-row items-center justify-between mb-4">
-                        <View>
-                            <Text className="text-lg font-bold text-foreground">{tournamentName}</Text>
-                            <Text className="text-sm text-muted-foreground">{roundName}</Text>
-                        </View>
-                        <Pressable
-                            onPress={onClose}
-                            className="w-8 h-8 rounded-full bg-secondary items-center justify-center"
-                        >
-                            <Ionicons name="close" size={20} color="hsl(220, 15%, 55%)" />
-                        </Pressable>
+            <View
+                className="flex-1 bg-[#0B1120]"
+                style={{
+                    paddingTop: Math.max(insets.top, 50),
+                    paddingBottom: Math.max(insets.bottom, 20),
+                }}
+            >
+                {/* Header Bar */}
+                <View className="flex-row items-center justify-between px-6 pb-4 mb-1 border-b border-white/5">
+                    <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-white/5 items-center justify-center active:bg-white/10">
+                        <Ionicons name="close" size={20} color="#94A3B8" />
+                    </Pressable>
+                    <View className="items-center flex-1 mx-4">
+                        <Text className="text-sm font-black text-white uppercase tracking-[3px]" numberOfLines={1}>
+                            {tournamentName}
+                        </Text>
+                        <Text className="text-[10px] text-slate-500 font-bold mt-0.5">{roundName}</Text>
                     </View>
+                    <View className="w-10" />
+                </View>
 
-                    {isLoadingDetails && !matchDetails && (
-                        <View className="py-2 mb-4">
-                            <ActivityIndicator size="small" color="#10B981" />
+                {isLoadingDetails && !matchDetails && (
+                    <View className="py-2 items-center">
+                        <ActivityIndicator size="small" color="#10B981" />
+                    </View>
+                )}
+
+                <ScrollView
+                    className="flex-1"
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 40 }}
+                >
+                    {status === 'completed' ? (
+                        renderCompletedMatch()
+                    ) : (status === 'scheduled' || status === 'ready_phase') ? (
+                        renderScheduledMatch()
+                    ) : (
+                        <View className="flex-1">
+                            {currentStatus === 'pending_availability' ? (
+                                <View className="flex-1 px-2">
+                                    <HourlyAvailabilityPicker
+                                        matchId={matchId}
+                                        deadline={localDeadline}
+                                        opponentName={opponentName}
+                                        opponentAvailability={opponentSlots}
+                                        initialSlots={mySlots}
+                                        onSubmit={async (slots: string[], dateTimeSlots: string[]) => {
+                                            try {
+                                                setIsSubmitting(true);
+                                                const payload = {
+                                                    matchId: matchId,
+                                                    selectedSlots: dateTimeSlots,
+                                                };
+                                                const response = await authenticatedFetch(ENDPOINTS.SUBMIT_MATCH_AVAILABILITY, {
+                                                    method: 'POST',
+                                                    body: JSON.stringify(payload),
+                                                });
+                                                if (response.ok) {
+                                                    const result = await response.json();
+                                                    if (result.data?.confirmedTime) {
+                                                        const confirmedDate = new Date(result.data.confirmedTime);
+                                                        setConfirmedTime(confirmedDate.toLocaleString());
+                                                        setCurrentStatus('scheduled');
+                                                    }
+                                                    if (onMatchUpdate) onMatchUpdate();
+                                                }
+                                            } catch (error) {
+                                                console.error('Error submitting availability:', error);
+                                            } finally {
+                                                setIsSubmitting(false);
+                                            }
+                                        }}
+                                    />
+                                </View>
+                            ) : (
+                                <View className="py-10 items-center justify-center">
+                                    <Text className="text-muted-foreground italic">Scheduling Not Supported Here</Text>
+                                </View>
+                            )}
                         </View>
                     )}
-
-                    <ScrollView showsVerticalScrollIndicator={false}>
-                        {status === 'completed' ? (
-                            <View className="py-2">
-                                {isLoadingDetails ? (
-                                    <View className="py-20 items-center justify-center">
-                                        <ActivityIndicator size="large" color="#10B981" />
-                                        <Text className="text-muted-foreground mt-4">Loading results...</Text>
-                                    </View>
-                                ) : matchDetails ? (
-                                    <View className="space-y-6">
-                                        {!isEditMode ? (
-                                            <>
-                                                <View className="items-center py-4 bg-muted/10 rounded-3xl border border-border/10">
-                                                    <Text className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Final Score</Text>
-                                                    <View className="flex-row items-center justify-center gap-8">
-                                                        <Pressable onPress={() => navigateToProfile(matchDetails.homeUserId)} className="items-center gap-2">
-                                                            <PlayerAvatar name={matchDetails.homeUser} size="lg" />
-                                                            <Text className="text-xs font-bold text-foreground">{matchDetails.homeUser}</Text>
-                                                            <Text className="text-4xl font-black text-primary">{matchDetails.homeUserScore}</Text>
-                                                        </Pressable>
-
-                                                        <Text className="text-2xl font-black text-muted-foreground mb-4">:</Text>
-
-                                                        <Pressable onPress={() => navigateToProfile(matchDetails.awayUserId)} className="items-center gap-2">
-                                                            <PlayerAvatar name={matchDetails.awayUser} size="lg" />
-                                                            <Text className="text-xs font-bold text-foreground">{matchDetails.awayUser}</Text>
-                                                            <Text className="text-4xl font-black text-white">{matchDetails.awayUserScore}</Text>
-                                                        </Pressable>
-                                                    </View>
-                                                </View>
-
-                                                {matchDetails.evidences && matchDetails.evidences.length > 0 && (
-                                                    <View className="mb-6">
-                                                        <View className="flex-row items-center gap-2 mb-3">
-                                                            <Ionicons name="images-outline" size={18} color="#64748B" />
-                                                            <Text className="text-sm font-bold text-foreground">Evidence Gallery</Text>
-                                                        </View>
-                                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                                                            {matchDetails.evidences.map((url, idx) => (
-                                                                <Pressable
-                                                                    key={idx}
-                                                                    className="mr-3"
-                                                                    onPress={() => setPreviewImage(url)}
-                                                                >
-                                                                    <Image
-                                                                        source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                                                        className="w-40 h-56 rounded-2xl bg-muted"
-                                                                        resizeMode="cover"
-                                                                    />
-                                                                </Pressable>
-                                                            ))}
-                                                        </ScrollView>
-                                                    </View>
-                                                )}
-
-                                                {canEditResult && (
-                                                    <Button
-                                                        onPress={handleEditResult}
-                                                        variant="outline"
-                                                        className="w-full mt-4"
-                                                    >
-                                                        <View className="flex-row items-center gap-2">
-                                                            <Ionicons name="create-outline" size={18} color="#10B981" />
-                                                            <Text className="text-primary font-bold">Edit Result</Text>
-                                                        </View>
-                                                    </Button>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <>
-                                                {/* Edit Mode */}
-                                                <View className="items-center mb-2">
-                                                    <Text className="text-sm text-muted-foreground">Editing Match Result</Text>
-                                                    <Text className="text-xs text-slate-500 mt-1">Hub Owner Privileges</Text>
-                                                </View>
-
-                                                {error && (
-                                                    <View className="bg-destructive/10 p-4 rounded-2xl mb-2">
-                                                        <Text className="text-destructive text-sm text-center font-medium">{error}</Text>
-                                                    </View>
-                                                )}
-
-                                                <View className="flex-row items-center justify-between gap-4">
-                                                    <View className="flex-1 items-center gap-3">
-                                                        <PlayerAvatar name={matchDetails.homeUser} size="lg" />
-                                                        <Text className="text-sm font-bold text-foreground text-center" numberOfLines={1}>
-                                                            {matchDetails.homeUser}
-                                                        </Text>
-                                                        <TextInput
-                                                            className="bg-muted/30 w-full h-12 rounded-xl text-center text-lg font-bold text-foreground border border-border/10"
-                                                            placeholder="0"
-                                                            placeholderTextColor="#71717A"
-                                                            keyboardType="numeric"
-                                                            value={homeScore}
-                                                            onChangeText={(val) => setHomeScore(val.replace(/[^0-9]/g, ''))}
-                                                        />
-                                                    </View>
-                                                    <Text className="text-2xl font-bold text-muted-foreground mt-12">VS</Text>
-                                                    <View className="flex-1 items-center gap-3">
-                                                        <PlayerAvatar name={matchDetails.awayUser} size="lg" />
-                                                        <Text className="text-sm font-bold text-foreground text-center" numberOfLines={1}>
-                                                            {matchDetails.awayUser}
-                                                        </Text>
-                                                        <TextInput
-                                                            className="bg-muted/30 w-full h-12 rounded-xl text-center text-lg font-bold text-foreground border border-border/10"
-                                                            placeholder="0"
-                                                            placeholderTextColor="#71717A"
-                                                            keyboardType="numeric"
-                                                            value={awayScore}
-                                                            onChangeText={(val) => setAwayScore(val.replace(/[^0-9]/g, ''))}
-                                                        />
-                                                    </View>
-                                                </View>
-
-                                                <View className="mt-6 border-t border-border/10 pt-6">
-                                                    <View className="flex-row items-center justify-between mb-3">
-                                                        <View>
-                                                            <Text className="text-sm font-bold text-foreground">Evidence</Text>
-                                                            <Text className="text-[11px] text-muted-foreground">Add match result screenshots</Text>
-                                                        </View>
-                                                        <Pressable onPress={pickImages} className="flex-row items-center bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20">
-                                                            <Ionicons name="add" size={16} color="#10B981" />
-                                                            <Text className="text-xs font-bold text-primary ml-1">Add Photos</Text>
-                                                        </Pressable>
-                                                    </View>
-                                                    {selectedImages.length > 0 ? (
-                                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                                                            {selectedImages.map((img, index) => (
-                                                                <View key={img.uri + index} className="mr-3 mb-2">
-                                                                    <Image source={{ uri: img.uri }} className="w-20 h-20 rounded-xl" />
-                                                                    <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-destructive w-5 h-5 rounded-full items-center justify-center border border-background shadow-sm">
-                                                                        <Ionicons name="close" size={12} color="white" />
-                                                                    </Pressable>
-                                                                </View>
-                                                            ))}
-                                                        </ScrollView>
-                                                    ) : (
-                                                        <Pressable onPress={pickImages} className="h-20 border border-dashed border-border/30 rounded-2xl items-center justify-center bg-muted/5">
-                                                            <Ionicons name="images-outline" size={24} color="#71717A" />
-                                                            <Text className="text-[11px] text-muted-foreground mt-1">No photos selected</Text>
-                                                        </Pressable>
-                                                    )}
-                                                </View>
-
-                                                <View className="mt-6 flex-row gap-3">
-                                                    <Button variant="outline" className="flex-1" onPress={handleCancelEdit}>Cancel</Button>
-                                                    <Button className="flex-1" onPress={handleSubmitResult} loading={isSubmitting}>Save Changes</Button>
-                                                </View>
-                                            </>
-                                        )}
-                                    </View>
-                                ) : (
-                                    <View className="py-20 items-center">
-                                        <Ionicons name="alert-circle-outline" size={48} color="#71717A" />
-                                        <Text className="text-muted-foreground mt-2">{error || 'No details available'}</Text>
-                                    </View>
-                                )}
-                            </View>
-                        ) : (status === 'scheduled' || status === 'ready_phase') ? (
-                            <View className="space-y-4">
-                                <View className="items-center mb-2">
-                                    <Text className="text-sm text-muted-foreground">Match Time</Text>
-                                    <Text className="text-lg font-bold text-primary mt-1">{confirmedTime || scheduledTime || 'TBD'}</Text>
-                                </View>
-                                {error && (
-                                    <View className="bg-destructive/10 p-4 rounded-2xl mb-2">
-                                        <Text className="text-destructive text-sm text-center font-medium">{error}</Text>
-                                    </View>
-                                )}
-                                <View className="flex-row items-center justify-between gap-4">
-                                    <View className="flex-1 items-center gap-3">
-                                        <PlayerAvatar name={home?.username || 'Home'} size="lg" />
-                                        <Text className="text-sm font-bold text-foreground text-center" numberOfLines={1}>
-                                            {home?.username || 'Home'}
-                                        </Text>
-                                        <TextInput
-                                            className={cn("bg-muted/30 w-full h-12 rounded-xl text-center text-lg font-bold text-foreground border border-border/10", !canSubmit && "opacity-50")}
-                                            placeholder="0"
-                                            placeholderTextColor="#71717A"
-                                            keyboardType="numeric"
-                                            value={homeScore}
-                                            onChangeText={(val) => setHomeScore(val.replace(/[^0-9]/g, ''))}
-                                            editable={canSubmit}
-                                        />
-                                    </View>
-                                    <Text className="text-2xl font-bold text-muted-foreground mt-12">VS</Text>
-                                    <View className="flex-1 items-center gap-3">
-                                        <PlayerAvatar name={away?.username || opponentName || 'Away'} size="lg" />
-                                        <Text className="text-sm font-bold text-foreground text-center" numberOfLines={1}>
-                                            {away?.username || opponentName || 'Away'}
-                                        </Text>
-                                        <TextInput
-                                            className={cn("bg-muted/30 w-full h-12 rounded-xl text-center text-lg font-bold text-foreground border border-border/10", !canSubmit && "opacity-50")}
-                                            placeholder="0"
-                                            placeholderTextColor="#71717A"
-                                            keyboardType="numeric"
-                                            value={awayScore}
-                                            onChangeText={(val) => setAwayScore(val.replace(/[^0-9]/g, ''))}
-                                            editable={canSubmit}
-                                        />
-                                    </View>
-                                </View>
-
-                                {matchDetails?.evidences && matchDetails.evidences.length > 0 && (
-                                    <View className="mt-8">
-                                        <View className="flex-row items-center gap-2 mb-3">
-                                            <Ionicons name="images-outline" size={18} color="#64748B" />
-                                            <Text className="text-sm font-bold text-foreground">Previously Uploaded Evidence</Text>
-                                        </View>
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                                            {matchDetails.evidences.map((url, idx) => (
-                                                <Pressable
-                                                    key={idx}
-                                                    className="mr-3"
-                                                    onPress={() => setPreviewImage(url)}
-                                                >
-                                                    <Image
-                                                        source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                                        className="w-32 h-44 rounded-2xl bg-muted"
-                                                        resizeMode="cover"
-                                                    />
-                                                </Pressable>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-
-                                <View className="mt-6 border-t border-border/10 pt-6">
-                                    <View className="flex-row items-center justify-between mb-3">
-                                        <View>
-                                            <Text className="text-sm font-bold text-foreground">Evidence</Text>
-                                            <Text className="text-[11px] text-muted-foreground">Add match result screenshots</Text>
-                                        </View>
-                                        <Pressable onPress={pickImages} className="flex-row items-center bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20">
-                                            <Ionicons name="add" size={16} color="#10B981" />
-                                            <Text className="text-xs font-bold text-primary ml-1">Add Photos</Text>
-                                        </Pressable>
-                                    </View>
-                                    {selectedImages.length > 0 ? (
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                                            {selectedImages.map((img, index) => (
-                                                <View key={img.uri + index} className="mr-3 mb-2">
-                                                    <Image source={{ uri: img.uri }} className="w-20 h-20 rounded-xl" />
-                                                    <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-destructive w-5 h-5 rounded-full items-center justify-center border border-background shadow-sm">
-                                                        <Ionicons name="close" size={12} color="white" />
-                                                    </Pressable>
-                                                </View>
-                                            ))}
-                                        </ScrollView>
-                                    ) : (
-                                        <Pressable onPress={pickImages} className="h-20 border border-dashed border-border/30 rounded-2xl items-center justify-center bg-muted/5">
-                                            <Ionicons name="images-outline" size={24} color="#71717A" />
-                                            <Text className="text-[11px] text-muted-foreground mt-1">No photos selected</Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-
-                                <View className="mt-6 flex-row gap-3">
-                                    <Button variant="outline" className="flex-1" onPress={() => { setHomeScore(''); setAwayScore(''); setError(null); setSelectedImages([]); }}>Clear</Button>
-                                    <Button className="flex-1" onPress={handleSubmitResult} loading={isSubmitting} disabled={isRoundLocked || !canSubmit}>
-                                        {isRoundLocked ? "Round not open yet" : !canSubmit ? (hasStartTime ? "Players Only" : "Admin Only") : "Submit Result"}
-                                    </Button>
-                                </View>
-                                
-                                {selectedImages.length > 0 && !canSubmit && isParticipant && (
-                                    <Button 
-                                        className="mt-3 bg-indigo-600" 
-                                        onPress={handleUploadOnly} 
-                                        loading={isUploadingEvidence}
-                                    >
-                                        <View className="flex-row items-center gap-2">
-                                            <Ionicons name="cloud-upload-outline" size={18} color="white" />
-                                            <Text className="text-white font-bold">Upload Evidence Only</Text>
-                                        </View>
-                                    </Button>
-                                )}
-
-                                {!canSubmit && (
-                                    <Text className="text-[10px] text-muted-foreground text-center mt-2 italic">
-                                        {hasStartTime ? "Only match participants can report results once scheduled" : "Only administrators can report results for unscheduled matches"}
-                                    </Text>
-                                )}
-                            </View>
-                        ) : (
-                            <View className="flex-1">
-                                {currentStatus === 'pending_availability' ? (
-                                    <View className="flex-1">
-                                        <HourlyAvailabilityPicker
-                                            matchId={matchId}
-                                            deadline={localDeadline}
-                                            opponentName={opponentName}
-                                            opponentAvailability={opponentSlots}
-                                            initialSlots={mySlots}
-                                            onSubmit={async (slots: string[], dateTimeSlots: string[]) => {
-                                                try {
-                                                    setIsSubmitting(true);
-                                                    const payload = {
-                                                        matchId: matchId,
-                                                        selectedSlots: dateTimeSlots,
-                                                    };
-                                                    const response = await authenticatedFetch(ENDPOINTS.SUBMIT_MATCH_AVAILABILITY, {
-                                                        method: 'POST',
-                                                        body: JSON.stringify(payload),
-                                                    });
-                                                    if (response.ok) {
-                                                        const result = await response.json();
-                                                        if (result.data?.confirmedTime) {
-                                                            const confirmedDate = new Date(result.data.confirmedTime);
-                                                            setConfirmedTime(confirmedDate.toLocaleString());
-                                                            setCurrentStatus('scheduled');
-                                                        }
-                                                        if (onMatchUpdate) onMatchUpdate();
-                                                    }
-                                                } catch (error) {
-                                                    console.error('Error submitting availability:', error);
-                                                } finally {
-                                                    setIsSubmitting(false);
-                                                }
-                                            }}
-                                        />
-                                    </View>
-                                ) : (
-                                    <View className="py-10 items-center justify-center">
-                                        <Text className="text-muted-foreground italic">Scheduling Not Supported Here</Text>
-                                    </View>
-                                )}
-                            </View>
-                        )}
-                    </ScrollView>
-                </View>
+                </ScrollView>
             </View>
 
             {/* Fullscreen Image Preview */}
@@ -680,9 +950,9 @@ export function MatchDetailsModal({
                 animationType="fade"
                 onRequestClose={() => setPreviewImage(null)}
             >
-                <View className="flex-1 bg-black/90 items-center justify-center p-4">
+                <View className="flex-1 bg-black/95 items-center justify-center p-4">
                     <Pressable
-                        className="absolute top-12 right-6 z-10 w-10 h-10 rounded-full bg-black/50 items-center justify-center border border-white/20"
+                        className="absolute top-12 right-6 z-10 w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/20"
                         onPress={() => setPreviewImage(null)}
                     >
                         <Ionicons name="close" size={24} color="white" />

@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { BracketMatch } from './BracketMatch';
-import { cn } from '../../lib/utils';
+import { cn, parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
 interface Standing {
@@ -195,7 +195,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                             <Text className="text-xs font-bold text-muted-foreground">Round {activeRound}</Text>
                                             {currentRoundMatches[0]?.roundDeadline && (
                                                 <Text className="text-[10px] text-red-400 mt-0.5">
-                                                    End: {new Date(currentRoundMatches[0].roundDeadline!).toLocaleDateString()} {new Date(currentRoundMatches[0].roundDeadline!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                    End: {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString()} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                                                 </Text>
                                             )}
                                         </View>
