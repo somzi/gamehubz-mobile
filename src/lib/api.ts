@@ -178,6 +178,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     try {
         const isFormData = options.body instanceof FormData;
 
+        // 1. Priprema zaglavlja (Headers)
         let headers: Record<string, string> = {};
         if (options.headers) {
             if (options.headers instanceof Headers) {
@@ -187,31 +188,69 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             }
         }
 
-        if (!headers['Content-Type'] && (options.method === 'POST' || options.method === 'PUT') && !isFormData) {
+        // 2. SPECIJALNA LOGIKA ZA FORM DATA (Slike/Fajlovi) - Fix za Android
+        if (isFormData) {
+            const token = await SecureStore.getItemAsync('access_token').catch(() => null) || authToken;
+            
+            const formHeaders = { ...headers };
+            // KLJUČNO: Brišemo Content-Type da bi fetch sam dodao boundary
+            delete formHeaders['Content-Type'];
+            
+            if (token) formHeaders['Authorization'] = `Bearer ${token}`;
+
+            const fetchResponse = await fetch(url, { 
+                method: options.method || 'POST', 
+                headers: formHeaders, 
+                body: options.body 
+            });
+
+            // Ako server vrati grešku (npr. 400, 413, 500)
+            if (!fetchResponse.ok) {
+                const errText = await fetchResponse.text().catch(() => 'Upload failed');
+                return {
+                    ok: false,
+                    status: fetchResponse.status,
+                    statusText: fetchResponse.statusText,
+                    json: async () => { 
+                        try { return JSON.parse(errText); } 
+                        catch { throw new Error(errText); }
+                    },
+                    text: async () => errText,
+                } as unknown as Response;
+            }
+
+            // Ako je sve u redu, vraćamo fetch response (koji ima .json() i .text())
+            return fetchResponse;
+        }
+
+        // 3. LOGIKA ZA STANDARDNE JSON ZAHTEVE (Axios)
+        if (!headers['Content-Type'] && (options.method === 'POST' || options.method === 'PUT')) {
             headers['Content-Type'] = 'application/json';
         }
 
         let routeUrl = url;
-        if (routeUrl.startsWith(API_BASE_URL)) routeUrl = routeUrl.replace(API_BASE_URL, '');
-
-        const bodyData = options.body;
+        if (routeUrl.startsWith(API_BASE_URL)) {
+            routeUrl = routeUrl.replace(API_BASE_URL, '');
+        }
 
         const response = await apiClient({
             method: options.method || 'GET',
             url: routeUrl,
-            data: isFormData ? options.body : bodyData,
+            data: options.body,
             headers: headers,
         });
 
-        // Add `.text()` to resolve returning empty string when response.data is undefined or null
+        // Pakujemo Axios odgovor da izgleda kao standardni Fetch Response
         return {
             ok: response.status >= 200 && response.status < 300,
             status: response.status,
             statusText: response.statusText,
             json: async () => response.data,
-            text: async () => typeof response.data === 'string' ? response.data : (response.data ? JSON.stringify(response.data) : ''),
+            text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
         } as unknown as Response;
+
     } catch (error: any) {
+        // 4. ERROR HANDLING (Mreža, Timeout, Axios errori)
         const response = error.response;
         return {
             ok: false,
