@@ -10,7 +10,7 @@ import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
-import { Tabs } from '../components/ui/Tabs';
+
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
@@ -1130,8 +1130,28 @@ export default function TournamentDetailsScreen() {
                         })()}
                     </View>
 
-                    <View className="px-4 py-4">
-                        <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+                    <View className="px-5 mt-2 mb-4">
+                        <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1.5" style={{ gap: 6 }}>
+                            {tabs.map((tab) => {
+                                const isActive = activeTab === tab.value;
+                                const iconMap: Record<string, string> = { overview: 'grid-outline', bracket: 'git-merge-outline', players: 'people-outline', teams: 'people-outline' };
+                                return (
+                                    <Pressable
+                                        key={tab.value}
+                                        onPress={() => setActiveTab(tab.value)}
+                                        className={`flex-1 flex-row items-center justify-center gap-1.5 py-3.5 rounded-xl ${
+                                            isActive ? 'bg-indigo-500/15 border border-indigo-500/25' : ''
+                                        }`}
+                                        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                                    >
+                                        <Ionicons name={(iconMap[tab.value] || 'ellipse') as any} size={14} color={isActive ? '#818CF8' : '#475569'} />
+                                        <Text className={`text-xs font-black ${
+                                            isActive ? 'text-white' : 'text-slate-600'
+                                        }`}>{tab.label}</Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
                     </View>
 
                     {activeTab === 'overview' && (

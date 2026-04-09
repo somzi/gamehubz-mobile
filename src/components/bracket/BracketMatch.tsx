@@ -34,7 +34,6 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     const navigation = useNavigation<NavigationProp>();
 
     const handlePlayerClick = (userId: string) => {
-        // Only navigate if we're not using the match detail modal
         if (onPress) {
             onPress();
         } else if (userId) {
@@ -42,12 +41,15 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
         }
     };
 
-    const renderParticipant = (participant: Participant | null) => {
+    const renderParticipant = (participant: Participant | null, position: 'top' | 'bottom') => {
         if (!participant) {
             return (
-                <View className="flex-row items-center gap-2 px-3 py-2 bg-muted/30 rounded-lg h-10">
-                    <View className="w-6 h-6 rounded-full bg-muted/50" />
-                    <Text className="text-sm text-muted-foreground italic">TBD</Text>
+                <View className={cn(
+                    "flex-row items-center px-3 py-2.5",
+                    position === 'top' ? "rounded-t-2xl" : "rounded-b-2xl",
+                )}>
+                    <View className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06]" />
+                    <Text className="text-xs text-slate-600 italic ml-2.5 flex-1">TBD</Text>
                 </View>
             );
         }
@@ -57,23 +59,43 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
         return (
             <Pressable
                 onPress={() => handlePlayerClick(participant.userId)}
-                className="flex-row items-center gap-2 px-3 py-2 rounded-lg h-10 bg-muted/30"
+                className={cn(
+                    "flex-row items-center px-3 py-2.5",
+                    position === 'top' ? "rounded-t-2xl" : "rounded-b-2xl",
+                    isWinner && "bg-emerald-500/[0.04]",
+                )}
             >
                 {isTeamTournament ? (
-                    <Ionicons name="people" size={16} color={isWinner ? '#10B981' : '#94A3B8'} />
+                    <View className={cn(
+                        "w-6 h-6 rounded-lg items-center justify-center",
+                        isWinner ? "bg-emerald-500/15" : "bg-white/[0.04]"
+                    )}>
+                        <Ionicons name="people" size={12} color={isWinner ? '#10B981' : '#475569'} />
+                    </View>
                 ) : (
                     <PlayerAvatar name={participant.username} size="sm" className="w-6 h-6" />
                 )}
                 <Text
-                    className={cn("text-sm font-medium flex-1", isWinner ? "text-primary" : "text-foreground")}
+                    className={cn(
+                        "text-xs font-semibold flex-1 ml-2.5",
+                        isWinner ? "text-emerald-400" : "text-slate-300"
+                    )}
                     numberOfLines={1}
                 >
                     {participant.username}
                 </Text>
                 {participant.score !== null && (
-                    <Text className={cn("text-sm font-bold", isWinner ? "text-primary" : "text-foreground")}>
-                        {participant.score}
-                    </Text>
+                    <View className={cn(
+                        "w-7 h-7 rounded-lg items-center justify-center ml-2",
+                        isWinner ? "bg-emerald-500/15" : "bg-white/[0.04]"
+                    )}>
+                        <Text className={cn(
+                            "text-xs font-black",
+                            isWinner ? "text-emerald-400" : "text-slate-400"
+                        )}>
+                            {participant.score}
+                        </Text>
+                    </View>
                 )}
             </Pressable>
         );
@@ -98,11 +120,8 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     const hasScore = (p: any) => p?.score !== null && p?.score !== undefined;
     const isAlreadyReported = hasScore(home) || hasScore(away);
 
-    // Can show details if match has participants and is Scheduled (1), Live (2) or Completed (3, 4)
-    // We relax the "isParticipant" requirement for viewing, but keep it for reporting
     const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4);
     
-    // User request: admin only if startTime is null, players only if startTime is not null
     const hasStartTime = !!startTime;
     const canUserReport = hasStartTime ? isParticipant : isAdmin;
     const canReport = canShowDetails && !isAlreadyReported && canUserReport && (status === 2 || status === 1);
@@ -112,8 +131,8 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             onPress={canShowDetails ? onPress : undefined}
             disabled={!canShowDetails}
             className={cn(
-                "flex-col gap-1 w-52 p-2 rounded-2xl bg-card border border-border/30",
-                canReport && "border-primary/30",
+                "w-52 rounded-2xl bg-[#0D1525] border overflow-hidden",
+                canReport ? "border-emerald-500/20" : "border-white/[0.06]",
                 className
             )}
             style={({ pressed }) => ({
@@ -122,16 +141,17 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             })}
         >
             {canReport && (
-                <View className="flex-row items-center justify-between mb-1 px-1">
+                <View className="flex-row items-center justify-between px-3 py-1.5 bg-emerald-500/[0.06]">
                     <View className="flex-row items-center gap-1">
                         <Ionicons name="create-outline" size={10} color="#10B981" />
-                        <Text className="text-[10px] font-extrabold text-primary uppercase tracking-tighter">Report</Text>
+                        <Text className="text-[9px] font-black text-emerald-400 uppercase tracking-[1.5px]">Report</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={10} color="#3F3F46" />
+                    <Ionicons name="chevron-forward" size={10} color="#10B981" />
                 </View>
             )}
-            {renderParticipant(home)}
-            {renderParticipant(away)}
+            {renderParticipant(home, 'top')}
+            <View className="h-px bg-white/[0.04] mx-3" />
+            {renderParticipant(away, 'bottom')}
         </Pressable>
     );
 }

@@ -491,52 +491,45 @@ export function MatchScheduleCard({
         <>
             <Pressable
                 onPress={() => setModalVisible(true)}
-                className={cn(
-                    "mb-2 rounded-[24px] border border-white/5 bg-white/[0.03] p-5",
-                    currentStatus === 'ready_phase' && "border-indigo-500/30"
-                )}
-                style={({ pressed }) => ({
-                    opacity: pressed ? 0.7 : 1,
-                    transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
+                className="active:opacity-80"
             >
-                <View className="flex-row items-center gap-4">
-                    {/* Left side: Avatar */}
-                    <View className="w-12 h-12 items-center justify-center">
-                        <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="rounded-2xl" />
-                    </View>
+                <View className={cn(
+                    "bg-[#131B2E] rounded-3xl overflow-hidden",
+                    currentStatus === 'ready_phase' && "border border-indigo-500/20"
+                )}>
+                    <View className="flex-row">
+                        <View style={{ width: 4, backgroundColor: statusColor, opacity: 0.6 }} className="rounded-l-3xl" />
 
-                    <View className="flex-1 min-w-0">
-                        {/* Header Row: Hub + Time */}
-                        <View className="flex-row justify-between items-center mb-0.5">
-                            <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest" numberOfLines={1}>
-                                {roundName}
-                            </Text>
-                            {matchTime && currentStatus !== 'scheduled' && (
-                                <Text className="text-[10px] font-medium text-slate-500 uppercase tracking-tighter">
-                                    {matchTime}
+                        <View className="flex-1 p-4">
+                            {/* Top row: hub + tournament */}
+                            <View className="flex-row items-center justify-between mb-3">
+                                <Text className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex-1" numberOfLines={1}>
+                                    {roundName}
                                 </Text>
-                            )}
-                        </View>
+                                <Text className="text-[10px] font-medium text-slate-600" numberOfLines={1}>
+                                    {tournamentName}
+                                </Text>
+                            </View>
 
-                        {/* Tournament Row */}
-                        <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5" numberOfLines={1}>
-                            {tournamentName}
-                        </Text>
+                            {/* Main content row */}
+                            <View className="flex-row items-center">
+                                <View className="w-11 h-11 items-center justify-center">
+                                    <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="rounded-xl" />
+                                </View>
 
-                        {/* Main Title Row */}
-                        <Text className="text-lg font-bold text-white tracking-tight" numberOfLines={1}>
-                            vs {opponentName}
-                        </Text>
+                                <View className="flex-1 ml-3 min-w-0">
+                                    <Text className="text-base font-black text-white tracking-tight" numberOfLines={1}>
+                                        vs {opponentName}
+                                    </Text>
+                                    <View className="flex-row items-center mt-1.5">
+                                        {getStatusContent()}
+                                    </View>
+                                </View>
 
-                        {/* Status badge */}
-                        <View className="flex-row items-center mt-1">
-                            {getStatusContent()}
+                                <Ionicons name="chevron-forward" size={14} color="#1E293B" />
+                            </View>
                         </View>
                     </View>
-
-                    {/* Right side: Chevron */}
-                    <Ionicons name="chevron-forward" size={16} color="#334155" />
                 </View>
             </Pressable>
 

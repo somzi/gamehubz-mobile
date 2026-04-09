@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { Card } from '../ui/Card';
 import { cn } from '../../lib/utils';
 
 interface MatchHistoryCardProps {
@@ -37,69 +36,80 @@ export function MatchHistoryCard({
     const isDraw = result === "draw";
 
     return (
-        <Card onPress={onPress} className={cn("overflow-hidden", className)}>
-            <View className="w-full">
-                {/* Header Row: Hub/Tournament + Date */}
-                <View className="flex-row justify-between items-start mb-6 pb-2 border-b border-white/5">
-                    <View className="flex-row items-start flex-1 pr-4">
-                        <View className={cn("w-1.5 h-1.5 rounded-full mr-2 mt-1.5", isWin ? "bg-primary" : (result === 'draw' ? "bg-blue-400" : "bg-destructive"))} />
-                        <View className="flex-1">
-                            {hubName && (
-                                <Text className="text-[11px] font-bold text-white uppercase tracking-widest mb-0.5" numberOfLines={1}>
-                                    {hubName}
+        <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed && onPress ? 0.85 : 1 })} className={cn("overflow-hidden", className)}>
+            <View className="flex-row bg-[#131B2E] rounded-3xl overflow-hidden">
+                {/* Left accent bar */}
+                <View
+                    className="w-1"
+                    style={{ backgroundColor: isWin ? 'rgba(16,185,129,0.6)' : isDraw ? 'rgba(129,140,248,0.6)' : 'rgba(239,68,68,0.6)' }}
+                />
+
+                <View className="flex-1 p-4">
+                    {/* Header: Hub/Tournament + Date */}
+                    <View className="flex-row justify-between items-center mb-4 pb-2.5" style={{ borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' }}>
+                        <View className="flex-row items-center flex-1 pr-4">
+                            <View className={cn("w-1.5 h-1.5 rounded-full mr-2", isWin ? "bg-[#10B981]" : isDraw ? "bg-indigo-400" : "bg-[#EF4444]")} />
+                            <View className="flex-1">
+                                {hubName && (
+                                    <Text className="text-[10px] font-black text-white uppercase tracking-widest mb-0.5" numberOfLines={1}>
+                                        {hubName}
+                                    </Text>
+                                )}
+                                <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest" numberOfLines={1}>
+                                    {tournamentName}
                                 </Text>
+                            </View>
+                        </View>
+                        <Text className="text-[9px] font-bold text-slate-600 uppercase">{date}</Text>
+                    </View>
+
+                    {/* Versus Content */}
+                    <View className="flex-row items-center justify-between px-1">
+                        {/* User side */}
+                        <View className="items-center w-[28%]">
+                            <PlayerAvatar src={userAvatarUrl} name={userName} size="md" className="rounded-2xl mb-2" />
+                            <Text className="text-[10px] font-bold text-white text-center" numberOfLines={1}>
+                                {userName}
+                            </Text>
+                        </View>
+
+                        {/* Score section */}
+                        <View className="items-center flex-1">
+                            {userScore !== undefined && opponentScore !== undefined ? (
+                                <Text className="text-2xl font-black text-white mb-2.5" style={{ letterSpacing: 6 }}>
+                                    {userScore} : {opponentScore}
+                                </Text>
+                            ) : (
+                                <Text className="text-lg font-black text-slate-600 mb-2.5 uppercase">VS</Text>
                             )}
-                            <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest" numberOfLines={1}>
-                                {tournamentName}
+                            <View
+                                className={cn(
+                                    "px-4 py-1.5 rounded-xl",
+                                    isWin ? "bg-[#10B981]/10" :
+                                        isDraw ? "bg-indigo-400/10" :
+                                            "bg-[#EF4444]/10"
+                                )}
+                                style={{ borderWidth: 1, borderColor: isWin ? 'rgba(16,185,129,0.2)' : isDraw ? 'rgba(129,140,248,0.2)' : 'rgba(239,68,68,0.2)' }}
+                            >
+                                <Text className={cn(
+                                    "text-[9px] font-black uppercase tracking-wider",
+                                    isWin ? "text-[#10B981]" : isDraw ? "text-indigo-400" : "text-[#EF4444]"
+                                )}>
+                                    {isWin ? "Victory" : isDraw ? "Draw" : "Defeat"}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Opponent side */}
+                        <View className="items-center w-[28%]">
+                            <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="rounded-2xl mb-2" />
+                            <Text className="text-[10px] font-bold text-white text-center" numberOfLines={1}>
+                                {opponentName}
                             </Text>
                         </View>
-                    </View>
-                    <Text className="text-[10px] font-bold text-slate-500 uppercase mt-1">{date}</Text>
-                </View>
-
-                {/* Versus Content */}
-                <View className="flex-row items-center justify-between px-2">
-                    {/* User side */}
-                    <View className="items-center w-[30%]">
-                        <PlayerAvatar src={userAvatarUrl} name={userName} size="md" className="rounded-2xl mb-2" />
-                        <Text className="text-[11px] font-bold text-white text-center" numberOfLines={1}>
-                            {userName}
-                        </Text>
-                    </View>
-
-                    {/* Score section */}
-                    <View className="items-center flex-1">
-                        {userScore !== undefined && opponentScore !== undefined ? (
-                            <Text className="text-2xl font-black text-white mb-2 tracking-widest">
-                                {userScore} : {opponentScore}
-                            </Text>
-                        ) : (
-                            <Text className="text-lg font-black text-slate-500 mb-2 uppercase italic">VS</Text>
-                        )}
-                        <View className={cn(
-                            "px-4 py-1 rounded-full",
-                            isWin ? "bg-primary/20 border border-primary/30" :
-                                isDraw ? "bg-blue-400/20 border border-blue-400/30" :
-                                    "bg-destructive/20 border border-destructive/30"
-                        )}>
-                            <Text className={cn(
-                                "text-[10px] font-black uppercase tracking-tight",
-                                isWin ? "text-primary" : isDraw ? "text-blue-400" : "text-destructive"
-                            )}>
-                                {isWin ? "Victory" : isDraw ? "Draw" : "Defeat"}
-                            </Text>
-                        </View>
-                    </View>
-
-                    {/* Opponent side */}
-                    <View className="items-center w-[30%]">
-                        <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="rounded-2xl mb-2" />
-                        <Text className="text-xs font-bold text-white text-center" numberOfLines={1}>
-                            {opponentName}
-                        </Text>
                     </View>
                 </View>
             </View>
-        </Card>
+        </Pressable>
     );
 }

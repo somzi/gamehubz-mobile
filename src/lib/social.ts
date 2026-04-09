@@ -17,11 +17,19 @@ export const getSocialUrl = (platform: string, username: string): string => {
         case 'youtube':
             // YouTube can have /c/, /user/, or /@ depending on the type, but /@ is most common now
             return `https://youtube.com/@${cleanUsername}`;
-        case 'discord':
-            // Discord doesn't have a direct profile URL for users in the same way, 
-            // but we can return the username or a search link if needed.
-            // For now, let's return '#' as it usually requires an invite link or specific channel link.
+        case 'discord': {
+            // If it's already a full URL containing discord.gg, normalize it
+            if (cleanUsername.includes('discord.gg/')) {
+                const code = cleanUsername.split('discord.gg/').pop()?.split('/')[0];
+                return code ? `https://discord.gg/${code}` : '#';
+            }
+            // If it looks like an invite code (short alphanumeric, no # or . or @)
+            if (/^[a-zA-Z0-9_-]{2,20}$/.test(cleanUsername)) {
+                return `https://discord.gg/${cleanUsername}`;
+            }
+            // Otherwise it's a username (e.g. john#1234) — no url, handle as copy
             return '#';
+        }
         case 'telegram':
             return `https://t.me/${cleanUsername}`;
         default:

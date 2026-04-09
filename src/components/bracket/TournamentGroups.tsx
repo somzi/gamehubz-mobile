@@ -102,47 +102,60 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                 return (
                     <View key={group.groupId} className="flex-col gap-6">
                         <View>
-                            <Text className="text-lg font-bold text-foreground mb-4">{group.name}</Text>
+                            <Text className="text-lg font-black text-white mb-4">{group.name}</Text>
 
-                            <View className="bg-card rounded-xl border border-border/30 overflow-hidden">
+                            <View className="bg-[#0D1525] rounded-2xl border border-white/[0.06] overflow-hidden">
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                     <View className="min-w-full">
-                                        <View className="flex-row bg-muted/30 py-3 px-4 border-b border-border/30">
-                                            <Text className="w-8 text-xs font-bold text-muted-foreground text-center">#</Text>
-                                            <Text className="w-32 text-xs font-bold text-muted-foreground ml-2">Player</Text>
-                                            <Text className="w-12 text-xs font-bold text-muted-foreground text-center">Pts</Text>
-                                            <Text className="w-8 text-xs font-bold text-muted-foreground text-center">P</Text>
-                                            <Text className="w-8 text-xs font-bold text-muted-foreground text-center">W</Text>
-                                            <Text className="w-8 text-xs font-bold text-muted-foreground text-center">D</Text>
-                                            <Text className="w-8 text-xs font-bold text-muted-foreground text-center">L</Text>
-                                            <Text className="w-10 text-xs font-bold text-muted-foreground text-center">GF</Text>
-                                            <Text className="w-10 text-xs font-bold text-muted-foreground text-center">GA</Text>
-                                            <Text className="w-10 text-xs font-bold text-muted-foreground text-center">GD</Text>
+                                        <View className="flex-row bg-white/[0.03] py-3 px-4 border-b border-white/[0.04]">
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">#</Text>
+                                            <Text className="w-32 text-[10px] font-black text-slate-500 ml-2 uppercase tracking-wider">Player</Text>
+                                            <Text className="w-12 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">Pts</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">P</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">W</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">D</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">L</Text>
+                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GF</Text>
+                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GA</Text>
+                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GD</Text>
                                         </View>
                                         {group.standings.map((standing, index) => (
                                             <Pressable
                                                 key={standing.participantId}
                                                 onPress={() => handlePlayerPress(standing)}
                                                 className={cn(
-                                                    "flex-row py-3 px-4 border-b border-border/10 items-center",
+                                                    "flex-row py-3 px-4 border-b border-white/[0.03] items-center",
                                                     index === group.standings.length - 1 && "border-b-0"
                                                 )}
                                                 style={({ pressed }: { pressed: boolean }) => ({
-                                                    backgroundColor: pressed ? 'rgba(255, 255, 255, 0.05)' : 'transparent'
+                                                    backgroundColor: pressed ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
                                                 })}
                                             >
-                                                <Text className="w-8 text-sm font-medium text-muted-foreground text-center">{standing.position}</Text>
-                                                <Text className="w-32 text-sm font-bold text-foreground ml-2" numberOfLines={1}>
+                                                <View className="w-8 items-center justify-center">
+                                                    <View className={cn(
+                                                        "w-5 h-5 rounded-md items-center justify-center",
+                                                        standing.position <= 2 ? "bg-emerald-500/15" : "bg-white/[0.04]"
+                                                    )}>
+                                                        <Text className={cn(
+                                                            "text-[10px] font-black",
+                                                            standing.position <= 2 ? "text-emerald-400" : "text-slate-500"
+                                                        )}>{standing.position}</Text>
+                                                    </View>
+                                                </View>
+                                                <Text className="w-32 text-xs font-bold text-slate-300 ml-2" numberOfLines={1}>
                                                     {standing.username || getUsername(standing.userId, group.matches)}
                                                 </Text>
-                                                <Text className="w-12 text-sm text-center font-bold text-accent">{standing.points}</Text>
-                                                <Text className="w-8 text-sm text-center text-muted-foreground">{standing.matchesPlayed}</Text>
-                                                <Text className="w-8 text-sm text-center text-muted-foreground">{standing.wins}</Text>
-                                                <Text className="w-8 text-sm text-center text-muted-foreground">{standing.draws}</Text>
-                                                <Text className="w-8 text-sm text-center text-muted-foreground">{standing.losses}</Text>
-                                                <Text className="w-10 text-sm text-center text-muted-foreground">{standing.goalsFor}</Text>
-                                                <Text className="w-10 text-sm text-center text-muted-foreground">{standing.goalsAgainst}</Text>
-                                                <Text className="w-10 text-sm text-center text-muted-foreground">{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</Text>
+                                                <Text className="w-12 text-xs text-center font-black text-indigo-400">{standing.points}</Text>
+                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.matchesPlayed}</Text>
+                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.wins}</Text>
+                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.draws}</Text>
+                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.losses}</Text>
+                                                <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsFor}</Text>
+                                                <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsAgainst}</Text>
+                                                <Text className={cn(
+                                                    "w-10 text-xs text-center font-bold",
+                                                    standing.goalDifference > 0 ? "text-emerald-400" : standing.goalDifference < 0 ? "text-red-400" : "text-slate-500"
+                                                )}>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</Text>
                                             </Pressable>
                                         ))}
                                     </View>
@@ -151,11 +164,11 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                         </View>
 
                         <View>
-                            <Text className="text-sm font-semibold text-muted-foreground mb-4">Matches</Text>
+                            <Text className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Matches</Text>
                             
                             {/* Horizontal Round Tabs */}
                             {rounds.length > 0 && (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ gap: 8 }}>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ gap: 6 }}>
                                     {rounds.map(roundNum => {
                                         const rMatches = groupedMatches[roundNum];
                                         const isLocked = rMatches.length > 0 && !!rMatches[0].isRoundLocked;
@@ -166,20 +179,20 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 key={`tab-${roundNum}`}
                                                 onPress={() => handleTabPress(group.groupId, roundNum, isLocked)}
                                                 className={cn(
-                                                    "flex-row items-center gap-2 px-4 py-2 rounded-xl border",
+                                                    "flex-row items-center gap-1.5 px-4 py-2 rounded-xl border",
                                                     isActive
-                                                        ? "bg-primary border-primary"
-                                                        : "bg-muted/30 border-border/10"
+                                                        ? "bg-indigo-500/10 border-indigo-500/20"
+                                                        : "bg-transparent border-white/[0.04]"
                                                 )}
                                             >
                                                 <Text className={cn(
-                                                    "text-sm font-bold",
-                                                    isActive ? "text-primary-foreground" : "text-muted-foreground"
+                                                    "text-xs font-bold",
+                                                    isActive ? "text-white" : "text-slate-600"
                                                 )}>
                                                     Round {roundNum}
                                                 </Text>
                                                 {isLocked && (
-                                                    <Ionicons name="lock-closed" size={14} color="#64748B" />
+                                                    <Ionicons name="lock-closed" size={11} color={isActive ? "#818CF8" : "#475569"} />
                                                 )}
                                             </Pressable>
                                         );
@@ -190,26 +203,30 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                             {/* Active Round Content */}
                             {currentRoundMatches.length > 0 && (
                                 <View className="mb-4">
-                                    <View className="flex-row items-center justify-between px-2 mb-4">
-                                        <View>
-                                            <Text className="text-xs font-bold text-muted-foreground">Round {activeRound}</Text>
-                                            {currentRoundMatches[0]?.roundDeadline && (
-                                                <Text className="text-[10px] text-red-400 mt-0.5">
-                                                    End: {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString()} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                                </Text>
+                                    {/* Deadline + Edit Schedule row (only if deadline exists or admin) */}
+                                    {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4)))) && (
+                                        <View className="flex-row items-center justify-between px-1 mb-4">
+                                            {currentRoundMatches[0]?.roundDeadline ? (
+                                                <View className="flex-row items-center gap-1.5">
+                                                    <Ionicons name="time-outline" size={11} color="#EF4444" />
+                                                    <Text className="text-[10px] text-red-400 font-semibold">
+                                                        {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString()} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                    </Text>
+                                                </View>
+                                            ) : <View />}
+                                            {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4)) && (
+                                                <Pressable
+                                                    onPress={() => onEditDeadline?.({ roundNumber: Number(activeRound), roundDeadline: currentRoundMatches[0]?.roundDeadline, roundOpenAt: currentRoundMatches[0]?.matchOpensAt })}
+                                                    className="flex-row items-center gap-1 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 active:opacity-70"
+                                                >
+                                                    <Ionicons name="calendar-outline" size={10} color="#818CF8" />
+                                                    <Text className="text-[9px] font-bold text-indigo-400 uppercase tracking-[1.5px]">
+                                                        Edit Schedule
+                                                    </Text>
+                                                </Pressable>
                                             )}
                                         </View>
-                                        {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.status === 3 || m.status === 4)) && (
-                                            <Pressable
-                                                onPress={() => onEditDeadline?.({ roundNumber: Number(activeRound), roundDeadline: currentRoundMatches[0]?.roundDeadline, roundOpenAt: currentRoundMatches[0]?.matchOpensAt })}
-                                                className="bg-primary/20 px-3 py-1 rounded-md border border-primary/30"
-                                            >
-                                                <Text className="text-primary text-[10px] uppercase font-bold tracking-wider">
-                                                    Edit Schedule
-                                                </Text>
-                                            </Pressable>
-                                        )}
-                                    </View>
+                                    )}
                                     <View className="flex-col gap-3 items-center">
                                         {currentRoundMatches.map((match) => (
                                             <BracketMatch

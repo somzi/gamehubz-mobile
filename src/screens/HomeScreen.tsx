@@ -116,7 +116,7 @@ export default function HomeScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
             <ScrollView
                 className="flex-1"
                 refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor="#10B981" />}

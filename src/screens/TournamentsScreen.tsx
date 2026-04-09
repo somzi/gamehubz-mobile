@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { TournamentRegion } from '../types/tournament';
 import { TournamentCard } from '../components/cards/TournamentCard';
-import { StatCard } from '../components/ui/StatCard';
-import { PageHeader } from '../components/layout/PageHeader';
-// import { FloatingActionButton } from '../components/layout/FloatingActionButton'; // Removed
-import { Tabs } from '../components/ui/Tabs';
-import { Button } from '../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
+import { cn } from '../lib/utils';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -159,11 +155,18 @@ export default function TournamentsScreen() {
     };
 
     const tabs = [
-        { label: 'Live', value: 'live' },
-        { label: 'Upcoming', value: 'upcoming' },
-        { label: 'Open', value: 'open' },
-        { label: 'Completed', value: 'completed' },
+        { label: 'Live', value: 'live', icon: 'radio' as const },
+        { label: 'Upcoming', value: 'upcoming', icon: 'time' as const },
+        { label: 'Open', value: 'open', icon: 'add-circle' as const },
+        { label: 'Completed', value: 'completed', icon: 'checkmark-circle' as const },
     ];
+
+    const activeTabConfig: Record<string, { color: string; bg: string }> = {
+        live: { color: '#EF4444', bg: 'bg-red-500/10' },
+        upcoming: { color: '#818CF8', bg: 'bg-indigo-500/10' },
+        open: { color: '#10B981', bg: 'bg-emerald-500/10' },
+        completed: { color: '#64748B', bg: 'bg-slate-500/10' },
+    };
 
     const handleScroll = (event: any) => {
         const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
@@ -176,38 +179,49 @@ export default function TournamentsScreen() {
     const renderContent = () => {
         if (isLoading) {
             return (
-                <View className="items-center py-20">
-                    <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-muted-foreground mt-4 font-medium">Loading tournaments...</Text>
+                <View className="items-center py-24">
+                    <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
+                        <ActivityIndicator size="small" color="#818CF8" />
+                    </View>
+                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading tournaments...</Text>
                 </View>
             );
         }
 
         if (error) {
             return (
-                <View className="items-center py-12 px-6">
-                    <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                    <Text className="text-destructive mt-4 text-center font-medium">{error}</Text>
-                    <Button onPress={() => fetchTournaments(0, false)} size="sm" className="mt-4">
-                        Retry
-                    </Button>
+                <View className="items-center py-16 px-6">
+                    <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
+                        <Ionicons name="alert-circle" size={28} color="#EF4444" />
+                    </View>
+                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
+                    <Text className="text-xs text-slate-600 text-center mb-5">{error}</Text>
+                    <Pressable
+                        onPress={() => fetchTournaments(0, false)}
+                        className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
+                    >
+                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
+                    </Pressable>
                 </View>
             );
         }
 
         if (tournaments.length === 0) {
             return (
-                <View className="items-center py-12 opacity-50">
-                    <Ionicons name="trophy-outline" size={48} color="#71717A" />
-                    <Text className="text-muted-foreground mt-4 font-medium">No tournaments found</Text>
+                <View className="items-center py-20">
+                    <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
+                        <Ionicons name="trophy-outline" size={28} color="#334155" />
+                    </View>
+                    <Text className="text-sm font-semibold text-slate-500">No tournaments found</Text>
+                    <Text className="text-xs text-slate-600 mt-1">Check back later for new events</Text>
                 </View>
             );
         }
 
         return (
-            <View className="mt-2">
+            <View className="mt-1">
                 {tournaments.map((tournament: any, index: number) => (
-                    <View key={tournament.Id || tournament.id || `t-${index}`} className="mb-5">
+                    <View key={`${tournament.Id || tournament.id || 'tournament'}-${index}`} className="mb-3">
                         <TournamentCard
                             name={tournament.Name || tournament.name}
                             description={tournament.Description || tournament.description}
@@ -228,8 +242,8 @@ export default function TournamentsScreen() {
                 ))}
 
                 {hasMore && isMoreLoading && (
-                    <View className="py-8 items-center justify-center">
-                        <ActivityIndicator size="small" color="#10B981" />
+                    <View className="py-6 items-center justify-center">
+                        <ActivityIndicator size="small" color="#818CF8" />
                     </View>
                 )}
             </View>
@@ -238,30 +252,66 @@ export default function TournamentsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
-            <PageHeader
-                title="Tournaments"
-                rightElement={<Ionicons name="trophy" size={24} color="#10B981" />}
-            />
+            {/* Premium header */}
+            <View className="px-6 pt-4 pb-2">
+                <View className="flex-row items-center justify-between">
+                    <View>
+                        <Text className="text-2xl font-black text-white tracking-tight">Tournaments</Text>
+                        <Text className="text-xs text-slate-600 font-medium mt-0.5">Compete & Conquer</Text>
+                    </View>
+                    <View className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 items-center justify-center">
+                        <Ionicons name="trophy" size={18} color="#818CF8" />
+                    </View>
+                </View>
+            </View>
+
+            {/* Tabs - full width */}
+            <View className="px-5 pb-3 pt-2">
+                    <View className="flex-row gap-1.5">
+                        {tabs.map((tab) => {
+                            const isActive = activeTab === tab.value;
+                            const tabCfg = activeTabConfig[tab.value];
+                            return (
+                                <Pressable
+                                    key={tab.value}
+                                    onPress={() => setActiveTab(tab.value)}
+                                    className={cn(
+                                        "flex-1 flex-row items-center justify-center py-2.5 rounded-2xl border",
+                                        isActive
+                                            ? `${tabCfg.bg} border-white/[0.08]`
+                                            : "bg-transparent border-white/[0.04]"
+                                    )}
+                                >
+                                    <Ionicons
+                                        name={tab.icon}
+                                        size={13}
+                                        color={isActive ? tabCfg.color : '#475569'}
+                                    />
+                                    <Text className={cn(
+                                        "text-[10px] font-bold ml-1 tracking-wide",
+                                        isActive ? "text-white" : "text-slate-600"
+                                    )}>
+                                        {tab.label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+            </View>
+
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingBottom: 20 }}
+                contentContainerStyle={{ paddingBottom: 24 }}
                 refreshControl={
-                    <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#10B981" />
+                    <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#818CF8" />
                 }
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
             >
-                <View className="px-4 py-4 gap-4">
-                    <Tabs
-                        tabs={tabs}
-                        activeTab={activeTab}
-                        onTabChange={setActiveTab}
-                    />
-
+                <View className="px-5">
                     {renderContent()}
                 </View>
             </ScrollView>
-
         </SafeAreaView>
     );
 }

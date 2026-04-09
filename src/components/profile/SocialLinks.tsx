@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, Linking } from 'react-native';
+import { View, Text, Pressable, Linking, Alert, Share } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
 
@@ -31,7 +31,7 @@ const platformConfig: any = {
         bgColor: "bg-[#E4405F]/20",
     },
     twitter: {
-        icon: <FontAwesome name="twitter" size={20} />,
+        icon: <Text style={{ fontSize: 18, fontWeight: '900', color: 'white' }}>𝕏</Text>,
         color: "text-foreground",
         bgColor: "bg-foreground/10",
     },
@@ -55,9 +55,21 @@ const platformConfig: any = {
 export function SocialLinks({ links, className }: SocialLinksProps) {
     if (!links || links.length === 0) return null;
 
-    const handlePress = (url?: string) => {
-        if (url) {
-            Linking.openURL(url).catch((err) => console.error("Couldn't load page", err));
+    const handlePress = (link: SocialLink) => {
+        if (link.platform === 'discord') {
+            if (link.url && link.url !== '#') {
+                // Invite link — open Discord app or browser
+                Linking.openURL(link.url).catch(() =>
+                    Linking.openURL(link.url!).catch((err) => console.error("Couldn't open Discord", err))
+                );
+            } else {
+                // Plain username — share/copy
+                Share.share({ message: link.username, title: 'Discord Username' });
+            }
+            return;
+        }
+        if (link.url && link.url !== '#') {
+            Linking.openURL(link.url).catch((err) => console.error("Couldn't load page", err));
         }
     };
 
@@ -70,7 +82,7 @@ export function SocialLinks({ links, className }: SocialLinksProps) {
                 return (
                     <Pressable
                         key={link.platform}
-                        onPress={() => handlePress(link.url)}
+                        onPress={() => handlePress(link)}
                         className={cn(
                             "items-center justify-center w-10 h-10 rounded-full border border-border/30",
                             config.bgColor

@@ -21,6 +21,7 @@ import UpdateProfileScreen from '../screens/UpdateProfileScreen';
 import ManageHubScreen from '../screens/ManageHubScreen';
 import HubMembersScreen from '../screens/HubMembersScreen';
 import ManageHubSocialsScreen from '../screens/ManageHubSocialsScreen';
+import ManageUserSocialsScreen from '../screens/ManageUserSocialsScreen';
 import ManageTournamentScreen from '../screens/ManageTournamentScreen';
 import TeamDashboardScreen from '../screens/TeamDashboardScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
@@ -111,6 +112,10 @@ export function RootNavigator() {
                     <Stack.Screen
                         name="ManageHubSocials"
                         component={ManageHubSocialsScreen}
+                    />
+                    <Stack.Screen
+                        name="ManageUserSocials"
+                        component={ManageUserSocialsScreen}
                     />
                     <Stack.Screen
                         name="ManageTournament"

@@ -8,7 +8,7 @@ import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { TournamentCard } from '../components/cards/TournamentCard';
 
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from '../components/ui/Tabs';
+
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { parseUtcDate } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
@@ -411,8 +411,28 @@ export default function HubProfileScreen() {
                 </View>
 
                 {/* ─── Hub Tabs (Overview / Tournaments) ─── */}
-                <View className="px-4 py-4">
-                    <Tabs tabs={hubTabs} activeTab={hubTab} onTabChange={setHubTab} />
+                <View className="px-5 mt-6 mb-5">
+                    <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1.5" style={{ gap: 6 }}>
+                        {hubTabs.map((tab) => {
+                            const isActive = hubTab === tab.value;
+                            const iconMap: Record<string, string> = { overview: 'grid-outline', tournaments: 'trophy-outline' };
+                            return (
+                                <Pressable
+                                    key={tab.value}
+                                    onPress={() => setHubTab(tab.value)}
+                                    className={`flex-1 flex-row items-center justify-center gap-2 py-3.5 rounded-xl ${
+                                        isActive ? 'bg-indigo-500/15 border border-indigo-500/25' : ''
+                                    }`}
+                                    style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                                >
+                                    <Ionicons name={(iconMap[tab.value] || 'ellipse') as any} size={15} color={isActive ? '#818CF8' : '#475569'} />
+                                    <Text className={`text-sm font-black ${
+                                        isActive ? 'text-white' : 'text-slate-600'
+                                    }`}>{tab.label}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
                 </View>
 
                 {/* ═══════════════════════════════════════════ */}
@@ -528,12 +548,34 @@ export default function HubProfileScreen() {
                         {isFollowing || isOwner ? (
                             <>
                                 {/* Tournament filter tabs */}
-                                <View className="mb-4">
-                                    <Tabs
-                                        tabs={tournamentFilterTabs}
-                                        activeTab={tournamentFilter}
-                                        onTabChange={setTournamentFilter}
-                                    />
+                                <View className="mb-5">
+                                    <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1.5" style={{ gap: 6 }}>
+                                        {tournamentFilterTabs.map((tab) => {
+                                            const isActive = tournamentFilter === tab.value;
+                                            const colorMap: Record<string, { activeBg: string; activeBorder: string; text: string; icon: string }> = {
+                                                live: { activeBg: 'bg-red-500/10', activeBorder: 'border-red-500/20', text: 'text-red-400', icon: '#EF4444' },
+                                                upcoming: { activeBg: 'bg-indigo-500/10', activeBorder: 'border-indigo-500/20', text: 'text-indigo-400', icon: '#818CF8' },
+                                                past: { activeBg: 'bg-slate-500/10', activeBorder: 'border-slate-500/20', text: 'text-slate-400', icon: '#64748B' },
+                                            };
+                                            const iconMap: Record<string, string> = { live: 'radio', upcoming: 'time-outline', past: 'checkmark-circle-outline' };
+                                            const colors = colorMap[tab.value] || colorMap.upcoming;
+                                            return (
+                                                <Pressable
+                                                    key={tab.value}
+                                                    onPress={() => setTournamentFilter(tab.value)}
+                                                    className={`flex-1 flex-row items-center justify-center gap-1.5 py-3 rounded-xl ${
+                                                        isActive ? `${colors.activeBg} border ${colors.activeBorder}` : ''
+                                                    }`}
+                                                    style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                                                >
+                                                    <Ionicons name={iconMap[tab.value] as any} size={13} color={isActive ? colors.icon : '#334155'} />
+                                                    <Text className={`text-xs font-black ${
+                                                        isActive ? colors.text : 'text-slate-700'
+                                                    }`}>{tab.label}</Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
                                 </View>
                                 {renderTournamentList()}
                             </>

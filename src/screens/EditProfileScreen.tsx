@@ -219,8 +219,13 @@ export default function EditProfileScreen() {
                 <View className="space-y-1">
                     <MenuItem
                         icon="person-outline"
-                        label="Manage Profile"
+                        label="Edit Profile Info"
                         onPress={() => navigation.navigate('UpdateProfile')}
+                    />
+                    <MenuItem
+                        icon="share-social-outline"
+                        label="Manage Socials"
+                        onPress={() => navigation.navigate('ManageUserSocials')}
                     />
                     <MenuItem
                         icon="lock-closed-outline"
