@@ -74,6 +74,7 @@ export const ENDPOINTS = {
     RESET_PASSWORD: `${API_BASE_URL}/api/Auth/resetPassword`,
     GET_ALL_HUB_ACTIVITY: (pageNumber: number) => `${API_BASE_URL}/api/hubActivity/all?pageNumber=${pageNumber}`,
     EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
+    PUSH_TOKEN: `${API_BASE_URL}/api/users/push-token`,
 };
 
 import axios from 'axios';
@@ -191,17 +192,17 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
         // 2. SPECIJALNA LOGIKA ZA FORM DATA (Slike/Fajlovi) - Fix za Android
         if (isFormData) {
             const token = await SecureStore.getItemAsync('access_token').catch(() => null) || authToken;
-            
+
             const formHeaders = { ...headers };
             // KLJUČNO: Brišemo Content-Type da bi fetch sam dodao boundary
             delete formHeaders['Content-Type'];
-            
+
             if (token) formHeaders['Authorization'] = `Bearer ${token}`;
 
-            const fetchResponse = await fetch(url, { 
-                method: options.method || 'POST', 
-                headers: formHeaders, 
-                body: options.body 
+            const fetchResponse = await fetch(url, {
+                method: options.method || 'POST',
+                headers: formHeaders,
+                body: options.body
             });
 
             // Ako server vrati grešku (npr. 400, 413, 500)
@@ -211,8 +212,8 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
                     ok: false,
                     status: fetchResponse.status,
                     statusText: fetchResponse.statusText,
-                    json: async () => { 
-                        try { return JSON.parse(errText); } 
+                    json: async () => {
+                        try { return JSON.parse(errText); }
                         catch { throw new Error(errText); }
                     },
                     text: async () => errText,
