@@ -6,7 +6,7 @@ const LOCAL_IP = '192.168.0.3';
 const LOCAL_PORT = '5057';
 const LOCAL_URL = `http://${LOCAL_IP}:${LOCAL_PORT}`;
 
-export const API_BASE_URL = 'http://178.104.50.1:8081';
+export const API_BASE_URL = 'https://test-api.codespheresolutions.dev';
 
 console.log(`[API] Environment: ${IS_PROD ? 'Production' : 'Development'}`);
 console.log(`[API] Base URL: ${API_BASE_URL}`);
