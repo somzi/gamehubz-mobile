@@ -74,7 +74,7 @@ export const ENDPOINTS = {
     RESET_PASSWORD: `${API_BASE_URL}/api/Auth/resetPassword`,
     GET_ALL_HUB_ACTIVITY: (pageNumber: number) => `${API_BASE_URL}/api/hubActivity/all?pageNumber=${pageNumber}`,
     EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
-    PUSH_TOKEN: `${API_BASE_URL}/api/users/push-token`,
+    PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
 };
 
 import axios from 'axios';
