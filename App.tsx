@@ -11,12 +11,10 @@ import './global.css';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
-import { usePushNotifications } from './src/hooks/usePushNotifications';
 
 // Show notifications even when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
@@ -49,9 +47,6 @@ const linking: LinkingOptions<RootStackParamList> = {
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
-
-  // Register for push notifications and sync token
-  usePushNotifications();
 
   // Handle notification taps (background / killed state)
   useEffect(() => {

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, ReactNode, useMemo, useEffe
 import { User, AuthResponse, UserSocial } from '../types/auth';
 import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToLogout } from '../lib/api';
 import * as SecureStore from 'expo-secure-store';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import { NotificationPermissionModal } from '../components/NotificationPermissionModal';
 
 interface AuthContextType {
     user: User | null;
@@ -42,6 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isAppReady, setIsAppReady] = useState(false);
+
+    // Push notification double-opt-in
+    const { initializePushNotifications, registerAndSync } = usePushNotifications();
+    const [showNotifModal, setShowNotifModal] = useState(false);
 
     useEffect(() => {
         const loadStoredAuth = async () => {
@@ -147,6 +153,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAuthToken(newAcc);
                 setRefreshToken(newRef);
                 setUser(normalizeUser(data.user));
+
+                // Trigger push notification flow after successful login
+                initializePushNotifications().then(permStatus => {
+                    if (permStatus === 'undetermined') {
+                        setShowNotifModal(true);
+                    }
+                });
+
                 return { success: true };
             } else {
                 // Determine error message from body
@@ -393,9 +407,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         deleteAccount,
     }), [user, token, isLoading, login, register, logout, updateProfile, saveUserSocial, refreshUser, deleteAccount]);
 
+    const handleNotifAllow = useCallback(async () => {
+        setShowNotifModal(false);
+        await registerAndSync();
+    }, [registerAndSync]);
+
+    const handleNotifDismiss = useCallback(() => {
+        setShowNotifModal(false);
+    }, []);
+
     return (
         <AuthContext.Provider value={authContextValue}>
             {isAppReady ? children : null}
+            <NotificationPermissionModal
+                visible={showNotifModal}
+                onAllow={handleNotifAllow}
+                onDismiss={handleNotifDismiss}
+            />
         </AuthContext.Provider>
     );
 }
