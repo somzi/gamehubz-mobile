@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { HubCard } from '../components/cards/HubCard';
+import { StatusModal } from '../components/modals/StatusModal';
 
 import { API_BASE_URL, ENDPOINTS, authenticatedFetch } from '../lib/api';
 
@@ -46,6 +47,9 @@ export default function HubsScreen() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Error modal state (for backend business-rule errors like 'already owns a hub')
+    const [errorModal, setErrorModal] = useState<{ title: string; message: string } | null>(null);
 
     // Pagination State
     const [pageNumber, setPageNumber] = useState(0);
@@ -178,7 +182,42 @@ export default function HubsScreen() {
 
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to create hub');
+
+                // Try to extract a meaningful message from the response
+                let errorMessage = 'Failed to create hub';
+                try {
+                    const parsed = JSON.parse(text);
+                    if (typeof parsed === 'string') {
+                        errorMessage = parsed;
+                    } else if (parsed?.message) {
+                        errorMessage = parsed.message;
+                    } else if (parsed?.Message) {
+                        errorMessage = parsed.Message;
+                    } else if (Array.isArray(parsed?.messages) && parsed.messages.length > 0) {
+                        errorMessage = parsed.messages[0];
+                    } else if (Array.isArray(parsed?.Messages) && parsed.Messages.length > 0) {
+                        errorMessage = parsed.Messages[0];
+                    } else if (typeof parsed?.title === 'string') {
+                        errorMessage = parsed.title;
+                    }
+                } catch {
+                    // Response wasn't JSON, use raw text
+                    if (text) errorMessage = text;
+                }
+
+                // Check if this is the "already owns a hub" business rule
+                const isAlreadyOwns = errorMessage.toLowerCase().includes('already own');
+
+                if (isAlreadyOwns) {
+                    setIsModalOpen(false);
+                    setErrorModal({
+                        title: 'Hub Limit Reached',
+                        message: 'You already own a hub. Each player can only manage one hub at a time.',
+                    });
+                } else {
+                    setError(errorMessage);
+                }
+                return;
             }
 
             // Success
@@ -408,6 +447,16 @@ export default function HubsScreen() {
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
+
+            {/* Business-rule error modal (e.g. already owns a hub) */}
+            <StatusModal
+                visible={!!errorModal}
+                onClose={() => setErrorModal(null)}
+                type="error"
+                title={errorModal?.title ?? ''}
+                message={errorModal?.message ?? ''}
+                buttonText="Got It"
+            />
         </SafeAreaView>
     );
 }
