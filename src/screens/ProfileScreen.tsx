@@ -253,22 +253,45 @@ export default function ProfileScreen() {
                 {/* ─── Profile Card ─── */}
                 <View className="mx-5 mt-3">
                     <View className="bg-[#131B2E] rounded-3xl p-5">
-                        <View style={{ position: 'relative', minHeight: 90 }}>
-                            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, justifyContent: 'center' }}>
-                                <View style={{ borderRadius: 999, borderWidth: 2.5, borderColor: 'rgba(16,185,129,0.4)', padding: 3 }}>
-                                    <PlayerAvatar src={user?.avatarUrl} name={displayData.username} size="xl" className="border-0" />
-                                </View>
+                        {/* Header: Avatar + Info side by side */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                            {/* Avatar with glow border */}
+                            <View style={{
+                                borderRadius: 999,
+                                borderWidth: 2.5,
+                                borderColor: 'rgba(16,185,129,0.5)',
+                                padding: 3,
+                                shadowColor: '#10B981',
+                                shadowOffset: { width: 0, height: 0 },
+                                shadowOpacity: 0.35,
+                                shadowRadius: 10,
+                                elevation: 6,
+                            }}>
+                                <PlayerAvatar src={user?.avatarUrl} name={displayData.username} size="xl" className="border-0" />
                             </View>
-                            <View className="items-center" style={{ paddingVertical: 4 }}>
-                                <Text className="text-2xl font-black text-white tracking-tight">{displayData.username}</Text>
-                                <View className="flex-row items-center mt-1.5">
-                                    <View className="flex-row items-center bg-emerald-500/10 px-3 py-1 rounded-lg">
-                                        <Ionicons name="game-controller" size={13} color="#10B981" />
-                                        <Text className="text-[#10B981] font-bold text-sm ml-1.5">{displayData.nickName}</Text>
+                            {/* Text info - flex: 1 prevents overlapping */}
+                            <View style={{ flex: 1, flexShrink: 1 }}>
+                                <Text
+                                    className="text-xl font-black text-white tracking-tight"
+                                    numberOfLines={1}
+                                    style={{ flexShrink: 1 }}
+                                >
+                                    {displayData.username}
+                                </Text>
+                                <View style={{ alignSelf: 'flex-start', marginTop: 6 }}>
+                                    <View className="flex-row items-center bg-emerald-500/10 px-2.5 py-1 rounded-lg" style={{ flexShrink: 1 }}>
+                                        <Ionicons name="game-controller" size={12} color="#10B981" />
+                                        <Text
+                                            className="text-[#10B981] font-bold text-xs ml-1.5"
+                                            numberOfLines={1}
+                                            style={{ flexShrink: 1 }}
+                                        >
+                                            {displayData.nickName}
+                                        </Text>
                                     </View>
                                 </View>
                                 <View className="flex-row items-center mt-1.5">
-                                    <Ionicons name="globe-outline" size={12} color="#64748B" />
+                                    <Ionicons name="globe-outline" size={11} color="#64748B" />
                                     <Text className="text-slate-500 font-bold text-[10px] ml-1.5 uppercase tracking-widest">{displayData.region}</Text>
                                 </View>
                             </View>
@@ -309,7 +332,7 @@ export default function ProfileScreen() {
 
                     <View className="px-5 pb-12">
                         {activeTab === 'stats' && (
-                            <View style={{ gap: 12 }}>
+                            <View style={{ gap: 10 }}>
                                 {/* ─── Quick Stats ─── */}
                                 <View className="flex-row bg-[#131B2E] rounded-2xl p-1" style={{ gap: 2 }}>
                                     <View className="flex-1 py-2 items-center">
@@ -334,8 +357,8 @@ export default function ProfileScreen() {
                                 </View>
 
                                 {/* ─── Recent Form ─── */}
-                                <View className="bg-[#131B2E] rounded-3xl p-5">
-                                    <View className="flex-row items-center justify-between mb-4">
+                                <View className="bg-[#131B2E] rounded-3xl p-4">
+                                    <View className="flex-row items-center justify-between mb-3">
                                         <View className="flex-row items-center" style={{ gap: 8 }}>
                                             <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
                                                 <Ionicons name="trending-up" size={14} color="#818CF8" />
@@ -357,12 +380,12 @@ export default function ProfileScreen() {
                                     </View>
                                     {performanceList.length > 0 ? (
                                         <>
-                                            <View className="flex-row items-center justify-center" style={{ gap: 6 }}>
+                                            <View className="flex-row items-center justify-center" style={{ gap: 5 }}>
                                                 {[...performanceList].reverse().slice(-10).map((match, i) => (
                                                     <View key={i} className="flex-1 items-center">
                                                         <View
                                                             className={cn(
-                                                                "w-8 h-8 rounded-xl items-center justify-center",
+                                                                "w-7 h-7 rounded-lg items-center justify-center",
                                                                 match.isWin ? "bg-[#10B981]/15" : "bg-[#EF4444]/15"
                                                             )}
                                                             style={{ borderWidth: 1.5, borderColor: match.isWin ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)' }}
@@ -379,7 +402,7 @@ export default function ProfileScreen() {
                                                 {Array.from({ length: Math.max(0, 10 - performanceList.length) }).map((_, i) => (
                                                     <View key={`empty-${i}`} className="flex-1 items-center">
                                                         <View
-                                                            className="w-8 h-8 rounded-xl items-center justify-center bg-white/[0.03]"
+                                                            className="w-7 h-7 rounded-lg items-center justify-center bg-white/[0.03]"
                                                             style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.04)' }}
                                                         >
                                                             <Text className="text-[10px] font-black text-white/10">-</Text>
@@ -387,14 +410,14 @@ export default function ProfileScreen() {
                                                     </View>
                                                 ))}
                                             </View>
-                                            <View className="flex-row items-center justify-between mt-3 px-1">
+                                            <View className="flex-row items-center justify-between mt-2 px-1">
                                                 <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">Oldest</Text>
                                                 <View className="flex-1 mx-3 h-[1px] bg-white/[0.04]" />
                                                 <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">Latest</Text>
                                             </View>
                                         </>
                                     ) : (
-                                        <View className="items-center py-6">
+                                        <View className="items-center py-4">
                                             <Ionicons name="analytics-outline" size={28} color="#1E293B" />
                                             <Text className="text-slate-600 text-[10px] mt-2">No performance data yet</Text>
                                         </View>
@@ -402,33 +425,45 @@ export default function ProfileScreen() {
                                 </View>
 
                                 {/* ─── Win Rate Hero ─── */}
-                                <View className="bg-[#131B2E] rounded-3xl p-6 items-center">
-                                    <View className="w-[120px] h-[120px] relative items-center justify-center mb-5">
+                                <View className="bg-[#131B2E] rounded-3xl p-5 items-center">
+                                    <View style={{
+                                        width: 100,
+                                        height: 100,
+                                        position: 'relative',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        marginBottom: 14,
+                                        shadowColor: '#10B981',
+                                        shadowOffset: { width: 0, height: 0 },
+                                        shadowOpacity: 0.3,
+                                        shadowRadius: 14,
+                                        elevation: 4,
+                                    }}>
                                         <CircularProgress
                                             percentage={Math.round(displayData.winPercentage)}
-                                            size={120}
-                                            strokeWidth={10}
+                                            size={100}
+                                            strokeWidth={9}
                                             color="#10B981"
                                             backgroundColor="#1E293B"
                                             showText={false}
                                         />
                                         <View className="absolute inset-0 items-center justify-center">
-                                            <Text className="text-white text-3xl font-black">{Math.round(displayData.winPercentage)}%</Text>
+                                            <Text className="text-white text-2xl font-black">{Math.round(displayData.winPercentage)}%</Text>
                                             <Text className="text-slate-500 text-[7px] uppercase font-black tracking-[2px]">Win Rate</Text>
                                         </View>
                                     </View>
 
                                     {/* ─── W / D / L Horizontal Bars ─── */}
-                                    <View className="w-full" style={{ gap: 10 }}>
+                                    <View className="w-full" style={{ gap: 8 }}>
                                         <View>
-                                            <View className="flex-row items-center justify-between mb-1.5">
+                                            <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
                                                     <View className="w-2 h-2 rounded-full bg-[#10B981]" />
                                                     <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Wins</Text>
                                                 </View>
                                                 <Text className="text-[#10B981] text-sm font-black">{displayData.wins}</Text>
                                             </View>
-                                            <View className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
+                                            <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
                                                 <View
                                                     className="h-full bg-[#10B981] rounded-full"
                                                     style={{ width: displayData.totalMatches > 0 ? `${(displayData.wins / displayData.totalMatches) * 100}%` : '0%' }}
@@ -436,14 +471,14 @@ export default function ProfileScreen() {
                                             </View>
                                         </View>
                                         <View>
-                                            <View className="flex-row items-center justify-between mb-1.5">
+                                            <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
                                                     <View className="w-2 h-2 rounded-full bg-[#EAB308]" />
                                                     <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Draws</Text>
                                                 </View>
                                                 <Text className="text-[#EAB308] text-sm font-black">{displayData.draws}</Text>
                                             </View>
-                                            <View className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
+                                            <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
                                                 <View
                                                     className="h-full bg-[#EAB308] rounded-full"
                                                     style={{ width: displayData.totalMatches > 0 ? `${(displayData.draws / displayData.totalMatches) * 100}%` : '0%' }}
@@ -451,14 +486,14 @@ export default function ProfileScreen() {
                                             </View>
                                         </View>
                                         <View>
-                                            <View className="flex-row items-center justify-between mb-1.5">
+                                            <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
                                                     <View className="w-2 h-2 rounded-full bg-[#EF4444]" />
                                                     <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Losses</Text>
                                                 </View>
                                                 <Text className="text-[#EF4444] text-sm font-black">{displayData.losses}</Text>
                                             </View>
-                                            <View className="h-2.5 bg-white/[0.04] rounded-full overflow-hidden">
+                                            <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
                                                 <View
                                                     className="h-full bg-[#EF4444] rounded-full"
                                                     style={{ width: displayData.totalMatches > 0 ? `${(displayData.losses / displayData.totalMatches) * 100}%` : '0%' }}

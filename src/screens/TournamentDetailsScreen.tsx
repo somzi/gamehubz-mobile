@@ -926,44 +926,56 @@ export default function TournamentDetailsScreen() {
                     />
                 ) : currentStage.groups && currentStage.groups.length > 0 ? (
                     <View>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            className="px-4 mb-6"
-                            contentContainerStyle={{ gap: 8 }}
-                        >
-                            {currentStage.groups.map((group: any, idx: number) => (
-                                <Pressable
-                                    key={group.groupId || idx}
-                                    onPress={() => setSelectedGroupIndex(idx)}
-                                    className={cn(
-                                        "px-4 py-2 rounded-lg border",
-                                        selectedGroupIndex === idx
-                                            ? "bg-accent/20 border-accent/40"
-                                            : "bg-muted/5 border-border/5"
-                                    )}
-                                >
-                                    <Text className={cn(
-                                        "text-xs font-bold",
-                                        selectedGroupIndex === idx ? "text-accent" : "text-muted-foreground"
-                                    )}>
-                                        {group.name || `Group ${String.fromCharCode(65 + idx)}`}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </ScrollView>
+                        {/* Sort groups alphabetically by name (Group A, Group B, …) */}
+                        {(() => {
+                            const sortedGroups = [...currentStage.groups].sort((a: any, b: any) => {
+                                const nameA = (a.name || '').toLowerCase();
+                                const nameB = (b.name || '').toLowerCase();
+                                return nameA.localeCompare(nameB);
+                            });
+                            return (
+                                <>
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        className="px-4 mb-6"
+                                        contentContainerStyle={{ gap: 8 }}
+                                    >
+                                        {sortedGroups.map((group: any, idx: number) => (
+                                            <Pressable
+                                                key={group.groupId || idx}
+                                                onPress={() => setSelectedGroupIndex(idx)}
+                                                className={cn(
+                                                    "px-4 py-2 rounded-lg border",
+                                                    selectedGroupIndex === idx
+                                                        ? "bg-accent/20 border-accent/40"
+                                                        : "bg-muted/5 border-border/5"
+                                                )}
+                                            >
+                                                <Text className={cn(
+                                                    "text-xs font-bold",
+                                                    selectedGroupIndex === idx ? "text-accent" : "text-muted-foreground"
+                                                )}>
+                                                    {group.name || `Group ${String.fromCharCode(65 + idx)}`}
+                                                </Text>
+                                            </Pressable>
+                                        ))}
+                                    </ScrollView>
 
-                        {currentStage.groups[selectedGroupIndex] && (
-                            <TournamentGroups
-                                groups={[currentStage.groups[selectedGroupIndex]]}
-                                onMatchPress={handleMatchPress}
-                                currentUserId={user?.id}
-                                currentUsername={user?.username}
-                                isAdmin={tournament?.createdBy === user?.id}
-                                onEditDeadline={handleEditDeadline}
-                                tournamentStatus={tournament?.status}
-                            />
-                        )}
+                                    {sortedGroups[selectedGroupIndex] && (
+                                        <TournamentGroups
+                                            groups={[sortedGroups[selectedGroupIndex]]}
+                                            onMatchPress={handleMatchPress}
+                                            currentUserId={user?.id}
+                                            currentUsername={user?.username}
+                                            isAdmin={tournament?.createdBy === user?.id}
+                                            onEditDeadline={handleEditDeadline}
+                                            tournamentStatus={tournament?.status}
+                                        />
+                                    )}
+                                </>
+                            );
+                        })()}
                     </View>
                 ) : (
                     <View className="py-10 items-center justify-center">
