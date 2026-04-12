@@ -931,6 +931,8 @@ export function MatchScheduleCard({
                                                     className={cn("mb-2 flex-1")}
                                                     nestedScrollEnabled
                                                     showsVerticalScrollIndicator={false}
+                                                    keyboardShouldPersistTaps="handled"
+                                                    keyboardDismissMode="on-drag"
                                                     contentContainerStyle={{ paddingVertical: 10 }}
                                                     onContentSizeChange={() => commentsScrollRef.current?.scrollToEnd({ animated: false })}
                                                 >
