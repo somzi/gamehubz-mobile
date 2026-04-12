@@ -25,6 +25,15 @@ export function usePushNotifications() {
             return 'denied';
         }
 
+        if (Platform.OS === 'android') {
+            await Notifications.setNotificationChannelAsync('default', {
+                name: 'Default',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#10B981',
+            });
+        }
+
         const { status } = await Notifications.getPermissionsAsync();
 
         if (status === 'granted') {
