@@ -48,10 +48,16 @@ export function HourlyAvailabilityPicker({
         return new Set((initialSlots || []).map(iso => {
             if (!iso) return '';
             try {
-                const [datePart, timePart] = iso.split('T');
-                const [hourStr] = timePart.split(':');
-                const hour = parseInt(hourStr, 10);
-                return `${datePart}-${hour}`;
+                // Parse the UTC ISO string to a Date object, which auto-adjusts to local time
+                const date = new Date(iso);
+                if (isNaN(date.getTime())) return '';
+                
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hour = date.getHours();
+                
+                return `${year}-${month}-${day}-${hour}`;
             } catch (e) {
                 console.error('Error parsing slot:', iso, e);
                 return '';
@@ -84,10 +90,16 @@ export function HourlyAvailabilityPicker({
         return new Set((opponentAvailability || []).map(iso => {
             if (!iso) return '';
             try {
-                const [datePart, timePart] = iso.split('T');
-                const [hourStr] = timePart.split(':');
-                const hour = parseInt(hourStr, 10);
-                return `${datePart}-${hour}`;
+                // Parse the UTC ISO string to a Date object, which auto-adjusts to local time
+                const date = new Date(iso);
+                if (isNaN(date.getTime())) return '';
+                
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hour = date.getHours();
+                
+                return `${year}-${month}-${day}-${hour}`;
             } catch (e) {
                 console.error('Error parsing opponent slot:', iso, e);
                 return '';
@@ -137,11 +149,14 @@ export function HourlyAvailabilityPicker({
     const handleSubmit = async () => {
         const dateTimeSlots = Array.from(selectedSlots).map(slot => {
             const parts = slot.split('-');
-            const year = parts[0];
-            const month = parts[1];
-            const day = parts[2];
-            const hour = parts[3];
-            return `${year}-${month}-${day}T${hour.padStart(2, '0')}:00:00`;
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+            const hour = parseInt(parts[3], 10);
+            
+            // Construct local date and convert to UTC ISO string
+            const localDate = new Date(year, month - 1, day, hour, 0, 0);
+            return localDate.toISOString();
         });
 
         onSubmit(Array.from(selectedSlots), dateTimeSlots);
