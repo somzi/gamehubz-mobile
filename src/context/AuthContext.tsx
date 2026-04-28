@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useCallback, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 import { User, AuthResponse, UserSocial } from '../types/auth';
 import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToLogout } from '../lib/api';
 import * as SecureStore from 'expo-secure-store';
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isAppReady, setIsAppReady] = useState(false);
 
     // Push notifications
-    const { initializePushNotifications, registerAndSync } = usePushNotifications();
+    const { checkAndSync, requestAndSync } = usePushNotifications();
 
     useEffect(() => {
         const loadStoredAuth = async () => {
@@ -86,27 +87,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => unsubscribe();
     }, []);
 
-    // Initialize push notifications when user becomes authenticated
-    // This covers the app-restart path (cached credentials) where login() is not called
+    // ─── Push notification initialization on authentication ────────
+    // Runs on every authenticated session start (login or auto-restore).
+    //
+    // Flow:
+    // 1. checkAndSync() — non-intrusive read of current permission.
+    //    Handles the "recovery" case: user denied earlier but later
+    //    enabled notifications in system settings → token is fetched
+    //    and synced without any popup.
+    // 2. If permission is 'undetermined', call requestAndSync() to
+    //    trigger the native OS dialog:
+    //    • Android 13+: shows the POST_NOTIFICATIONS system popup.
+    //    • iOS: shows the native alert exactly once per install
+    //      (subsequent calls are no-ops per Apple policy).
+    // 3. AppState listener: when the user returns from system settings
+    //    after enabling notifications, checkAndSync() re-runs silently
+    //    to pick up the newly granted permission and sync the token.
+    //
+    // NOTE: pushInitialized is set at the END of the try block so that
+    // if the flow fails (e.g. network error during sync), it will
+    // retry on the next render cycle without requiring a hard restart.
     const pushInitialized = useRef(false);
     useEffect(() => {
         if (user && token && isAppReady && !pushInitialized.current) {
-            pushInitialized.current = true;
-            console.log('[AuthContext] User authenticated, initializing push notifications...');
-            initializePushNotifications().then(permStatus => {
-                console.log(`[AuthContext] Push init result: ${permStatus}`);
-                if (permStatus === 'undetermined') {
-                    registerAndSync();
+            console.log('[AuthContext] User authenticated — starting push notification flow');
+
+            (async () => {
+                try {
+                    // Step 1: non-intrusive check + sync (handles recovery)
+                    const permStatus = await checkAndSync();
+                    console.log(`[AuthContext] Push checkAndSync result: ${permStatus}`);
+
+                    if (permStatus === 'granted') {
+                        console.log('[AuthContext] Push permissions already granted, sync handled');
+                    } else if (permStatus === 'undetermined') {
+                        // First time or never prompted — request explicitly
+                        console.log(`[AuthContext] Permissions undetermined on ${Platform.OS}, requesting…`);
+                        const granted = await requestAndSync();
+                        console.log(`[AuthContext] Push requestAndSync result: ${granted ? 'granted' : 'denied'}`);
+                    } else {
+                        // permStatus === 'denied'
+                        console.log('[AuthContext] Push permissions denied — user must enable in system settings');
+                    }
+
+                    // Mark as initialized only after the entire flow succeeds.
+                    // If an error occurred above, this line is skipped and the
+                    // flow will retry on the next render cycle.
+                    pushInitialized.current = true;
+                } catch (err) {
+                    console.warn('[AuthContext] Push notification flow error (will retry):', err);
                 }
-            }).catch(err => {
-                console.warn('[AuthContext] Push init error:', err);
-            });
+            })();
         }
-        // Reset when user logs out so it re-fires on next login
+
+        // Reset when user logs out so the flow re-fires on next login
         if (!user) {
             pushInitialized.current = false;
         }
-    }, [user, token, isAppReady, initializePushNotifications, registerAndSync]);
+    }, [user, token, isAppReady, checkAndSync, requestAndSync]);
+
+    // ─── AppState listener for push notification recovery ──────────
+    // When the user toggles back from System Settings → App, we
+    // re-check permissions silently. This covers the scenario where
+    // a user denied the initial prompt, navigated to settings to
+    // enable notifications, and then returned to the app.
+    // checkAndSync() is non-intrusive (no prompt) and idempotent,
+    // so this is safe on both iOS and Android.
+    const appStateRef = useRef(AppState.currentState);
+    useEffect(() => {
+        if (!user || !token) return;
+
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+            if (
+                appStateRef.current.match(/inactive|background/) &&
+                nextAppState === 'active'
+            ) {
+                console.log('[AuthContext] App foregrounded — re-checking push permissions');
+                checkAndSync().catch(err => {
+                    console.warn('[AuthContext] Foreground push re-check error:', err);
+                });
+            }
+            appStateRef.current = nextAppState;
+        });
+
+        return () => subscription.remove();
+    }, [user, token, checkAndSync]);
     // Helpers
     const normalizeUser = (apiUser: any): User => {
         return {

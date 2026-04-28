@@ -1,30 +1,38 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { apiClient, ENDPOINTS } from '../lib/api';
 
 export type PermissionStatus = 'granted' | 'denied' | 'undetermined';
 
+const STORAGE_KEY_LAST_SYNCED_TOKEN = 'push_last_synced_token';
+
+/**
+ * Hook for managing push notification permissions, token retrieval,
+ * and idempotent backend synchronization.
+ *
+ * Key behaviours:
+ *  - `checkAndSync()` — Non-intrusive. Reads current permission status,
+ *    fetches the token if granted, syncs only when the token differs from
+ *    the last successfully synced value (persisted in SecureStore).
+ *    Covers the "recovery" scenario where a user enables notifications
+ *    in system settings after previously denying.
+ *
+ *  - `requestAndSync()` — Intrusive. Calls `requestPermissionsAsync()`
+ *    which shows the native OS prompt (Android 13+ system dialog / iOS
+ *    first-time prompt). Then fetches + syncs the token if granted.
+ *    On iOS, the OS ensures this prompt only appears once — subsequent
+ *    calls resolve immediately without a popup.
+ */
 export function usePushNotifications() {
     const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const lastSyncedToken = useRef<string | null>(null);
 
-    /**
-     * Check current permission status and, if already granted,
-     * fetch the token and sync with the server.
-     * Returns the current permission status so the caller can
-     * decide whether to show the opt-in modal.
-     */
-    const initializePushNotifications = useCallback(async (): Promise<PermissionStatus> => {
-        if (!Device.isDevice) {
-            setError('Push notifications require a physical device.');
-            console.warn('[Push] Must use physical device for push notifications');
-            return 'denied';
-        }
-
+    // ─── Android notification channel ──────────────────────────────
+    const ensureAndroidChannel = useCallback(async () => {
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'Default',
@@ -33,8 +41,76 @@ export function usePushNotifications() {
                 lightColor: '#10B981',
             });
         }
+    }, []);
+
+    // ─── Token fetch + idempotent sync ─────────────────────────────
+    const fetchTokenAndSync = useCallback(async (): Promise<string | null> => {
+        try {
+            const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+            const tokenResponse = await Notifications.getExpoPushTokenAsync({
+                projectId,
+            });
+            const token = tokenResponse.data;
+            console.log(`[Push] Token fetched successfully: ${token ? token.substring(0, 20) + '…' : 'null'}`);
+
+            if (!token) {
+                console.warn('[Push] Token fetch returned null');
+                return null;
+            }
+
+            // Idempotency: compare against persisted last-synced token
+            const lastSynced = await SecureStore.getItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN);
+
+            if (token === lastSynced) {
+                console.log('[Push] Backend sync SKIPPED — token unchanged since last successful sync');
+                return token;
+            }
+
+            console.log('[Push] Backend sync INITIATED — token is new or changed');
+            await syncTokenWithServer(token);
+            return token;
+        } catch (e) {
+            console.warn('[Push] Token fetch FAILED:', e);
+            setError('Failed to retrieve push token. Are you on a physical device?');
+            return null;
+        }
+    }, []);
+
+    const syncTokenWithServer = async (token: string) => {
+        try {
+            await apiClient.post(ENDPOINTS.PUSH_TOKEN, {
+                token,
+                platform: Platform.OS,
+            });
+            // Persist on success so future launches can skip redundant calls
+            await SecureStore.setItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN, token);
+            console.log('[Push] Token synced with server and persisted locally');
+        } catch (e) {
+            console.warn('[Push] Backend sync FAILED:', e);
+        }
+    };
+
+    // ─── Public API ────────────────────────────────────────────────
+
+    /**
+     * Non-intrusive check: reads current permission status without
+     * triggering any OS prompt.  If already `granted`, fetches the
+     * token and syncs idempotently.
+     *
+     * Use on every app launch / auth restore to handle the recovery
+     * case (user granted permissions later via system settings).
+     */
+    const checkAndSync = useCallback(async (): Promise<PermissionStatus> => {
+        if (!Device.isDevice) {
+            setError('Push notifications require a physical device.');
+            console.warn('[Push] Must use physical device for push notifications');
+            return 'denied';
+        }
+
+        await ensureAndroidChannel();
 
         const { status } = await Notifications.getPermissionsAsync();
+        console.log(`[Push] Permission status detected: ${status}`);
 
         if (status === 'granted') {
             const token = await fetchTokenAndSync();
@@ -42,34 +118,34 @@ export function usePushNotifications() {
         }
 
         return status as PermissionStatus;
-    }, []);
+    }, [ensureAndroidChannel, fetchTokenAndSync]);
 
     /**
-     * Request permissions from the OS, set up the Android channel,
-     * fetch the token, and sync with the server.
-     * This is the "second opt-in" that gets called after the user
-     * taps "Allow" on the custom modal.
+     * Explicitly request notification permissions from the OS.
+     *
+     * - Android 13+ (API 33): triggers the native POST_NOTIFICATIONS
+     *   system dialog.
+     * - iOS: triggers the native alert exactly once per app install.
+     *   Subsequent calls are a no-op (Apple policy).
+     *
+     * If permission is granted, fetches the token and syncs.
      */
-    const registerAndSync = useCallback(async (): Promise<boolean> => {
+    const requestAndSync = useCallback(async (): Promise<boolean> => {
         if (!Device.isDevice) {
             setError('Push notifications require a physical device.');
             console.warn('[Push] Must use physical device for push notifications');
             return false;
         }
 
-        if (Platform.OS === 'android') {
-            await Notifications.setNotificationChannelAsync('default', {
-                name: 'Default',
-                importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#10B981',
-            });
-        }
+        await ensureAndroidChannel();
 
+        console.log('[Push] Requesting notification permissions from OS…');
         const { status } = await Notifications.requestPermissionsAsync();
+        console.log(`[Push] Permission request result: ${status}`);
 
         if (status !== 'granted') {
             setError('Notification permission not granted.');
+            console.log('[Push] User denied notification permissions');
             return false;
         }
 
@@ -79,41 +155,7 @@ export function usePushNotifications() {
             return true;
         }
         return false;
-    }, []);
+    }, [ensureAndroidChannel, fetchTokenAndSync]);
 
-    async function fetchTokenAndSync(): Promise<string | null> {
-        try {
-            const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-            const tokenResponse = await Notifications.getExpoPushTokenAsync({
-                projectId,
-            });
-            const token = tokenResponse.data;
-
-            if (token && token !== lastSyncedToken.current) {
-                await syncTokenWithServer(token);
-            }
-
-            return token;
-        } catch (e) {
-            // Prevents crashes on emulators/simulators where token retrieval fails
-            console.warn('[Push] Failed to get push token:', e);
-            setError('Failed to retrieve push token. Are you on a physical device?');
-            return null;
-        }
-    }
-
-    async function syncTokenWithServer(token: string) {
-        try {
-            await apiClient.post(ENDPOINTS.PUSH_TOKEN, {
-                token,
-                platform: Platform.OS,
-            });
-            lastSyncedToken.current = token;
-            console.log('[Push] Token synced with server');
-        } catch (e) {
-            console.warn('[Push] Failed to sync token:', e);
-        }
-    }
-
-    return { expoPushToken, error, initializePushNotifications, registerAndSync };
+    return { expoPushToken, error, checkAndSync, requestAndSync };
 }
