@@ -10,6 +10,7 @@ interface HourlyAvailabilityPickerProps {
     opponentAvailability?: string[];
     initialSlots?: string[];
     onSubmit: (selectedSlots: string[], dateTimeSlots: string[]) => void | Promise<void>;
+    onMarkScheduled?: () => void | Promise<void>;
 }
 
 // Generate hours from 00:00 to 23:00
@@ -43,6 +44,7 @@ export function HourlyAvailabilityPicker({
     opponentAvailability = [],
     initialSlots = [],
     onSubmit,
+    onMarkScheduled,
 }: HourlyAvailabilityPickerProps) {
     const initialKeys = useMemo(() => {
         return new Set((initialSlots || []).map(iso => {
@@ -340,22 +342,64 @@ export function HourlyAvailabilityPicker({
             {/* Action Button */}
             {
                 !submitted ? (
-                    <Pressable
-                        onPress={handleSubmit}
-                        disabled={selectedSlots.size === 0}
-                        className={cn(
-                            "w-full h-14 rounded-2xl shadow-lg flex-row items-center justify-center gap-2",
-                            selectedSlots.size > 0 ? "bg-primary" : "bg-slate-700 opacity-50"
+                    <View className="gap-3">
+                        <Pressable
+                            onPress={handleSubmit}
+                            disabled={selectedSlots.size === 0}
+                            className={cn(
+                                "w-full h-14 rounded-2xl shadow-lg flex-row items-center justify-center gap-2",
+                                selectedSlots.size > 0 ? "bg-primary" : "bg-slate-700 opacity-50"
+                            )}
+                        >
+                            <Ionicons name="send" size={18} color={selectedSlots.size > 0 ? "#0F172A" : "#64748B"} />
+                            <Text className={cn(
+                                "font-black text-base uppercase tracking-wider",
+                                selectedSlots.size > 0 ? "text-slate-900" : "text-slate-500"
+                            )}>
+                                Confirm Availability ({selectedSlots.size})
+                            </Text>
+                        </Pressable>
+
+                        {/* Skip scheduling — already agreed outside app */}
+                        {onMarkScheduled && (
+                            <View>
+                                {/* Divider */}
+                                <View className="flex-row items-center gap-3 my-1">
+                                    <View className="flex-1 h-[1px] bg-white/[0.06]" />
+                                    <Text className="text-[10px] font-black text-slate-600 uppercase tracking-[2px]">or</Text>
+                                    <View className="flex-1 h-[1px] bg-white/[0.06]" />
+                                </View>
+
+                                <Pressable
+                                    onPress={onMarkScheduled}
+                                    style={({ pressed }) => ({
+                                        opacity: pressed ? 0.75 : 1,
+                                        transform: [{ scale: pressed ? 0.97 : 1 }],
+                                    })}
+                                >
+                                    <View className="w-full rounded-2xl border border-white/[0.08] bg-slate-800/40 flex-row items-center px-4 py-3.5 gap-3">
+                                        {/* Icon pill */}
+                                        <View className="w-8 h-8 rounded-xl bg-slate-700/60 border border-white/[0.06] items-center justify-center">
+                                            <Ionicons name="link-outline" size={15} color="#64748B" />
+                                        </View>
+
+                                        {/* Text */}
+                                        <View className="flex-1">
+                                            <Text className="text-[13px] font-bold text-slate-300 tracking-tight leading-tight">
+                                                Already agreed on a time?
+                                            </Text>
+                                            <Text className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                                Skip scheduling — we confirmed outside the app
+                                            </Text>
+                                        </View>
+
+                                        {/* Arrow */}
+                                        <Ionicons name="chevron-forward" size={14} color="#334155" />
+                                    </View>
+                                </Pressable>
+                            </View>
                         )}
-                    >
-                        <Ionicons name="send" size={18} color={selectedSlots.size > 0 ? "#0F172A" : "#64748B"} />
-                        <Text className={cn(
-                            "font-black text-base uppercase tracking-wider",
-                            selectedSlots.size > 0 ? "text-slate-900" : "text-slate-500"
-                        )}>
-                            Confirm Availability ({selectedSlots.size})
-                        </Text>
-                    </Pressable>
+                    </View>
                 ) : (
                     <View className="py-4 rounded-3xl bg-primary/10 border border-primary/20 items-center justify-center">
                         <Ionicons name="checkmark-circle" size={24} color="#10B981" />

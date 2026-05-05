@@ -277,6 +277,34 @@ export function MatchScheduleCard({
         }
     };
 
+    const handleMarkScheduled = async () => {
+        try {
+            setIsSubmitting(true);
+            if (!matchId) return;
+
+            const response = await authenticatedFetch(ENDPOINTS.SET_MATCH_SCHEDULED(matchId), {
+                method: 'POST',
+            });
+
+            if (response.ok) {
+                setCurrentStatus('scheduled');
+                setMatchTime('Agreed outside app');
+                
+                if (onMatchUpdate) {
+                    onMatchUpdate();
+                }
+            } else {
+                const errorText = await response.text().catch(() => 'Failed to mark as scheduled');
+                setError(errorText);
+            }
+        } catch (error: any) {
+            console.error('Error marking scheduled:', error);
+            setError(error.message || 'An error occurred');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const pickImages = async () => {
         try {
             const { status: pStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -685,6 +713,7 @@ export function MatchScheduleCard({
                                                     opponentAvailability={opponentSlots}
                                                     initialSlots={mySlots}
                                                     onSubmit={handleAvailabilitySubmit}
+                                                    onMarkScheduled={handleMarkScheduled}
                                                 />
                                             </View>
                                         )}

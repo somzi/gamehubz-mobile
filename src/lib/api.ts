@@ -72,6 +72,7 @@ export const ENDPOINTS = {
     GET_ALL_HUB_ACTIVITY: (pageNumber: number) => `${API_BASE_URL}/api/hubActivity/all?pageNumber=${pageNumber}`,
     EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
+    SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
 };
 
 import axios from 'axios';
