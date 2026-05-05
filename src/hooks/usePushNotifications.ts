@@ -8,6 +8,12 @@ import { apiClient, ENDPOINTS } from '../lib/api';
 
 export type PermissionStatus = 'granted' | 'denied' | 'undetermined';
 
+export interface PushPermissionState {
+    status: PermissionStatus;
+    granted: boolean;
+    canAskAgain: boolean;
+}
+
 const STORAGE_KEY_LAST_SYNCED_TOKEN = 'push_last_synced_token';
 
 /**
@@ -94,30 +100,42 @@ export function usePushNotifications() {
 
     /**
      * Non-intrusive check: reads current permission status without
-     * triggering any OS prompt.  If already `granted`, fetches the
+     * triggering any OS prompt. If already granted, fetches the
      * token and syncs idempotently.
      *
      * Use on every app launch / auth restore to handle the recovery
      * case (user granted permissions later via system settings).
      */
-    const checkAndSync = useCallback(async (): Promise<PermissionStatus> => {
+    const checkAndSync = useCallback(async (): Promise<PushPermissionState> => {
         if (!Device.isDevice) {
             setError('Push notifications require a physical device.');
             console.warn('[Push] Must use physical device for push notifications');
-            return 'denied';
+            return {
+                status: 'denied',
+                granted: false,
+                canAskAgain: false,
+            };
         }
 
         await ensureAndroidChannel();
 
-        const { status } = await Notifications.getPermissionsAsync();
-        console.log(`[Push] Permission status detected: ${status}`);
+        const permission = await Notifications.getPermissionsAsync();
+        const granted = permission.granted || permission.status === 'granted';
 
-        if (status === 'granted') {
+        console.log(
+            `[Push] Permission status detected: ${permission.status} | granted=${granted} | canAskAgain=${permission.canAskAgain}`,
+        );
+
+        if (granted) {
             const token = await fetchTokenAndSync();
             if (token) setExpoPushToken(token);
         }
 
-        return status as PermissionStatus;
+        return {
+            status: permission.status as PermissionStatus,
+            granted,
+            canAskAgain: permission.canAskAgain,
+        };
     }, [ensureAndroidChannel, fetchTokenAndSync]);
 
     /**
