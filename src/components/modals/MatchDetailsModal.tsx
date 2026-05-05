@@ -342,8 +342,7 @@ export function MatchDetailsModal({
     const isAway = (away?.userId || matchDetails?.awayUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isParticipant = !!(isHome || isAway);
 
-    const hasStartTime = !!scheduledTime || !!matchDetails?.scheduledTime;
-    const canSubmit = hasStartTime ? isParticipant : isHubOwner;
+    const canSubmit = isParticipant || isHubOwner;
 
     // Determine winner for completed matches
     const getWinnerSide = () => {
@@ -819,7 +818,7 @@ export function MatchDetailsModal({
                                 "text-sm font-black uppercase tracking-wider",
                                 (isRoundLocked || !canSubmit) ? "text-slate-500" : "text-[#0F172A]"
                             )}>
-                                {isRoundLocked ? "Locked" : !canSubmit ? (hasStartTime ? "Players Only" : "Admin Only") : "Submit"}
+                                {isRoundLocked ? "Locked" : !canSubmit ? "View Only" : "Submit"}
                             </Text>
                         )}
                     </Pressable>
@@ -841,11 +840,7 @@ export function MatchDetailsModal({
                     </Pressable>
                 )}
 
-                {!canSubmit && (
-                    <Text className="text-[10px] text-slate-600 text-center mb-4 font-medium">
-                        {hasStartTime ? "Only match participants can report results once scheduled" : "Only administrators can report results for unscheduled matches"}
-                    </Text>
-                )}
+
             </View>
         );
     };
