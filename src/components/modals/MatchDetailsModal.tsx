@@ -805,10 +805,10 @@ export function MatchDetailsModal({
                     </Pressable>
                     <Pressable
                         onPress={handleSubmitResult}
-                        disabled={isRoundLocked || !canSubmit}
+                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit}
                         className={cn(
                             "flex-1 rounded-2xl py-4 items-center active:opacity-80",
-                            (isRoundLocked || !canSubmit) ? "bg-white/5 border border-white/[0.06]" : "bg-[#10B981]"
+                            ((isRoundLocked && !isHubOwner) || !canSubmit) ? "bg-white/5 border border-white/[0.06]" : "bg-[#10B981]"
                         )}
                     >
                         {isSubmitting ? (
@@ -816,9 +816,9 @@ export function MatchDetailsModal({
                         ) : (
                             <Text className={cn(
                                 "text-sm font-black uppercase tracking-wider",
-                                (isRoundLocked || !canSubmit) ? "text-slate-500" : "text-[#0F172A]"
+                                ((isRoundLocked && !isHubOwner) || !canSubmit) ? "text-slate-500" : "text-[#0F172A]"
                             )}>
-                                {isRoundLocked ? "Locked" : !canSubmit ? "View Only" : "Submit"}
+                                {(isRoundLocked && !isHubOwner) ? "Locked" : !canSubmit ? "View Only" : "Submit"}
                             </Text>
                         )}
                     </Pressable>
