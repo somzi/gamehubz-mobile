@@ -42,61 +42,84 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     };
 
     const renderParticipant = (participant: Participant | null, position: 'top' | 'bottom') => {
+        const isTop = position === 'top';
+
         if (!participant) {
             return (
                 <View className={cn(
-                    "flex-row items-center px-3 py-2.5",
-                    position === 'top' ? "rounded-t-2xl" : "rounded-b-2xl",
+                    "flex-row items-center px-4 py-3",
+                    isTop ? "rounded-t-2xl" : "rounded-b-2xl",
                 )}>
-                    <View className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06]" />
-                    <Text className="text-xs text-slate-600 italic ml-2.5 flex-1">TBD</Text>
+                    <View
+                        className="w-7 h-7 rounded-full items-center justify-center"
+                        style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed' }}
+                    />
+                    <Text className="text-xs text-slate-700 italic ml-3 flex-1 font-medium">TBD</Text>
+                    <View className="w-8 h-8 rounded-xl bg-white/[0.02] items-center justify-center">
+                        <Text className="text-xs text-slate-700 font-black">—</Text>
+                    </View>
                 </View>
             );
         }
 
         const isWinner = participant.isWinner;
+        const hasMatchScore = participant.score !== null && participant.score !== undefined;
 
         return (
             <Pressable
                 onPress={() => handlePlayerClick(participant.userId)}
                 className={cn(
-                    "flex-row items-center px-3 py-2.5",
-                    position === 'top' ? "rounded-t-2xl" : "rounded-b-2xl",
-                    isWinner && "bg-emerald-500/[0.04]",
+                    "flex-row items-center px-4 py-3",
+                    isTop ? "rounded-t-2xl" : "rounded-b-2xl",
+                    isWinner ? "bg-emerald-500/[0.06]" : undefined,
                 )}
             >
+                {/* Winner accent bar */}
+                {isWinner && (
+                    <View
+                        className="absolute left-0 w-[3px] bg-emerald-400 rounded-full"
+                        style={{ top: 6, bottom: 6 }}
+                    />
+                )}
+
                 {isTeamTournament ? (
                     <View className={cn(
-                        "w-6 h-6 rounded-lg items-center justify-center",
-                        isWinner ? "bg-emerald-500/15" : "bg-white/[0.04]"
+                        "w-7 h-7 rounded-xl items-center justify-center",
+                        isWinner ? "bg-emerald-500/20" : "bg-white/[0.05]"
                     )}>
-                        <Ionicons name="people" size={12} color={isWinner ? '#10B981' : '#475569'} />
+                        <Ionicons name="people" size={13} color={isWinner ? '#34D399' : '#475569'} />
                     </View>
                 ) : (
-                    <PlayerAvatar name={participant.username} size="sm" className="w-6 h-6" />
+                    <PlayerAvatar name={participant.username} size="sm" className="w-7 h-7" />
                 )}
+
                 <Text
                     className={cn(
-                        "text-xs font-semibold flex-1 ml-2.5",
-                        isWinner ? "text-emerald-400" : "text-slate-300"
+                        "text-sm font-semibold flex-1 ml-3",
+                        isWinner ? "text-emerald-300" : "text-slate-200"
                     )}
                     numberOfLines={1}
                 >
                     {participant.username}
                 </Text>
-                {participant.score !== null && (
-                    <View className={cn(
-                        "w-7 h-7 rounded-lg items-center justify-center ml-2",
-                        isWinner ? "bg-emerald-500/15" : "bg-white/[0.04]"
-                    )}>
+
+                {/* Score chip */}
+                <View className={cn(
+                    "min-w-[32px] h-8 px-2 rounded-xl items-center justify-center ml-2",
+                    isWinner ? "bg-emerald-500/20" : "bg-white/[0.04]"
+                )}>
+                    {hasMatchScore ? (
                         <Text className={cn(
-                            "text-xs font-black",
-                            isWinner ? "text-emerald-400" : "text-slate-400"
+                            "text-sm font-black",
+                            isWinner ? "text-emerald-300" : "text-slate-500"
                         )}>
                             {participant.score}
                         </Text>
-                    </View>
-                )}
+                    ) : (
+                        <Text className="text-xs text-slate-700 font-bold">—</Text>
+                    )}
+                </View>
+
             </Pressable>
         );
     };
@@ -119,9 +142,11 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
 
     const hasScore = (p: any) => p?.score !== null && p?.score !== undefined;
     const isAlreadyReported = hasScore(home) || hasScore(away);
+    const isCompleted = status === 3 || status === 4;
+    const isLive = status === 2;
 
     const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4);
-    
+
     const hasStartTime = !!startTime;
     const canUserReport = hasStartTime ? isParticipant : isAdmin;
     const canReport = canShowDetails && !isAlreadyReported && canUserReport && (status === 2 || status === 1);
@@ -131,26 +156,57 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             onPress={canShowDetails ? onPress : undefined}
             disabled={!canShowDetails}
             className={cn(
-                "w-52 rounded-2xl bg-[#0D1525] border overflow-hidden",
-                canReport ? "border-emerald-500/20" : "border-white/[0.06]",
+                "rounded-2xl bg-[#0D1525] border overflow-hidden",
+                canReport ? "border-emerald-500/25" : isCompleted ? "border-white/[0.06]" : "border-white/[0.06]",
                 className
             )}
             style={({ pressed }) => ({
-                opacity: pressed && canShowDetails ? 0.7 : 1,
-                transform: [{ scale: pressed && canShowDetails ? 0.98 : 1 }]
+                opacity: pressed && canShowDetails ? 0.75 : 1,
+                transform: [{ scale: pressed && canShowDetails ? 0.985 : 1 }]
             })}
         >
-            {canReport && (
-                <View className="flex-row items-center justify-between px-3 py-1.5 bg-emerald-500/[0.06]">
-                    <View className="flex-row items-center gap-1">
-                        <Ionicons name="create-outline" size={10} color="#10B981" />
-                        <Text className="text-[9px] font-black text-emerald-400 uppercase tracking-[1.5px]">Report</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={10} color="#10B981" />
+            {/* Status / action header */}
+            {(canReport || isLive || isCompleted) && (
+                <View className={cn(
+                    "flex-row items-center justify-between px-4 py-2",
+                    canReport
+                        ? "bg-emerald-500/[0.08]"
+                        : isLive
+                            ? "bg-amber-500/[0.08]"
+                            : "bg-white/[0.02]"
+                )}>
+                    {canReport && (
+                        <>
+                            <View className="flex-row items-center gap-1.5">
+                                <View className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                <Text className="text-[10px] font-black text-emerald-400 uppercase tracking-[1.5px]">
+                                    Report Result
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color="#34D399" />
+                        </>
+                    )}
+                    {!canReport && isLive && (
+                        <View className="flex-row items-center gap-1.5">
+                            <View className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <Text className="text-[10px] font-black text-amber-400 uppercase tracking-[1.5px]">
+                                In Progress
+                            </Text>
+                        </View>
+                    )}
+                    {!canReport && isCompleted && (
+                        <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="checkmark-circle" size={11} color="#34D399" />
+                            <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-[1.5px]">
+                                Completed
+                            </Text>
+                        </View>
+                    )}
                 </View>
             )}
+
             {renderParticipant(home, 'top')}
-            <View className="h-px bg-white/[0.04] mx-3" />
+            <View className="h-px mx-4" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
             {renderParticipant(away, 'bottom')}
         </Pressable>
     );

@@ -187,17 +187,51 @@ export function HourlyAvailabilityPicker({
             {/* Deadline & Instruction */}
             <View className="bg-slate-800/40 rounded-2xl p-3 border border-white/5 mb-1">
                 <View className="flex-row items-center gap-2">
+                    <View className="w-[3px] self-stretch rounded-full mr-1" style={{ backgroundColor: 'rgba(16,185,129,0.7)' }} />
                     <View className="w-7 h-7 rounded-lg bg-amber-500/10 items-center justify-center border border-amber-500/20">
                         <Ionicons name="calendar-outline" size={14} color="#FBBF24" />
                     </View>
                     <Text className="text-sm text-slate-400 font-bold">Deadline: {displayDeadline}</Text>
                 </View>
                 <View className="h-[1px] bg-white/5 my-2" />
-                <Text className="text-sm text-slate-300 leading-5">
-                    Pick dates and times when you can play vs{' '}
-                    <Text className="font-bold text-primary">{opponentName}</Text>
-                </Text>
+                <View className="flex-row items-center flex-wrap gap-x-1.5 gap-y-1">
+                    <Text className="text-sm text-slate-300">Pick dates and times when you can play vs</Text>
+                    <View className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2 py-0.5 self-center">
+                        <Text className="text-sm text-emerald-400 font-bold">{opponentName}</Text>
+                    </View>
+                </View>
             </View>
+
+            {/* Already agreed on a time? */}
+            {onMarkScheduled && (
+                <>
+                    <Pressable
+                        onPress={onMarkScheduled}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                        className="w-full rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.06] flex-row items-center px-4 py-4 gap-3"
+                    >
+                        <View className="w-9 h-9 rounded-full bg-emerald-500/15 items-center justify-center">
+                            <Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-[15px] font-bold text-white leading-tight">
+                                Already agreed on a time?
+                            </Text>
+                            <Text className="text-[12px] text-slate-400 mt-0.5">
+                                Skip scheduling and report directly
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                    </Pressable>
+
+                    {/* OR divider */}
+                    <View className="flex-row items-center" style={{ marginVertical: 16 }}>
+                        <View className="flex-1 h-[1px] bg-white/[0.06]" />
+                        <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3">OR</Text>
+                        <View className="flex-1 h-[1px] bg-white/[0.06]" />
+                    </View>
+                </>
+            )}
 
             {/* Date Tabs (ostaje fiksne visine) */}
             <View>
@@ -214,19 +248,19 @@ export function HourlyAvailabilityPicker({
                                 className={cn(
                                     "mr-2 px-4 py-3 rounded-2xl items-center min-w-[80px] border",
                                     isSelected
-                                        ? "bg-primary border-primary"
-                                        : "bg-slate-800/40 border-slate-700/50"
+                                        ? "bg-indigo-600 border-indigo-400/40"
+                                        : "bg-white/[0.03] border-white/[0.07]"
                                 )}
                             >
                                 <Text className={cn(
-                                    "text-xs font-bold uppercase tracking-tight",
-                                    isSelected ? "text-slate-900" : "text-slate-400"
+                                    "text-[11px] font-black uppercase tracking-tight",
+                                    isSelected ? "text-white" : "text-slate-400"
                                 )}>
                                     {day.label}
                                 </Text>
                                 <Text className={cn(
                                     "text-[10px] mt-1",
-                                    isSelected ? "text-slate-900/70" : "text-slate-500"
+                                    isSelected ? "text-slate-300" : "text-slate-500"
                                 )}>
                                     {day.fullLabel}
                                 </Text>
@@ -278,40 +312,43 @@ export function HourlyAvailabilityPicker({
                                     onPress={() => toggleSlot(dayKey, hour)}
                                     disabled={isDisabled}
                                     className={cn(
-                                        "w-[20.5%] h-12 mb-2 rounded-xl items-center justify-center border",
+                                        "w-[20.5%] h-12 mb-2 rounded-xl items-center justify-center",
                                         isDisabled
-                                            ? "bg-slate-800/10 border-slate-700/10 opacity-20"
+                                            ? "opacity-35"
                                             : isMutual
-                                                ? "bg-primary border-primary"
+                                                ? "bg-emerald-500/20 border border-emerald-500/30"
                                                 : isSelected
-                                                    ? "bg-primary/20 border-primary"
+                                                    ? "bg-indigo-600/80 border border-indigo-400/30"
                                                     : opponentAvail
-                                                        ? "bg-indigo-500/10 border-indigo-500/30"
-                                                        : "bg-slate-800/30 border-slate-700/30",
+                                                        ? "bg-amber-500/15 border border-amber-500/20"
+                                                        : "bg-white/[0.03] border border-white/[0.08]",
                                         submitted && "opacity-50"
                                     )}
                                 >
                                     {isMutual ? (
-                                        <View className="items-center justify-center">
-                                            <Ionicons name="checkmark-done" size={16} color="#0F172A" />
-                                            <Text className="text-[11px] text-slate-900 uppercase font-black tracking-tighter -mt-0.5">
-                                                Mutual
-                                            </Text>
-                                        </View>
+                                        <>
+                                            <View className="items-center justify-center">
+                                                <Ionicons name="checkmark-done" size={16} color="#10B981" />
+                                                <Text className="text-[11px] text-emerald-300 uppercase font-bold tracking-tighter -mt-0.5">
+                                                    Mutual
+                                                </Text>
+                                            </View>
+                                            <View className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                        </>
                                     ) : (
                                         <>
                                             <View className="flex-row items-center justify-center gap-1">
                                                 {opponentAvail && !isSelected && (
-                                                    <View className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-0.5" />
+                                                    <View className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-0.5" />
                                                 )}
                                                 <Text className={cn(
-                                                    "text-sm font-black",
-                                                    isSelected ? "text-primary" : opponentAvail ? "text-indigo-400" : "text-slate-300"
+                                                    "text-sm",
+                                                    isDisabled ? "text-slate-700 font-normal" : isSelected ? "text-white font-bold" : opponentAvail ? "text-amber-300 font-black" : "text-slate-400 font-black"
                                                 )}>
                                                     {formatHour(hour)}
                                                 </Text>
                                                 {isSelected && (
-                                                    <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                                                    <Ionicons name="checkmark-circle" size={12} color="#818cf8" />
                                                 )}
                                             </View>
                                         </>
@@ -323,18 +360,18 @@ export function HourlyAvailabilityPicker({
                 </ScrollView>
             </View>
 
-            {/* Legend (Zalepčeno na dno iznad dugmeta) */}
-            <View className="flex-row items-center justify-center gap-3 py-1 flex-wrap mt-auto">
+            {/* Legend */}
+            <View className="bg-white/[0.03] rounded-xl px-4 py-2 flex-row items-center justify-center gap-4 flex-wrap mt-auto">
                 <View className="flex-row items-center gap-1.5">
-                    <View className="w-2.5 h-2.5 rounded-full bg-primary/20 border border-primary" />
+                    <View className="w-2.5 h-2.5 rounded-sm bg-indigo-600/80 border border-indigo-400/30" />
                     <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Your Choice</Text>
                 </View>
                 <View className="flex-row items-center gap-1.5">
-                    <View className="w-2.5 h-2.5 rounded-full bg-indigo-500/20 border border-indigo-500/30" />
+                    <View className="w-2.5 h-2.5 rounded-sm bg-amber-500/15 border border-amber-500/20" />
                     <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Opponent</Text>
                 </View>
                 <View className="flex-row items-center gap-1.5">
-                    <View className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    <View className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20 border border-emerald-500/30" />
                     <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Mutual Slot</Text>
                 </View>
             </View>
@@ -346,59 +383,28 @@ export function HourlyAvailabilityPicker({
                         <Pressable
                             onPress={handleSubmit}
                             disabled={selectedSlots.size === 0}
+                            style={selectedSlots.size > 0 ? {
+                                shadowColor: '#6366F1',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.4,
+                                shadowRadius: 12,
+                                elevation: 8,
+                            } : undefined}
                             className={cn(
-                                "w-full h-14 rounded-2xl shadow-lg flex-row items-center justify-center gap-2",
-                                selectedSlots.size > 0 ? "bg-primary" : "bg-slate-700 opacity-50"
+                                "w-full h-14 rounded-2xl flex-row items-center justify-center gap-2",
+                                selectedSlots.size > 0
+                                    ? "bg-indigo-600"
+                                    : "bg-white/[0.04] border border-white/[0.06]"
                             )}
                         >
-                            <Ionicons name="send" size={18} color={selectedSlots.size > 0 ? "#0F172A" : "#64748B"} />
+                            <Ionicons name="send" size={18} color={selectedSlots.size > 0 ? "#ffffff" : "#475569"} />
                             <Text className={cn(
                                 "font-black text-base uppercase tracking-wider",
-                                selectedSlots.size > 0 ? "text-slate-900" : "text-slate-500"
+                                selectedSlots.size > 0 ? "text-white" : "text-slate-600"
                             )}>
                                 Confirm Availability ({selectedSlots.size})
                             </Text>
                         </Pressable>
-
-                        {/* Skip scheduling — already agreed outside app */}
-                        {onMarkScheduled && (
-                            <View>
-                                {/* Divider */}
-                                <View className="flex-row items-center gap-3 my-1">
-                                    <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                                    <Text className="text-[10px] font-black text-slate-600 uppercase tracking-[2px]">or</Text>
-                                    <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                                </View>
-
-                                <Pressable
-                                    onPress={onMarkScheduled}
-                                    style={({ pressed }) => ({
-                                        opacity: pressed ? 0.75 : 1,
-                                        transform: [{ scale: pressed ? 0.97 : 1 }],
-                                    })}
-                                >
-                                    <View className="w-full rounded-2xl border border-white/[0.08] bg-slate-800/40 flex-row items-center px-4 py-3.5 gap-3">
-                                        {/* Icon pill */}
-                                        <View className="w-8 h-8 rounded-xl bg-slate-700/60 border border-white/[0.06] items-center justify-center">
-                                            <Ionicons name="link-outline" size={15} color="#64748B" />
-                                        </View>
-
-                                        {/* Text */}
-                                        <View className="flex-1">
-                                            <Text className="text-[13px] font-bold text-slate-300 tracking-tight leading-tight">
-                                                Already agreed on a time?
-                                            </Text>
-                                            <Text className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                                Skip scheduling — we confirmed outside the app
-                                            </Text>
-                                        </View>
-
-                                        {/* Arrow */}
-                                        <Ionicons name="chevron-forward" size={14} color="#334155" />
-                                    </View>
-                                </Pressable>
-                            </View>
-                        )}
                     </View>
                 ) : (
                     <View className="py-4 rounded-3xl bg-primary/10 border border-primary/20 items-center justify-center">

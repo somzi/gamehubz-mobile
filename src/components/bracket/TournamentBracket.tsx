@@ -1,8 +1,26 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, Pressable, Animated } from 'react-native';
 import { BracketMatch } from './BracketMatch';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
+
+/* ── Layout constants ─────────────────────────────────────────────── */
+const MATCH_H = 130;            // vertical slot per match card
+const BASE_GAP = 8;             // gap between R1 cards
+const UNIT = MATCH_H + BASE_GAP; // 138 px per R1 slot
+const MATCH_W = 220;            // fixed card width
+const CONNECTOR_W = 40;         // width of connector column between rounds
+const HEADER_H = 64;            // height of round header row
+const STROKE = 1.5;
+const LINE_DEFAULT = 'rgba(255,255,255,0.06)';
+const LINE_MY_PATH = 'rgba(99,102,241,0.25)';
+
+/** Absolute top of a match card within its round's match-area View. */
+function computeMatchTop(roundIdx: number, matchIdx: number): number {
+    if (roundIdx === 0) return matchIdx * UNIT;
+    // Center between the two feeder matches from the previous round
+    return ((2 * matchIdx + 1) * Math.pow(2, roundIdx - 1) - 0.5) * UNIT;
+}
 
 interface Participant {
     participantId: string;
@@ -42,66 +60,270 @@ interface TournamentBracketProps {
     isTeamTournament?: boolean;
 }
 
-export function TournamentBracket({ rounds, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, isTeamTournament }: TournamentBracketProps) {
-    return (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View className="flex-row gap-6 p-4">
-                {rounds.map((round) => (
-                    <View key={round.roundNumber} className="flex-col">
-                        {/* Round header */}
-                        <View className="items-center mb-4">
-                            <View className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-2 items-center">
-                                <Text className="text-xs font-black text-white tracking-wide">
-                                    {round.name}
-                                </Text>
-                                {round.roundDeadline && (
-                                    <View className="flex-row items-center mt-1 gap-1">
-                                        <Ionicons name="time-outline" size={9} color="#EF4444" />
-                                        <Text className="text-[9px] text-red-400 font-semibold">
-                                            {parseUtcDate(round.roundDeadline).toLocaleDateString()} {parseUtcDate(round.roundDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                            {isAdmin && tournamentStatus !== 4 && !(round.matches.length > 0 && round.matches.every(m => m.status === 3 || m.status === 4)) && (
-                                <Pressable
-                                    onPress={() => onEditDeadline?.(round)}
-                                    className="mt-2 flex-row items-center gap-1 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 active:opacity-70"
-                                >
-                                    <Ionicons name="calendar-outline" size={10} color="#818CF8" />
-                                    <Text className="text-[9px] font-bold text-indigo-400 uppercase tracking-[1.5px]">
-                                        Edit Schedule
-                                    </Text>
-                                </Pressable>
-                            )}
-                        </View>
+type RoundStatus = 'completed' | 'active' | 'upcoming';
 
-                        {/* Matches */}
-                        <View className="flex-col justify-around flex-1 gap-3">
-                            {round.matches.map((match) => (
-                                <View key={match.id} className="flex-row items-center">
-                                    <BracketMatch
-                                        home={match.home}
-                                        away={match.away}
-                                        startTime={match.startTime}
-                                        status={match.status}
-                                        onPress={() => onMatchPress?.(match)}
-                                        currentUserId={currentUserId}
-                                        currentUsername={currentUsername}
-                                        isAdmin={isAdmin}
-                                        isTeamTournament={isTeamTournament}
-                                    />
-                                    {match.nextMatchId && (
-                                        <View className="w-6 items-center justify-center">
-                                            <View className="w-6 h-px" style={{ backgroundColor: 'rgba(255,255,255,0.06)' }} />
+function getRoundStatus(round: Round): RoundStatus {
+    if (!round.matches.length) return 'upcoming';
+    if (round.matches.every(m => m.status === 3 || m.status === 4)) return 'completed';
+    if (round.matches.some(m => m.status === 1 || m.status === 2)) return 'active';
+    return 'upcoming';
+}
+
+export function TournamentBracket({
+    rounds,
+    onMatchPress,
+    currentUserId,
+    currentUsername,
+    isAdmin,
+    onEditDeadline,
+    tournamentStatus,
+    isTeamTournament,
+}: TournamentBracketProps) {
+    if (!rounds?.length) return null;
+
+    /* Zoom state */
+    const ZOOM_STEP = 0.15;
+    const ZOOM_MIN = 0.5;
+    const ZOOM_MAX = 1.0;
+    const [scale, setScale] = useState(0.7);
+    const animScale = useRef(new Animated.Value(0.9)).current;
+    const zoomIn = () => {
+        const next = Math.min(ZOOM_MAX, scale + ZOOM_STEP);
+        setScale(next);
+        animScale.setValue(next);
+    };
+    const zoomOut = () => {
+        const next = Math.max(ZOOM_MIN, scale - ZOOM_STEP);
+        setScale(next);
+        animScale.setValue(next);
+    };
+
+    /* Total height of the match area — driven by the first (largest) round */
+    const maxR1 = rounds[0].matches.length || 1;
+    const totalH = maxR1 * UNIT - BASE_GAP;
+
+    /* Match id → Match lookup */
+    const matchById = useMemo(() => {
+        const map: Record<string, Match> = {};
+        rounds.forEach(r => r.matches.forEach(m => { map[m.id] = m; }));
+        return map;
+    }, [rounds]);
+
+    /* "My path" highlight set */
+    const myPathIds = useMemo(() => {
+        const highlighted = new Set<string>();
+        if (!currentUserId && !currentUsername) return highlighted;
+        const norm = (s?: string | null) => (s ?? '').toLowerCase().trim();
+        const cId = norm(currentUserId);
+        const cName = norm(currentUsername);
+        const isMe = (uid?: string | null, uname?: string | null) =>
+            (!!cId && norm(uid) === cId) || (!!cName && norm(uname) === cName);
+        const trace = (matchId: string) => {
+            if (highlighted.has(matchId)) return;
+            const m = matchById[matchId];
+            if (!m) return;
+            highlighted.add(matchId);
+            if (m.nextMatchId) {
+                if (m.home?.isWinner && isMe(m.home.userId, m.home.username)) trace(m.nextMatchId);
+                if (m.away?.isWinner && isMe(m.away.userId, m.away.username)) trace(m.nextMatchId);
+            }
+        };
+        rounds.forEach(r => r.matches.forEach(m => {
+            if (isMe(m.home?.userId, m.home?.username) || isMe(m.away?.userId, m.away?.username)) {
+                trace(m.id);
+            }
+        }));
+        return highlighted;
+    }, [rounds, currentUserId, currentUsername, matchById]);
+
+    const innerContent = (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            {rounds.map((round, roundIdx) => {
+                    const roundStatus = getRoundStatus(round);
+                    const isLastRound = roundIdx === rounds.length - 1;
+                    const canEditRound = isAdmin &&
+                        tournamentStatus !== 4 &&
+                        roundStatus !== 'completed';
+
+                    return (
+                        <React.Fragment key={round.roundNumber}>
+                            {/* ── Round column ──────────────────────────────── */}
+                            <View style={{ width: MATCH_W }}>
+
+                                {/* Header pill */}
+                                <View style={{ height: HEADER_H, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <View style={{
+                                            flexDirection: 'row', alignItems: 'center', gap: 6,
+                                            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+                                            borderWidth: 1,
+                                            backgroundColor: roundStatus === 'active' ? 'rgba(79,70,229,0.8)' : 'rgba(255,255,255,0.03)',
+                                            borderColor: roundStatus === 'active' ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.07)',
+                                        }}>
+                                            {roundStatus === 'completed' && (
+                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' }} />
+                                            )}
+                                            {roundStatus === 'active' && (
+                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#C7D2FE' }} />
+                                            )}
+                                            <Text
+                                                style={{
+                                                    fontSize: 11, fontWeight: '700',
+                                                    color: roundStatus === 'active' ? '#FFFFFF' : roundStatus === 'completed' ? '#64748B' : '#94A3B8',
+                                                }}
+                                                numberOfLines={1}
+                                            >
+                                                {round.name}
+                                            </Text>
+                                            <Text style={{
+                                                fontSize: 10, fontWeight: '600',
+                                                color: roundStatus === 'active' ? 'rgba(199,210,254,0.7)' : '#475569',
+                                            }}>
+                                                {round.matches.length}
+                                            </Text>
+                                        </View>
+
+                                        {/* Admin calendar button */}
+                                        {canEditRound && (
+                                            <Pressable
+                                                onPress={() => onEditDeadline?.(round)}
+                                                style={{
+                                                    width: 28, height: 28, borderRadius: 14,
+                                                    alignItems: 'center', justifyContent: 'center',
+                                                    backgroundColor: 'rgba(99,102,241,0.1)',
+                                                    borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)',
+                                                }}
+                                            >
+                                                <Ionicons name="calendar-outline" size={12} color="#818CF8" />
+                                            </Pressable>
+                                        )}
+                                    </View>
+                                    {round.roundDeadline && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                                            <Ionicons name="time-outline" size={9} color="#F87171" />
+                                            <Text style={{ fontSize: 9, color: '#F87171', fontWeight: '600' }}>
+                                                {parseUtcDate(round.roundDeadline).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                                {' '}
+                                                {parseUtcDate(round.roundDeadline).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                            </Text>
                                         </View>
                                     )}
                                 </View>
-                            ))}
-                        </View>
-                    </View>
-                ))}
+
+                                {/* Match cards — absolutely positioned within the match area */}
+                                <View style={{ width: MATCH_W, height: totalH, position: 'relative' }}>
+                                    {round.matches.map((match, matchIdx) => {
+                                        const top = computeMatchTop(roundIdx, matchIdx);
+                                        const isHighlighted = myPathIds.has(match.id);
+                                        return (
+                                            <View
+                                                key={match.id}
+                                                style={{ position: 'absolute', top, left: 0, width: MATCH_W }}
+                                            >
+                                                <BracketMatch
+                                                    home={match.home}
+                                                    away={match.away}
+                                                    startTime={match.startTime}
+                                                    status={match.status}
+                                                    onPress={() => onMatchPress?.(match)}
+                                                    currentUserId={currentUserId}
+                                                    currentUsername={currentUsername}
+                                                    isAdmin={isAdmin}
+                                                    isTeamTournament={isTeamTournament}
+                                                    className={isHighlighted ? 'border-indigo-500/30' : undefined}
+                                                />
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+
+                            {/* ── Connector column ──────────────────────────── */}
+                            {!isLastRound && (
+                                <View style={{ width: CONNECTOR_W, height: HEADER_H + totalH, position: 'relative' }}>
+                                    {Array.from({ length: Math.floor(round.matches.length / 2) }, (_, j) => {
+                                        const topMatch = round.matches[2 * j];
+                                        const botMatch = round.matches[2 * j + 1];
+                                        if (!topMatch || !botMatch) return null;
+
+                                        const topCenter = HEADER_H + computeMatchTop(roundIdx, 2 * j) + MATCH_H / 2;
+                                        const botCenter = HEADER_H + computeMatchTop(roundIdx, 2 * j + 1) + MATCH_H / 2;
+                                        const midCenter = (topCenter + botCenter) / 2;
+                                        const halfW = CONNECTOR_W / 2;
+
+                                        // Determine if this connector is on "my path"
+                                        const nextMatch = topMatch.nextMatchId
+                                            ? matchById[topMatch.nextMatchId]
+                                            : botMatch.nextMatchId
+                                                ? matchById[botMatch.nextMatchId]
+                                                : null;
+                                        const onMyPath =
+                                            (myPathIds.has(topMatch.id) || myPathIds.has(botMatch.id)) &&
+                                            !!nextMatch && myPathIds.has(nextMatch.id);
+                                        const lineColor = onMyPath ? LINE_MY_PATH : LINE_DEFAULT;
+
+                                        return (
+                                            <React.Fragment key={j}>
+                                                {/* Top horizontal stub */}
+                                                <View style={{ position: 'absolute', left: 0, top: topCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: lineColor }} />
+                                                {/* Bottom horizontal stub */}
+                                                <View style={{ position: 'absolute', left: 0, top: botCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: lineColor }} />
+                                                {/* Vertical connector */}
+                                                <View style={{ position: 'absolute', left: halfW - STROKE / 2, top: topCenter, width: STROKE, height: botCenter - topCenter, backgroundColor: lineColor }} />
+                                                {/* Right stub into next-round match */}
+                                                <View style={{ position: 'absolute', left: halfW, top: midCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: lineColor }} />
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </View>
+                            )}
+                        </React.Fragment>
+                    );
+                })}
             </View>
-        </ScrollView>
+    );
+
+    return (
+        <View>
+            {/* Zoom controls — above the bracket, aligned right */}
+            <View style={{ flexDirection: 'row', gap: 8, paddingRight: 16, paddingBottom: 8, alignSelf: 'flex-end' }}>
+                <Pressable
+                    onPress={zoomOut}
+                    disabled={scale <= ZOOM_MIN}
+                    style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                        opacity: scale <= ZOOM_MIN ? 0.35 : 1,
+                    }}
+                >
+                    <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>−</Text>
+                </Pressable>
+                <Pressable
+                    onPress={zoomIn}
+                    disabled={scale >= ZOOM_MAX}
+                    style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: 'rgba(255,255,255,0.06)',
+                        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                        opacity: scale >= ZOOM_MAX ? 0.35 : 1,
+                    }}
+                >
+                    <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>+</Text>
+                </Pressable>
+            </View>
+
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, alignItems: 'flex-start' }}
+            >
+                <Animated.View style={{ alignSelf: 'flex-start', transform: [{ scale: animScale }], transformOrigin: 'top left' }}>
+                    {innerContent}
+                </Animated.View>
+            </ScrollView>
+        </View>
     );
 }
