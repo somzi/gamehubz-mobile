@@ -219,7 +219,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             const selectedFormatValue = Number(selectedFormat);
             const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
             if (!isAllowedTeamFormat) {
-                setError('Team tournaments only support Single Bracket');
+                setError('Team tournaments only support Single Bracket, League, or Groups + Bracket');
                 return;
             }
         }
@@ -492,15 +492,13 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                 </View>
                             </View>
 
-                            {!isTeamTournament && (
-                                <View className="flex-row gap-4">
+                            <View className="flex-row gap-4">
                                     <View className="flex-1">
                                         {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
                                             setShowFormatPicker(true)
                                         )}
                                     </View>
                                 </View>
-                            )}
 
                             {/* Tournament Mode Toggle */}
                             <View>

@@ -9,6 +9,8 @@ export enum TournamentFormat {
 
 export const TEAM_TOURNAMENT_FORMATS = [
     TournamentFormat.SingleElimination,
+    TournamentFormat.League,
+    TournamentFormat.GroupStageWithKnockout,
 ] as const;
 
 export const TOURNAMENT_FORMAT_OPTIONS = [
