@@ -69,6 +69,7 @@ export function MatchScheduleCard({
     // Result reporting state
     const [homeScore, setHomeScore] = useState('');
     const [awayScore, setAwayScore] = useState('');
+    const [dbHomeUserId, setDbHomeUserId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
@@ -173,6 +174,20 @@ export function MatchScheduleCard({
         return date.toLocaleDateString();
     };
 
+    const fetchDbHomeUserId = async () => {
+        if (!matchId) return;
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
+            if (response.ok) {
+                const data = await response.json();
+                const id = data.homeUserId || data.HomeUserId || null;
+                setDbHomeUserId(id);
+            }
+        } catch (error) {
+            console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
+        }
+    };
+
     // Fetch availability and comments when modal opens
     useEffect(() => {
         if (!modalVisible) return;
@@ -185,6 +200,11 @@ export function MatchScheduleCard({
         // or if we explicitly want to refresh on open
         if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'pending_availability') {
             fetchComments();
+        }
+
+        // Fetch DB home/away roles so we can correctly map scores on submit
+        if (currentStatus === 'scheduled' || currentStatus === 'ready_phase') {
+            fetchDbHomeUserId();
         }
     }, [modalVisible, matchId]); // Removed currentStatus from dependencies to prevent re-fetching on status changes
 
@@ -368,10 +388,21 @@ export function MatchScheduleCard({
         setError(null);
 
         try {
+            // Determine if the logged-in user is the real DB Home or Away participant.
+            // The UI always shows the logged-in user on the left (visual home), but that
+            // does not necessarily match the database home/away role.
+            const isUserDbHome =
+                dbHomeUserId != null &&
+                user?.id != null &&
+                dbHomeUserId.toLowerCase() === user.id.toLowerCase();
+
+            const visualLeftScore = parseInt(homeScore, 10);  // logged-in user's score
+            const visualRightScore = parseInt(awayScore, 10); // opponent's score
+
             const payload = {
                 MatchId: matchId,
-                HomeScore: parseInt(homeScore, 10),
-                AwayScore: parseInt(awayScore, 10),
+                HomeScore: isUserDbHome ? visualLeftScore : visualRightScore,
+                AwayScore: isUserDbHome ? visualRightScore : visualLeftScore,
                 TournamentId: tournamentId
             };
 
