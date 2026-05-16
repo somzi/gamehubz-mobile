@@ -343,7 +343,7 @@ export function MatchDetailsModal({
     const isAway = (away?.userId || matchDetails?.awayUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isParticipant = !!(isHome || isAway);
 
-    const canEditResult = status === 'completed' && !isEditMode && (isHubOwner || (isParticipant && canRevert));
+    const canEditResult = status === 'completed' && !isEditMode && canRevert;
 
     const canSubmit = isParticipant || isHubOwner;
 

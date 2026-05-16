@@ -794,32 +794,8 @@ export default function TournamentDetailsScreen() {
             return;
         }
 
-        // Compute canRevert: completed match where the current user is a participant
-        // and the next match in the bracket hasn't started yet (status 0 / pending or no next match).
-        let canRevert = false;
-        const isCompleted = match.status === 3 || match.status === 4;
-        if (isCompleted && user?.id) {
-            const uid = user.id.toLowerCase();
-            const isParticipant =
-                match.home?.userId?.toLowerCase() === uid ||
-                match.away?.userId?.toLowerCase() === uid;
-            if (isParticipant) {
-                if (!match.nextMatchId) {
-                    // Final — no downstream match to corrupt
-                    canRevert = true;
-                } else {
-                    // Look up the next match across all stages
-                    const allMatches: any[] = stages.flatMap((s: any) =>
-                        (s.rounds ?? []).flatMap((r: any) => r.matches ?? [])
-                    );
-                    const nextMatch = allMatches.find((m: any) => m.id === match.nextMatchId);
-                    // Allow revert only while the next match hasn't been played yet
-                    canRevert = !nextMatch || nextMatch.status === 0;
-                }
-            }
-        }
-
-        setSelectedMatch({ ...match, canRevert });
+        const backendCanRevert = match.canRevert ?? match.CanRevert ?? false;
+        setSelectedMatch({ ...match, canRevert: backendCanRevert });
         setShowReportModal(true);
     };
 
