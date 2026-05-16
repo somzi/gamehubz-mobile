@@ -102,6 +102,10 @@ export function TournamentBracket({
     const maxR1 = rounds[0].matches.length || 1;
     const totalH = maxR1 * UNIT - BASE_GAP;
 
+    /* Exact pixel dimensions of the bracket canvas */
+    const contentWidth = rounds.length * MATCH_W + (rounds.length - 1) * CONNECTOR_W;
+    const contentHeight = HEADER_H + totalH;
+
     /* Match id → Match lookup */
     const matchById = useMemo(() => {
         const map: Record<string, Match> = {};
@@ -318,11 +322,27 @@ export function TournamentBracket({
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, alignItems: 'flex-start' }}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 }}
             >
-                <Animated.View style={{ alignSelf: 'flex-start', transform: [{ scale: animScale }], transformOrigin: 'top left' }}>
-                    {innerContent}
-                </Animated.View>
+                {/*
+                  Outer View is explicitly sized to the SCALED dimensions so the
+                  ScrollView only allocates real visual space — no excess blank area.
+                  The inner Animated.View lives absolutely inside and scales from
+                  the top-left origin.
+                */}
+                <View style={{ width: contentWidth * scale, height: contentHeight * scale, overflow: 'hidden' }}>
+                    <Animated.View style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: contentWidth,
+                        height: contentHeight,
+                        transform: [{ scale: animScale }],
+                        transformOrigin: 'top left',
+                    }}>
+                        {innerContent}
+                    </Animated.View>
+                </View>
             </ScrollView>
         </View>
     );
