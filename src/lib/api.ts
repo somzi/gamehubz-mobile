@@ -14,7 +14,7 @@ export const ENDPOINTS = {
     GET_HUB: (id: string) => `${API_BASE_URL}/api/Hub/${id}`,
     GET_TOURNAMENT_STRUCTURE: (id: string) => `${API_BASE_URL}/api/tournament/${id}/structure`,
     UPDATE_PROFILE: `${API_BASE_URL}/api/user/update`,
-    GET_PLAYER_STATS: (id: string) => `${API_BASE_URL}/api/userProfile/${id}/stats`,
+    GET_PLAYER_STATS: (id: string) => `${API_BASE_URL}/api/UserProfile/v2/${id}/stats`,
     USER_SOCIAL: `${API_BASE_URL}/api/UserSocial`,
     GET_USER_INFO: (id: string) => `${API_BASE_URL}/api/UserProfile/${id}/info`,
     GET_USER_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/joined?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,

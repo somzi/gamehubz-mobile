@@ -85,7 +85,12 @@ export function TournamentCard({
                 </View>
 
                 <View className="flex-1 min-w-0">
-                    <Text className="text-lg font-black text-white leading-tight mb-0.5">
+                    <Text
+                        className="text-lg font-black text-white leading-tight mb-0.5"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                    >
                         {name}
                     </Text>
                     <Text className="text-[#10B981] text-xs font-bold uppercase tracking-wider">

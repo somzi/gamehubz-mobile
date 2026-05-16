@@ -18,7 +18,7 @@ export interface MatchListItemDto {
 }
 
 export interface PlayerPerformanceDto {
-    isWin: boolean;
+    outcome: 'W' | 'L' | 'D';
 }
 
 export interface PlayerMatchesDto {

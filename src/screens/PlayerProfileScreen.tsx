@@ -89,7 +89,7 @@ export default function PlayerProfileScreen() {
                             winRate: s.stats?.WinRate || s.stats?.winRate || s.Stats?.WinRate || s.Stats?.winRate || 0,
                         } : null,
                         performance: (s.performance || s.Performance || []).map((m: any) => ({
-                            isWin: m.IsWin !== undefined ? m.IsWin : m.isWin
+                            outcome: (m.outcome || m.Outcome || 'L') as 'W' | 'L' | 'D'
                         }))
                     };
                     setPlayerMatches(normalizedStats);
@@ -440,6 +440,10 @@ export default function PlayerProfileScreen() {
                                                     <Text className="text-[8px] text-slate-500 font-bold uppercase">Win</Text>
                                                 </View>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
+                                                    <View className="w-2 h-2 rounded-full bg-[#EAB308]" />
+                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">Draw</Text>
+                                                </View>
+                                                <View className="flex-row items-center" style={{ gap: 3 }}>
                                                     <View className="w-2 h-2 rounded-full bg-[#EF4444]" />
                                                     <Text className="text-[8px] text-slate-500 font-bold uppercase">Loss</Text>
                                                 </View>
@@ -454,15 +458,15 @@ export default function PlayerProfileScreen() {
                                                         <View
                                                             className={cn(
                                                                 "w-7 h-7 rounded-lg items-center justify-center",
-                                                                match.isWin ? "bg-[#10B981]/15" : "bg-[#EF4444]/15"
+                                                                match.outcome === 'W' ? "bg-[#10B981]/15" : match.outcome === 'D' ? "bg-[#EAB308]/15" : "bg-[#EF4444]/15"
                                                             )}
-                                                            style={{ borderWidth: 1.5, borderColor: match.isWin ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)' }}
+                                                            style={{ borderWidth: 1.5, borderColor: match.outcome === 'W' ? 'rgba(16,185,129,0.3)' : match.outcome === 'D' ? 'rgba(234,179,8,0.3)' : 'rgba(239,68,68,0.3)' }}
                                                         >
                                                             <Text className={cn(
                                                                 "text-[10px] font-black",
-                                                                match.isWin ? "text-[#10B981]" : "text-[#EF4444]"
+                                                                match.outcome === 'W' ? "text-[#10B981]" : match.outcome === 'D' ? "text-[#EAB308]" : "text-[#EF4444]"
                                                             )}>
-                                                                {match.isWin ? 'W' : 'L'}
+                                                                {match.outcome}
                                                             </Text>
                                                         </View>
                                                     </View>
@@ -619,7 +623,13 @@ export default function PlayerProfileScreen() {
                                                 userAvatarUrl={match.userAvatarUrl || match.userAvatar || match.UserAvatarUrl || match.UserAvatar || userInfo.avatarUrl}
                                                 opponentName={match.opponentName || match.OpponentName || "Opponent"}
                                                 opponentAvatarUrl={match.opponentAvatarUrl || match.opponentAvatar || match.OpponentAvatarUrl || match.OpponentAvatar || ""}
-                                                result={match.isWin === true || match.IsWin === true ? 'win' : (match.isWin === false || match.IsWin === false ? 'loss' : 'draw')}
+                                                result={(
+                                                    (match.userScore ?? match.UserScore) !== null &&
+                                                    (match.userScore ?? match.UserScore) !== undefined &&
+                                                    (match.opponentScore ?? match.OpponentScore) !== null &&
+                                                    (match.opponentScore ?? match.OpponentScore) !== undefined &&
+                                                    (match.userScore ?? match.UserScore) === (match.opponentScore ?? match.OpponentScore)
+                                                ) ? 'draw' : (match.isWin === true || match.IsWin === true ? 'win' : (match.isWin === false || match.IsWin === false ? 'loss' : 'draw'))}
                                                 userScore={match.userScore ?? match.UserScore ?? undefined}
                                                 opponentScore={match.opponentScore ?? match.OpponentScore ?? undefined}
                                                 date={match.scheduledTime || match.ScheduledTime ? new Date(match.scheduledTime || match.ScheduledTime).toLocaleDateString() : 'N/A'}
