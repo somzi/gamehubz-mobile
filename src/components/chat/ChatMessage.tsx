@@ -13,21 +13,22 @@ import { translateMessage } from '../../lib/translationApi';
 interface Language {
   label: string;
   code: string;
+  flag: string;
 }
 
 const LANGUAGES: Language[] = [
-  { label: 'Srpski', code: 'SR' },
-  { label: 'English', code: 'EN-US' },
-  { label: 'Español', code: 'ES' },
-  { label: 'German', code: 'DE' },
-  { label: 'French', code: 'FR' },
-  { label: 'Hindi', code: 'HI' },
-  { label: 'Arabic', code: 'AR' },
-  { label: 'Português', code: 'PT-PT' },
-  { label: 'Italiano', code: 'IT' },
-  { label: 'Türkçe', code: 'TR' },
-  { label: 'Русский', code: 'RU' },
-  { label: 'Polski', code: 'PL' },
+  { label: 'Srpski', code: 'SR', flag: '🇷🇸' },
+  { label: 'English', code: 'EN-US', flag: '🇬🇧' },
+  { label: 'Español', code: 'ES', flag: '🇪🇸' },
+  { label: 'German', code: 'DE', flag: '🇩🇪' },
+  { label: 'French', code: 'FR', flag: '🇫🇷' },
+  { label: 'Hindi', code: 'HI', flag: '🇮🇳' },
+  { label: 'Arabic', code: 'AR', flag: '🇸🇦' },
+  { label: 'Português', code: 'PT-PT', flag: '🇵🇹' },
+  { label: 'Italiano', code: 'IT', flag: '🇮🇹' },
+  { label: 'Türkçe', code: 'TR', flag: '🇹🇷' },
+  { label: 'Русский', code: 'RU', flag: '🇷🇺' },
+  { label: 'Polski', code: 'PL', flag: '🇵🇱' },
 ];
 
 export interface ChatMessageProps {
@@ -171,7 +172,9 @@ export function ChatMessage({ text, isOwn }: ChatMessageProps): JSX.Element {
               ]}
               android_ripple={{ color: '#22304D' }}
             >
-              <Text style={styles.sheetRowText}>{lang.label}</Text>
+              <Text style={styles.sheetRowText}>
+                {lang.flag}  {lang.label}
+              </Text>
             </Pressable>
           ))}
           <Pressable
