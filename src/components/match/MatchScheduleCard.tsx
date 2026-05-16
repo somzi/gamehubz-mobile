@@ -12,6 +12,7 @@ import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signal
 import * as ImagePicker from 'expo-image-picker';
 import { MatchComment } from '../../types/auth';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../../lib/image';
+import { MatchChatBubble } from '../chat/MatchChatBubble';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -1023,19 +1024,10 @@ export function MatchScheduleCard({
                                                                             {formatCommentTime(comment.sentAt)}
                                                                         </Text>
                                                                     </View>
-                                                                    <View className={cn(
-                                                                        "px-4 py-3 rounded-[20px]",
-                                                                        isMyComment
-                                                                            ? "bg-primary rounded-br-none"
-                                                                            : "bg-slate-800 rounded-bl-none border border-white/5"
-                                                                    )}>
-                                                                        <Text className={cn(
-                                                                            "leading-5 font-medium",
-                                                                            isMyComment ? "text-slate-900" : "text-white"
-                                                                        )}>
-                                                                            {comment.content}
-                                                                        </Text>
-                                                                    </View>
+                                                                    <MatchChatBubble
+                                                                        content={comment.content}
+                                                                        isMyComment={isMyComment}
+                                                                    />
                                                                 </View>
 
                                                                 {isMyComment && (
