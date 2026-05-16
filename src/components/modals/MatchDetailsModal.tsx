@@ -51,6 +51,7 @@ interface MatchDetailsModalProps {
     evidences?: string[];
     hubOwnerId?: string;
     isRoundLocked?: boolean;
+    canRevert?: boolean;
 }
 
 export function MatchDetailsModal({
@@ -72,6 +73,7 @@ export function MatchDetailsModal({
     evidences,
     hubOwnerId,
     isRoundLocked = false,
+    canRevert = false,
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -336,11 +338,12 @@ export function MatchDetailsModal({
 
     // Permission check
     const isHubOwner = !!(hubOwnerId && user?.id && hubOwnerId.toLowerCase() === user.id.toLowerCase());
-    const canEditResult = isHubOwner && status === 'completed' && !isEditMode;
 
     const isHome = (home?.userId || matchDetails?.homeUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isAway = (away?.userId || matchDetails?.awayUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isParticipant = !!(isHome || isAway);
+
+    const canEditResult = status === 'completed' && !isEditMode && (isHubOwner || (isParticipant && canRevert));
 
     const canSubmit = isParticipant || isHubOwner;
 
@@ -562,7 +565,7 @@ export function MatchDetailsModal({
                     <View className="bg-[#F59E0B]/10 px-4 py-1.5 rounded-full border border-[#F59E0B]/20">
                         <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-[3px]">Editing Result</Text>
                     </View>
-                    <Text className="text-[10px] text-slate-500 mt-2 font-bold">Hub Owner Privileges</Text>
+                    <Text className="text-[10px] text-slate-500 mt-2 font-bold">{isHubOwner ? 'Hub Owner Privileges' : 'Fix Your Score'}</Text>
                 </View>
 
                 {error && (
