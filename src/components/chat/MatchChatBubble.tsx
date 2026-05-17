@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { JSX, useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -19,7 +20,7 @@ interface Language {
 
 const LANGUAGES: Language[] = [
   { label: 'Srpski', code: 'SR', flag: '🇷🇸' },
-  { label: 'English', code: 'EN-US', flag: '🇬🇧' },
+  { label: 'English', code: 'EN-US', flag: '🇺🇸' },
   { label: 'Español', code: 'ES', flag: '🇪🇸' },
   { label: 'German', code: 'DE', flag: '🇩🇪' },
   { label: 'French', code: 'FR', flag: '🇫🇷' },
@@ -204,29 +205,53 @@ export function MatchChatBubble({
       >
         <View style={sheetStyles.sheet}>
           <View style={sheetStyles.dragHandle} />
-          <Text style={sheetStyles.sheetTitle}>Translate to…</Text>
-          {LANGUAGES.map((lang, idx) => (
-            <Pressable
-              key={lang.code}
-              onPress={() => onPickLanguage(lang)}
-              style={[
-                sheetStyles.sheetRow,
-                idx === LANGUAGES.length - 1 && sheetStyles.sheetRowLast,
-              ]}
-              android_ripple={{ color: '#22304D' }}
-            >
-              <Text style={sheetStyles.sheetRowText}>
-                {lang.flag}  {lang.label}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={closeSheet}
-            style={sheetStyles.sheetCancel}
-            android_ripple={{ color: '#22304D' }}
+          <View style={sheetStyles.sheetHeader}>
+            <View style={sheetStyles.iconCircle}>
+              <Ionicons name="language" size={24} color="#7FB0FF" />
+            </View>
+            <Text style={sheetStyles.sheetTitle}>Translate Message</Text>
+            <Text style={sheetStyles.sheetSubtitle}>
+              Choose a target language
+            </Text>
+          </View>
+          <ScrollView
+            style={sheetStyles.sheetList}
+            contentContainerStyle={sheetStyles.grid}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={sheetStyles.sheetCancelText}>Cancel</Text>
-          </Pressable>
+            {LANGUAGES.map((lang) => {
+              const isActive = translatedLang?.code === lang.code;
+              return (
+                <Pressable
+                  key={lang.code}
+                  onPress={() => onPickLanguage(lang)}
+                  style={({ pressed }) => [
+                    sheetStyles.langCell,
+                    pressed && sheetStyles.langCellPressed,
+                  ]}
+                >
+                  <View style={[sheetStyles.flagWrap, isActive && sheetStyles.flagWrapActive]}>
+                    <Text style={sheetStyles.langFlag}>{lang.flag}</Text>
+                  </View>
+                  <Text style={[sheetStyles.langName, isActive && sheetStyles.langNameActive]}>
+                    {lang.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <View style={sheetStyles.footer}>
+            <Pressable
+              onPress={closeSheet}
+              style={({ pressed }) => [
+                sheetStyles.cancelBtn,
+                pressed && sheetStyles.cancelBtnPressed,
+              ]}
+            >
+              <Text style={sheetStyles.cancelText}>Cancel</Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
     </View>
@@ -239,58 +264,118 @@ const sheetStyles = StyleSheet.create({
     margin: 0,
   },
   sheet: {
-    backgroundColor: '#1C2538',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 28,
+    backgroundColor: '#111827',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingBottom: 32,
+    maxHeight: '88%',
+    overflow: 'hidden',
   },
   dragHandle: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#3A4D71',
+    backgroundColor: '#2E3D5C',
     alignSelf: 'center',
     marginTop: 12,
-    marginBottom: 8,
+    marginBottom: 0,
+  },
+  sheetHeader: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(127,176,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(127,176,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   sheetTitle: {
-    color: '#9BA8C2',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 6,
-    paddingBottom: 14,
-  },
-  sheetRow: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2C3A57',
-  },
-  sheetRowLast: {
-    borderBottomWidth: 0,
-  },
-  sheetRowText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  sheetSubtitle: {
+    color: '#4A5A7A',
+    fontSize: 13,
+    fontWeight: '400',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  sheetList: {
+    flexGrow: 0,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 8,
+    paddingTop: 24,
+    paddingBottom: 16,
+    rowGap: 24,
+  },
+  langCell: {
+    width: '25%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langCellPressed: {
+    opacity: 0.6,
+  },
+  flagWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  flagWrapActive: {
+    backgroundColor: 'rgba(127,176,255,0.15)',
+  },
+  langFlag: {
+    fontSize: 28,
+  },
+  langName: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '500',
-    textAlign: 'left',
+    textAlign: 'center',
   },
-  sheetCancel: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+  langNameActive: {
+    color: '#7FB0FF',
+    fontWeight: '700',
+  },
+  footer: {
+    paddingTop: 8,
+    paddingBottom: 4,
     borderTopWidth: 1,
-    borderTopColor: '#2C3A57',
-    marginTop: 8,
+    borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  sheetCancelText: {
+  cancelBtn: {
+    alignSelf: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+  },
+  cancelBtnPressed: {
+    opacity: 0.6,
+  },
+  cancelText: {
     color: '#FF6B6B',
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
 });
