@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Animated } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { BracketMatch } from './BracketMatch';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,16 +86,11 @@ export function TournamentBracket({
     const ZOOM_MIN = 0.5;
     const ZOOM_MAX = 1.0;
     const [scale, setScale] = useState(0.7);
-    const animScale = useRef(new Animated.Value(0.9)).current;
     const zoomIn = () => {
-        const next = Math.min(ZOOM_MAX, scale + ZOOM_STEP);
-        setScale(next);
-        animScale.setValue(next);
+        setScale(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
     };
     const zoomOut = () => {
-        const next = Math.max(ZOOM_MIN, scale - ZOOM_STEP);
-        setScale(next);
-        animScale.setValue(next);
+        setScale(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
     };
 
     /* Total height of the match area — driven by the first (largest) round */
@@ -331,17 +326,17 @@ export function TournamentBracket({
                   the top-left origin.
                 */}
                 <View style={{ width: contentWidth * scale, height: contentHeight * scale, overflow: 'hidden' }}>
-                    <Animated.View style={{
+                    <View style={{
                         position: 'absolute',
                         top: 0,
                         left: 0,
                         width: contentWidth,
                         height: contentHeight,
-                        transform: [{ scale: animScale }],
+                        transform: [{ scale }],
                         transformOrigin: 'top left',
                     }}>
                         {innerContent}
-                    </Animated.View>
+                    </View>
                 </View>
             </ScrollView>
         </View>
