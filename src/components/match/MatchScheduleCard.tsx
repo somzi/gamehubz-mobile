@@ -279,6 +279,8 @@ export function MatchScheduleCard({
             if (response.ok) {
                 const result = await response.json();
 
+                setMySlots(dateTimeSlots);
+
                 // Check if match was scheduled
                 if (result.data?.confirmedTime) {
                     const confirmedDate = new Date(result.data.confirmedTime);

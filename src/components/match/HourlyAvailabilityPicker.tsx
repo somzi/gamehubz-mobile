@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cn } from '../../lib/utils';
+import { cn, parseUtcDate } from '../../lib/utils';
 
 interface HourlyAvailabilityPickerProps {
     matchId: string;
@@ -50,8 +50,7 @@ export function HourlyAvailabilityPicker({
         return new Set((initialSlots || []).map(iso => {
             if (!iso) return '';
             try {
-                // Parse the UTC ISO string to a Date object, which auto-adjusts to local time
-                const date = new Date(iso);
+                const date = parseUtcDate(iso);
                 if (isNaN(date.getTime())) return '';
                 
                 const year = date.getFullYear();
@@ -68,12 +67,12 @@ export function HourlyAvailabilityPicker({
     }, [initialSlots]);
 
     const [selectedSlots, setSelectedSlots] = useState<Set<string>>(initialKeys);
-    const [submitted, setSubmitted] = useState(false);
+    const [submitted, setSubmitted] = useState(initialKeys.size > 0);
     const [selectedDateIndex, setSelectedDateIndex] = useState(0);
 
     const deadlineDate = useMemo(() => {
         if (!deadline || deadline === 'TBD') return null;
-        const d = new Date(deadline);
+        const d = parseUtcDate(deadline);
         return isNaN(d.getTime()) ? null : d;
     }, [deadline]);
 
@@ -86,14 +85,16 @@ export function HourlyAvailabilityPicker({
 
     useEffect(() => {
         setSelectedSlots(initialKeys);
+        if (initialKeys.size > 0) {
+            setSubmitted(true);
+        }
     }, [initialKeys]);
 
     const processedOpponentKeys = useMemo(() => {
         return new Set((opponentAvailability || []).map(iso => {
             if (!iso) return '';
             try {
-                // Parse the UTC ISO string to a Date object, which auto-adjusts to local time
-                const date = new Date(iso);
+                const date = parseUtcDate(iso);
                 if (isNaN(date.getTime())) return '';
                 
                 const year = date.getFullYear();
@@ -278,21 +279,14 @@ export function HourlyAvailabilityPicker({
                 </ScrollView>
             </View>
 
-            {/* Hourly List Section Header */}
-            <View className="flex-row items-center justify-between px-1 mt-1">
-                <Text className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
-                    Available times for {selectedDay.fullLabel}
-                </Text>
-            </View>
-
             {/* Hourly List for Selected Date */}
-            <View className="flex-1 bg-slate-900/40 rounded-3xl border border-white/5 p-2">
+            <View className="flex-1 bg-slate-900/40 rounded-2xl border border-white/5 p-2 mt-1">
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     nestedScrollEnabled={true}
-                    contentContainerStyle={{ paddingBottom: 10 }} // Malo prostora na dnu scrolla
+                    contentContainerStyle={{ paddingBottom: 2 }}
                 >
-                    <View className="flex-row flex-wrap justify-between p-1">
+                    <View className="flex-row flex-wrap justify-between">
                         {HOURS.map((hour) => {
                             const dayKey = selectedDay.key;
                             const slotId = `${dayKey}-${hour}`;
@@ -305,6 +299,7 @@ export function HourlyAvailabilityPicker({
                             const isAfterDeadline = deadlineDate && slotDate.getTime() > deadlineDate.getTime();
                             const isPast = slotDate.getTime() < new Date().getTime();
                             const isDisabled = submitted || isAfterDeadline || isPast;
+                            const isInactive = isDisabled && !isSelected && !opponentAvail;
 
                             return (
                                 <Pressable
@@ -312,46 +307,46 @@ export function HourlyAvailabilityPicker({
                                     onPress={() => toggleSlot(dayKey, hour)}
                                     disabled={isDisabled}
                                     className={cn(
-                                        "w-[20.5%] h-12 mb-2 rounded-xl items-center justify-center",
-                                        isDisabled
-                                            ? "opacity-35"
+                                        "w-[22.5%] h-11 mb-1.5 rounded-xl items-center justify-center",
+                                        isInactive
+                                            ? "bg-white/[0.02] border border-white/[0.04] opacity-40"
                                             : isMutual
-                                                ? "bg-emerald-500/20 border border-emerald-500/30"
+                                                ? "bg-emerald-500/20 border border-emerald-500/40"
                                                 : isSelected
-                                                    ? "bg-indigo-600/80 border border-indigo-400/30"
+                                                    ? "bg-indigo-600/80 border border-indigo-400/40"
                                                     : opponentAvail
-                                                        ? "bg-amber-500/15 border border-amber-500/20"
-                                                        : "bg-white/[0.03] border border-white/[0.08]",
-                                        submitted && "opacity-50"
+                                                        ? "bg-amber-500/15 border border-amber-500/25"
+                                                        : "bg-white/[0.04] border border-white/[0.08]",
                                     )}
                                 >
                                     {isMutual ? (
                                         <>
                                             <View className="items-center justify-center">
-                                                <Ionicons name="checkmark-done" size={16} color="#10B981" />
-                                                <Text className="text-[11px] text-emerald-300 uppercase font-bold tracking-tighter -mt-0.5">
+                                                <Ionicons name="checkmark-done" size={14} color="#10B981" />
+                                                <Text className="text-[9px] text-emerald-300 uppercase font-black tracking-tighter -mt-0.5">
                                                     Mutual
                                                 </Text>
                                             </View>
                                             <View className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                         </>
                                     ) : (
-                                        <>
-                                            <View className="flex-row items-center justify-center gap-1">
-                                                {opponentAvail && !isSelected && (
-                                                    <View className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-0.5" />
-                                                )}
-                                                <Text className={cn(
-                                                    "text-sm",
-                                                    isDisabled ? "text-slate-700 font-normal" : isSelected ? "text-white font-bold" : opponentAvail ? "text-amber-300 font-black" : "text-slate-400 font-black"
-                                                )}>
-                                                    {formatHour(hour)}
-                                                </Text>
-                                                {isSelected && (
-                                                    <Ionicons name="checkmark-circle" size={12} color="#818cf8" />
-                                                )}
-                                            </View>
-                                        </>
+                                        <View className="flex-row items-center justify-center gap-1">
+                                            {opponentAvail && !isSelected && (
+                                                <View className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-0.5" />
+                                            )}
+                                            <Text className={cn(
+                                                "text-sm",
+                                                isInactive ? "text-slate-600 font-normal"
+                                                    : isSelected ? "text-white font-black"
+                                                        : opponentAvail ? "text-amber-300 font-black"
+                                                            : "text-slate-400 font-bold"
+                                            )}>
+                                                {formatHour(hour)}
+                                            </Text>
+                                            {isSelected && (
+                                                <Ionicons name="checkmark-circle" size={12} color="#c7d2fe" />
+                                            )}
+                                        </View>
                                     )}
                                 </Pressable>
                             );
