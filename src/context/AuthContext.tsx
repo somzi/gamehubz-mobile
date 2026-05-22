@@ -3,7 +3,7 @@ import { AppState, Platform } from 'react-native';
 import { User, AuthResponse, UserSocial } from '../types/auth';
 import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToLogout } from '../lib/api';
 import * as SecureStore from 'expo-secure-store';
-import { usePushNotifications } from '../hooks/usePushNotifications';
+import { usePushNotifications, STORAGE_KEY_LAST_SYNCED_TOKEN } from '../hooks/usePushNotifications';
 
 
 interface AuthContextType {
@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setRefreshToken(null);
             setAuthToken(null);
             SecureStore.deleteItemAsync('user_meta').catch(() => { });
+            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN).catch(() => { });
         });
 
         return () => unsubscribe();
@@ -114,8 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             (async () => {
                 try {
-                    // Step 1: non-intrusive check + sync (handles recovery)
-                    const permission = await checkAndSync();
+                    // Step 1: non-intrusive check + forced sync.
+                    // force=true ensures the token is (re)written to the DB on
+                    // every authenticated session start, regardless of the local
+                    // cache — recovers the case where the row was deleted server-side.
+                    const permission = await checkAndSync(true);
                     console.log(
                         `[AuthContext] Push checkAndSync result: ${permission.status} | granted=${permission.granted} | canAskAgain=${permission.canAskAgain}`,
                     );
@@ -442,6 +446,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_meta');
+        await SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN);
 
         setUser(null);
         setToken(null);

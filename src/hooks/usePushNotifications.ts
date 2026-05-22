@@ -14,7 +14,7 @@ export interface PushPermissionState {
     canAskAgain: boolean;
 }
 
-const STORAGE_KEY_LAST_SYNCED_TOKEN = 'push_last_synced_token';
+export const STORAGE_KEY_LAST_SYNCED_TOKEN = 'push_last_synced_token';
 
 /**
  * Hook for managing push notification permissions, token retrieval,
@@ -50,7 +50,7 @@ export function usePushNotifications() {
     }, []);
 
     // ─── Token fetch + idempotent sync ─────────────────────────────
-    const fetchTokenAndSync = useCallback(async (): Promise<string | null> => {
+    const fetchTokenAndSync = useCallback(async (force = false): Promise<string | null> => {
         try {
             const projectId = Constants.expoConfig?.extra?.eas?.projectId;
             const tokenResponse = await Notifications.getExpoPushTokenAsync({
@@ -64,12 +64,16 @@ export function usePushNotifications() {
                 return null;
             }
 
-            // Idempotency: compare against persisted last-synced token
-            const lastSynced = await SecureStore.getItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN);
-
-            if (token === lastSynced) {
-                console.log('[Push] Backend sync SKIPPED — token unchanged since last successful sync');
-                return token;
+            // Idempotency: skip only for non-forced (foreground) re-checks.
+            // The backend is the source of truth, so login/restore always
+            // forces a sync — the local cache can drift from the DB (e.g. the
+            // row was deleted server-side) and must never block a re-write.
+            if (!force) {
+                const lastSynced = await SecureStore.getItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN);
+                if (token === lastSynced) {
+                    console.log('[Push] Backend sync SKIPPED — token unchanged since last successful sync');
+                    return token;
+                }
             }
 
             console.log('[Push] Backend sync INITIATED — token is new or changed');
@@ -106,7 +110,7 @@ export function usePushNotifications() {
      * Use on every app launch / auth restore to handle the recovery
      * case (user granted permissions later via system settings).
      */
-    const checkAndSync = useCallback(async (): Promise<PushPermissionState> => {
+    const checkAndSync = useCallback(async (force = false): Promise<PushPermissionState> => {
         if (!Device.isDevice) {
             setError('Push notifications require a physical device.');
             console.warn('[Push] Must use physical device for push notifications');
@@ -127,7 +131,7 @@ export function usePushNotifications() {
         );
 
         if (granted) {
-            const token = await fetchTokenAndSync();
+            const token = await fetchTokenAndSync(force);
             if (token) setExpoPushToken(token);
         }
 
@@ -167,7 +171,7 @@ export function usePushNotifications() {
             return false;
         }
 
-        const token = await fetchTokenAndSync();
+        const token = await fetchTokenAndSync(true);
         if (token) {
             setExpoPushToken(token);
             return true;
