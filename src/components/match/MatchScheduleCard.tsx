@@ -618,15 +618,16 @@ export function MatchScheduleCard({
                 transparent={false}
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
+                statusBarTranslucent={true}
             >
                 <View
                     className={cn("flex-1", isPremium ? "bg-[#0B1120]" : "bg-background")}
                     style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 >
                     <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                         className="flex-1"
-                        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                        keyboardVerticalOffset={0}
                     >
                         <View className={cn(
                             "flex-1 px-5 pt-5",
