@@ -175,18 +175,20 @@ export function MatchScheduleCard({
         return date.toLocaleDateString();
     };
 
-    const fetchDbHomeUserId = async () => {
-        if (!matchId) return;
+    const fetchDbHomeUserId = async (): Promise<string | null> => {
+        if (!matchId) return null;
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
             if (response.ok) {
                 const data = await response.json();
                 const id = data.homeUserId || data.HomeUserId || null;
                 setDbHomeUserId(id);
+                return id;
             }
         } catch (error) {
             console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
         }
+        return null;
     };
 
     // Fetch availability and comments when modal opens
@@ -394,10 +396,17 @@ export function MatchScheduleCard({
             // Determine if the logged-in user is the real DB Home or Away participant.
             // The UI always shows the logged-in user on the left (visual home), but that
             // does not necessarily match the database home/away role.
+            // If we don't yet know the DB home id, fetch it now so we never guess the
+            // mapping and silently swap the scores.
+            let resolvedHomeUserId = dbHomeUserId;
+            if (resolvedHomeUserId == null) {
+                resolvedHomeUserId = await fetchDbHomeUserId();
+            }
+
             const isUserDbHome =
-                dbHomeUserId != null &&
+                resolvedHomeUserId != null &&
                 user?.id != null &&
-                dbHomeUserId.toLowerCase() === user.id.toLowerCase();
+                resolvedHomeUserId.toLowerCase() === user.id.toLowerCase();
 
             const visualLeftScore = parseInt(homeScore, 10);  // logged-in user's score
             const visualRightScore = parseInt(awayScore, 10); // opponent's score
