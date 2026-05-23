@@ -15,7 +15,7 @@ import { StatusModal } from '../components/modals/StatusModal';
 
 export default function RegisterScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-    const { register, isLoading } = useAuth();
+    const { register, login, isLoading } = useAuth();
 
     const regionOptions = [
         { label: 'North America', value: RegionType.NA },
@@ -89,6 +89,12 @@ export default function RegisterScreen() {
 
         const success = await register(payload);
         if (success) {
+            // Auto-login so the user lands straight in the app. On success,
+            // isAuthenticated flips and RootNavigator swaps to the app stack.
+            const loginResult = await login(formData.email, formData.password);
+            if (loginResult.success) return;
+
+            // Account created but auto-login failed (e.g. needs verification) — send to Login.
             setStatusModalConfig({
                 type: 'success',
                 title: 'Account Created',
