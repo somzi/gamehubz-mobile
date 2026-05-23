@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
@@ -55,6 +55,22 @@ export function MatchScheduleCard({
 }: MatchScheduleCardProps) {
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
+
+    // Android-only: under Expo SDK 54 edge-to-edge, the window no longer resizes for
+    // the keyboard and KeyboardAvoidingView mis-measures inside a statusBarTranslucent
+    // Modal, so we track the real keyboard height and pad the content ourselves.
+    // iOS is left untouched and keeps using KeyboardAvoidingView below.
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+    useEffect(() => {
+        if (Platform.OS !== 'android') return;
+        const showSub = Keyboard.addListener('keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+        const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
 
     const [modalVisible, setModalVisible] = useState(false);
     const [currentStatus, setCurrentStatus] = useState<MatchStatus>(initialStatus);
@@ -611,6 +627,13 @@ export function MatchScheduleCard({
     function renderModal() {
         const isPremium = variant === 'compact';
 
+        // iOS keeps the original KeyboardAvoidingView; Android uses a plain View with
+        // keyboard-height padding (see the Keyboard listener effect above).
+        const KeyboardWrapper: React.ComponentType<any> = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+        const keyboardWrapperProps: any = Platform.OS === 'ios'
+            ? { behavior: 'padding', keyboardVerticalOffset: 0, className: 'flex-1' }
+            : { className: 'flex-1', style: { paddingBottom: keyboardHeight > 0 ? Math.max(0, keyboardHeight - insets.bottom) : 0 } };
+
         const scrollToBottom = () => {
             setTimeout(() => {
                 if (activeModalTab === 'chat') {
@@ -633,11 +656,7 @@ export function MatchScheduleCard({
                     className={cn("flex-1", isPremium ? "bg-[#0B1120]" : "bg-background")}
                     style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 >
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        className="flex-1"
-                        keyboardVerticalOffset={0}
-                    >
+                    <KeyboardWrapper {...keyboardWrapperProps}>
                         <View className={cn(
                             "flex-1 px-5 pt-5",
                             isPremium ? "bg-[#0B1120]" : "bg-card"
@@ -1106,7 +1125,7 @@ export function MatchScheduleCard({
                                 </View>
                             )}
                         </View>
-                    </KeyboardAvoidingView>
+                    </KeyboardWrapper>
                 </View>
             </Modal>
         );
