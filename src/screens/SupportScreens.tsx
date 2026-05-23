@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Ionicons } from '@expo/vector-icons';
@@ -138,15 +138,18 @@ export function ContactUsScreen() {
                         </View>
                     </TouchableOpacity>
 
-                    {/* <TouchableOpacity className="bg-card p-5 rounded-2xl border border-white/5 flex-row items-center gap-4">
-                        <View className="bg-[#7289DA]/20 p-3 rounded-xl">
-                            <Ionicons name="logo-discord" size={24} color="#7289DA" />
+                    <TouchableOpacity
+                        onPress={() => Linking.openURL('https://discord.gg/CUFWXhfRPb')}
+                        className="bg-card p-5 rounded-2xl border border-white/5 flex-row items-center gap-4"
+                    >
+                        <View className="bg-[#5865F2]/20 p-3 rounded-xl">
+                            <Ionicons name="logo-discord" size={24} color="#5865F2" />
                         </View>
                         <View>
                             <Text className="text-white font-bold text-base">Join our Discord</Text>
-                            <Text className="text-gray-400 text-sm">discord.gg/gamehubz</Text>
+                            <Text className="text-gray-400 text-sm">discord.gg/CUFWXhfRPb</Text>
                         </View>
-                    </TouchableOpacity> */}
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </SafeAreaView>
