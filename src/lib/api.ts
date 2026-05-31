@@ -43,6 +43,7 @@ export const ENDPOINTS = {
     UPDATE_HUB: `${API_BASE_URL}/api/hub/update`,
     SUBMIT_MATCH_AVAILABILITY: `${API_BASE_URL}/api/match/availability`,
     GET_HUB_MEMBERS: (id: string) => `${API_BASE_URL}/api/Hub/${id}/members`,
+    GET_HUB_MEMBERS_PAGED: (id: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/${id}/members/paged?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     GET_MATCH_AVAILABILITY: (matchId: string, userId: string) => `${API_BASE_URL}/api/match/${matchId}/availability/user/${userId}`,
     GET_USER_HOME_MATCHES: (userId: string) => `${API_BASE_URL}/api/match/home/${userId}`,
     CHECK_REGISTRATION: (id: string, userId: string) => `${API_BASE_URL}/api/tournament/${id}/user/${userId}/registred`,

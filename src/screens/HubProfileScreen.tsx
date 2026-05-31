@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { TournamentCard } from '../components/cards/TournamentCard';
+import { HubRole } from '../types/hub';
 
 import { Ionicons } from '@expo/vector-icons';
 
@@ -44,6 +45,12 @@ export default function HubProfileScreen() {
     const [isAboutOpen, setIsAboutOpen] = useState(false);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
     const [isUnfollowing, setIsUnfollowing] = useState(false);
+    const [memberSearch, setMemberSearch] = useState('');
+    const [members, setMembers] = useState<any[]>([]);
+    const [memberPage, setMemberPage] = useState(0);
+    const [hasMoreMembers, setHasMoreMembers] = useState(true);
+    const [isMembersLoading, setIsMembersLoading] = useState(false);
+    const memberSearchSeq = useRef(0);
 
 
     useFocusEffect(
@@ -124,6 +131,51 @@ export default function HubProfileScreen() {
             setPage(nextPage);
             fetchTournaments(nextPage, tournamentFilter);
         }
+    };
+
+    const fetchMembers = useCallback(async (pageNumber: number, search: string, seq: number) => {
+        try {
+            if (pageNumber === 0) setIsMembersLoading(true);
+            const response = await authenticatedFetch(ENDPOINTS.GET_HUB_MEMBERS_PAGED(id, pageNumber, search));
+            if (!response.ok) return;
+            const data = await response.json();
+            const list: any[] = Array.isArray(data) ? data : (data.result || []);
+            // ignore stale results from older searches
+            if (seq !== memberSearchSeq.current) return;
+            setMembers(prev => (pageNumber === 0 ? list : [...prev, ...list]));
+            setHasMoreMembers(list.length === 10);
+        } catch (err) {
+            console.error('Error fetching members:', err);
+        } finally {
+            if (seq === memberSearchSeq.current) setIsMembersLoading(false);
+        }
+    }, [id]);
+
+    // Debounce search + initial load whenever the user switches to the Members tab
+    useEffect(() => {
+        if (hubTab !== 'members') return;
+        const seq = ++memberSearchSeq.current;
+        setMembers([]);
+        setMemberPage(0);
+        setHasMoreMembers(true);
+        const handle = setTimeout(() => {
+            fetchMembers(0, memberSearch.trim(), seq);
+        }, memberSearch ? 300 : 0);
+        return () => clearTimeout(handle);
+    }, [hubTab, memberSearch, fetchMembers]);
+
+    const loadMoreMembers = () => {
+        if (isMembersLoading || !hasMoreMembers) return;
+        const nextPage = memberPage + 1;
+        setMemberPage(nextPage);
+        fetchMembers(nextPage, memberSearch.trim(), memberSearchSeq.current);
+    };
+
+    const getRoleMeta = (role: number) => {
+        if (role === HubRole.HubAdmin) {
+            return { label: 'Admin', color: 'text-indigo-300', bg: 'bg-indigo-500/15 border border-indigo-500/30', icon: 'star', iconColor: '#A5B4FC' };
+        }
+        return { label: 'Member', color: 'text-slate-400', bg: 'bg-white/[0.05] border border-white/10', icon: 'person', iconColor: '#94A3B8' };
     };
 
     const handleFollowToggle = async () => {
@@ -235,6 +287,7 @@ export default function HubProfileScreen() {
     const hubTabs = [
         { label: 'Overview', value: 'overview' },
         { label: 'Tournaments', value: 'tournaments' },
+        { label: 'Members', value: 'members' },
     ];
 
     const tournamentFilterTabs = [
@@ -373,7 +426,8 @@ export default function HubProfileScreen() {
                 onScroll={({ nativeEvent }) => {
                     const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
                     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 50) {
-                        loadMoreTournaments();
+                        if (hubTab === 'tournaments') loadMoreTournaments();
+                        else if (hubTab === 'members') loadMoreMembers();
                     }
                 }}
                 scrollEventThrottle={16}
@@ -490,7 +544,7 @@ export default function HubProfileScreen() {
                     <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1.5" style={{ gap: 6 }}>
                         {hubTabs.map((tab) => {
                             const isActive = hubTab === tab.value;
-                            const iconMap: Record<string, string> = { overview: 'grid-outline', tournaments: 'trophy-outline' };
+                            const iconMap: Record<string, string> = { overview: 'grid-outline', tournaments: 'trophy-outline', members: 'people-outline' };
                             return (
                                 <Pressable
                                     key={tab.value}
@@ -610,6 +664,98 @@ export default function HubProfileScreen() {
                                         </View>
                                     </View>
                                 )}
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* ═══════════════════════════════════════════ */}
+                {/* ─── MEMBERS TAB ─── */}
+                {/* ═══════════════════════════════════════════ */}
+                {hubTab === 'members' && (
+                    <View className="px-4 pb-12">
+                        {(isFollowing || isOwner || isPublic) ? (
+                            <>
+                                <View className="mb-4">
+                                    <View className="flex-row items-center bg-[#0D1525] px-3 rounded-xl border border-white/5">
+                                        <Ionicons name="search-outline" size={18} color="#475569" />
+                                        <TextInput
+                                            className="flex-1 h-11 text-white ml-2 text-sm"
+                                            placeholder="Search members..."
+                                            placeholderTextColor="#475569"
+                                            value={memberSearch}
+                                            onChangeText={setMemberSearch}
+                                            autoCorrect={false}
+                                            autoCapitalize="none"
+                                        />
+                                        {memberSearch.length > 0 && (
+                                            <Pressable onPress={() => setMemberSearch('')} hitSlop={10}>
+                                                <Ionicons name="close-circle" size={18} color="#475569" />
+                                            </Pressable>
+                                        )}
+                                    </View>
+                                </View>
+
+                                <View className="bg-[#131B2E] rounded-2xl border border-white/5 overflow-hidden">
+                                    {members.map((member, index) => {
+                                        const mId = member.userId || member.UserId;
+                                        const mName = member.username || member.Username || 'Unknown';
+                                        const role = member.hubRole ?? member.HubRole ?? HubRole.HubMember;
+                                        const roleMeta = getRoleMeta(role);
+                                        const isLast = index === members.length - 1;
+                                        return (
+                                            <Pressable
+                                                key={mId || `m-${index}`}
+                                                onPress={() => mId && navigation.navigate('PlayerProfile', { id: mId })}
+                                                className={`flex-row items-center justify-between px-4 py-3 ${isLast ? '' : 'border-b border-white/5'}`}
+                                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                                            >
+                                                <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
+                                                    <PlayerAvatar name={mName} size="md" />
+                                                    <Text className="text-white font-semibold text-sm flex-1" numberOfLines={1}>
+                                                        {mName}
+                                                    </Text>
+                                                </View>
+                                                <View className={`flex-row items-center px-2 py-1 rounded-full ${roleMeta.bg}`} style={{ gap: 4 }}>
+                                                    <Ionicons name={roleMeta.icon as any} size={10} color={roleMeta.iconColor} />
+                                                    <Text className={`text-[10px] font-black uppercase tracking-wide ${roleMeta.color}`}>
+                                                        {roleMeta.label}
+                                                    </Text>
+                                                </View>
+                                            </Pressable>
+                                        );
+                                    })}
+
+                                    {isMembersLoading && (
+                                        <View className="py-6 items-center">
+                                            <ActivityIndicator size="small" color="#818CF8" />
+                                        </View>
+                                    )}
+
+                                    {!isMembersLoading && members.length === 0 && (
+                                        <View className="py-12 items-center px-6">
+                                            <View className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-3">
+                                                <Ionicons name="people-outline" size={24} color="#334155" />
+                                            </View>
+                                            <Text className="text-sm font-semibold text-slate-500">
+                                                {memberSearch ? 'No matches' : 'No members yet'}
+                                            </Text>
+                                            {memberSearch ? (
+                                                <Text className="text-xs text-slate-600 mt-1">Try a different search</Text>
+                                            ) : null}
+                                        </View>
+                                    )}
+                                </View>
+                            </>
+                        ) : (
+                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 overflow-hidden">
+                                <View className="py-12 items-center justify-center px-6">
+                                    <View className="w-16 h-16 rounded-2xl bg-[#0F172A] items-center justify-center mb-4 border border-white/5">
+                                        <Ionicons name="lock-closed-outline" size={28} color="#334155" />
+                                    </View>
+                                    <Text className="text-white font-black text-lg text-center">Private Content</Text>
+                                    <Text className="text-slate-500 mt-2 text-center text-sm px-6">Follow this hub to see its members</Text>
+                                </View>
                             </View>
                         )}
                     </View>
