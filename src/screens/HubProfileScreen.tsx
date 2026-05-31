@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
@@ -10,7 +10,7 @@ import { HubRole } from '../types/hub';
 
 import { Ionicons } from '@expo/vector-icons';
 
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { SocialLinks } from '../components/profile/SocialLinks';
@@ -29,6 +29,7 @@ export default function HubProfileScreen() {
     const { user } = useAuth();
     const [isFollowing, setIsFollowing] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [isPublic, setIsPublic] = useState(true);
     const [hasPendingRequest, setHasPendingRequest] = useState(false);
     const [isRequestingJoin, setIsRequestingJoin] = useState(false);
@@ -81,6 +82,7 @@ export default function HubProfileScreen() {
             setHubData(hub);
             setIsFollowing(hub.isUserFollowHub || false);
             setIsOwner(hub.isUserOwner || false);
+            setIsAdmin(hub.isUserAdmin || hub.IsUserAdmin || false);
             setIsPublic(hub.isPublic !== false);
             setHasPendingRequest(hub.hasPendingJoinRequest || false);
             setError(null);
@@ -194,9 +196,14 @@ export default function HubProfileScreen() {
                 const response = await authenticatedFetch(ENDPOINTS.CANCEL_HUB_JOIN_REQUEST(id), {
                     method: 'DELETE',
                 });
-                if (response.ok) setHasPendingRequest(false);
+                if (response.ok) {
+                    setHasPendingRequest(false);
+                } else {
+                    const text = await response.text();
+                    Alert.alert('Unable to cancel', getErrorMessage(text) || 'Failed to cancel join request.');
+                }
             } catch (error) {
-                console.error('Error cancelling request:', error);
+                Alert.alert('Unable to cancel', getErrorMessage(error));
             } finally {
                 setIsRequestingJoin(false);
             }
@@ -215,9 +222,12 @@ export default function HubProfileScreen() {
                 } else {
                     setHasPendingRequest(true);
                 }
+            } else {
+                const text = await response.text();
+                Alert.alert('Unable to join', getErrorMessage(text) || 'Failed to join hub.');
             }
         } catch (error) {
-            console.error('Error joining hub:', error);
+            Alert.alert('Unable to join', getErrorMessage(error));
         } finally {
             setIsRequestingJoin(false);
         }
@@ -233,9 +243,12 @@ export default function HubProfileScreen() {
             if (response.ok) {
                 setIsFollowing(false);
                 setShowUnfollowConfirm(false);
+            } else {
+                const text = await response.text();
+                Alert.alert('Unable to unfollow', getErrorMessage(text) || 'Failed to unfollow hub.');
             }
         } catch (error) {
-            console.error('Error unfollowing hub:', error);
+            Alert.alert('Unable to unfollow', getErrorMessage(error));
         } finally {
             setIsUnfollowing(false);
         }
@@ -254,12 +267,10 @@ export default function HubProfileScreen() {
             });
 
             if (response.ok) {
-                // Refresh hub details after update
-                await fetchHubDetails();
+                fetchHubDetails();
             }
         } catch (error) {
             console.error('Error updating hub:', error);
-            throw error;
         }
     };
 
@@ -408,7 +419,7 @@ export default function HubProfileScreen() {
                 <Text className="text-lg font-black text-white tracking-tight">Hub</Text>
                 <View className="flex-row items-center gap-2">
 {/* Share button hidden - coming soon */}
-                    {isOwner && (
+                    {(isOwner || isAdmin) && (
                         <Pressable
                             onPress={() => navigation.navigate('ManageHub', { hubId: id })}
                             className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10"
@@ -470,18 +481,6 @@ export default function HubProfileScreen() {
                                 </View>
                             )}
 
-
-                            {/* Privacy badge */}
-                            <View className="mt-4 flex-row items-center justify-center gap-1.5">
-                                <Ionicons
-                                    name={isPublic ? "globe-outline" : "lock-closed-outline"}
-                                    size={12}
-                                    color={isPublic ? "#10B981" : "#F59E0B"}
-                                />
-                                <Text className={`text-[10px] font-bold uppercase tracking-widest ${isPublic ? "text-emerald-400" : "text-amber-400"}`}>
-                                    {isPublic ? "Public" : "Private"}
-                                </Text>
-                            </View>
 
                             {/* Follow / Request Join Button */}
                             {!isOwner && (() => {

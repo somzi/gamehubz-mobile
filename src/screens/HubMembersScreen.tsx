@@ -28,6 +28,13 @@ interface MemberRow {
     hubRole: HubRole;
 }
 
+interface BannedRow {
+    userId: string;
+    username: string;
+    avatarUrl?: string;
+    bannedAt?: string;
+}
+
 const ROLE_META: Record<HubRole, { label: string; container: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
     [HubRole.HubOwner]: {
         label: 'Owner',
@@ -77,13 +84,29 @@ export default function HubMembersScreen() {
     const { hubId } = route.params;
     const { user: currentUser } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'members' | 'requests'>('members');
+    const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'blacklisted'>('members');
     const [members, setMembers] = useState<MemberRow[]>([]);
     const [requests, setRequests] = useState<JoinRequest[]>([]);
+    const [bans, setBans] = useState<BannedRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRequestsLoading, setIsRequestsLoading] = useState(false);
+    const [isBansLoading, setIsBansLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+    const [isOwner, setIsOwner] = useState(false);
+
+    const fetchHubMeta = useCallback(async () => {
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_HUB(hubId));
+            if (response.ok) {
+                const data = await response.json();
+                const hub = data.result || data;
+                setIsOwner(!!(hub.isUserOwner || hub.IsUserOwner));
+            }
+        } catch (error) {
+            console.error('Error fetching hub meta:', error);
+        }
+    }, [hubId]);
 
     const markProcessing = (id: string, on: boolean) => {
         setProcessingIds(prev => {
@@ -125,11 +148,35 @@ export default function HubMembersScreen() {
         }
     }, [hubId]);
 
+    const fetchBans = useCallback(async () => {
+        try {
+            setIsBansLoading(true);
+            const response = await authenticatedFetch(ENDPOINTS.GET_HUB_BANS(hubId));
+            if (response.ok) {
+                const data = await response.json();
+                const raw: any[] = Array.isArray(data) ? data : (data.result || []);
+                const normalized: BannedRow[] = raw.map(b => ({
+                    userId: b.userId || b.UserId,
+                    username: b.username || b.Username || 'Unknown',
+                    avatarUrl: b.avatarUrl || b.AvatarUrl,
+                    bannedAt: b.bannedAt || b.BannedAt,
+                })).filter(b => !!b.userId);
+                setBans(normalized);
+            }
+        } catch (error) {
+            console.error('Error fetching hub bans:', error);
+        } finally {
+            setIsBansLoading(false);
+        }
+    }, [hubId]);
+
     useFocusEffect(
         useCallback(() => {
+            fetchHubMeta();
             fetchMembers();
             fetchRequests();
-        }, [fetchMembers, fetchRequests])
+            fetchBans();
+        }, [fetchHubMeta, fetchMembers, fetchRequests, fetchBans])
     );
 
     const changeRole = async (member: MemberRow, newRole: HubRole) => {
@@ -208,6 +255,7 @@ export default function HubMembersScreen() {
                             );
                             if (response.ok) {
                                 setMembers(prev => prev.filter(m => m.userId !== member.userId));
+                                fetchBans();
                             } else {
                                 const text = await response.text();
                                 Alert.alert('Error', getErrorMessage(text) || 'Failed to ban member.');
@@ -223,19 +271,54 @@ export default function HubMembersScreen() {
         );
     };
 
+    const unbanMember = (ban: BannedRow) => {
+        Alert.alert(
+            'Unban Member',
+            `Lift the ban on ${ban.username}? They will be able to join the hub again.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Unban',
+                    onPress: async () => {
+                        markProcessing(ban.userId, true);
+                        try {
+                            const response = await authenticatedFetch(
+                                ENDPOINTS.UNBAN_HUB_MEMBER(hubId, ban.userId),
+                                { method: 'DELETE' }
+                            );
+                            if (response.ok) {
+                                setBans(prev => prev.filter(b => b.userId !== ban.userId));
+                            } else {
+                                const text = await response.text();
+                                Alert.alert('Error', getErrorMessage(text) || 'Failed to unban user.');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', getErrorMessage(error));
+                        } finally {
+                            markProcessing(ban.userId, false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const openMemberActions = (member: MemberRow) => {
         const buttons: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [];
 
-        if (member.hubRole === HubRole.HubMember) {
-            buttons.push({
-                text: 'Promote to Admin',
-                onPress: () => changeRole(member, HubRole.HubAdmin),
-            });
-        } else if (member.hubRole === HubRole.HubAdmin) {
-            buttons.push({
-                text: 'Demote to Member',
-                onPress: () => changeRole(member, HubRole.HubMember),
-            });
+        // Only the Owner can grant/revoke admin privileges.
+        if (isOwner) {
+            if (member.hubRole === HubRole.HubMember) {
+                buttons.push({
+                    text: 'Promote to admin',
+                    onPress: () => changeRole(member, HubRole.HubAdmin),
+                });
+            } else if (member.hubRole === HubRole.HubAdmin) {
+                buttons.push({
+                    text: 'Demote to member',
+                    onPress: () => changeRole(member, HubRole.HubMember),
+                });
+            }
         }
 
         buttons.push({
@@ -311,12 +394,22 @@ export default function HubMembersScreen() {
         r.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const filteredBans = bans.filter(b =>
+        b.username.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     const adminCount = members.filter(m => m.hubRole === HubRole.HubAdmin).length;
 
     const tabs = [
         { value: 'members' as const, label: 'Members', icon: 'people-outline' as const, count: members.length },
         { value: 'requests' as const, label: 'Requests', icon: 'mail-outline' as const, count: requests.length },
+        { value: 'blacklisted' as const, label: 'Banned', icon: 'ban-outline' as const, count: bans.length },
     ];
+
+    const searchPlaceholder =
+        activeTab === 'members' ? 'Search members...'
+            : activeTab === 'requests' ? 'Search requests...'
+                : 'Search blacklisted...';
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -324,23 +417,26 @@ export default function HubMembersScreen() {
 
             {/* Tabs */}
             <View className="px-4 pt-2 pb-1">
-                <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1.5" style={{ gap: 6 }}>
+                <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1" style={{ gap: 4 }}>
                     {tabs.map((tab) => {
                         const isActive = activeTab === tab.value;
                         return (
                             <Pressable
                                 key={tab.value}
                                 onPress={() => setActiveTab(tab.value)}
-                                className={`flex-1 flex-row items-center justify-center gap-2 py-3 rounded-xl ${isActive ? 'bg-indigo-500/15 border border-indigo-500/25' : ''}`}
-                                style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                                className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl border ${isActive ? 'bg-indigo-500/20 border-indigo-400/40' : 'border-transparent'}`}
+                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, gap: 5 })}
                             >
-                                <Ionicons name={tab.icon} size={15} color={isActive ? '#818CF8' : '#475569'} />
-                                <Text className={`text-sm font-black ${isActive ? 'text-white' : 'text-slate-600'}`}>
+                                <Ionicons name={tab.icon} size={13} color={isActive ? '#A5B4FC' : '#475569'} />
+                                <Text
+                                    className={`text-[12px] font-black ${isActive ? 'text-white' : 'text-slate-500'}`}
+                                    numberOfLines={1}
+                                >
                                     {tab.label}
                                 </Text>
                                 {tab.count > 0 && (
-                                    <View className={`px-2 py-0.5 rounded-full ${isActive ? 'bg-indigo-500/25' : 'bg-white/[0.05]'}`}>
-                                        <Text className={`text-[10px] font-black ${isActive ? 'text-indigo-300' : 'text-slate-500'}`}>
+                                    <View className={`px-1.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-white/10'}`} style={{ minWidth: 20, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Text className={`text-[10px] font-black text-center ${isActive ? 'text-white' : 'text-slate-200'}`}>
                                             {tab.count}
                                         </Text>
                                     </View>
@@ -364,7 +460,7 @@ export default function HubMembersScreen() {
                     <Ionicons name="search-outline" size={20} color="#71717A" />
                     <TextInput
                         className="flex-1 h-12 text-white ml-2"
-                        placeholder={activeTab === 'members' ? 'Search members...' : 'Search requests...'}
+                        placeholder={searchPlaceholder}
                         placeholderTextColor="#71717A"
                         value={searchQuery}
                         onChangeText={setSearchQuery}
@@ -372,7 +468,7 @@ export default function HubMembersScreen() {
                 </View>
             </View>
 
-            {activeTab === 'members' ? (
+            {activeTab === 'members' && (
                 isLoading ? (
                     <View className="flex-1 items-center justify-center">
                         <ActivityIndicator size="large" color="#8B5CF6" />
@@ -439,7 +535,9 @@ export default function HubMembersScreen() {
                         )}
                     </ScrollView>
                 )
-            ) : (
+            )}
+
+            {activeTab === 'requests' && (
                 isRequestsLoading ? (
                     <View className="flex-1 items-center justify-center">
                         <ActivityIndicator size="large" color="#818CF8" />
@@ -498,6 +596,68 @@ export default function HubMembersScreen() {
                                 </View>
                                 <Text className="text-sm font-semibold text-slate-500">No pending requests</Text>
                                 <Text className="text-xs text-slate-600 mt-1">New join requests will appear here</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                )
+            )}
+
+            {activeTab === 'blacklisted' && (
+                isBansLoading ? (
+                    <View className="flex-1 items-center justify-center">
+                        <ActivityIndicator size="large" color="#EF4444" />
+                    </View>
+                ) : (
+                    <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 24 }}>
+                        {filteredBans.length > 0 ? (
+                            filteredBans.map((ban) => {
+                                const isProcessing = processingIds.has(ban.userId);
+                                return (
+                                    <View
+                                        key={ban.userId}
+                                        className="flex-row items-center justify-between py-4 border-b border-white/5"
+                                    >
+                                        <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
+                                            <PlayerAvatar name={ban.username} src={ban.avatarUrl} size="md" />
+                                            <View className="flex-1">
+                                                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                                                    {ban.username}
+                                                </Text>
+                                                <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
+                                                    <Ionicons name="ban-outline" size={11} color="#EF4444" />
+                                                    <Text className="text-[11px] text-red-400">
+                                                        Banned{ban.bannedAt ? ` ${new Date(ban.bannedAt).toLocaleDateString()}` : ''}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                        </View>
+
+                                        {isProcessing ? (
+                                            <View className="w-24 h-10 items-center justify-center">
+                                                <ActivityIndicator size="small" color="#10B981" />
+                                            </View>
+                                        ) : (
+                                            <Pressable
+                                                onPress={() => unbanMember(ban)}
+                                                className="bg-emerald-500/15 border border-emerald-500/30 px-4 h-10 rounded-xl items-center justify-center flex-row"
+                                                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, gap: 6 })}
+                                            >
+                                                <Ionicons name="checkmark-circle-outline" size={15} color="#10B981" />
+                                                <Text className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+                                                    Unban
+                                                </Text>
+                                            </Pressable>
+                                        )}
+                                    </View>
+                                );
+                            })
+                        ) : (
+                            <View className="items-center py-20">
+                                <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
+                                    <Ionicons name="ban-outline" size={28} color="#334155" />
+                                </View>
+                                <Text className="text-sm font-semibold text-slate-500">No banned users</Text>
+                                <Text className="text-xs text-slate-600 mt-1">Banned users will appear here</Text>
                             </View>
                         )}
                     </ScrollView>

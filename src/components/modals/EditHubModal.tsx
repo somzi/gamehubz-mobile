@@ -38,16 +38,16 @@ export function EditHubModal({
     }, [visible, initialName, initialDescription, initialIsPublic]);
 
     const handleSave = async () => {
-        if (!name.trim()) return;
+        if (!name.trim() || isSaving) return;
 
         setIsSaving(true);
         try {
             await onSave(name, description, isPublic);
-            onClose();
         } catch (error) {
             console.error('Error saving hub:', error);
         } finally {
             setIsSaving(false);
+            onClose();
         }
     };
 
@@ -59,77 +59,78 @@ export function EditHubModal({
             onRequestClose={onClose}
         >
             <Pressable
-                className="flex-1 bg-black/50 justify-center items-center px-6"
+                className="flex-1 bg-black/60 justify-center items-center px-5"
                 onPress={onClose}
             >
                 <Pressable
-                    className="bg-card rounded-2xl p-6 w-full max-w-md border border-border/30"
+                    className="bg-[#0D1525] rounded-3xl p-6 w-full max-w-md border border-white/[0.06]"
                     onPress={(e) => e.stopPropagation()}
                 >
-                    <View className="flex-row justify-between items-center mb-6">
-                        <Text className="text-xl font-bold text-foreground">Edit Hub</Text>
-                        <Pressable onPress={onClose}>
-                            <Ionicons name="close" size={24} color="#94A3B8" />
+                    <View className="flex-row justify-between items-center mb-5">
+                        <Text className="text-xl font-black text-white">Edit Hub</Text>
+                        <Pressable onPress={onClose} className="w-8 h-8 rounded-xl bg-white/[0.05] items-center justify-center">
+                            <Ionicons name="close" size={18} color="#64748B" />
                         </Pressable>
                     </View>
 
-                    <View className="space-y-4">
-                        <View>
-                            <Text className="text-sm font-medium text-foreground mb-2">Hub Name</Text>
-                            <TextInput
-                                value={name}
-                                onChangeText={setName}
-                                placeholder="Enter hub name"
-                                placeholderTextColor="#64748B"
-                                className="bg-background border border-border rounded-xl px-4 py-3 text-foreground"
-                            />
-                        </View>
+                    <View className="mb-4">
+                        <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Hub Name</Text>
+                        <TextInput
+                            value={name}
+                            onChangeText={setName}
+                            placeholder="Enter hub name"
+                            placeholderTextColor="#334155"
+                            className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm"
+                        />
+                    </View>
 
-                        <View>
-                            <Text className="text-sm font-medium text-foreground mb-2">Description</Text>
-                            <TextInput
-                                value={description}
-                                onChangeText={setDescription}
-                                placeholder="Enter hub description"
-                                placeholderTextColor="#64748B"
-                                multiline
-                                numberOfLines={4}
-                                textAlignVertical="top"
-                                className="bg-background border border-border rounded-xl px-4 py-3 text-foreground min-h-[100px]"
-                            />
-                        </View>
+                    <View className="mb-5">
+                        <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Description</Text>
+                        <TextInput
+                            value={description}
+                            onChangeText={setDescription}
+                            placeholder="Enter hub description"
+                            placeholderTextColor="#334155"
+                            multiline
+                            numberOfLines={4}
+                            textAlignVertical="top"
+                            className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm h-24"
+                        />
+                    </View>
 
-                        <View className="bg-background border border-border rounded-xl p-4">
-                            <View className="flex-row items-center justify-between">
-                                <View className="flex-row items-center gap-3 flex-1">
-                                    <View className={cn(
-                                        "w-10 h-10 rounded-2xl items-center justify-center",
-                                        isPublic ? "bg-emerald-500/10" : "bg-amber-500/10"
-                                    )}>
-                                        <Ionicons
-                                            name={isPublic ? "globe-outline" : "lock-closed-outline"}
-                                            size={18}
-                                            color={isPublic ? "#10B981" : "#F59E0B"}
-                                        />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-foreground font-bold text-sm">
-                                            {isPublic ? "Public Hub" : "Private Hub"}
-                                        </Text>
-                                        <Text className="text-muted-foreground text-xs mt-0.5">
-                                            {isPublic
-                                                ? "Anyone can follow this hub"
-                                                : "Members need approval to join"}
-                                        </Text>
-                                    </View>
+                    <View className="h-[1px] bg-white/5 mb-5" />
+
+                    <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Privacy</Text>
+                    <View className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06]">
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center gap-3 flex-1">
+                                <View className={cn(
+                                    "w-10 h-10 rounded-2xl items-center justify-center",
+                                    isPublic ? "bg-emerald-500/10" : "bg-amber-500/10"
+                                )}>
+                                    <Ionicons
+                                        name={isPublic ? "globe-outline" : "lock-closed-outline"}
+                                        size={18}
+                                        color={isPublic ? "#10B981" : "#F59E0B"}
+                                    />
                                 </View>
-                                <Toggle
-                                    value={isPublic}
-                                    onValueChange={setIsPublic}
-                                    activeColor="#10B981"
-                                    inactiveColor="#F59E0B"
-                                />
+                                <View className="flex-1">
+                                    <Text className="text-white font-bold text-sm">
+                                        {isPublic ? "Public Hub" : "Private Hub"}
+                                    </Text>
+                                    <Text className="text-slate-500 text-xs mt-0.5">
+                                        {isPublic
+                                            ? "Anyone can follow this hub"
+                                            : "Members need approval to join"}
+                                    </Text>
+                                </View>
                             </View>
+                            <Toggle
+                                value={isPublic}
+                                onValueChange={setIsPublic}
+                                activeColor="#10B981"
+                                inactiveColor="#F59E0B"
+                            />
                         </View>
                     </View>
 

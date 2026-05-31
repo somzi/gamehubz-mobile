@@ -192,14 +192,13 @@ export default function ManageHubScreen() {
             });
 
             if (response.ok) {
-                await fetchHubDetails();
+                fetchHubDetails();
             } else {
                 Alert.alert('Error', 'Failed to update hub.');
             }
         } catch (error) {
             console.error('Error updating hub:', error);
             Alert.alert('Error', 'An unexpected error occurred.');
-            throw error;
         }
     };
 
@@ -261,6 +260,9 @@ export default function ManageHubScreen() {
         );
     }
 
+    const isOwner = !!(hubData?.isUserOwner || hubData?.IsUserOwner);
+    const isAdmin = !!(hubData?.isUserAdmin || hubData?.IsUserAdmin);
+
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title="Manage Hub" showBack />
@@ -275,21 +277,23 @@ export default function ManageHubScreen() {
                             size="lg"
                             className="w-20 h-20"
                         />
-                        <TouchableOpacity
-                            onPress={handlePickAvatar}
-                            disabled={isUploadingAvatar}
-                            className="absolute -bottom-1 -right-1 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-background shadow-sm"
-                        >
-                            {isUploadingAvatar ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <Ionicons name="camera" size={14} color="white" />
-                            )}
-                        </TouchableOpacity>
+                        {isOwner && (
+                            <TouchableOpacity
+                                onPress={handlePickAvatar}
+                                disabled={isUploadingAvatar}
+                                className="absolute -bottom-1 -right-1 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-background shadow-sm"
+                            >
+                                {isUploadingAvatar ? (
+                                    <ActivityIndicator size="small" color="white" />
+                                ) : (
+                                    <Ionicons name="camera" size={14} color="white" />
+                                )}
+                            </TouchableOpacity>
+                        )}
                     </View>
                     <Text className="text-xl font-bold text-white text-center mt-3">{hubData?.name || 'Hub'}</Text>
                     <Text className="text-gray-500 text-sm text-center mt-1" numberOfLines={1}>
-                        {hubData?.description || 'Management Dashboard'}
+                        {'Management Dashboard'}
                     </Text>
                 </View>
 
@@ -300,11 +304,13 @@ export default function ManageHubScreen() {
                         label="Manage Members"
                         onPress={() => navigation.navigate('HubMembers', { hubId })}
                     />
-                    <MenuItem
-                        icon="create-outline"
-                        label="Edit Hub Info"
-                        onPress={() => setShowEditModal(true)}
-                    />
+                    {isOwner && (
+                        <MenuItem
+                            icon="create-outline"
+                            label="Edit Hub Info"
+                            onPress={() => setShowEditModal(true)}
+                        />
+                    )}
                     <MenuItem
                         icon="share-social-outline"
                         label="Manage Socials"
@@ -315,42 +321,46 @@ export default function ManageHubScreen() {
                         label="Create Tournament"
                         onPress={() => setShowCreateTournamentModal(true)}
                     />
-                    <Pressable
-                        onPress={() => setShowVerificationModal(true)}
-                        className="flex-row items-center justify-between py-4 border-b border-white/5"
-                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                    >
-                        <View className="flex-row items-center gap-4">
-                            <Ionicons name="shield-checkmark-outline" size={22} color="#71717A" />
-                            <Text className="font-medium text-base text-white">Verification</Text>
-                        </View>
-                        <View className="flex-row items-center" style={{ gap: 8 }}>
-                            {hubData?.isVerified ? (
-                                <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                    <Ionicons name="checkmark" size={11} color="#38BDF8" />
-                                    <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">Verified</Text>
-                                </View>
-                            ) : verificationStatus === 0 ? (
-                                <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                    <Ionicons name="time-outline" size={11} color="#F59E0B" />
-                                    <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pending</Text>
-                                </View>
-                            ) : verificationStatus === 2 ? (
-                                <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                    <Ionicons name="close" size={11} color="#EF4444" />
-                                    <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">Rejected</Text>
-                                </View>
-                            ) : null}
-                            <Ionicons name="chevron-forward" size={18} color="#3F3F46" />
-                        </View>
-                    </Pressable>
-                    <MenuItem
-                        icon="trash-outline"
-                        label="Delete Hub"
-                        onPress={handleDeleteHub}
-                        color="#EF4444"
-                        showChevron={false}
-                    />
+                    {isOwner && (
+                        <Pressable
+                            onPress={() => setShowVerificationModal(true)}
+                            className="flex-row items-center justify-between py-4 border-b border-white/5"
+                            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                        >
+                            <View className="flex-row items-center gap-4">
+                                <Ionicons name="shield-checkmark-outline" size={22} color="#71717A" />
+                                <Text className="font-medium text-base text-white">Verification</Text>
+                            </View>
+                            <View className="flex-row items-center" style={{ gap: 8 }}>
+                                {hubData?.isVerified ? (
+                                    <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                        <Ionicons name="checkmark" size={11} color="#38BDF8" />
+                                        <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">Verified</Text>
+                                    </View>
+                                ) : verificationStatus === 0 ? (
+                                    <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                        <Ionicons name="time-outline" size={11} color="#F59E0B" />
+                                        <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pending</Text>
+                                    </View>
+                                ) : verificationStatus === 2 ? (
+                                    <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                        <Ionicons name="close" size={11} color="#EF4444" />
+                                        <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">Rejected</Text>
+                                    </View>
+                                ) : null}
+                                <Ionicons name="chevron-forward" size={18} color="#3F3F46" />
+                            </View>
+                        </Pressable>
+                    )}
+                    {isOwner && (
+                        <MenuItem
+                            icon="trash-outline"
+                            label="Delete Hub"
+                            onPress={handleDeleteHub}
+                            color="#EF4444"
+                            showChevron={false}
+                        />
+                    )}
                 </View>
 
                 {/* Extra space at bottom */}

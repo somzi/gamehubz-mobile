@@ -13,6 +13,7 @@ interface HubCardProps {
     avatarUrl?: string;
     onClick: () => void;
     isJoined?: boolean;
+    isVerified?: boolean;
     className?: string;
     index?: number;
 }
@@ -25,6 +26,7 @@ export function HubCard({
     avatarUrl,
     onClick,
     isJoined,
+    isVerified,
     className,
     index = 0,
 }: HubCardProps) {
@@ -72,10 +74,16 @@ export function HubCard({
                 </View>
 
                 <View className="flex-1 min-w-0 pr-2">
-                    <Text className="text-white font-black text-lg tracking-tight leading-tight mb-1" numberOfLines={2}>
-                        {name}
-                    </Text>
-
+                    <View className="flex-row items-center mb-1" style={{ gap: 6 }}>
+                        <Text className="text-white font-black text-lg tracking-tight leading-tight flex-shrink" numberOfLines={2}>
+                            {name}
+                        </Text>
+                        {isVerified && (
+                            <View className="w-5 h-5 rounded-full bg-sky-500 items-center justify-center">
+                                <Ionicons name="checkmark" size={13} color="#fff" />
+                            </View>
+                        )}
+                    </View>
                 </View>
 
                 {isJoined && (

@@ -383,6 +383,7 @@ export default function HubsScreen() {
                                             avatarUrl={hub.avatarUrl || hub.logoUrl}
                                             index={idx}
                                             isJoined={activeTab === 'joined'}
+                                            isVerified={(hub as any).isVerified || (hub as any).IsVerified}
                                             onClick={() => navigation.navigate('HubProfile', { id: hub.id })}
                                         />
                                     </View>
@@ -400,25 +401,32 @@ export default function HubsScreen() {
 
             <Modal
                 visible={isModalOpen}
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
                 onRequestClose={() => setIsModalOpen(false)}
             >
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    className="flex-1 justify-end bg-black/50"
+                    className="flex-1"
                 >
-                    <View className="bg-[#0D1525] p-6 rounded-t-3xl border-t border-white/[0.06]">
-                        <View className="flex-row justify-between items-center mb-5">
-                            <Text className="text-xl font-black text-white">Create New Hub</Text>
-                            <Pressable onPress={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-white/[0.05] items-center justify-center">
-                                <Ionicons name="close" size={18} color="#64748B" />
-                            </Pressable>
-                        </View>
+                    <Pressable
+                        className="flex-1 bg-black/60 justify-center items-center px-5"
+                        onPress={() => setIsModalOpen(false)}
+                    >
+                        <Pressable
+                            className="bg-[#0D1525] rounded-3xl p-6 w-full max-w-md border border-white/[0.06]"
+                            onPress={(e) => e.stopPropagation()}
+                        >
+                            <View className="flex-row justify-between items-center mb-5">
+                                <Text className="text-xl font-black text-white">Create New Hub</Text>
+                                <Pressable onPress={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-white/[0.05] items-center justify-center">
+                                    <Ionicons name="close" size={18} color="#64748B" />
+                                </Pressable>
+                            </View>
 
-                        <View className="space-y-4">
-                            {error && <Text className="text-red-400 text-sm font-medium">{error}</Text>}
-                            <View>
+                            {error && <Text className="text-red-400 text-sm font-medium mb-3">{error}</Text>}
+
+                            <View className="mb-4">
                                 <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Hub Name</Text>
                                 <TextInput
                                     className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm"
@@ -428,7 +436,8 @@ export default function HubsScreen() {
                                     onChangeText={setHubName}
                                 />
                             </View>
-                            <View>
+
+                            <View className="mb-5">
                                 <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Description</Text>
                                 <TextInput
                                     className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm h-24"
@@ -440,6 +449,9 @@ export default function HubsScreen() {
                                 />
                             </View>
 
+                            <View className="h-[1px] bg-white/5 mb-5" />
+
+                            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Privacy</Text>
                             <View className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06]">
                                 <View className="flex-row items-center justify-between">
                                     <View className="flex-row items-center gap-3 flex-1">
@@ -475,14 +487,14 @@ export default function HubsScreen() {
 
                             <Button
                                 onPress={handleCreateHub}
-                                className="mt-4"
+                                className="mt-6"
                                 loading={isCreating}
                                 disabled={!hubName.trim()}
                             >
                                 <Text className="text-white font-bold">Create Hub</Text>
                             </Button>
-                        </View>
-                    </View>
+                        </Pressable>
+                    </Pressable>
                 </KeyboardAvoidingView>
             </Modal>
 
