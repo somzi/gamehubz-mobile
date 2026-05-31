@@ -73,8 +73,13 @@ export default function TournamentDetailsScreen() {
         message: string;
     }>({ type: 'success', title: '', message: '' });
     const [hubOwnerId, setHubOwnerId] = useState<string | undefined>(undefined);
+    const [bracketCanManage, setBracketCanManage] = useState(false);
     const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
     const [joiningTeamId, setJoiningTeamId] = useState<string | null>(null);
+
+    // Owner-level permission for this tournament: hub owner, hub admin or platform admin.
+    // Resolved by the v2 overview/structure endpoints (tournament.canManage / bracketCanManage).
+    const canManage: boolean = !!((tournament as any)?.canManage || bracketCanManage);
 
     const [showDeadlineModal, setShowDeadlineModal] = useState(false);
     const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null } | null>(null);
@@ -237,7 +242,7 @@ export default function TournamentDetailsScreen() {
         if (!silent) setIsLoading(true);
         setError(null);
         try {
-            const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW(id);
+            const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V2(id);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
                 throw new Error(`Failed to fetch tournament: ${response.status}`);
@@ -255,6 +260,7 @@ export default function TournamentDetailsScreen() {
                 numberOfParticipants: rawData.numberOfParticipants || rawData.NumberOfParticipants,
                 format: rawData.format !== undefined ? rawData.format : rawData.Format,
                 createdBy: rawData.createdBy || rawData.CreatedBy || rawData.createdby,
+                canManage: rawData.canManage ?? rawData.CanManage ?? false,
                 groupsCount: rawData.groupsCount || rawData.GroupsCount,
                 qualifiersPerGroup: rawData.qualifiersPerGroup || rawData.QualifiersPerGroup,
                 prize: rawData.prize || rawData.Prize,
@@ -296,7 +302,7 @@ export default function TournamentDetailsScreen() {
         setLoadingBracket(true);
         setBracketError(null);
         try {
-            const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE(id);
+            const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE_V2(id);
             console.log('Fetching bracket from:', url);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
@@ -309,6 +315,9 @@ export default function TournamentDetailsScreen() {
             if (data.hubOwnerId || data.HubOwnerId) {
                 setHubOwnerId(data.hubOwnerId || data.HubOwnerId);
             }
+
+            // v2 exposes whether the current user may manage (hub owner / hub admin / platform admin)
+            setBracketCanManage(data.canManage ?? data.CanManage ?? false);
         } catch (err) {
             console.error('Bracket fetch error:', err);
             setBracketError('Failed to load bracket structure');
@@ -788,7 +797,7 @@ export default function TournamentDetailsScreen() {
         // Allow Pending (1), Live (2) and Completed (3, 4) matches
         if (match.status !== 1 && match.status !== 2 && match.status !== 3 && match.status !== 4) return;
 
-        const isCreator = tournament?.createdBy?.toLowerCase() === user?.id?.toLowerCase();
+        const isCreator = canManage;
 
         if (match.isRoundLocked && !isCreator) {
             Alert.alert("Round Locked", "Unlocks when all matches in the previous round are completed");
@@ -849,8 +858,7 @@ export default function TournamentDetailsScreen() {
 
     const renderStages = () => {
         if (stages.length === 0) {
-            const creatorId = tournament?.createdBy;
-            const isCreator = creatorId && user?.id && creatorId.toLowerCase() === user.id.toLowerCase();
+            const isCreator = canManage;
             const isRegClosed = tournament?.status === 2;
 
             return (
@@ -934,7 +942,7 @@ export default function TournamentDetailsScreen() {
                             onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
                             currentUserId={user?.id}
                             currentUsername={user?.username}
-                            isAdmin={tournament?.createdBy === user?.id}
+                            isAdmin={canManage}
                             onEditDeadline={handleEditDeadline}
                             tournamentStatus={tournament?.status}
                             isTeamTournament={tournament?.isTeamTournament}
@@ -954,7 +962,7 @@ export default function TournamentDetailsScreen() {
                                         onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(thirdPlaceMatch)}
                                         currentUserId={user?.id}
                                         currentUsername={user?.username}
-                                        isAdmin={tournament?.createdBy === user?.id}
+                                        isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                     />
                                 </View>
@@ -1005,7 +1013,7 @@ export default function TournamentDetailsScreen() {
                                             onMatchPress={handleMatchPress}
                                             currentUserId={user?.id}
                                             currentUsername={user?.username}
-                                            isAdmin={tournament?.createdBy === user?.id}
+                                            isAdmin={canManage}
                                             onEditDeadline={handleEditDeadline}
                                             tournamentStatus={tournament?.status}
                                         />
@@ -1048,8 +1056,6 @@ export default function TournamentDetailsScreen() {
         );
     }
 
-    const creatorId = tournament?.createdBy || tournament?.createdby || tournament?.CreatedBy;
-
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]">
             <PageHeader
@@ -1071,7 +1077,7 @@ export default function TournamentDetailsScreen() {
                             </Pressable>
                         )}
 {/* Share button hidden - coming soon */}
-                        {creatorId?.toLowerCase() === user?.id?.toLowerCase() && (
+                        {canManage && (
                             <Pressable
                                 onPress={() => navigation.navigate('ManageTournament' as any, { id })}
                                 className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10"
@@ -1133,7 +1139,7 @@ export default function TournamentDetailsScreen() {
                         </View>
 
                         {(() => {
-                            const isCreator = creatorId && user?.id && creatorId.toLowerCase() === user.id.toLowerCase();
+                            const isCreator = canManage;
                             const isParticipant = participants.some(p =>
                                 (p.username || p.Username)?.toLowerCase() === user?.username?.toLowerCase()
                             );
@@ -1207,7 +1213,7 @@ export default function TournamentDetailsScreen() {
                         <View className="px-4 py-4 pb-12">
 
                             {/* Hub Owner Close Registration Button */}
-                            {creatorId?.toLowerCase() === user?.id?.toLowerCase() &&
+                            {canManage &&
                                 (tournament?.status === 0 || tournament?.status === 1) && (
                                     <Button
                                         className="w-full mb-4 bg-[#EF4444]"
@@ -1219,7 +1225,7 @@ export default function TournamentDetailsScreen() {
                                 )}
 
                             {/* Hub Owner Open Registration Button */}
-                            {creatorId?.toLowerCase() === user?.id?.toLowerCase() &&
+                            {canManage &&
                                 tournament?.status === 2 && (
                                     <Button
                                         className="w-full mb-4 bg-[#10B981]"
@@ -1495,7 +1501,7 @@ export default function TournamentDetailsScreen() {
                                         <Text className={`font-black text-[10px] uppercase tracking-wider ${teamsTab === 'open' ? 'text-[#3B82F6]' : 'text-slate-500'}`}>Registred</Text>
                                     </Pressable>
                                 )}
-                                {creatorId?.toLowerCase() === user?.id?.toLowerCase() && (
+                                {canManage && (
                                     <Pressable
                                         onPress={() => setTeamsTab('registrations')}
                                         className={`flex-1 py-2.5 items-center justify-center rounded-xl ${teamsTab === 'registrations' ? 'bg-[#F59E0B]/10 border border-[#F59E0B]/20' : 'bg-transparent'}`}
@@ -1620,7 +1626,7 @@ export default function TournamentDetailsScreen() {
                                                 </Pressable>
 
                                                 {/* Remove Team Button — Creator Only (Outside Card) */}
-                                                {creatorId?.toLowerCase() === user?.id?.toLowerCase() && (
+                                                {canManage && (
                                                     <View className="self-start mt-5">
                                                         <Pressable
                                                             onPress={() => handleRemoveTeam(teamId as string, teamName as string)}
@@ -1770,7 +1776,7 @@ export default function TournamentDetailsScreen() {
                             )}
 
                             {/* Registrations (Moved into Teams logic) */}
-                            {teamsTab === 'registrations' && creatorId?.toLowerCase() === user?.id?.toLowerCase() && (
+                            {teamsTab === 'registrations' && canManage && (
                                 <View className="mt-2">
                                     <View className="flex-row justify-between items-center mb-4">
                                         <Text className="text-sm font-bold text-slate-400 uppercase tracking-widest">
@@ -1911,7 +1917,7 @@ export default function TournamentDetailsScreen() {
                                 >
                                     <Text className={`font-black text-[10px] uppercase tracking-wider ${playersTab === 'confirmed' ? 'text-[#3B82F6]' : 'text-slate-500'}`}>Confirmed</Text>
                                 </Pressable>
-                                {tournament?.createdBy?.toLowerCase() === user?.id?.toLowerCase() && (
+                                {canManage && (
                                     <Pressable
                                         onPress={() => {
                                             setPlayersTab('registrations');
@@ -1943,7 +1949,7 @@ export default function TournamentDetailsScreen() {
                                 ) : (
                                     participants.map((p, i) => {
                                         const pUserId = p.userId || p.UserId || p.id;
-                                        const isCreator = tournament?.createdBy?.toLowerCase() === user?.id?.toLowerCase();
+                                        const isCreator = canManage;
                                         const canRemove = isCreator && (tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2);
                                         const isCurrentUser = user?.id?.toLowerCase() === pUserId?.toLowerCase();
 
@@ -1989,7 +1995,7 @@ export default function TournamentDetailsScreen() {
                             )}
 
                             {/* Registrations (admin, solo) */}
-                            {playersTab === 'registrations' && tournament?.createdBy?.toLowerCase() === user?.id?.toLowerCase() && (
+                            {playersTab === 'registrations' && canManage && (
                                 <>
                                     {/* Approve All button */}
                                     {pendingRegistrations.length > 0 && (
@@ -2083,6 +2089,7 @@ export default function TournamentDetailsScreen() {
                 away={selectedMatch?.away}
                 evidences={selectedMatch?.evidences}
                 hubOwnerId={hubOwnerId}
+                canManage={canManage}
                 isRoundLocked={selectedMatch?.isRoundLocked}
                 canRevert={selectedMatch?.canRevert}
                 onMatchUpdate={() => {
@@ -2129,6 +2136,7 @@ export default function TournamentDetailsScreen() {
                     matchId={selectedTeamMatchId}
                     tournamentId={tournament?.id}
                     hubOwnerId={hubOwnerId}
+                    canManage={canManage}
                     currentUserId={user?.id}
                     onMatchUpdate={() => {
                         fetchBracket();

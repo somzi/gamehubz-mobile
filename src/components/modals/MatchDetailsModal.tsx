@@ -50,6 +50,7 @@ interface MatchDetailsModalProps {
     away?: { userId: string; username: string; score: number | null };
     evidences?: string[];
     hubOwnerId?: string;
+    canManage?: boolean;
     isRoundLocked?: boolean;
     canRevert?: boolean;
 }
@@ -72,6 +73,7 @@ export function MatchDetailsModal({
     away,
     evidences,
     hubOwnerId,
+    canManage = false,
     isRoundLocked = false,
     canRevert = false,
 }: MatchDetailsModalProps) {
@@ -337,6 +339,7 @@ export function MatchDetailsModal({
     };
 
     // Permission check
+    // canManage covers hub owner, hub admin and platform admin (resolved by the v2 structure endpoint).
     const isHubOwner = !!(hubOwnerId && user?.id && hubOwnerId.toLowerCase() === user.id.toLowerCase());
 
     const isHome = (home?.userId || matchDetails?.homeUserId)?.toLowerCase() === user?.id?.toLowerCase();
@@ -345,7 +348,7 @@ export function MatchDetailsModal({
 
     const canEditResult = status === 'completed' && !isEditMode && canRevert;
 
-    const canSubmit = isParticipant || isHubOwner;
+    const canSubmit = isParticipant || isHubOwner || canManage;
 
     // Determine winner for completed matches
     const getWinnerSide = () => {

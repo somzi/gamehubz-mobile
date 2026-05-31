@@ -40,6 +40,7 @@ interface TeamMatchDetailModalProps {
     matchId: string | null;
     tournamentId?: string;
     hubOwnerId?: string;
+    canManage?: boolean;
     currentUserId?: string;
     onMatchUpdate?: () => void;
 }
@@ -50,6 +51,7 @@ export function TeamMatchDetailModal({
     matchId,
     tournamentId,
     hubOwnerId,
+    canManage = false,
     currentUserId,
     onMatchUpdate,
 }: TeamMatchDetailModalProps) {
@@ -423,9 +425,11 @@ export function TeamMatchDetailModal({
         }
     };
 
+    // Owner-level privileges: hub owner, hub admin or platform admin (canManage comes from the v2 endpoint).
     const isHubOwner =
-        !!currentUserId && !!hubOwnerId &&
-        currentUserId.toLowerCase() === hubOwnerId.toLowerCase();
+        canManage ||
+        (!!currentUserId && !!hubOwnerId &&
+            currentUserId.toLowerCase() === hubOwnerId.toLowerCase());
 
     const isCaptainOfHome = data?.homeTeam && !!currentUserId && (
         String(data.homeTeam.captainUserId).toLowerCase() === String(currentUserId).toLowerCase() ||
