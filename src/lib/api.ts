@@ -90,6 +90,31 @@ export const ENDPOINTS = {
     EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
+
+    // ─── Friends / Social ───────────────────────────────────────────────
+    GET_FRIENDS: (search: string = "") => `${API_BASE_URL}/api/Friend${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    GET_INCOMING_REQUESTS: (search: string = "") => `${API_BASE_URL}/api/Friend/requests/incoming${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    GET_OUTGOING_REQUESTS: (search: string = "") => `${API_BASE_URL}/api/Friend/requests/outgoing${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    GET_BLOCKED_USERS: (search: string = "") => `${API_BASE_URL}/api/Friend/blocked${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    GET_FRIEND_STATUS: (otherUserId: string) => `${API_BASE_URL}/api/Friend/status/${otherUserId}`,
+    SEND_FRIEND_REQUEST: `${API_BASE_URL}/api/Friend/request`,
+    ACCEPT_FRIEND_REQUEST: (requestId: string) => `${API_BASE_URL}/api/Friend/requests/${requestId}/accept`,
+    REJECT_FRIEND_REQUEST: (requestId: string) => `${API_BASE_URL}/api/Friend/requests/${requestId}/reject`,
+    CANCEL_FRIEND_REQUEST: (requestId: string) => `${API_BASE_URL}/api/Friend/requests/${requestId}/cancel`,
+    UNFRIEND: (otherUserId: string) => `${API_BASE_URL}/api/Friend/${otherUserId}`,
+    BLOCK_USER: `${API_BASE_URL}/api/Friend/block`,
+    UNBLOCK_USER: (otherUserId: string) => `${API_BASE_URL}/api/Friend/block/${otherUserId}`,
+
+    // ─── Direct Chat ────────────────────────────────────────────────────
+    GET_DIRECT_CHATS: (search: string = "") => `${API_BASE_URL}/api/DirectChat${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    GET_OR_CREATE_DIRECT_CHAT: (otherUserId: string) => `${API_BASE_URL}/api/DirectChat/with/${otherUserId}`,
+    GET_DIRECT_CHAT_MESSAGES: (chatId: string, take: number = 100, before?: string) =>
+        `${API_BASE_URL}/api/DirectChat/${chatId}/messages?take=${take}${before ? `&before=${encodeURIComponent(before)}` : ""}`,
+    SEND_DIRECT_MESSAGE: (chatId: string) => `${API_BASE_URL}/api/DirectChat/${chatId}/messages`,
+    MARK_DIRECT_CHAT_READ: (chatId: string) => `${API_BASE_URL}/api/DirectChat/${chatId}/read`,
+
+    // ─── SignalR hub URLs ───────────────────────────────────────────────
+    SIGNALR_DM_HUB: `${API_BASE_URL}/hubs/dm`,
 };
 
 import axios from 'axios';

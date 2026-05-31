@@ -8,6 +8,7 @@ import PlayerProfileScreen from '../screens/PlayerProfileScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import NotFoundScreen from '../screens/NotFoundScreen';
 import MyMatchesScreen from '../screens/MyMatchesScreen';
+import DirectChatScreen from '../screens/DirectChatScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -128,6 +129,10 @@ export function RootNavigator() {
                     <Stack.Screen
                         name="TeamDashboard"
                         component={TeamDashboardScreen}
+                    />
+                    <Stack.Screen
+                        name="DirectChat"
+                        component={DirectChatScreen}
                     />
                 </>
             )}

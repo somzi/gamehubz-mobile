@@ -16,6 +16,7 @@ import { getSocialUrl } from '../lib/social';
 import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { Button } from '../components/ui/Button';
 import { TournamentCard } from '../components/cards/TournamentCard';
+import { FriendActionBar } from '../components/profile/FriendActionBar';
 
 
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -371,6 +372,9 @@ export default function PlayerProfileScreen() {
                         )}
                     </View>
                 </View>
+
+                {/* ─── Friend / Message / Block ─── */}
+                <FriendActionBar otherUserId={id} otherUsername={displayData.username} />
 
                 {/* Tabs Section */}
                 <View className="mt-2 flex-1 min-h-[500px]">

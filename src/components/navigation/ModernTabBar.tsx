@@ -75,6 +75,7 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                             case 'Home': return focused ? 'home' : 'home-outline';
                             case 'Tournaments': return focused ? 'trophy' : 'trophy-outline';
                             case 'Hubs': return focused ? 'planet' : 'planet-outline';
+                            case 'Social': return focused ? 'chatbubbles' : 'chatbubbles-outline';
                             case 'Profile': return focused ? 'person' : 'person-outline';
                             default: return 'help-outline';
                         }

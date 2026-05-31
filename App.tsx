@@ -33,12 +33,14 @@ const linking: LinkingOptions<RootStackParamList> = {
           Home: 'home',
           Tournaments: 'tournaments',
           Hubs: 'hubs',
+          Social: 'social',
           Profile: 'profile',
         },
       },
       TournamentDetails: 'tournament/:id',
       HubProfile: 'hub/:id',
       PlayerProfile: 'player/:id',
+      DirectChat: 'chat/:chatId',
       Login: 'login',
     },
   },
@@ -67,6 +69,22 @@ export default function App() {
         case 'NEW_TOURNAMENT':
           if (data.tournamentId) {
             nav.navigate('TournamentDetails', { id: data.tournamentId });
+          }
+          break;
+        case 'direct_message':
+          if (data.chatId) {
+            nav.navigate('DirectChat', { chatId: data.chatId });
+          }
+          break;
+        case 'friend_request':
+          nav.navigate('MainTabs' as any, {
+            screen: 'Social',
+            params: { initialTab: 'requests' },
+          });
+          break;
+        case 'friend_accepted':
+          if (data.userId) {
+            nav.navigate('PlayerProfile', { id: data.userId });
           }
           break;
       }

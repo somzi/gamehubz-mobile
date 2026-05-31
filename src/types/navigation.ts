@@ -22,11 +22,13 @@ export type RootStackParamList = {
     ManageTournament: { id: string };
     MyMatches: undefined;
     TeamDashboard: { teamId: string; tournamentId: string; teamSize?: number; tournamentStatus?: number };
+    DirectChat: { chatId?: string; otherUserId?: string };
 };
 
 export type MainTabParamList = {
     Home: undefined;
     Tournaments: undefined;
     Hubs: undefined;
+    Social: { initialTab?: 'friends' | 'requests' | 'chats' } | undefined;
     Profile: undefined;
 };
