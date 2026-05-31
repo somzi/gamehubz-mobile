@@ -25,6 +25,7 @@ interface MemberRow {
     userId: string;
     username: string;
     nickname?: string;
+    avatarUrl?: string;
     hubRole: HubRole;
 }
 
@@ -61,8 +62,9 @@ function normalizeMember(raw: any): MemberRow | null {
     if (!userId) return null;
     const username = raw.Username || raw.username || raw.Name || raw.name || 'Unknown';
     const nickname = raw.Nickname || raw.nickname || raw.nickName || '';
+    const avatarUrl = raw.AvatarUrl || raw.avatarUrl || undefined;
     const role = raw.HubRole ?? raw.hubRole ?? HubRole.HubMember;
-    return { userId, username, nickname, hubRole: role as HubRole };
+    return { userId, username, nickname, avatarUrl, hubRole: role as HubRole };
 }
 
 function RoleBadge({ role }: { role: HubRole }) {
@@ -485,7 +487,7 @@ export default function HubMembersScreen() {
                                         className="flex-row items-center justify-between py-3.5 border-b border-white/5"
                                     >
                                         <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                            <PlayerAvatar name={member.username} size="md" />
+                                            <PlayerAvatar name={member.username} src={member.avatarUrl} size="md" />
                                             <View className="flex-1">
                                                 <View className="flex-row items-center" style={{ gap: 8 }}>
                                                     <Text className="text-white font-semibold text-base" numberOfLines={1}>
@@ -508,7 +510,7 @@ export default function HubMembersScreen() {
                                             </View>
                                         </View>
 
-                                        {!isSelf && (
+                                        {!isSelf && member.hubRole !== HubRole.HubOwner && (
                                             isProcessing ? (
                                                 <View className="w-10 h-10 items-center justify-center">
                                                     <ActivityIndicator size="small" color="#818CF8" />

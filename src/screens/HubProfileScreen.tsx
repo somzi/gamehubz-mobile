@@ -174,6 +174,9 @@ export default function HubProfileScreen() {
     };
 
     const getRoleMeta = (role: number) => {
+        if (role === HubRole.HubOwner) {
+            return { label: 'Owner', color: 'text-amber-400', bg: 'bg-amber-500/15 border border-amber-500/30', icon: 'shield-checkmark', iconColor: '#FBBF24' };
+        }
         if (role === HubRole.HubAdmin) {
             return { label: 'Admin', color: 'text-indigo-300', bg: 'bg-indigo-500/15 border border-indigo-500/30', icon: 'star', iconColor: '#A5B4FC' };
         }
@@ -699,6 +702,7 @@ export default function HubProfileScreen() {
                                     {members.map((member, index) => {
                                         const mId = member.userId || member.UserId;
                                         const mName = member.username || member.Username || 'Unknown';
+                                        const mAvatar = member.avatarUrl || member.AvatarUrl;
                                         const role = member.hubRole ?? member.HubRole ?? HubRole.HubMember;
                                         const roleMeta = getRoleMeta(role);
                                         const isLast = index === members.length - 1;
@@ -710,7 +714,7 @@ export default function HubProfileScreen() {
                                                 style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                                             >
                                                 <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                                    <PlayerAvatar name={mName} size="md" />
+                                                    <PlayerAvatar name={mName} src={mAvatar} size="md" />
                                                     <Text className="text-white font-semibold text-sm flex-1" numberOfLines={1}>
                                                         {mName}
                                                     </Text>

@@ -8,5 +8,6 @@ export interface HubMember {
     userId: string;
     username: string;
     pushToken?: string;
+    avatarUrl?: string;
     hubRole: HubRole;
 }
