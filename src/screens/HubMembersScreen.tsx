@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
+import { HubRole } from '../types/hub';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
@@ -20,18 +21,77 @@ interface JoinRequest {
     requestedAt: string;
 }
 
+interface MemberRow {
+    userId: string;
+    username: string;
+    nickname?: string;
+    hubRole: HubRole;
+}
+
+const ROLE_META: Record<HubRole, { label: string; container: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
+    [HubRole.HubOwner]: {
+        label: 'Owner',
+        container: 'bg-amber-500/15 border border-amber-500/30',
+        text: 'text-amber-400',
+        icon: 'shield-checkmark',
+    },
+    [HubRole.HubAdmin]: {
+        label: 'Admin',
+        container: 'bg-indigo-500/15 border border-indigo-500/30',
+        text: 'text-indigo-300',
+        icon: 'star',
+    },
+    [HubRole.HubMember]: {
+        label: 'Member',
+        container: 'bg-white/[0.05] border border-white/10',
+        text: 'text-slate-400',
+        icon: 'person',
+    },
+};
+
+function normalizeMember(raw: any): MemberRow | null {
+    const userId = raw.UserId || raw.userId || raw.id || raw.Id;
+    if (!userId) return null;
+    const username = raw.Username || raw.username || raw.Name || raw.name || 'Unknown';
+    const nickname = raw.Nickname || raw.nickname || raw.nickName || '';
+    const role = raw.HubRole ?? raw.hubRole ?? HubRole.HubMember;
+    return { userId, username, nickname, hubRole: role as HubRole };
+}
+
+function RoleBadge({ role }: { role: HubRole }) {
+    const meta = ROLE_META[role] ?? ROLE_META[HubRole.HubMember];
+    return (
+        <View className={`flex-row items-center px-2 py-1 rounded-full ${meta.container}`} style={{ gap: 4 }}>
+            <Ionicons name={meta.icon} size={11} color={
+                role === HubRole.HubOwner ? '#FBBF24' : role === HubRole.HubAdmin ? '#A5B4FC' : '#94A3B8'
+            } />
+            <Text className={`text-[10px] font-black uppercase tracking-wide ${meta.text}`}>
+                {meta.label}
+            </Text>
+        </View>
+    );
+}
+
 export default function HubMembersScreen() {
     const route = useRoute<HubMembersScreenRouteProp>();
     const { hubId } = route.params;
     const { user: currentUser } = useAuth();
 
     const [activeTab, setActiveTab] = useState<'members' | 'requests'>('members');
-    const [members, setMembers] = useState<any[]>([]);
+    const [members, setMembers] = useState<MemberRow[]>([]);
     const [requests, setRequests] = useState<JoinRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRequestsLoading, setIsRequestsLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
+    const markProcessing = (id: string, on: boolean) => {
+        setProcessingIds(prev => {
+            const next = new Set(prev);
+            if (on) next.add(id); else next.delete(id);
+            return next;
+        });
+    };
 
     const fetchMembers = useCallback(async () => {
         try {
@@ -39,7 +99,9 @@ export default function HubMembersScreen() {
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_MEMBERS(hubId));
             if (response.ok) {
                 const data = await response.json();
-                setMembers(data.result || data || []);
+                const raw = data.result || data || [];
+                const normalized = (Array.isArray(raw) ? raw : []).map(normalizeMember).filter(Boolean) as MemberRow[];
+                setMembers(normalized);
             }
         } catch (error) {
             console.error('Error fetching hub members:', error);
@@ -70,43 +132,94 @@ export default function HubMembersScreen() {
         }, [fetchMembers, fetchRequests])
     );
 
-    const handleKick = (memberId: string, memberName: string) => {
+    const changeRole = async (member: MemberRow, newRole: HubRole) => {
+        markProcessing(member.userId, true);
+        try {
+            const response = await authenticatedFetch(
+                ENDPOINTS.CHANGE_HUB_MEMBER_ROLE(hubId, member.userId),
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({ role: newRole }),
+                }
+            );
+            if (response.ok) {
+                setMembers(prev =>
+                    prev.map(m => (m.userId === member.userId ? { ...m, hubRole: newRole } : m))
+                );
+            } else {
+                const text = await response.text();
+                Alert.alert('Error', getErrorMessage(text) || 'Failed to update role.');
+            }
+        } catch (error) {
+            Alert.alert('Error', getErrorMessage(error));
+        } finally {
+            markProcessing(member.userId, false);
+        }
+    };
+
+    const removeMember = (member: MemberRow) => {
         Alert.alert(
-            'Kick Member',
-            `Are you sure you want to kick ${memberName} from the hub?`,
+            'Remove Member',
+            `Remove ${member.username} from the hub?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Kick',
+                    text: 'Remove',
                     style: 'destructive',
                     onPress: async () => {
+                        markProcessing(member.userId, true);
                         try {
-                            const response = await authenticatedFetch(ENDPOINTS.KICK_HUB_MEMBER(hubId, memberId), {
-                                method: 'POST'
-                            });
+                            const response = await authenticatedFetch(
+                                ENDPOINTS.REMOVE_HUB_MEMBER(hubId, member.userId),
+                                { method: 'DELETE' }
+                            );
                             if (response.ok) {
-                                setMembers(prev => prev.filter(m => {
-                                    const mId = m.UserId || m.userId || m.id || m.Id || m.ID;
-                                    return mId !== memberId;
-                                }));
-                                Alert.alert('Success', `${memberName} has been kicked.`);
+                                setMembers(prev => prev.filter(m => m.userId !== member.userId));
                             } else {
-                                Alert.alert('Error', 'Failed to kick member.');
+                                const text = await response.text();
+                                Alert.alert('Error', getErrorMessage(text) || 'Failed to remove member.');
                             }
                         } catch (error) {
-                            Alert.alert('Error', 'An unexpected error occurred.');
+                            Alert.alert('Error', getErrorMessage(error));
+                        } finally {
+                            markProcessing(member.userId, false);
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
     };
 
+    const openMemberActions = (member: MemberRow) => {
+        const buttons: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+
+        if (member.hubRole === HubRole.HubMember) {
+            buttons.push({
+                text: 'Promote to Admin',
+                onPress: () => changeRole(member, HubRole.HubAdmin),
+            });
+        } else if (member.hubRole === HubRole.HubAdmin) {
+            buttons.push({
+                text: 'Demote to Member',
+                onPress: () => changeRole(member, HubRole.HubMember),
+            });
+        }
+
+        buttons.push({
+            text: 'Remove from hub',
+            style: 'destructive',
+            onPress: () => removeMember(member),
+        });
+        buttons.push({ text: 'Cancel', style: 'cancel' });
+
+        Alert.alert(member.username, 'Choose an action', buttons);
+    };
+
     const handleApprove = async (requestId: string, username: string) => {
-        setProcessingIds(prev => new Set(prev).add(requestId));
+        markProcessing(requestId, true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.APPROVE_HUB_JOIN_REQUEST(requestId), {
-                method: 'POST'
+                method: 'POST',
             });
             if (response.ok) {
                 setRequests(prev => prev.filter(r => r.requestId !== requestId));
@@ -117,11 +230,7 @@ export default function HubMembersScreen() {
         } catch (error) {
             Alert.alert('Error', 'An unexpected error occurred.');
         } finally {
-            setProcessingIds(prev => {
-                const next = new Set(prev);
-                next.delete(requestId);
-                return next;
-            });
+            markProcessing(requestId, false);
         }
     };
 
@@ -135,10 +244,10 @@ export default function HubMembersScreen() {
                     text: 'Reject',
                     style: 'destructive',
                     onPress: async () => {
-                        setProcessingIds(prev => new Set(prev).add(requestId));
+                        markProcessing(requestId, true);
                         try {
                             const response = await authenticatedFetch(ENDPOINTS.REJECT_HUB_JOIN_REQUEST(requestId), {
-                                method: 'POST'
+                                method: 'POST',
                             });
                             if (response.ok) {
                                 setRequests(prev => prev.filter(r => r.requestId !== requestId));
@@ -148,26 +257,23 @@ export default function HubMembersScreen() {
                         } catch (error) {
                             Alert.alert('Error', 'An unexpected error occurred.');
                         } finally {
-                            setProcessingIds(prev => {
-                                const next = new Set(prev);
-                                next.delete(requestId);
-                                return next;
-                            });
+                            markProcessing(requestId, false);
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
     };
 
-    const filteredMembers = members.filter(m => {
-        const name = m.Username || m.username || '';
-        return name.toLowerCase().includes(searchQuery.toLowerCase());
-    });
+    const filteredMembers = members.filter(m =>
+        m.username.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const filteredRequests = requests.filter(r =>
         r.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const adminCount = members.filter(m => m.hubRole === HubRole.HubAdmin).length;
 
     const tabs = [
         { value: 'members' as const, label: 'Members', icon: 'people-outline' as const, count: members.length },
@@ -207,6 +313,14 @@ export default function HubMembersScreen() {
                 </View>
             </View>
 
+            {activeTab === 'members' && adminCount > 0 && (
+                <View className="px-4 pt-2">
+                    <Text className="text-[11px] text-slate-500">
+                        {adminCount} {adminCount === 1 ? 'admin' : 'admins'} · {members.length} total
+                    </Text>
+                </View>
+            )}
+
             <View className="px-4 py-2">
                 <View className="flex-row items-center bg-card px-3 rounded-xl border border-white/5">
                     <Ionicons name="search-outline" size={20} color="#71717A" />
@@ -226,39 +340,55 @@ export default function HubMembersScreen() {
                         <ActivityIndicator size="large" color="#8B5CF6" />
                     </View>
                 ) : (
-                    <ScrollView className="flex-1 px-4">
+                    <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 24 }}>
                         {filteredMembers.length > 0 ? (
-                            filteredMembers.map((member, index) => {
-                                const mId = member.UserId || member.userId || member.id || member.Id || member.ID;
-                                const mName = member.Username || member.username || member.Name || member.name || 'Unknown';
-                                const mNick = member.Nickname || member.nickname || member.nickName || '';
-
+                            filteredMembers.map((member) => {
+                                const isSelf = member.userId === currentUser?.id;
+                                const isProcessing = processingIds.has(member.userId);
                                 return (
                                     <View
-                                        key={mId || `member-${index}`}
-                                        className="flex-row items-center justify-between py-4 border-b border-white/5"
+                                        key={member.userId}
+                                        className="flex-row items-center justify-between py-3.5 border-b border-white/5"
                                     >
-                                        <View className="flex-row items-center gap-3">
-                                            <PlayerAvatar name={mName} size="md" />
-                                            <View>
-                                                <Text className="text-white font-medium text-base">{mName}</Text>
-                                                {mNick ? <Text className="text-gray-500 text-xs">{mNick}</Text> : null}
+                                        <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
+                                            <PlayerAvatar name={member.username} size="md" />
+                                            <View className="flex-1">
+                                                <View className="flex-row items-center" style={{ gap: 8 }}>
+                                                    <Text className="text-white font-semibold text-base" numberOfLines={1}>
+                                                        {member.username}
+                                                    </Text>
+                                                    {isSelf && (
+                                                        <Text className="text-[10px] font-black uppercase text-slate-500">
+                                                            You
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                                <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
+                                                    <RoleBadge role={member.hubRole} />
+                                                    {member.nickname ? (
+                                                        <Text className="text-slate-500 text-xs" numberOfLines={1}>
+                                                            {member.nickname}
+                                                        </Text>
+                                                    ) : null}
+                                                </View>
                                             </View>
                                         </View>
 
-                                        {mId !== currentUser?.id && (
-                                            <Pressable
-                                                onPress={() => {
-                                                    if (!mId) {
-                                                        Alert.alert('Error', 'Could not identify this user.');
-                                                        return;
-                                                    }
-                                                    handleKick(mId, mName);
-                                                }}
-                                                className="bg-destructive/10 px-4 py-2 rounded-lg"
-                                            >
-                                                <Text className="text-destructive font-bold text-sm">Kick</Text>
-                                            </Pressable>
+                                        {!isSelf && (
+                                            isProcessing ? (
+                                                <View className="w-10 h-10 items-center justify-center">
+                                                    <ActivityIndicator size="small" color="#818CF8" />
+                                                </View>
+                                            ) : (
+                                                <Pressable
+                                                    onPress={() => openMemberActions(member)}
+                                                    className="w-10 h-10 rounded-xl items-center justify-center bg-white/[0.03] border border-white/[0.06]"
+                                                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                                                    hitSlop={8}
+                                                >
+                                                    <Ionicons name="ellipsis-horizontal" size={18} color="#94A3B8" />
+                                                </Pressable>
+                                            )
                                         )}
                                     </View>
                                 );
