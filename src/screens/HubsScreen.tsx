@@ -12,6 +12,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { HubCard } from '../components/cards/HubCard';
 import { StatusModal } from '../components/modals/StatusModal';
+import { Toggle } from '../components/ui/Toggle';
 
 import { API_BASE_URL, ENDPOINTS, authenticatedFetch } from '../lib/api';
 
@@ -41,6 +42,7 @@ export default function HubsScreen() {
     // Create Hub State
     const [hubName, setHubName] = useState("");
     const [hubDescription, setHubDescription] = useState("");
+    const [hubIsPublic, setHubIsPublic] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
 
     const [hubs, setHubs] = useState<Hub[]>([]);
@@ -176,7 +178,8 @@ export default function HubsScreen() {
                 method: 'POST',
                 body: JSON.stringify({
                     Name: hubName.trim(),
-                    Description: hubDescription.trim() || undefined
+                    Description: hubDescription.trim() || undefined,
+                    IsPublic: hubIsPublic
                 })
             });
 
@@ -224,6 +227,7 @@ export default function HubsScreen() {
             setIsModalOpen(false);
             setHubName("");
             setHubDescription("");
+            setHubIsPublic(true);
             fetchHubs(); // Refresh list
         } catch (err: any) {
             console.error('Create hub error:', err);
@@ -435,6 +439,40 @@ export default function HubsScreen() {
                                     onChangeText={setHubDescription}
                                 />
                             </View>
+
+                            <View className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06]">
+                                <View className="flex-row items-center justify-between">
+                                    <View className="flex-row items-center gap-3 flex-1">
+                                        <View className={cn(
+                                            "w-10 h-10 rounded-2xl items-center justify-center",
+                                            hubIsPublic ? "bg-emerald-500/10" : "bg-amber-500/10"
+                                        )}>
+                                            <Ionicons
+                                                name={hubIsPublic ? "globe-outline" : "lock-closed-outline"}
+                                                size={18}
+                                                color={hubIsPublic ? "#10B981" : "#F59E0B"}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-white font-bold text-sm">
+                                                {hubIsPublic ? "Public Hub" : "Private Hub"}
+                                            </Text>
+                                            <Text className="text-slate-500 text-xs mt-0.5">
+                                                {hubIsPublic
+                                                    ? "Anyone can follow this hub"
+                                                    : "Members need approval to join"}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Toggle
+                                        value={hubIsPublic}
+                                        onValueChange={setHubIsPublic}
+                                        activeColor="#10B981"
+                                        inactiveColor="#F59E0B"
+                                    />
+                                </View>
+                            </View>
+
                             <Button
                                 onPress={handleCreateHub}
                                 className="mt-4"

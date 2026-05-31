@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, Pressable, TextInput } from 'react-native';
 import { Button } from '../ui/Button';
 import { Ionicons } from '@expo/vector-icons';
+import { Toggle } from '../ui/Toggle';
+import { cn } from '../../lib/utils';
 
 interface EditHubModalProps {
     visible: boolean;
     hubId: string;
     initialName: string;
     initialDescription: string;
+    initialIsPublic?: boolean;
     onClose: () => void;
-    onSave: (name: string, description: string) => Promise<void>;
+    onSave: (name: string, description: string, isPublic: boolean) => Promise<void>;
 }
 
 export function EditHubModal({
@@ -17,19 +20,29 @@ export function EditHubModal({
     hubId,
     initialName,
     initialDescription,
+    initialIsPublic = true,
     onClose,
     onSave,
 }: EditHubModalProps) {
     const [name, setName] = useState(initialName);
     const [description, setDescription] = useState(initialDescription);
+    const [isPublic, setIsPublic] = useState(initialIsPublic);
     const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (visible) {
+            setName(initialName);
+            setDescription(initialDescription);
+            setIsPublic(initialIsPublic);
+        }
+    }, [visible, initialName, initialDescription, initialIsPublic]);
 
     const handleSave = async () => {
         if (!name.trim()) return;
 
         setIsSaving(true);
         try {
-            await onSave(name, description);
+            await onSave(name, description, isPublic);
             onClose();
         } catch (error) {
             console.error('Error saving hub:', error);
@@ -84,6 +97,39 @@ export function EditHubModal({
                                 textAlignVertical="top"
                                 className="bg-background border border-border rounded-xl px-4 py-3 text-foreground min-h-[100px]"
                             />
+                        </View>
+
+                        <View className="bg-background border border-border rounded-xl p-4">
+                            <View className="flex-row items-center justify-between">
+                                <View className="flex-row items-center gap-3 flex-1">
+                                    <View className={cn(
+                                        "w-10 h-10 rounded-2xl items-center justify-center",
+                                        isPublic ? "bg-emerald-500/10" : "bg-amber-500/10"
+                                    )}>
+                                        <Ionicons
+                                            name={isPublic ? "globe-outline" : "lock-closed-outline"}
+                                            size={18}
+                                            color={isPublic ? "#10B981" : "#F59E0B"}
+                                        />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-foreground font-bold text-sm">
+                                            {isPublic ? "Public Hub" : "Private Hub"}
+                                        </Text>
+                                        <Text className="text-muted-foreground text-xs mt-0.5">
+                                            {isPublic
+                                                ? "Anyone can follow this hub"
+                                                : "Members need approval to join"}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Toggle
+                                    value={isPublic}
+                                    onValueChange={setIsPublic}
+                                    activeColor="#10B981"
+                                    inactiveColor="#F59E0B"
+                                />
+                            </View>
                         </View>
                     </View>
 

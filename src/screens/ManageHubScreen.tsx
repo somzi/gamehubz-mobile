@@ -167,7 +167,7 @@ export default function ManageHubScreen() {
         }
     };
 
-    const handleUpdateHub = async (name: string, description: string) => {
+    const handleUpdateHub = async (name: string, description: string, isPublic: boolean) => {
         try {
             const response = await authenticatedFetch(ENDPOINTS.UPDATE_HUB, {
                 method: 'POST',
@@ -175,6 +175,7 @@ export default function ManageHubScreen() {
                     id: hubId,
                     name: name,
                     description: description,
+                    isPublic: isPublic,
                 }),
             });
 
@@ -320,6 +321,7 @@ export default function ManageHubScreen() {
                 hubId={hubId}
                 initialName={hubData?.name || ''}
                 initialDescription={hubData?.description || ''}
+                initialIsPublic={hubData?.isPublic !== false}
                 onClose={() => setShowEditModal(false)}
                 onSave={handleUpdateHub}
             />

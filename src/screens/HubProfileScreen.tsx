@@ -28,6 +28,9 @@ export default function HubProfileScreen() {
     const { user } = useAuth();
     const [isFollowing, setIsFollowing] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
+    const [isPublic, setIsPublic] = useState(true);
+    const [hasPendingRequest, setHasPendingRequest] = useState(false);
+    const [isRequestingJoin, setIsRequestingJoin] = useState(false);
     const [hubTab, setHubTab] = useState('overview');
     const [tournamentFilter, setTournamentFilter] = useState('live');
     const [hubData, setHubData] = useState<any>(null);
@@ -67,9 +70,12 @@ export default function HubProfileScreen() {
                 throw new Error('Failed to fetch hub details');
             }
             const data = await response.json();
-            setHubData(data.result || data);
-            setIsFollowing(data.result?.isUserFollowHub || data.isUserFollowHub || false);
-            setIsOwner(data.result?.isUserOwner || data.isUserOwner || false);
+            const hub = data.result || data;
+            setHubData(hub);
+            setIsFollowing(hub.isUserFollowHub || false);
+            setIsOwner(hub.isUserOwner || false);
+            setIsPublic(hub.isPublic !== false);
+            setHasPendingRequest(hub.hasPendingJoinRequest || false);
             setError(null);
         } catch (err: any) {
             console.error('Error fetching hub details:', err);
@@ -129,19 +135,39 @@ export default function HubProfileScreen() {
             return;
         }
 
+        if (hasPendingRequest) {
+            // Cancel pending request
+            setIsRequestingJoin(true);
+            try {
+                const response = await authenticatedFetch(ENDPOINTS.CANCEL_HUB_JOIN_REQUEST(id), {
+                    method: 'DELETE',
+                });
+                if (response.ok) setHasPendingRequest(false);
+            } catch (error) {
+                console.error('Error cancelling request:', error);
+            } finally {
+                setIsRequestingJoin(false);
+            }
+            return;
+        }
+
+        setIsRequestingJoin(true);
         try {
-            // Follow
-            const response = await authenticatedFetch(ENDPOINTS.FOLLOW_HUB, {
+            // Use unified join endpoint - backend decides between immediate follow (public) or request (private)
+            const response = await authenticatedFetch(ENDPOINTS.REQUEST_HUB_JOIN(id), {
                 method: 'POST',
-                body: JSON.stringify({
-                    id: null,
-                    userId: user.id,
-                    hubId: id,
-                }),
             });
-            if (response.ok) setIsFollowing(true);
+            if (response.ok) {
+                if (isPublic) {
+                    setIsFollowing(true);
+                } else {
+                    setHasPendingRequest(true);
+                }
+            }
         } catch (error) {
-            console.error('Error following hub:', error);
+            console.error('Error joining hub:', error);
+        } finally {
+            setIsRequestingJoin(false);
         }
     };
 
@@ -163,7 +189,7 @@ export default function HubProfileScreen() {
         }
     };
 
-    const handleUpdateHub = async (name: string, description: string) => {
+    const handleUpdateHub = async (name: string, description: string, isPublicValue?: boolean) => {
         try {
             const response = await authenticatedFetch(ENDPOINTS.UPDATE_HUB, {
                 method: 'POST',
@@ -171,6 +197,7 @@ export default function HubProfileScreen() {
                     id: id,
                     name: name,
                     description: description,
+                    isPublic: isPublicValue !== undefined ? isPublicValue : isPublic,
                 }),
             });
 
@@ -383,29 +410,70 @@ export default function HubProfileScreen() {
                             )}
 
 
-                            {/* Follow Button */}
-                            {!isOwner && (
-                                <Pressable
-                                    onPress={handleFollowToggle}
-                                    className={`mt-4 w-full py-3.5 rounded-2xl flex-row items-center justify-center gap-2 ${
-                                        isFollowing
-                                            ? "bg-white/5 border border-white/10"
-                                            : "bg-[#10B981]"
-                                    }`}
-                                    style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                                >
-                                    <Ionicons
-                                        name={isFollowing ? "checkmark-circle" : "add-circle"}
-                                        size={17}
-                                        color={isFollowing ? "#94A3B8" : "#fff"}
-                                    />
-                                    <Text className={`font-black text-sm tracking-wide ${
-                                        isFollowing ? "text-slate-400" : "text-white"
-                                    }`}>
-                                        {isFollowing ? "Following" : "Follow Hub"}
-                                    </Text>
-                                </Pressable>
-                            )}
+                            {/* Privacy badge */}
+                            <View className="mt-4 flex-row items-center justify-center gap-1.5">
+                                <Ionicons
+                                    name={isPublic ? "globe-outline" : "lock-closed-outline"}
+                                    size={12}
+                                    color={isPublic ? "#10B981" : "#F59E0B"}
+                                />
+                                <Text className={`text-[10px] font-bold uppercase tracking-widest ${isPublic ? "text-emerald-400" : "text-amber-400"}`}>
+                                    {isPublic ? "Public" : "Private"}
+                                </Text>
+                            </View>
+
+                            {/* Follow / Request Join Button */}
+                            {!isOwner && (() => {
+                                const buttonLabel = isFollowing
+                                    ? "Following"
+                                    : hasPendingRequest
+                                        ? "Request Pending"
+                                        : isPublic
+                                            ? "Follow Hub"
+                                            : "Request to Join";
+                                const buttonIcon = isFollowing
+                                    ? "checkmark-circle"
+                                    : hasPendingRequest
+                                        ? "time-outline"
+                                        : isPublic
+                                            ? "add-circle"
+                                            : "lock-open-outline";
+                                const buttonBg = isFollowing
+                                    ? "bg-white/5 border border-white/10"
+                                    : hasPendingRequest
+                                        ? "bg-amber-500/15 border border-amber-500/30"
+                                        : isPublic
+                                            ? "bg-[#10B981]"
+                                            : "bg-amber-500";
+                                const textColor = isFollowing
+                                    ? "text-slate-400"
+                                    : hasPendingRequest
+                                        ? "text-amber-400"
+                                        : "text-white";
+                                const iconColor = isFollowing
+                                    ? "#94A3B8"
+                                    : hasPendingRequest
+                                        ? "#F59E0B"
+                                        : "#fff";
+
+                                return (
+                                    <Pressable
+                                        onPress={handleFollowToggle}
+                                        disabled={isRequestingJoin}
+                                        className={`mt-3 w-full py-3.5 rounded-2xl flex-row items-center justify-center gap-2 ${buttonBg}`}
+                                        style={({ pressed }) => ({ opacity: (pressed || isRequestingJoin) ? 0.8 : 1 })}
+                                    >
+                                        {isRequestingJoin ? (
+                                            <ActivityIndicator size="small" color={iconColor} />
+                                        ) : (
+                                            <Ionicons name={buttonIcon as any} size={17} color={iconColor} />
+                                        )}
+                                        <Text className={`font-black text-sm tracking-wide ${textColor}`}>
+                                            {buttonLabel}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })()}
                         </View>
                     </View>
                 </View>
