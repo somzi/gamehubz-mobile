@@ -79,6 +79,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [selectedRegion, setSelectedRegion] = useState(regionReverseMapping[tournament?.region] || 'global');
     const [startDate, setStartDate] = useState(tournament?.startDate || '');
     const [registrationDeadline, setRegistrationDeadline] = useState(tournament?.registrationDeadline || '');
+    const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
 
     const initialDurationMinutes = tournament?.roundDurationMinutes;
     let initialDurVal = '';
@@ -110,6 +111,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         return TOURNAMENT_FORMAT_OPTIONS.find(f => f.value === selectedFormat)?.label || 'Select Format';
     };
 
+    // Number of bracket entrants: players for solo, teams for team tournaments (team size is fixed after creation).
+    const teamSizeNum = Number(tournament?.teamSize ?? tournament?.TeamSize ?? 0);
+    const participantCount = isTeamTournament
+        ? (teamSizeNum > 0 && parseInt(maxPlayers) ? Math.floor(parseInt(maxPlayers) / teamSizeNum) : 0)
+        : (parseInt(maxPlayers) || 0);
+    const canShowThirdPlace = selectedFormat === String(TournamentFormat.SingleElimination) && participantCount > 2;
+
     useEffect(() => {
         if (!isTeamTournament) {
             return;
@@ -122,6 +130,46 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             setSelectedFormat(String(TournamentFormat.SingleElimination));
         }
     }, [isTeamTournament, selectedFormat]);
+
+    // Re-sync form fields whenever the modal opens or the tournament prop changes.
+    // useState initializers only run on the first mount; without this the modal
+    // keeps showing the initial values even after the parent refetches.
+    useEffect(() => {
+        if (!visible || !tournament) return;
+
+        setName(tournament?.name || '');
+        setDescription(tournament?.description || '');
+        setRules(tournament?.rules || '');
+        setMaxPlayers(String(tournament?.maxPlayers || ''));
+        setSelectedFormat(String(tournament?.format !== undefined ? tournament.format : '3'));
+        setGroupsCount(String(tournament?.groupsCount || '4'));
+        setQualifiersPerGroup(String(tournament?.qualifiersPerGroup || '2'));
+        setPrize(String(tournament?.prize || ''));
+        setPrizeCurrency(String(tournament?.prizeCurrency || '1'));
+        setSelectedRegion(regionReverseMapping[tournament?.region] || 'global');
+        setStartDate(tournament?.startDate || '');
+        setRegistrationDeadline(tournament?.registrationDeadline || '');
+        setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
+
+        const durMinutes = tournament?.roundDurationMinutes;
+        if (durMinutes != null) {
+            if (durMinutes > 0 && durMinutes % 1440 === 0) {
+                setRoundDurationValue(String(durMinutes / 1440));
+                setRoundDurationUnit('Days');
+            } else if (durMinutes > 0 && durMinutes % 60 === 0) {
+                setRoundDurationValue(String(durMinutes / 60));
+                setRoundDurationUnit('Hours');
+            } else {
+                setRoundDurationValue(String(durMinutes));
+                setRoundDurationUnit('Minutes');
+            }
+        } else {
+            setRoundDurationValue('');
+            setRoundDurationUnit('Minutes');
+        }
+
+        setError(null);
+    }, [visible, tournament]);
 
     const getRegionLabel = () => {
         return regions.find(r => r.value === selectedRegion)?.label || 'Region';
@@ -193,7 +241,9 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 Prize: parseInt(prize) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
                 Region: regionMapping[selectedRegion] ?? 0,
-                RoundDurationMinutes: roundDurationMinutes
+                RoundDurationMinutes: roundDurationMinutes,
+                // Always sent so an edit never silently resets it; only changeable before the bracket is generated.
+                HasThirdPlaceMatch: hasThirdPlaceMatch,
             };
 
             const response = await authenticatedFetch(ENDPOINTS.CREATE_TOURNAMENT, {
@@ -233,7 +283,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const renderOptionsModal = (
         visible: boolean,
         onCloseModal: () => void,
-        options: { value: string; label: string }[],
+        options: ReadonlyArray<{ value: string; label: string }>,
         selected: string | string[],
         onSelect: (val: string) => void,
         multi = false
@@ -439,6 +489,38 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             <Ionicons name="chevron-down" size={20} color="#94A3B8" />
                                         </TouchableOpacity>
                                     </View>
+                                </View>
+                            )}
+
+                            {canShowThirdPlace && (
+                                <View className="mb-6">
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="medal-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Third Place Match</Text>
+                                    </View>
+                                    <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                        <Pressable
+                                            onPress={() => { if (canEditAll) setHasThirdPlaceMatch(false); }}
+                                            disabled={!canEditAll}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!hasThirdPlaceMatch ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${!hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
+                                                NO
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => { if (canEditAll) setHasThirdPlaceMatch(true); }}
+                                            disabled={!canEditAll}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${hasThirdPlaceMatch ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
+                                                YES
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Adds a third place match. Skipped if fewer than 4 participants register. Takes effect when the bracket is generated.
+                                    </Text>
                                 </View>
                             )}
 

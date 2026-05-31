@@ -10,6 +10,7 @@ import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
+import { BracketMatch } from '../components/bracket/BracketMatch';
 
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -19,7 +20,7 @@ import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
-import { getTournamentFormatLabel, TournamentRegion } from '../types/tournament';
+import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
 import { StatusModal } from '../components/modals/StatusModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
@@ -879,6 +880,18 @@ export default function TournamentDetailsScreen() {
         const currentStage = stages[selectedStageIndex];
         if (!currentStage) return null;
 
+        // The binary-tree bracket can't place a third-place play-off inline, so pull it out
+        // and render it on its own below the bracket.
+        const stageRounds = currentStage.rounds || [];
+        const thirdPlaceMatch = stageRounds
+            .flatMap((r: any) => r.matches || [])
+            .find((m: any) => m.stage === MatchStage.ThirdPlace);
+        const bracketRounds = thirdPlaceMatch
+            ? stageRounds
+                .map((r: any) => ({ ...r, matches: (r.matches || []).filter((m: any) => m.stage !== MatchStage.ThirdPlace) }))
+                .filter((r: any) => r.matches.length > 0)
+            : stageRounds;
+
         return (
             <View key={currentStage.stageId || selectedStageIndex} className="mb-8">
                 {stages.length > 1 && (
@@ -914,17 +927,40 @@ export default function TournamentDetailsScreen() {
                 )}
 
 
-                {currentStage.rounds && currentStage.rounds.length > 0 ? (
-                    <TournamentBracket
-                        rounds={currentStage.rounds}
-                        onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
-                        currentUserId={user?.id}
-                        currentUsername={user?.username}
-                        isAdmin={tournament?.createdBy === user?.id}
-                        onEditDeadline={handleEditDeadline}
-                        tournamentStatus={tournament?.status}
-                        isTeamTournament={tournament?.isTeamTournament}
-                    />
+                {stageRounds.length > 0 ? (
+                    <>
+                        <TournamentBracket
+                            rounds={bracketRounds}
+                            onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
+                            currentUserId={user?.id}
+                            currentUsername={user?.username}
+                            isAdmin={tournament?.createdBy === user?.id}
+                            onEditDeadline={handleEditDeadline}
+                            tournamentStatus={tournament?.status}
+                            isTeamTournament={tournament?.isTeamTournament}
+                        />
+                        {thirdPlaceMatch && (
+                            <View className="px-4 mt-4">
+                                <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
+                                    <Ionicons name="medal-outline" size={16} color="#CD7F32" />
+                                    <Text className="text-sm font-bold text-white">Third Place Match</Text>
+                                </View>
+                                <View style={{ maxWidth: 320 }}>
+                                    <BracketMatch
+                                        home={thirdPlaceMatch.home}
+                                        away={thirdPlaceMatch.away}
+                                        startTime={thirdPlaceMatch.startTime}
+                                        status={thirdPlaceMatch.status}
+                                        onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(thirdPlaceMatch)}
+                                        currentUserId={user?.id}
+                                        currentUsername={user?.username}
+                                        isAdmin={tournament?.createdBy === user?.id}
+                                        isTeamTournament={tournament?.isTeamTournament}
+                                    />
+                                </View>
+                            </View>
+                        )}
+                    </>
                 ) : currentStage.groups && currentStage.groups.length > 0 ? (
                     <View>
                         {/* Sort groups alphabetically by name (Group A, Group B, …) */}

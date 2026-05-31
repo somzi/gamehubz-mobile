@@ -90,6 +90,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [teamSize, setTeamSize] = useState('');
     const [teamWinCondition, setTeamWinCondition] = useState('0');
 
+    // Third place play-off (single elimination only)
+    const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
+
     // Data State
     const [hubs, setHubs] = useState<{ id: string; name: string }[]>([]);
     const [isLoadingHubs, setIsLoadingHubs] = useState(false);
@@ -179,6 +182,19 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const getFormatLabel = () => {
         return TOURNAMENT_FORMAT_OPTIONS.find(f => f.value === selectedFormat)?.label || 'Select Format';
     };
+
+    // Number of bracket entrants: players for solo, teams for team tournaments.
+    const participantCount = (() => {
+        const mp = parseInt(maxPlayers);
+        if (isTeamTournament) {
+            const ts = parseInt(teamSize);
+            if (!ts || ts <= 0 || !mp) return 0;
+            return Math.floor(mp / ts);
+        }
+        return mp || 0;
+    })();
+    // Third place only makes sense for a single-elimination bracket with more than 2 entrants.
+    const canShowThirdPlace = selectedFormat === String(TournamentFormat.SingleElimination) && participantCount > 2;
 
     useEffect(() => {
         if (!isTeamTournament) {
@@ -287,6 +303,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 IsTeamTournament: isTeamTournament,
                 TeamSize: isTeamTournament ? parseInt(teamSize) : null,
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
+                HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
             };
 
             const requestBody = {
@@ -558,6 +575,37 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             <Ionicons name="chevron-down" size={16} color="#94A3B8" />
                                         </TouchableOpacity>
                                     </View>
+                                </View>
+                            )}
+
+                            {/* Third Place Match (single elimination, > 2 entrants) */}
+                            {canShowThirdPlace && (
+                                <View>
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="medal-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Third Place Match</Text>
+                                    </View>
+                                    <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                        <Pressable
+                                            onPress={() => setHasThirdPlaceMatch(false)}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!hasThirdPlaceMatch ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${!hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
+                                                NO
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => setHasThirdPlaceMatch(true)}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${hasThirdPlaceMatch ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
+                                                YES
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Adds a third place match. Skipped if fewer than 4 participants register.
+                                    </Text>
                                 </View>
                             )}
 
