@@ -160,7 +160,7 @@ export default function HubMembersScreen() {
     const removeMember = (member: MemberRow) => {
         Alert.alert(
             'Remove Member',
-            `Remove ${member.username} from the hub?`,
+            `Remove ${member.username} from the hub? They will be able to join again.`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -178,6 +178,39 @@ export default function HubMembersScreen() {
                             } else {
                                 const text = await response.text();
                                 Alert.alert('Error', getErrorMessage(text) || 'Failed to remove member.');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', getErrorMessage(error));
+                        } finally {
+                            markProcessing(member.userId, false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const banMember = (member: MemberRow) => {
+        Alert.alert(
+            'Ban Member',
+            `Ban ${member.username} from the hub? They will no longer be able to join or send requests.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Ban',
+                    style: 'destructive',
+                    onPress: async () => {
+                        markProcessing(member.userId, true);
+                        try {
+                            const response = await authenticatedFetch(
+                                ENDPOINTS.BAN_HUB_MEMBER(hubId, member.userId),
+                                { method: 'POST' }
+                            );
+                            if (response.ok) {
+                                setMembers(prev => prev.filter(m => m.userId !== member.userId));
+                            } else {
+                                const text = await response.text();
+                                Alert.alert('Error', getErrorMessage(text) || 'Failed to ban member.');
                             }
                         } catch (error) {
                             Alert.alert('Error', getErrorMessage(error));
@@ -209,6 +242,11 @@ export default function HubMembersScreen() {
             text: 'Remove from hub',
             style: 'destructive',
             onPress: () => removeMember(member),
+        });
+        buttons.push({
+            text: 'Ban from hub',
+            style: 'destructive',
+            onPress: () => banMember(member),
         });
         buttons.push({ text: 'Cancel', style: 'cancel' });
 

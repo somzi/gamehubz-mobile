@@ -398,7 +398,14 @@ export default function HubProfileScreen() {
                                     </View>
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-2xl font-black text-white leading-tight" numberOfLines={2}>{hubData.name}</Text>
+                                    <View className="flex-row items-center" style={{ gap: 8 }}>
+                                        <Text className="text-2xl font-black text-white leading-tight flex-shrink" numberOfLines={2}>{hubData.name}</Text>
+                                        {(hubData.isVerified || hubData.IsVerified) && (
+                                            <View className="w-6 h-6 rounded-full bg-sky-500 items-center justify-center">
+                                                <Ionicons name="checkmark" size={16} color="#fff" />
+                                            </View>
+                                        )}
+                                    </View>
                                 </View>
                             </View>
 

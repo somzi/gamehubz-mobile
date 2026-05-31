@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { EditHubModal } from '../components/modals/EditHubModal';
 import { CreateTournamentModal } from '../components/modals/CreateTournamentModal';
+import { RequestVerificationModal } from '../components/modals/RequestVerificationModal';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { StatusModal } from '../components/modals/StatusModal';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
@@ -56,6 +57,8 @@ export default function ManageHubScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showCreateTournamentModal, setShowCreateTournamentModal] = useState(false);
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
+    const [verificationStatus, setVerificationStatus] = useState<number | null>(null);
 
     // Avatar state
     const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -83,6 +86,15 @@ export default function ManageHubScreen() {
             console.error('Error fetching hub details:', error);
         } finally {
             setIsLoading(false);
+        }
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_HUB_VERIFICATION_REQUEST(hubId));
+            if (response.ok) {
+                const data = await response.json();
+                setVerificationStatus(data?.status ?? null);
+            }
+        } catch {
+            // ignore
         }
     };
 
@@ -303,6 +315,35 @@ export default function ManageHubScreen() {
                         label="Create Tournament"
                         onPress={() => setShowCreateTournamentModal(true)}
                     />
+                    <Pressable
+                        onPress={() => setShowVerificationModal(true)}
+                        className="flex-row items-center justify-between py-4 border-b border-white/5"
+                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                    >
+                        <View className="flex-row items-center gap-4">
+                            <Ionicons name="shield-checkmark-outline" size={22} color="#71717A" />
+                            <Text className="font-medium text-base text-white">Verification</Text>
+                        </View>
+                        <View className="flex-row items-center" style={{ gap: 8 }}>
+                            {hubData?.isVerified ? (
+                                <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                    <Ionicons name="checkmark" size={11} color="#38BDF8" />
+                                    <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">Verified</Text>
+                                </View>
+                            ) : verificationStatus === 0 ? (
+                                <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                    <Ionicons name="time-outline" size={11} color="#F59E0B" />
+                                    <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pending</Text>
+                                </View>
+                            ) : verificationStatus === 2 ? (
+                                <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                    <Ionicons name="close" size={11} color="#EF4444" />
+                                    <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">Rejected</Text>
+                                </View>
+                            ) : null}
+                            <Ionicons name="chevron-forward" size={18} color="#3F3F46" />
+                        </View>
+                    </Pressable>
                     <MenuItem
                         icon="trash-outline"
                         label="Delete Hub"
@@ -329,6 +370,13 @@ export default function ManageHubScreen() {
                 visible={showCreateTournamentModal}
                 onClose={() => setShowCreateTournamentModal(false)}
                 hubId={hubId}
+            />
+            <RequestVerificationModal
+                visible={showVerificationModal}
+                hubId={hubId}
+                isAlreadyVerified={!!hubData?.isVerified}
+                onClose={() => setShowVerificationModal(false)}
+                onSubmitted={fetchHubDetails}
             />
             <StatusModal
                 visible={showStatusModal}
