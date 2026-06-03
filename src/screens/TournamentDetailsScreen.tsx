@@ -54,6 +54,7 @@ export default function TournamentDetailsScreen() {
     const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
     const [loadingBracket, setLoadingBracket] = useState(false);
     const [bracketError, setBracketError] = useState<string | null>(null);
+    const [isThirdPlaceExpanded, setIsThirdPlaceExpanded] = useState(false);
 
     const { user } = useAuth();
     const [isRegistering, setIsRegistering] = useState(false);
@@ -952,25 +953,37 @@ export default function TournamentDetailsScreen() {
                             tournamentStatus={tournament?.status}
                             isTeamTournament={tournament?.isTeamTournament}
                         />
-                        {thirdPlaceMatch && (
+                        {thirdPlaceMatch && (thirdPlaceMatch.home || thirdPlaceMatch.away) && (
                             <View className="px-4 mt-4">
-                                <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
-                                    <Ionicons name="medal-outline" size={16} color="#CD7F32" />
-                                    <Text className="text-sm font-bold text-white">Third Place Match</Text>
-                                </View>
-                                <View style={{ maxWidth: 320 }}>
-                                    <BracketMatch
-                                        home={thirdPlaceMatch.home}
-                                        away={thirdPlaceMatch.away}
-                                        startTime={thirdPlaceMatch.startTime}
-                                        status={thirdPlaceMatch.status}
-                                        onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(thirdPlaceMatch)}
-                                        currentUserId={user?.id}
-                                        currentUsername={user?.username}
-                                        isAdmin={canManage}
-                                        isTeamTournament={tournament?.isTeamTournament}
+                                <Pressable
+                                    onPress={() => setIsThirdPlaceExpanded(prev => !prev)}
+                                    className="flex-row items-center justify-between mb-3"
+                                >
+                                    <View className="flex-row items-center" style={{ gap: 6 }}>
+                                        <Ionicons name="medal-outline" size={16} color="#CD7F32" />
+                                        <Text className="text-sm font-bold text-white">Third Place Match</Text>
+                                    </View>
+                                    <Ionicons
+                                        name={isThirdPlaceExpanded ? 'chevron-up' : 'chevron-down'}
+                                        size={16}
+                                        color="#94A3B8"
                                     />
-                                </View>
+                                </Pressable>
+                                {isThirdPlaceExpanded && (
+                                    <View style={{ maxWidth: 320 }}>
+                                        <BracketMatch
+                                            home={thirdPlaceMatch.home}
+                                            away={thirdPlaceMatch.away}
+                                            startTime={thirdPlaceMatch.startTime}
+                                            status={thirdPlaceMatch.status}
+                                            onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(thirdPlaceMatch)}
+                                            currentUserId={user?.id}
+                                            currentUsername={user?.username}
+                                            isAdmin={canManage}
+                                            isTeamTournament={tournament?.isTeamTournament}
+                                        />
+                                    </View>
+                                )}
                             </View>
                         )}
                     </>

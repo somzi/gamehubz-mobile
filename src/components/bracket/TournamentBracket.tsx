@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 /* ── Layout constants ─────────────────────────────────────────────── */
 const MATCH_H = 130;            // vertical slot per match card
-const BASE_GAP = 8;             // gap between R1 cards
-const UNIT = MATCH_H + BASE_GAP; // 138 px per R1 slot
+const BASE_GAP = 16;            // gap between R1 cards
+const UNIT = MATCH_H + BASE_GAP; // 146 px per R1 slot
 const MATCH_W = 220;            // fixed card width
 const CONNECTOR_W = 40;         // width of connector column between rounds
 const HEADER_H = 64;            // height of round header row
