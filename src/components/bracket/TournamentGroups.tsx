@@ -240,6 +240,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 currentUserId={currentUserId}
                                                 currentUsername={currentUsername}
                                                 isAdmin={isAdmin}
+                                                proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                             />
                                         ))}
                                     </View>

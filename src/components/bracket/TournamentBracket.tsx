@@ -229,6 +229,7 @@ export function TournamentBracket({
                                                     currentUsername={currentUsername}
                                                     isAdmin={isAdmin}
                                                     isTeamTournament={isTeamTournament}
+                                                    proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                     className={isHighlighted ? 'border-indigo-500/30' : undefined}
                                                 />
                                             </View>

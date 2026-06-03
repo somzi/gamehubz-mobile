@@ -74,6 +74,7 @@ export default function TournamentDetailsScreen() {
     }>({ type: 'success', title: '', message: '' });
     const [hubOwnerId, setHubOwnerId] = useState<string | undefined>(undefined);
     const [bracketCanManage, setBracketCanManage] = useState(false);
+    const [bracketRequireResultApproval, setBracketRequireResultApproval] = useState(false);
     const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
     const [joiningTeamId, setJoiningTeamId] = useState<string | null>(null);
 
@@ -318,6 +319,10 @@ export default function TournamentDetailsScreen() {
 
             // v2 exposes whether the current user may manage (hub owner / hub admin / platform admin)
             setBracketCanManage(data.canManage ?? data.CanManage ?? false);
+
+            // Tournament-level approval flag is mirrored on the structure response so the
+            // bracket UI can render the right submit / approve flow per match without an extra fetch.
+            setBracketRequireResultApproval(data.requireResultApproval ?? data.RequireResultApproval ?? false);
         } catch (err) {
             console.error('Bracket fetch error:', err);
             setBracketError('Failed to load bracket structure');
@@ -2092,6 +2097,7 @@ export default function TournamentDetailsScreen() {
                 canManage={canManage}
                 isRoundLocked={selectedMatch?.isRoundLocked}
                 canRevert={selectedMatch?.canRevert}
+                requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
                 onMatchUpdate={() => {
                     fetchBracket(); // Refresh the bracket/league data
                     // Refresh details if needed

@@ -41,6 +41,12 @@ export interface SubMatchDto {
     IsTieBreakMatch?: boolean;
     evidences?: string[];
     Evidences?: string[];
+    proposedHomeScore?: number | null;
+    ProposedHomeScore?: number | null;
+    proposedAwayScore?: number | null;
+    ProposedAwayScore?: number | null;
+    proposedByUserId?: string | null;
+    ProposedByUserId?: string | null;
 }
 
 export interface AggregateScoreDto {
@@ -82,6 +88,8 @@ export interface TeamMatchDetailsDto {
     TieBreak?: TieBreakStatusDto | null;
     evidences?: string[];
     Evidences?: string[];
+    requireResultApproval?: boolean;
+    RequireResultApproval?: boolean;
 }
 
 // Aliases for user's specific backend naming if they prefer

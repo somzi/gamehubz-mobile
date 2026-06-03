@@ -30,6 +30,10 @@ export interface MatchResultDetailDto {
     HomeUserAvatarUrl?: string;
     awayUserAvatarUrl?: string;
     AwayUserAvatarUrl?: string;
+    requireResultApproval?: boolean;
+    proposedHomeScore?: number | null;
+    proposedAwayScore?: number | null;
+    proposedByUserId?: string | null;
 }
 
 interface MatchDetailsModalProps {
@@ -53,6 +57,7 @@ interface MatchDetailsModalProps {
     canManage?: boolean;
     isRoundLocked?: boolean;
     canRevert?: boolean;
+    requireResultApproval?: boolean;
 }
 
 export function MatchDetailsModal({
@@ -76,6 +81,7 @@ export function MatchDetailsModal({
     canManage = false,
     isRoundLocked = false,
     canRevert = false,
+    requireResultApproval = false,
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -108,6 +114,11 @@ export function MatchDetailsModal({
 
     // Evidence collapse state
     const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
+
+    // Approval flow state
+    const [isApproving, setIsApproving] = useState(false);
+    const [isRejecting, setIsRejecting] = useState(false);
+    const [isEditingProposal, setIsEditingProposal] = useState(false);
 
     const formatAvatarUrl = (url?: string) => {
         if (!url) return '';
@@ -146,6 +157,10 @@ export function MatchDetailsModal({
                     scheduledTime: data.scheduledTime || data.ScheduledTime,
                     homeUserAvatarUrl: formatAvatarUrl(data.homeUserAvatarUrl || data.HomeUserAvatarUrl),
                     awayUserAvatarUrl: formatAvatarUrl(data.awayUserAvatarUrl || data.AwayUserAvatarUrl),
+                    requireResultApproval: data.requireResultApproval ?? data.RequireResultApproval ?? false,
+                    proposedHomeScore: data.proposedHomeScore ?? data.ProposedHomeScore ?? null,
+                    proposedAwayScore: data.proposedAwayScore ?? data.ProposedAwayScore ?? null,
+                    proposedByUserId: data.proposedByUserId ?? data.ProposedByUserId ?? null,
                 };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
@@ -307,13 +322,72 @@ export function MatchDetailsModal({
                 await handleUploadOnly();
             }
 
-            onClose();
+            // When approval is required and the submitter is a regular participant, the result
+            // becomes a pending proposal — keep the modal open so they immediately see the
+            // "Awaiting approval" state instead of getting bounced back to the bracket.
+            const willCreateProposal = approvalRequired && !(isHubOwner || canManage) && status !== 'completed';
+
             if (onMatchUpdate) onMatchUpdate();
+
+            if (willCreateProposal) {
+                setHomeScore('');
+                setAwayScore('');
+                setSelectedImages([]);
+                await fetchMatchDetails();
+            } else {
+                onClose();
+            }
         } catch (err: any) {
             console.error('Report result error:', err);
             setError(err.message || 'An error occurred while reporting result');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleApproveProposal = async () => {
+        if (!matchId) return;
+        setIsApproving(true);
+        setError(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.APPROVE_MATCH_RESULT, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || 'Failed to approve result');
+            }
+            if (onMatchUpdate) onMatchUpdate();
+            onClose();
+        } catch (err: any) {
+            console.error('Approve result error:', err);
+            setError(err.message || 'An error occurred while approving the result');
+        } finally {
+            setIsApproving(false);
+        }
+    };
+
+    const handleRejectProposal = async () => {
+        if (!matchId) return;
+        setIsRejecting(true);
+        setError(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.REJECT_MATCH_RESULT, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || 'Failed to reject result');
+            }
+            if (onMatchUpdate) onMatchUpdate();
+            await fetchMatchDetails();
+        } catch (err: any) {
+            console.error('Reject result error:', err);
+            setError(err.message || 'An error occurred while rejecting the result');
+        } finally {
+            setIsRejecting(false);
         }
     };
 
@@ -349,6 +423,16 @@ export function MatchDetailsModal({
     const canEditResult = status === 'completed' && !isEditMode && canRevert;
 
     const canSubmit = isParticipant || isHubOwner || canManage;
+
+    // Approval-flow derived state.
+    // The tournament setting reaches us either from the parent (bracket structure) or the match details payload.
+    const approvalRequired = !!(requireResultApproval || matchDetails?.requireResultApproval);
+    const proposedByUserId = matchDetails?.proposedByUserId || null;
+    const hasPendingProposal = approvalRequired && !!proposedByUserId && status !== 'completed';
+    const isProposer = hasPendingProposal && !!user?.id && proposedByUserId?.toLowerCase() === user.id.toLowerCase();
+    const isPrivileged = isHubOwner || canManage;
+    // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
+    const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
     // Determine winner for completed matches
     const getWinnerSide = () => {
@@ -674,12 +758,153 @@ export function MatchDetailsModal({
         );
     };
 
+    const renderPendingProposalCard = () => {
+        if (!matchDetails) return null;
+        const homeAvatar = matchDetails.homeUserAvatarUrl || matchDetails.HomeUserAvatarUrl || '';
+        const awayAvatar = matchDetails.awayUserAvatarUrl || matchDetails.AwayUserAvatarUrl || '';
+        const phs = matchDetails.proposedHomeScore ?? 0;
+        const pas = matchDetails.proposedAwayScore ?? 0;
+
+        // Whose name to display as "reported by" — fall back to the side label so the screen
+        // is never blank if the proposer profile didn't load.
+        const proposerIsHome = proposedByUserId?.toLowerCase() === matchDetails.homeUserId?.toLowerCase();
+        const proposerName = proposerIsHome
+            ? matchDetails.homeUser
+            : matchDetails.awayUser;
+
+        return (
+            <View className="mx-5 mt-4 mb-3">
+                <View className="bg-[#111827]/60 rounded-[32px] border border-white/[0.06] p-6 overflow-hidden">
+                    <View className="items-center mb-5">
+                        <View className="bg-[#F59E0B]/10 px-4 py-1.5 rounded-full">
+                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-[3px]">
+                                {isProposer ? 'Awaiting Approval' : 'Result Reported'}
+                            </Text>
+                        </View>
+                        <Text className="text-[10px] text-slate-400 mt-2 font-bold text-center">
+                            {isProposer
+                                ? 'Your opponent needs to confirm before this match is final.'
+                                : `${proposerName} reported the result. Confirm if it's correct.`}
+                        </Text>
+                    </View>
+
+                    {error && (
+                        <View className="bg-red-500/10 p-3 rounded-2xl mb-4 border border-red-500/20">
+                            <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
+                        </View>
+                    )}
+
+                    <View className="flex-row items-start justify-between">
+                        <Pressable onPress={() => navigateToProfile(matchDetails.homeUserId)} className="flex-1 items-center">
+                            <PlayerAvatar src={homeAvatar} name={matchDetails.homeUser} size="lg" className="rounded-2xl border-0" />
+                            <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
+                                {matchDetails.homeUser}
+                            </Text>
+                        </Pressable>
+
+                        <View className="items-center px-2 pt-1">
+                            <View className="flex-row items-baseline">
+                                <Text className="text-5xl font-black text-[#F59E0B]">{phs}</Text>
+                                <Text className="text-2xl font-black text-white/10 mx-2">:</Text>
+                                <Text className="text-5xl font-black text-[#F59E0B]">{pas}</Text>
+                            </View>
+                        </View>
+
+                        <Pressable onPress={() => navigateToProfile(matchDetails.awayUserId)} className="flex-1 items-center">
+                            <PlayerAvatar src={awayAvatar} name={matchDetails.awayUser} size="lg" className="rounded-2xl border-0" />
+                            <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
+                                {matchDetails.awayUser}
+                            </Text>
+                        </Pressable>
+                    </View>
+
+                    {(canDecideOnProposal || ((isProposer || isPrivileged) && !isEditingProposal)) && (
+                        <View className="flex-row gap-2.5 mt-6">
+                            {canDecideOnProposal && (
+                                <Pressable
+                                    onPress={handleRejectProposal}
+                                    disabled={isRejecting || isApproving}
+                                    className="flex-1 bg-red-500/10 border border-red-500/20 rounded-2xl py-3.5 items-center active:opacity-70"
+                                >
+                                    {isRejecting ? (
+                                        <ActivityIndicator size="small" color="#F87171" />
+                                    ) : (
+                                        <Text className="text-xs font-black text-red-400 uppercase tracking-wider">Reject</Text>
+                                    )}
+                                </Pressable>
+                            )}
+                            {canDecideOnProposal && (
+                                <Pressable
+                                    onPress={handleApproveProposal}
+                                    disabled={isApproving || isRejecting}
+                                    className="flex-1 bg-[#10B981] rounded-2xl py-3.5 items-center active:opacity-80"
+                                >
+                                    {isApproving ? (
+                                        <ActivityIndicator size="small" color="#0F172A" />
+                                    ) : (
+                                        <Text className="text-xs font-black text-[#0F172A] uppercase tracking-wider">Approve</Text>
+                                    )}
+                                </Pressable>
+                            )}
+                            {(isProposer || isPrivileged) && !isEditingProposal && (
+                                <Pressable
+                                    onPress={() => {
+                                        setHomeScore(String(phs ?? ''));
+                                        setAwayScore(String(pas ?? ''));
+                                        setIsEditingProposal(true);
+                                    }}
+                                    className="flex-1 bg-[#F59E0B]/10 border border-[#F59E0B]/25 rounded-2xl py-3.5 items-center active:opacity-70"
+                                >
+                                    <Text className="text-xs font-black text-[#F59E0B] uppercase tracking-wider">Edit</Text>
+                                </Pressable>
+                            )}
+                        </View>
+                    )}
+                </View>
+
+                {/* Slim divider before the evidence section */}
+                <View className="h-px bg-white/[0.08] mt-5" />
+            </View>
+        );
+    };
+
     const renderScheduledMatch = () => {
         const homeAvatar = matchDetails?.homeUserAvatarUrl || matchDetails?.HomeUserAvatarUrl || '';
         const awayAvatar = matchDetails?.awayUserAvatarUrl || matchDetails?.AwayUserAvatarUrl || '';
 
+        // While a proposal is pending we hide the manual submit form so the proposal card alone
+        // drives the decision. Anyone with the right to act (proposer, opponent, admin/owner)
+        // can open the form via the "Edit" button on the card.
+        const submitFormSuppressed = hasPendingProposal && !isEditingProposal;
+
         return (
             <View className="mx-5 mt-4">
+                {/* Pending proposal card — hidden while the user is editing so the edit form gets the full stage. */}
+                {hasPendingProposal && !isEditingProposal && renderPendingProposalCard()}
+
+                {submitFormSuppressed ? null : (
+                <>
+                {/* Edit-mode banner */}
+                {isEditingProposal && (
+                    <View className="mb-5">
+                        <View className="bg-[#F59E0B]/[0.08] rounded-[24px] border border-[#F59E0B]/20 p-4 flex-row items-center gap-3">
+                            <View className="w-10 h-10 rounded-2xl bg-[#F59E0B]/15 items-center justify-center">
+                                <Ionicons name="create-outline" size={18} color="#F59E0B" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-[2px]">
+                                    {isPrivileged && !isProposer ? 'Edit & Finalize' : 'Editing Your Report'}
+                                </Text>
+                                <Text className="text-[11px] text-slate-400 mt-0.5">
+                                    {isPrivileged && !isProposer
+                                        ? 'This will overwrite the proposal and finalize the match.'
+                                        : 'Update the score and tap Update Report to notify your opponent.'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                )}
+
                 {/* Scheduled Time */}
                 <View className="bg-[#111827]/60 rounded-[28px] border border-white/[0.06] p-5 mb-5">
                     <View className="items-center mb-5">
@@ -692,7 +917,7 @@ export function MatchDetailsModal({
                         </Text>
                     </View>
 
-                    {error && (
+                    {error && !hasPendingProposal && (
                         <View className="bg-red-500/10 p-3 rounded-2xl mb-4 border border-red-500/20">
                             <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
                         </View>
@@ -738,7 +963,53 @@ export function MatchDetailsModal({
                     </View>
                 </View>
 
-                {/* Previously Uploaded Evidence */}
+                {/* Action Buttons */}
+                <View className="flex-row gap-3 mb-4">
+                    {isEditingProposal ? (
+                        <Pressable
+                            onPress={() => { setIsEditingProposal(false); setHomeScore(''); setAwayScore(''); setError(null); }}
+                            className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
+                        >
+                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Cancel</Text>
+                        </Pressable>
+                    ) : (
+                        <Pressable
+                            onPress={() => { setHomeScore(''); setAwayScore(''); setError(null); setSelectedImages([]); }}
+                            className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
+                        >
+                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Clear</Text>
+                        </Pressable>
+                    )}
+                    <Pressable
+                        onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
+                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit}
+                        className={cn(
+                            "flex-1 rounded-2xl py-4 items-center active:opacity-80",
+                            ((isRoundLocked && !isHubOwner) || !canSubmit) ? "bg-white/5 border border-white/[0.06]" : "bg-[#10B981]"
+                        )}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator size="small" color={canSubmit ? "#0F172A" : "#71717A"} />
+                        ) : (
+                            <Text className={cn(
+                                "text-sm font-black uppercase tracking-wider",
+                                ((isRoundLocked && !isHubOwner) || !canSubmit) ? "text-slate-500" : "text-[#0F172A]"
+                            )}>
+                                {(isRoundLocked && !isHubOwner)
+                                    ? "Locked"
+                                    : !canSubmit
+                                        ? "View Only"
+                                        : isEditingProposal
+                                            ? "Update Report"
+                                            : (approvalRequired && !isPrivileged ? "Report" : "Submit")}
+                            </Text>
+                        )}
+                    </Pressable>
+                </View>
+                </>
+                )}
+
+                {/* Previously Uploaded Evidence — always visible so both sides can verify the proposal */}
                 {matchDetails?.evidences && matchDetails.evidences.length > 0 && (
                     <View className="mb-5">
                         <View className="flex-row items-center gap-2.5 mb-3.5 ml-1">
@@ -746,6 +1017,9 @@ export function MatchDetailsModal({
                                 <Ionicons name="images-outline" size={14} color="#818CF8" />
                             </View>
                             <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Uploaded Evidence</Text>
+                            <View className="bg-white/5 px-2 py-0.5 rounded-full">
+                                <Text className="text-[9px] font-bold text-slate-400">{matchDetails.evidences.length}</Text>
+                            </View>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             {matchDetails.evidences.map((url, idx) => (
@@ -763,90 +1037,62 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {/* Evidence Upload */}
-                <View className="mb-5">
-                    <View className="flex-row items-center justify-between mb-3">
-                        <View className="flex-row items-center gap-2">
-                            <View className="w-7 h-7 rounded-xl bg-[#10B981]/10 items-center justify-center">
-                                <Ionicons name="camera-outline" size={14} color="#10B981" />
-                            </View>
-                            <View>
-                                <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Add Evidence</Text>
-                                <Text className="text-[9px] text-slate-500 mt-0.5 font-medium">Match result screenshots</Text>
-                            </View>
-                        </View>
-                        <Pressable onPress={pickImages} className="flex-row items-center bg-[#10B981]/10 px-3 py-2 rounded-xl border border-[#10B981]/20 active:opacity-70">
-                            <Ionicons name="add" size={14} color="#10B981" />
-                            <Text className="text-[10px] font-black text-[#10B981] ml-1.5 uppercase tracking-wider">Add</Text>
-                        </Pressable>
-                    </View>
-                    {selectedImages.length > 0 ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {selectedImages.map((img, index) => (
-                                <View key={img.uri + index} className="mr-3 mb-2">
-                                    <View className="rounded-2xl overflow-hidden border border-white/5">
-                                        <Image source={{ uri: img.uri }} className="w-20 h-20" />
-                                    </View>
-                                    <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#0B1120] shadow-sm">
-                                        <Ionicons name="close" size={10} color="white" />
-                                    </Pressable>
+                {/* Evidence Upload — always visible so the proposer can keep adding screenshots
+                    even while a proposal is pending */}
+                {(isParticipant || isPrivileged) && (
+                    <View className="mb-5">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <View className="flex-row items-center gap-2">
+                                <View className="w-7 h-7 rounded-xl bg-[#10B981]/10 items-center justify-center">
+                                    <Ionicons name="camera-outline" size={14} color="#10B981" />
                                 </View>
-                            ))}
-                        </ScrollView>
-                    ) : (
-                        <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
-                            <Ionicons name="images-outline" size={22} color="#334155" />
-                            <Text className="text-[10px] text-slate-600 mt-1 font-bold">No photos selected</Text>
-                        </Pressable>
-                    )}
-                </View>
-
-                {/* Action Buttons */}
-                <View className="flex-row gap-3 mb-4">
-                    <Pressable
-                        onPress={() => { setHomeScore(''); setAwayScore(''); setError(null); setSelectedImages([]); }}
-                        className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
-                    >
-                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Clear</Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={handleSubmitResult}
-                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit}
-                        className={cn(
-                            "flex-1 rounded-2xl py-4 items-center active:opacity-80",
-                            ((isRoundLocked && !isHubOwner) || !canSubmit) ? "bg-white/5 border border-white/[0.06]" : "bg-[#10B981]"
-                        )}
-                    >
-                        {isSubmitting ? (
-                            <ActivityIndicator size="small" color={canSubmit ? "#0F172A" : "#71717A"} />
+                                <View>
+                                    <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Add Evidence</Text>
+                                    <Text className="text-[9px] text-slate-500 mt-0.5 font-medium">Match result screenshots</Text>
+                                </View>
+                            </View>
+                            <Pressable onPress={pickImages} className="flex-row items-center bg-[#10B981]/10 px-3 py-2 rounded-xl border border-[#10B981]/20 active:opacity-70">
+                                <Ionicons name="add" size={14} color="#10B981" />
+                                <Text className="text-[10px] font-black text-[#10B981] ml-1.5 uppercase tracking-wider">Add</Text>
+                            </Pressable>
+                        </View>
+                        {selectedImages.length > 0 ? (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                {selectedImages.map((img, index) => (
+                                    <View key={img.uri + index} className="mr-3 mb-2">
+                                        <View className="rounded-2xl overflow-hidden border border-white/5">
+                                            <Image source={{ uri: img.uri }} className="w-20 h-20" />
+                                        </View>
+                                        <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#0B1120] shadow-sm">
+                                            <Ionicons name="close" size={10} color="white" />
+                                        </Pressable>
+                                    </View>
+                                ))}
+                            </ScrollView>
                         ) : (
-                            <Text className={cn(
-                                "text-sm font-black uppercase tracking-wider",
-                                ((isRoundLocked && !isHubOwner) || !canSubmit) ? "text-slate-500" : "text-[#0F172A]"
-                            )}>
-                                {(isRoundLocked && !isHubOwner) ? "Locked" : !canSubmit ? "View Only" : "Submit"}
-                            </Text>
+                            <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
+                                <Ionicons name="images-outline" size={22} color="#334155" />
+                                <Text className="text-[10px] text-slate-600 mt-1 font-bold">No photos selected</Text>
+                            </Pressable>
                         )}
-                    </Pressable>
-                </View>
 
-                {selectedImages.length > 0 && !canSubmit && isParticipant && (
-                    <Pressable
-                        onPress={handleUploadOnly}
-                        className="bg-indigo-500/10 rounded-2xl py-4 items-center border border-indigo-500/20 mb-4 flex-row justify-center gap-2 active:opacity-70"
-                    >
-                        {isUploadingEvidence ? (
-                            <ActivityIndicator size="small" color="#818CF8" />
-                        ) : (
-                            <>
-                                <Ionicons name="cloud-upload-outline" size={16} color="#818CF8" />
-                                <Text className="text-sm font-black text-indigo-400 uppercase tracking-wider">Upload Evidence</Text>
-                            </>
+                        {selectedImages.length > 0 && submitFormSuppressed && (
+                            <Pressable
+                                onPress={handleUploadOnly}
+                                className="mt-3 bg-indigo-500/10 rounded-2xl py-3 items-center border border-indigo-500/20 flex-row justify-center gap-2 active:opacity-70"
+                            >
+                                {isUploadingEvidence ? (
+                                    <ActivityIndicator size="small" color="#818CF8" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="cloud-upload-outline" size={14} color="#818CF8" />
+                                        <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider">Upload Evidence</Text>
+                                    </>
+                                )}
+                            </Pressable>
                         )}
-                    </Pressable>
+                    </View>
                 )}
-
-
             </View>
         );
     };

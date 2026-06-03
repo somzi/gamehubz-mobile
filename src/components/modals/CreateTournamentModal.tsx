@@ -93,6 +93,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Third place play-off (single elimination only)
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
 
+    // Result approval — when on, reported scores need opponent (or admin) confirmation.
+    const [requireResultApproval, setRequireResultApproval] = useState(false);
+
     // Data State
     const [hubs, setHubs] = useState<{ id: string; name: string }[]>([]);
     const [isLoadingHubs, setIsLoadingHubs] = useState(false);
@@ -304,6 +307,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 TeamSize: isTeamTournament ? parseInt(teamSize) : null,
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
+                RequireResultApproval: requireResultApproval,
             };
 
             const requestBody = {
@@ -577,6 +581,35 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     </View>
                                 </View>
                             )}
+
+                            {/* Result Approval */}
+                            <View>
+                                <View className="flex-row items-center mb-3">
+                                    <Ionicons name="shield-checkmark-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text className="text-sm font-bold text-white">Require Result Approval</Text>
+                                </View>
+                                <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                    <Pressable
+                                        onPress={() => setRequireResultApproval(false)}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${!requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
+                                            NO
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => setRequireResultApproval(true)}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
+                                            YES
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                                <Text className="text-[11px] text-zinc-500 mt-2">
+                                    When ON, the opposing participant must confirm a reported result. The hub owner or admin can override.
+                                </Text>
+                            </View>
 
                             {/* Third Place Match (single elimination, > 2 entrants) */}
                             {canShowThirdPlace && (

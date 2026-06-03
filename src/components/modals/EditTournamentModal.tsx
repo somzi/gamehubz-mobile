@@ -80,6 +80,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [startDate, setStartDate] = useState(tournament?.startDate || '');
     const [registrationDeadline, setRegistrationDeadline] = useState(tournament?.registrationDeadline || '');
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
+    const [requireResultApproval, setRequireResultApproval] = useState(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
 
     const initialDurationMinutes = tournament?.roundDurationMinutes;
     let initialDurVal = '';
@@ -150,6 +151,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setStartDate(tournament?.startDate || '');
         setRegistrationDeadline(tournament?.registrationDeadline || '');
         setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
+        setRequireResultApproval(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
 
         const durMinutes = tournament?.roundDurationMinutes;
         if (durMinutes != null) {
@@ -244,6 +246,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 RoundDurationMinutes: roundDurationMinutes,
                 // Always sent so an edit never silently resets it; only changeable before the bracket is generated.
                 HasThirdPlaceMatch: hasThirdPlaceMatch,
+                RequireResultApproval: requireResultApproval,
             };
 
             const response = await authenticatedFetch(ENDPOINTS.CREATE_TOURNAMENT, {
@@ -491,6 +494,36 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     </View>
                                 </View>
                             )}
+
+                            <View className="mb-6">
+                                <View className="flex-row items-center mb-3">
+                                    <Ionicons name="shield-checkmark-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text className="text-sm font-bold text-white">Require Result Approval</Text>
+                                </View>
+                                <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                    <Pressable
+                                        onPress={() => { if (canEditAll) setRequireResultApproval(false); }}
+                                        disabled={!canEditAll}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${!requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
+                                            NO
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => { if (canEditAll) setRequireResultApproval(true); }}
+                                        disabled={!canEditAll}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
+                                            YES
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                                <Text className="text-[11px] text-zinc-500 mt-2">
+                                    Opponent must confirm a reported result. Owner / admin can override.
+                                </Text>
+                            </View>
 
                             {canShowThirdPlace && (
                                 <View className="mb-6">

@@ -408,6 +408,50 @@ export function TeamMatchDetailModal({
         }
     };
 
+    const handleApproveSubMatch = async (subMatch: SubMatchDto) => {
+        setSubmittingScoreId(subMatch.matchId);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.APPROVE_MATCH_RESULT, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: subMatch.matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'Failed');
+                throw new Error(text);
+            }
+            fetchData();
+            onMatchUpdate?.();
+        } catch (err: unknown) {
+            const message = getErrorMessage(err);
+            setStatusConfig({ type: 'error', title: 'Error', message });
+            setShowStatusModal(true);
+        } finally {
+            setSubmittingScoreId(null);
+        }
+    };
+
+    const handleRejectSubMatch = async (subMatch: SubMatchDto) => {
+        setSubmittingScoreId(subMatch.matchId);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.REJECT_MATCH_RESULT, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: subMatch.matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'Failed');
+                throw new Error(text);
+            }
+            fetchData();
+            onMatchUpdate?.();
+        } catch (err: unknown) {
+            const message = getErrorMessage(err);
+            setStatusConfig({ type: 'error', title: 'Error', message });
+            setShowStatusModal(true);
+        } finally {
+            setSubmittingScoreId(null);
+        }
+    };
+
     const handleSelectRepresentative = async (member: TeamMemberDto) => {
         if (!data) return;
         setIsSubmittingRep(true);
@@ -816,6 +860,65 @@ export function TeamMatchDetailModal({
                                             </Text>
                                         </Pressable>
                                     </View>
+
+                                    {(() => {
+                                        // Pending proposal — surfaced only while approval is required and the sub-match has not yet completed.
+                                        const approvalRequired = !!(data?.requireResultApproval ?? data?.RequireResultApproval);
+                                        const proposedBy = (sm.proposedByUserId ?? sm.ProposedByUserId) || null;
+                                        const subPending = sm.status === 'Pending' || sm.status === 0 || sm.status === 1;
+                                        const hasProposal = approvalRequired && !!proposedBy && subPending;
+                                        if (!hasProposal) return null;
+
+                                        const phs = sm.proposedHomeScore ?? sm.ProposedHomeScore ?? 0;
+                                        const pas = sm.proposedAwayScore ?? sm.ProposedAwayScore ?? 0;
+                                        const isProposer = !!currentUserId && proposedBy!.toLowerCase() === currentUserId.toLowerCase();
+                                        const homeId = (sm.homePlayer?.userId || sm.HomePlayer?.userId || '').toLowerCase();
+                                        const awayId = (sm.awayPlayer?.userId || sm.AwayPlayer?.userId || '').toLowerCase();
+                                        const me = (currentUserId || '').toLowerCase();
+                                        const isOpponent = !isProposer && (me === homeId || me === awayId);
+                                        const canDecide = isOpponent || isHubOwner;
+
+                                        return (
+                                            <View className="mt-3 pt-3 border-t border-[#F59E0B]/20">
+                                                <View className="bg-[#F59E0B]/[0.06] rounded-xl border border-[#F59E0B]/15 p-3">
+                                                    <View className="flex-row items-center justify-between mb-2">
+                                                        <View className="bg-[#F59E0B]/15 px-2 py-0.5 rounded-md border border-[#F59E0B]/25">
+                                                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-widest">
+                                                                {isProposer ? 'Awaiting Approval' : 'Result Reported'}
+                                                            </Text>
+                                                        </View>
+                                                        <Text className="text-[14px] font-black text-[#F59E0B]">{phs} : {pas}</Text>
+                                                    </View>
+                                                    {canDecide && (
+                                                        <View className="flex-row gap-2 mt-1">
+                                                            <Pressable
+                                                                onPress={() => handleRejectSubMatch(sm)}
+                                                                disabled={submittingScoreId === sm.matchId}
+                                                                className="flex-1 bg-red-500/10 rounded-lg py-2 items-center border border-red-500/20 active:opacity-70"
+                                                            >
+                                                                {submittingScoreId === sm.matchId ? (
+                                                                    <ActivityIndicator size="small" color="#F87171" />
+                                                                ) : (
+                                                                    <Text className="text-[10px] font-black text-red-400 uppercase tracking-wider">Reject</Text>
+                                                                )}
+                                                            </Pressable>
+                                                            <Pressable
+                                                                onPress={() => handleApproveSubMatch(sm)}
+                                                                disabled={submittingScoreId === sm.matchId}
+                                                                className="flex-1 bg-[#10B981] rounded-lg py-2 items-center active:opacity-80"
+                                                            >
+                                                                {submittingScoreId === sm.matchId ? (
+                                                                    <ActivityIndicator size="small" color="#0F172A" />
+                                                                ) : (
+                                                                    <Text className="text-[10px] font-black text-[#0F172A] uppercase tracking-wider">Approve</Text>
+                                                                )}
+                                                            </Pressable>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        );
+                                    })()}
 
                                     {/* Evidence & Edit Mode */}
                                     {editingMatchId === sm.matchId || (isHubOwner && sm.status === 'Pending') ? (

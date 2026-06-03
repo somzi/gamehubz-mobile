@@ -26,11 +26,13 @@ interface BracketMatchProps {
     currentUsername?: string;
     isAdmin?: boolean;
     isTeamTournament?: boolean;
+    // Pending proposal — when set, the match is in "awaiting approval" state regardless of its raw status.
+    proposedByUserId?: string | null;
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament }: BracketMatchProps) {
+export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId }: BracketMatchProps) {
     const navigation = useNavigation<NavigationProp>();
 
     const handlePlayerClick = (userId: string) => {
@@ -144,12 +146,16 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     const isAlreadyReported = hasScore(home) || hasScore(away);
     const isCompleted = status === 3 || status === 4;
     const isLive = status === 2;
+    // A pending proposal trumps any other in-progress state — surface it clearly so participants
+    // know they're waiting on an approval and not on the actual match.
+    const isAwaitingApproval = !isCompleted && !!proposedByUserId;
 
     const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4);
 
     const hasStartTime = !!startTime;
     const canUserReport = hasStartTime ? isParticipant : isAdmin;
-    const canReport = canShowDetails && !isAlreadyReported && canUserReport && (status === 2 || status === 1);
+    // While a proposal is pending we hide the "Report Result" CTA — the opponent should Approve / Reject instead.
+    const canReport = canShowDetails && !isAlreadyReported && !isAwaitingApproval && canUserReport && (status === 2 || status === 1);
 
     return (
         <Pressable
@@ -166,14 +172,16 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             })}
         >
             {/* Status / action header */}
-            {(canReport || isLive || isCompleted) && (
+            {(canReport || isAwaitingApproval || isLive || isCompleted) && (
                 <View className={cn(
                     "flex-row items-center justify-between px-4 py-2",
                     canReport
                         ? "bg-emerald-500/[0.08]"
-                        : isLive
-                            ? "bg-amber-500/[0.08]"
-                            : "bg-white/[0.02]"
+                        : isAwaitingApproval
+                            ? "bg-[#F59E0B]/[0.10]"
+                            : isLive
+                                ? "bg-amber-500/[0.08]"
+                                : "bg-white/[0.02]"
                 )}>
                     {canReport && (
                         <>
@@ -186,7 +194,18 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             <Ionicons name="chevron-forward" size={11} color="#34D399" />
                         </>
                     )}
-                    {!canReport && isLive && (
+                    {!canReport && isAwaitingApproval && (
+                        <>
+                            <View className="flex-row items-center gap-1.5">
+                                <Ionicons name="hourglass-outline" size={11} color="#F59E0B" />
+                                <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-[1.5px]">
+                                    Awaiting Approval
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={11} color="#F59E0B" />
+                        </>
+                    )}
+                    {!canReport && !isAwaitingApproval && isLive && (
                         <View className="flex-row items-center gap-1.5">
                             <View className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                             <Text className="text-[10px] font-black text-amber-400 uppercase tracking-[1.5px]">
@@ -194,7 +213,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             </Text>
                         </View>
                     )}
-                    {!canReport && isCompleted && (
+                    {!canReport && !isAwaitingApproval && isCompleted && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="checkmark-circle" size={11} color="#34D399" />
                             <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-[1.5px]">

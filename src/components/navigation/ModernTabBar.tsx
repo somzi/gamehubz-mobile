@@ -102,10 +102,15 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                                     color={isFocused ? '#10B981' : '#64748B'}
                                     style={isFocused && styles.activeIconGlow}
                                 />
-                                <Text style={[
-                                    styles.tabLabel,
-                                    { color: isFocused ? '#FFFFFF' : '#64748B' }
-                                ]}>
+                                <Text
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.85}
+                                    style={[
+                                        styles.tabLabel,
+                                        { color: isFocused ? '#FFFFFF' : '#64748B' }
+                                    ]}
+                                >
                                     {label as string}
                                 </Text>
                             </View>
@@ -167,12 +172,14 @@ const styles = StyleSheet.create({
         height: '100%',
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 4,
     },
     contentWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1,
         marginTop: 4, // Shift slightly down to balance the top indicator
+        width: '100%',
     },
     activeIconGlow: {
         shadowColor: '#10B981',
@@ -184,6 +191,7 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: '700',
         marginTop: 4,
-        letterSpacing: 0.5,
+        letterSpacing: 0.2,
+        textAlign: 'center',
     },
 });
