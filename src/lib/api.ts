@@ -115,6 +115,9 @@ export const ENDPOINTS = {
     SEND_DIRECT_MESSAGE: (chatId: string) => `${API_BASE_URL}/api/DirectChat/${chatId}/messages`,
     MARK_DIRECT_CHAT_READ: (chatId: string) => `${API_BASE_URL}/api/DirectChat/${chatId}/read`,
 
+    // ─── Country catalog ────────────────────────────────────────────────
+    GET_COUNTRIES: `${API_BASE_URL}/api/Country`,
+
     // ─── SignalR hub URLs ───────────────────────────────────────────────
     SIGNALR_DM_HUB: `${API_BASE_URL}/hubs/dm`,
 };

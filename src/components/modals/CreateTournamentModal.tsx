@@ -16,6 +16,7 @@ import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { DateTimePickerModal } from './DateTimePickerModal';
 import { TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { TEAM_LABELS } from '../../lib/teamConstants';
+import { CountryPicker } from '../ui/CountryPicker';
 
 interface CreateTournamentModalProps {
     visible: boolean;
@@ -71,6 +72,15 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [rules, setRules] = useState('');
     const [selectedHubId, setSelectedHubId] = useState<string>('');
     const [selectedRegions, setSelectedRegions] = useState<string[]>(['global']);
+    // Scope: a tournament is either region-scoped (existing) or country-scoped (one or more countries).
+    const [scopeMode, setScopeMode] = useState<'region' | 'country'>('region');
+    const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+
+    const toggleCountry = (code: string) => {
+        setSelectedCountries(prev =>
+            prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+        );
+    };
     const [prizePool, setPrizePool] = useState('');
     const [prizeCurrency, setPrizeCurrency] = useState('1'); // Default to Eur
     const [maxPlayers, setMaxPlayers] = useState('');
@@ -223,6 +233,11 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             return;
         }
 
+        if (scopeMode === 'country' && selectedCountries.length === 0) {
+            setError('Please select at least one country for a country-based tournament');
+            return;
+        }
+
         if (isTeamTournament) {
             const ts = parseInt(teamSize);
             if (!teamSize || isNaN(ts) || ts < 2 || ts > 11) {
@@ -299,6 +314,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 Prize: parseFloat(prizePool) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
                 Region: regionMapping[selectedRegions[0]] ?? 0,
+                // Country-scoped when the country tab is active; backend derives Region from the first.
+                Countries: scopeMode === 'country' ? selectedCountries : null,
                 Format: parseInt(selectedFormat),
                 GroupsCount: selectedFormat === '5' ? parseInt(groupsCount) : null,
                 QualifiersPerGroup: selectedFormat === '5' ? parseInt(qualifiersPerGroup) : null,
@@ -507,19 +524,46 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     />
                                 </View>
                                 <View className="flex-1">
-                                    {renderSelectField('Region', getRegionLabel(), 'globe-outline', () =>
-                                        setShowRegionPicker(true)
+                                    {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
+                                        setShowFormatPicker(true)
                                     )}
                                 </View>
                             </View>
 
-                            <View className="flex-row gap-4">
-                                    <View className="flex-1">
-                                        {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
-                                            setShowFormatPicker(true)
-                                        )}
-                                    </View>
+                            {/* Tournament Scope: region-based or country-based */}
+                            <View>
+                                <View className="flex-row items-center mb-3">
+                                    <Ionicons name="globe-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text className="text-sm font-bold text-white">Tournament Scope</Text>
                                 </View>
+                                <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 mb-3">
+                                    <Pressable
+                                        onPress={() => setScopeMode('region')}
+                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'region' ? 'bg-primary' : ''}`}
+                                    >
+                                        <Text className={`text-sm font-bold ${scopeMode === 'region' ? 'text-[#0F172A]' : 'text-slate-400'}`}>By Region</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => setScopeMode('country')}
+                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'country' ? 'bg-primary' : ''}`}
+                                    >
+                                        <Text className={`text-sm font-bold ${scopeMode === 'country' ? 'text-[#0F172A]' : 'text-slate-400'}`}>By Country</Text>
+                                    </Pressable>
+                                </View>
+
+                                {scopeMode === 'region' ? (
+                                    renderSelectField('Region', getRegionLabel(), 'earth-outline', () =>
+                                        setShowRegionPicker(true)
+                                    )
+                                ) : (
+                                    <CountryPicker
+                                        placeholder="Select countries"
+                                        multiple
+                                        values={selectedCountries}
+                                        onToggle={toggleCountry}
+                                    />
+                                )}
+                            </View>
 
                             {/* Tournament Mode Toggle */}
                             <View>

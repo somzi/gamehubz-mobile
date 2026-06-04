@@ -42,11 +42,21 @@ export interface MatchComment {
     sentAt: string;
 }
 
+export interface Country {
+    code: string;       // ISO 3166-1 alpha-2, e.g. "RS"
+    name: string;       // e.g. "Serbia"
+    flag: string;       // emoji, e.g. "🇷🇸"
+    region: RegionType; // region the country belongs to
+}
+
 export interface UserInfo {
     id: string;
     username: string;
     nickName?: string;
     region: RegionType;
+    country?: string | null;     // ISO code, null when not set
+    countryName?: string | null; // display name (from backend catalog)
+    countryFlag?: string | null; // flag emoji (from backend catalog)
     userSocials: UserSocial[];
     avatarUrl?: string;
 }
@@ -64,6 +74,9 @@ export interface User {
     username: string;
     nickName?: string;
     region: RegionType;
+    country?: string | null;     // ISO code, null when not set
+    countryName?: string | null; // display name (from backend catalog)
+    countryFlag?: string | null; // flag emoji (from backend catalog)
     userHubs: any[];
     tournamentRegistrations: any[];
     matches: any[];

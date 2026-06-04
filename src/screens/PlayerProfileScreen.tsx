@@ -262,6 +262,8 @@ export default function PlayerProfileScreen() {
         username: userInfo.username || 'Unknown',
         nickName: userInfo.nickName || userInfo.username || 'No Nickname',
         region: getRegionName(userInfo.region),
+        countryName: userInfo.countryName || null,
+        countryFlag: userInfo.countryFlag || null,
         totalMatches: playerMatches?.stats?.totalMatches || 0,
         winPercentage: playerMatches?.stats?.winRate || 0,
         wins: playerMatches?.stats?.wins || 0,
@@ -361,7 +363,11 @@ export default function PlayerProfileScreen() {
                                 </View>
                                 <View className="flex-row items-center mt-1.5">
                                     <Ionicons name="globe-outline" size={11} color="#64748B" />
-                                    <Text className="text-slate-500 font-bold text-[10px] ml-1.5 uppercase tracking-widest">{displayData.region}</Text>
+                                    <Text className="text-slate-500 font-bold text-[10px] ml-1.5 uppercase tracking-widest">
+                                        {displayData.countryName
+                                            ? `${displayData.countryFlag ?? ''} ${displayData.countryName} · ${displayData.region}`
+                                            : displayData.region}
+                                    </Text>
                                 </View>
                             </View>
                         </View>

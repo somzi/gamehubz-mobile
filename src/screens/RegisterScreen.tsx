@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -9,8 +9,10 @@ import { Button } from '../components/ui/Button';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
-import { RegionType } from '../types/auth';
+import { RegionType, Country } from '../types/auth';
 import { SelectInput } from '../components/ui/SelectInput';
+import { CountryPicker } from '../components/ui/CountryPicker';
+import { getCountries, getRegionName } from '../lib/countries';
 import { StatusModal } from '../components/modals/StatusModal';
 
 export default function RegisterScreen() {
@@ -35,8 +37,21 @@ export default function RegisterScreen() {
         confirmPassword: '',
         firstName: '',
         lastName: '',
-        region: undefined as RegionType | undefined
+        region: undefined as RegionType | undefined,
+        country: undefined as string | undefined,
     });
+
+    // Country list (to derive region from the chosen country — country dictates region).
+    const [countries, setCountries] = useState<Country[]>([]);
+    useEffect(() => {
+        getCountries().then(setCountries).catch(() => { });
+    }, []);
+
+    const handleSelectCountry = (code: string) => {
+        const region = countries.find(c => c.code === code)?.region;
+        setFormData(prev => ({ ...prev, country: code, region: region ?? prev.region }));
+        setErrors(prev => ({ ...prev, region: undefined, country: undefined }));
+    };
 
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState<Partial<typeof formData>>({});
@@ -64,7 +79,8 @@ export default function RegisterScreen() {
         if (!formData.password) newErrors.password = 'Password is required';
         if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
         if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-        if (formData.region === undefined) newErrors.region = 'Region is required' as any; // Temporary fix for Partial<FormData> type mismatch
+        // Region is required only when no country is chosen (country dictates region).
+        if (!formData.country && formData.region === undefined) newErrors.region = 'Region or country is required' as any;
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -82,6 +98,7 @@ export default function RegisterScreen() {
             email: formData.email,
             password: formData.password,
             region: formData.region,
+            country: formData.country,
             firstName: formData.firstName || "",
             lastName: formData.lastName || "",
             userRoleId: "6AB87F80-2DE2-4F95-BCE5-7B86F38E426F"
@@ -174,16 +191,33 @@ export default function RegisterScreen() {
                             error={errors.email}
                         />
 
-                        <SelectInput
-                            label="REGION"
-                            placeholder="Select your region"
-                            options={regionOptions}
-                            value={formData.region}
-                            onSelect={(val) => updateForm('region', val)}
-                            leftIcon="earth-outline"
-                            error={errors.region as string | undefined}
-                            className="mb-1"
+                        <CountryPicker
+                            label="COUNTRY (OPTIONAL)"
+                            placeholder="Select your country"
+                            value={formData.country}
+                            onSelect={handleSelectCountry}
+                            error={errors.country as string | undefined}
                         />
+
+                        {formData.country ? (
+                            <View className="flex-row items-center -mt-1 ml-1">
+                                <Ionicons name="earth-outline" size={13} color="#64748B" />
+                                <Text className="text-slate-500 text-xs font-medium ml-1.5">
+                                    Region: {getRegionName(formData.region)} (from country)
+                                </Text>
+                            </View>
+                        ) : (
+                            <SelectInput
+                                label="REGION"
+                                placeholder="Select your region"
+                                options={regionOptions}
+                                value={formData.region}
+                                onSelect={(val) => updateForm('region', val)}
+                                leftIcon="earth-outline"
+                                error={errors.region as string | undefined}
+                                className="mb-1"
+                            />
+                        )}
 
                         <View className="flex-row gap-3">
                             <View className="flex-1">

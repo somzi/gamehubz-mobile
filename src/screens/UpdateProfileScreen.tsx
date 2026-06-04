@@ -16,6 +16,8 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { ActivityIndicator } from 'react-native';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
+import { CountryPicker } from '../components/ui/CountryPicker';
+import { getRegionName } from '../lib/countries';
 
 type UpdateProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -25,6 +27,9 @@ export default function UpdateProfileScreen() {
 
     const [username, setUsername] = useState(user?.username || '');
     const [nickName, setNickName] = useState(user?.nickName || '');
+    // Country: editable only while unset; once set it locks.
+    const [country, setCountry] = useState<string | null>(user?.country ?? null);
+    const countryLocked = !!user?.country;
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [statusModalConfig, setStatusModalConfig] = useState<{
         type: 'success' | 'error' | 'info';
@@ -45,6 +50,7 @@ export default function UpdateProfileScreen() {
         if (user) {
             setUsername(user.username);
             setNickName(user.nickName || '');
+            setCountry(user.country ?? null);
         }
     }, [user]);
 
@@ -147,6 +153,8 @@ export default function UpdateProfileScreen() {
             id: user?.id,
             username: username.trim(),
             nickName: nickName.trim(),
+            // Only send when newly set (locked once it exists) so the backend applies it just once.
+            country: !countryLocked && country ? country : undefined,
         });
 
         if (success) {
@@ -214,6 +222,21 @@ export default function UpdateProfileScreen() {
                             onChangeText={setNickName}
                             placeholder="In-game nick"
                         />
+                        <View className="h-4" />
+                        <CountryPicker
+                            label="Country"
+                            value={country}
+                            onSelect={setCountry}
+                            locked={countryLocked}
+                        />
+                        {!countryLocked && country && (
+                            <View className="flex-row items-center mt-2 ml-1">
+                                <Ionicons name="earth-outline" size={13} color="#64748B" />
+                                <Text className="text-slate-500 text-xs font-medium ml-1.5">
+                                    Region: {getRegionName(user?.region)} → updates to match your country
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 </ScrollView>
 

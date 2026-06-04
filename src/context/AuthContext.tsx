@@ -192,6 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             username: apiUser.Username || apiUser.username,
             nickName: apiUser.Nickname || apiUser.nickName || apiUser.nickname,
             region: apiUser.Region !== undefined ? apiUser.Region : apiUser.region,
+            country: apiUser.Country ?? apiUser.country ?? null,
+            countryName: apiUser.CountryName ?? apiUser.countryName ?? null,
+            countryFlag: apiUser.CountryFlag ?? apiUser.countryFlag ?? null,
             avatarUrl: apiUser.avatarUrl || apiUser.AvatarUrl || apiUser.Avatar || apiUser.avatar || undefined,
             userSocials: (apiUser.UserSocials || apiUser.userSocials || []).map((s: any) => ({
                 ...s,
@@ -315,11 +318,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updateProfile = useCallback(async (data: any): Promise<boolean> => {
         setIsLoading(true);
         try {
-            const payload = {
+            const payload: any = {
                 Nickname: data.nickName || data.nickname || '',
                 UserId: data.id || data.userId,
                 Username: data.username || ''
             };
+
+            // Only send Country when the caller provides one (set-once; backend ignores/locks repeats).
+            if (data.country) payload.Country = data.country;
 
             const response = await authenticatedFetch(ENDPOINTS.UPDATE_PROFILE, {
                 method: 'POST',

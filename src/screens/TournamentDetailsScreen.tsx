@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
 import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
+import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
@@ -101,6 +102,7 @@ export default function TournamentDetailsScreen() {
     const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(true);
     const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
     const [isRulesOpen, setIsRulesOpen] = useState(false);
+    const [showCountriesModal, setShowCountriesModal] = useState(false);
 
     const handleJoin = async () => {
         if (!id || !user?.id) return;
@@ -269,6 +271,9 @@ export default function TournamentDetailsScreen() {
                 prizeCurrency: rawData.prizeCurrency || rawData.PrizeCurrency,
                 startDate: rawData.startDate || rawData.StartDate,
                 region: rawData.region !== undefined ? rawData.region : rawData.Region,
+                countries: rawData.countries || rawData.Countries || null,
+                countryNames: rawData.countryNames || rawData.CountryNames || null,
+                countryFlags: rawData.countryFlags || rawData.CountryFlags || null,
                 description: rawData.description || rawData.Description,
                 rules: rawData.rules || rawData.Rules,
                 registrationDeadline: rawData.registrationDeadline || rawData.RegistrationDeadLine || rawData.registrationDeadLine,
@@ -1166,13 +1171,40 @@ export default function TournamentDetailsScreen() {
                             const currentAttendeeCount = attendeeCount;
                             const isFull = tournament.maxPlayers > 0 && currentAttendeeCount >= tournament.maxPlayers;
 
+                            // Region/country eligibility — mirrors the backend feed filter so the
+                            // hub-navigation path can't surface a Join button the user can't use.
+                            const tournamentCountries: string[] = tournament.countries || [];
+                            const isCountryScoped = tournamentCountries.length > 0;
+                            const isEligible = isCountryScoped
+                                ? (!!user?.country && tournamentCountries.includes(user.country))
+                                : (tournament.region === TournamentRegion.Global || tournament.region === user?.region);
+                            const restrictionLabel = isCountryScoped
+                                ? (tournamentCountries.length <= 3
+                                    ? `${(tournament.countryFlags || []).join(' ')} ${(tournament.countryNames || tournamentCountries).join(', ')}`.trim()
+                                    : `${tournamentCountries.length} countries`)
+                                : 'this region';
+
                             const buttons = [];
 
-                            if (tournament.isTeamTournament) {
+                            // Surface a "restricted" note (instead of a join button) when the user
+                            // would otherwise be able to join but isn't eligible by region/country.
+                            const wouldJoin = !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull
+                                && (!tournament.isTeamTournament ? true : (!userTeam && !isLoadingTeams));
+
+                            if (wouldJoin && !isEligible) {
+                                buttons.push(
+                                    <View key="restricted" className="w-full bg-[#0D1525] border border-white/[0.06] rounded-2xl p-4 flex-row items-center gap-3">
+                                        <Ionicons name="lock-closed" size={18} color="#64748B" />
+                                        <Text className="flex-1 text-slate-400 text-sm font-medium">
+                                            Restricted to {restrictionLabel} — you're not eligible to join.
+                                        </Text>
+                                    </View>
+                                );
+                            } else if (tournament.isTeamTournament) {
                                 // Show nothing while teams are still loading (prevents flash of register button)
                                 if (isLoadingTeams) {
                                     // render nothing — button appears smoothly once data resolves
-                                } else if (!userTeam && !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull) {
+                                } else if (!userTeam && !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
                                     buttons.push(
                                         <Button
                                             key="team-register"
@@ -1185,7 +1217,7 @@ export default function TournamentDetailsScreen() {
                                 }
                             } else {
                                 // Solo tournament: existing flow
-                                if (!isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull) {
+                                if (!isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
                                     buttons.push(
                                         <Button
                                             key="join"
@@ -1394,24 +1426,58 @@ export default function TournamentDetailsScreen() {
                                                 </Text>
                                             </View>
                                             <View className="h-[1px] bg-white/5" />
-                                            {/* Region */}
-                                            <View className="flex-row items-center justify-between py-3">
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
-                                                        <Ionicons name="globe-outline" size={16} color="#10B981" />
+                                            {/* Region (or Countries when the tournament is country-scoped) */}
+                                            {(tournament.countries && tournament.countries.length > 0) ? (
+                                                tournament.countries.length === 1 ? (
+                                                    <View className="flex-row items-center justify-between py-3">
+                                                        <View className="flex-row items-center gap-3">
+                                                            <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
+                                                                <Ionicons name="flag-outline" size={16} color="#10B981" />
+                                                            </View>
+                                                            <Text className="text-sm text-slate-400 font-bold">Country</Text>
+                                                        </View>
+                                                        <Text className="flex-1 text-right text-base font-black text-white ml-3" style={{ flexShrink: 1 }}>
+                                                            {`${tournament.countryFlags?.[0] ? tournament.countryFlags[0] + ' ' : ''}${tournament.countryNames?.[0] ?? tournament.countries[0]}`}
+                                                        </Text>
                                                     </View>
-                                                    <Text className="text-sm text-slate-400 font-bold">Region</Text>
+                                                ) : (
+                                                    <Pressable
+                                                        onPress={() => setShowCountriesModal(true)}
+                                                        className="flex-row items-center justify-between py-3"
+                                                    >
+                                                        <View className="flex-row items-center gap-3">
+                                                            <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
+                                                                <Ionicons name="flag-outline" size={16} color="#10B981" />
+                                                            </View>
+                                                            <Text className="text-sm text-slate-400 font-bold">Countries</Text>
+                                                        </View>
+                                                        <View className="flex-row items-center" style={{ gap: 6 }}>
+                                                            <Text className="text-base font-black text-white">
+                                                                {tournament.countries.length} countries
+                                                            </Text>
+                                                            <Ionicons name="chevron-forward" size={16} color="#475569" />
+                                                        </View>
+                                                    </Pressable>
+                                                )
+                                            ) : (
+                                                <View className="flex-row items-center justify-between py-3">
+                                                    <View className="flex-row items-center gap-3">
+                                                        <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
+                                                            <Ionicons name="globe-outline" size={16} color="#10B981" />
+                                                        </View>
+                                                        <Text className="text-sm text-slate-400 font-bold">Region</Text>
+                                                    </View>
+                                                    <Text className="text-base font-black text-white uppercase">
+                                                        {tournament.region === TournamentRegion.Europe ? 'EU'
+                                                            : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
+                                                                : tournament.region === TournamentRegion.Asia ? 'Asia'
+                                                                    : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
+                                                                        : tournament.region === TournamentRegion.Africa ? 'AFR'
+                                                                            : tournament.region === TournamentRegion.Oceania ? 'OCE'
+                                                                                : 'Global'}
+                                                    </Text>
                                                 </View>
-                                                <Text className="text-base font-black text-white uppercase">
-                                                    {tournament.region === TournamentRegion.Europe ? 'EU'
-                                                        : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
-                                                            : tournament.region === TournamentRegion.Asia ? 'Asia'
-                                                                : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
-                                                                    : tournament.region === TournamentRegion.Africa ? 'AFR'
-                                                                        : tournament.region === TournamentRegion.Oceania ? 'OCE'
-                                                                            : 'Global'}
-                                                </Text>
-                                            </View>
+                                            )}
 
                                             {/* Hub */}
                                             {tournament.hubName && tournament.hubId && (
@@ -2146,6 +2212,14 @@ export default function TournamentDetailsScreen() {
                     availableTeams={tournamentTeams}
                 />
             )}
+
+            {/* Eligible countries (expanded from the General Info summary) */}
+            <CountryListModal
+                visible={showCountriesModal}
+                onClose={() => setShowCountriesModal(false)}
+                codes={tournament?.countries || []}
+                title="Eligible Countries"
+            />
 
             {/* Team Match Detail Modal */}
             {showTeamMatchDetail && (

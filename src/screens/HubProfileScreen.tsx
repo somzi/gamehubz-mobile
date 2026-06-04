@@ -676,7 +676,7 @@ export default function HubProfileScreen() {
                 {/* ═══════════════════════════════════════════ */}
                 {hubTab === 'members' && (
                     <View className="px-4 pb-12">
-                        {(isFollowing || isOwner || isPublic) ? (
+                        {(isFollowing || isOwner) ? (
                             <>
                                 <View className="mb-4">
                                     <View className="flex-row items-center bg-[#0D1525] px-3 rounded-xl border border-white/5">
