@@ -79,7 +79,6 @@ export default function ChangePasswordScreen() {
                 setShowStatusModal(true);
             } else {
                 const responseText = await response.text();
-                console.log(`[DEBUG] Error Response: ${response.status} - ${responseText}`);
 
                 let errorMsg = `Please check your current password.`;
                 try {

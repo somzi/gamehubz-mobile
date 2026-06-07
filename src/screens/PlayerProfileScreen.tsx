@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
-import { cn } from '../lib/utils';
+import { cn, formatDateSafe } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
 import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { Button } from '../components/ui/Button';
@@ -605,7 +605,7 @@ export default function PlayerProfileScreen() {
                                                 key={t.id}
                                                 name={t.name || t.title}
                                                 status={getTournamentStatus(t.status)}
-                                                date={t.startDate ? new Date(t.startDate).toLocaleDateString() : 'N/A'}
+                                                date={formatDateSafe(t.startDate, 'N/A')}
                                                 region="Global"
                                                 prizePool={`${t.prizeCurrency === 1 ? '$' : t.prizeCurrency === 2 ? '€' : ''}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
@@ -651,7 +651,7 @@ export default function PlayerProfileScreen() {
                                                 ) ? 'draw' : (match.isWin === true || match.IsWin === true ? 'win' : (match.isWin === false || match.IsWin === false ? 'loss' : 'draw'))}
                                                 userScore={match.userScore ?? match.UserScore ?? undefined}
                                                 opponentScore={match.opponentScore ?? match.OpponentScore ?? undefined}
-                                                date={match.scheduledTime || match.ScheduledTime ? new Date(match.scheduledTime || match.ScheduledTime).toLocaleDateString() : 'N/A'}
+                                                date={formatDateSafe(match.scheduledTime || match.ScheduledTime, 'N/A')}
                                             />
                                         ))}
                                         {hasMoreMatches && isLoadingMoreMatches && (

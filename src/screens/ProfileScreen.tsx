@@ -13,7 +13,7 @@ import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerMatchesDto } from '../types/user';
 import { SocialType } from '../types/auth';
-import { cn, parseUtcDate } from '../lib/utils';
+import { cn, parseUtcDate, formatDateSafe } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
 import { TournamentCard } from '../components/cards/TournamentCard';
 
@@ -524,7 +524,7 @@ export default function ProfileScreen() {
                                                 key={t.id}
                                                 name={t.name || t.title}
                                                 status={getTournamentStatus(t.status)}
-                                                date={t.startDate ? parseUtcDate(t.startDate).toLocaleDateString() : 'N/A'}
+                                                date={formatDateSafe(t.startDate, 'N/A')}
                                                 region="Global"
                                                 prizePool={`${t.prizeCurrency === 1 ? '$' : t.prizeCurrency === 2 ? '€' : ''}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
@@ -570,7 +570,7 @@ export default function ProfileScreen() {
                                                 ) ? 'draw' : (match.isWin === true || match.IsWin === true ? 'win' : (match.isWin === false || match.IsWin === false ? 'loss' : 'draw'))}
                                                 userScore={match.userScore ?? match.UserScore ?? undefined}
                                                 opponentScore={match.opponentScore ?? match.OpponentScore ?? undefined}
-                                                date={match.scheduledTime || match.ScheduledTime ? parseUtcDate(match.scheduledTime || match.ScheduledTime).toLocaleDateString() : 'N/A'}
+                                                date={formatDateSafe(match.scheduledTime || match.ScheduledTime, 'N/A')}
                                             />
                                         ))}
                                         {hasMoreMatches && isLoadingMoreMatches && (

@@ -9,7 +9,7 @@ import { TournamentCard } from '../components/cards/TournamentCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
-import { cn } from '../lib/utils';
+import { cn, formatDateSafe } from '../lib/utils';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -154,11 +154,6 @@ export default function TournamentsScreen() {
         }
     };
 
-    const formatTournamentDate = (raw?: string) => {
-        if (!raw) return 'TBD';
-        const d = new Date(raw);
-        return isNaN(d.getTime()) ? 'TBD' : d.toLocaleDateString();
-    };
 
     const tabs = [
         { label: 'Live', value: 'live', icon: 'radio' as const },
@@ -180,7 +175,7 @@ export default function TournamentsScreen() {
                 name={tournament.Name || tournament.name}
                 description={tournament.Description || tournament.description}
                 status={getTournamentStatus(tournament.Status ?? tournament.status)}
-                date={formatTournamentDate(tournament.StartDate || tournament.startDate)}
+                date={formatDateSafe(tournament.StartDate || tournament.startDate)}
                 region={getRegionName(tournament.Region ?? tournament.region)}
                 prizePool={`${getCurrencySymbol(tournament.PrizeCurrency ?? tournament.prizeCurrency)}${tournament.Prize ?? tournament.prize}`}
                 players={new Array(tournament.NumberOfParticipants ?? tournament.numberOfParticipants ?? tournament.participantsCount ?? tournament.tournamentParticipants?.length ?? 0).fill({})}

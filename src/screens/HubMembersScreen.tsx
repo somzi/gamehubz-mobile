@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, FlatList, Pressable, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { HubRole } from '../types/hub';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
+import { formatDateSafe } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
@@ -476,66 +477,67 @@ export default function HubMembersScreen() {
                         <ActivityIndicator size="large" color="#8B5CF6" />
                     </View>
                 ) : (
-                    <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 24 }}>
-                        {filteredMembers.length > 0 ? (
-                            filteredMembers.map((member) => {
-                                const isSelf = member.userId === currentUser?.id;
-                                const isProcessing = processingIds.has(member.userId);
-                                return (
-                                    <View
-                                        key={member.userId}
-                                        className="flex-row items-center justify-between py-3.5 border-b border-white/5"
-                                    >
-                                        <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                            <PlayerAvatar name={member.username} src={member.avatarUrl} size="md" />
-                                            <View className="flex-1">
-                                                <View className="flex-row items-center" style={{ gap: 8 }}>
-                                                    <Text className="text-white font-semibold text-base" numberOfLines={1}>
-                                                        {member.username}
+                    <FlatList
+                        data={filteredMembers}
+                        keyExtractor={(item) => item.userId}
+                        className="flex-1 px-4"
+                        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+                        removeClippedSubviews
+                        renderItem={({ item: member }) => {
+                            const isSelf = member.userId === currentUser?.id;
+                            const isProcessing = processingIds.has(member.userId);
+                            return (
+                                <View className="flex-row items-center justify-between py-3.5 border-b border-white/5">
+                                    <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
+                                        <PlayerAvatar name={member.username} src={member.avatarUrl} size="md" />
+                                        <View className="flex-1">
+                                            <View className="flex-row items-center" style={{ gap: 8 }}>
+                                                <Text className="text-white font-semibold text-base" numberOfLines={1}>
+                                                    {member.username}
+                                                </Text>
+                                                {isSelf && (
+                                                    <Text className="text-[10px] font-black uppercase text-slate-500">
+                                                        You
                                                     </Text>
-                                                    {isSelf && (
-                                                        <Text className="text-[10px] font-black uppercase text-slate-500">
-                                                            You
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                                <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
-                                                    <RoleBadge role={member.hubRole} />
-                                                    {member.nickname ? (
-                                                        <Text className="text-slate-500 text-xs" numberOfLines={1}>
-                                                            {member.nickname}
-                                                        </Text>
-                                                    ) : null}
-                                                </View>
+                                                )}
+                                            </View>
+                                            <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
+                                                <RoleBadge role={member.hubRole} />
+                                                {member.nickname ? (
+                                                    <Text className="text-slate-500 text-xs" numberOfLines={1}>
+                                                        {member.nickname}
+                                                    </Text>
+                                                ) : null}
                                             </View>
                                         </View>
-
-                                        {!isSelf && member.hubRole !== HubRole.HubOwner && (
-                                            isProcessing ? (
-                                                <View className="w-10 h-10 items-center justify-center">
-                                                    <ActivityIndicator size="small" color="#818CF8" />
-                                                </View>
-                                            ) : (
-                                                <Pressable
-                                                    onPress={() => openMemberActions(member)}
-                                                    className="w-10 h-10 rounded-xl items-center justify-center bg-white/[0.03] border border-white/[0.06]"
-                                                    style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-                                                    hitSlop={8}
-                                                >
-                                                    <Ionicons name="ellipsis-horizontal" size={18} color="#94A3B8" />
-                                                </Pressable>
-                                            )
-                                        )}
                                     </View>
-                                );
-                            })
-                        ) : (
+
+                                    {!isSelf && member.hubRole !== HubRole.HubOwner && (
+                                        isProcessing ? (
+                                            <View className="w-10 h-10 items-center justify-center">
+                                                <ActivityIndicator size="small" color="#818CF8" />
+                                            </View>
+                                        ) : (
+                                            <Pressable
+                                                onPress={() => openMemberActions(member)}
+                                                className="w-10 h-10 rounded-xl items-center justify-center bg-white/[0.03] border border-white/[0.06]"
+                                                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                                                hitSlop={8}
+                                            >
+                                                <Ionicons name="ellipsis-horizontal" size={18} color="#94A3B8" />
+                                            </Pressable>
+                                        )
+                                    )}
+                                </View>
+                            );
+                        }}
+                        ListEmptyComponent={
                             <View className="items-center py-20 opacity-30">
                                 <Ionicons name="people-outline" size={64} color="white" />
                                 <Text className="text-white mt-4">No members found</Text>
                             </View>
-                        )}
-                    </ScrollView>
+                        }
+                    />
                 )
             )}
 
@@ -545,53 +547,54 @@ export default function HubMembersScreen() {
                         <ActivityIndicator size="large" color="#818CF8" />
                     </View>
                 ) : (
-                    <ScrollView className="flex-1 px-4">
-                        {filteredRequests.length > 0 ? (
-                            filteredRequests.map((request) => {
-                                const isProcessing = processingIds.has(request.requestId);
-                                return (
-                                    <View
-                                        key={request.requestId}
-                                        className="flex-row items-center justify-between py-4 border-b border-white/5"
-                                    >
-                                        <View className="flex-row items-center gap-3 flex-1 mr-2">
-                                            <PlayerAvatar name={request.username} src={request.avatarUrl} size="md" />
-                                            <View className="flex-1">
-                                                <Text className="text-white font-medium text-base" numberOfLines={1}>
-                                                    {request.username}
-                                                </Text>
-                                                <Text className="text-gray-500 text-xs">
-                                                    Requested {new Date(request.requestedAt).toLocaleDateString()}
-                                                </Text>
-                                            </View>
-                                        </View>
-
-                                        <View className="flex-row gap-2">
-                                            <Pressable
-                                                onPress={() => handleApprove(request.requestId, request.username)}
-                                                disabled={isProcessing}
-                                                className="bg-emerald-500/15 border border-emerald-500/30 w-10 h-10 rounded-xl items-center justify-center"
-                                                style={({ pressed }) => ({ opacity: (pressed || isProcessing) ? 0.6 : 1 })}
-                                            >
-                                                {isProcessing ? (
-                                                    <ActivityIndicator size="small" color="#10B981" />
-                                                ) : (
-                                                    <Ionicons name="checkmark" size={20} color="#10B981" />
-                                                )}
-                                            </Pressable>
-                                            <Pressable
-                                                onPress={() => handleReject(request.requestId, request.username)}
-                                                disabled={isProcessing}
-                                                className="bg-red-500/15 border border-red-500/30 w-10 h-10 rounded-xl items-center justify-center"
-                                                style={({ pressed }) => ({ opacity: (pressed || isProcessing) ? 0.6 : 1 })}
-                                            >
-                                                <Ionicons name="close" size={20} color="#EF4444" />
-                                            </Pressable>
+                    <FlatList
+                        data={filteredRequests}
+                        keyExtractor={(item) => item.requestId}
+                        className="flex-1 px-4"
+                        contentContainerStyle={{ flexGrow: 1 }}
+                        removeClippedSubviews
+                        renderItem={({ item: request }) => {
+                            const isProcessing = processingIds.has(request.requestId);
+                            return (
+                                <View className="flex-row items-center justify-between py-4 border-b border-white/5">
+                                    <View className="flex-row items-center gap-3 flex-1 mr-2">
+                                        <PlayerAvatar name={request.username} src={request.avatarUrl} size="md" />
+                                        <View className="flex-1">
+                                            <Text className="text-white font-medium text-base" numberOfLines={1}>
+                                                {request.username}
+                                            </Text>
+                                            <Text className="text-gray-500 text-xs">
+                                                Requested {formatDateSafe(request.requestedAt, 'recently')}
+                                            </Text>
                                         </View>
                                     </View>
-                                );
-                            })
-                        ) : (
+
+                                    <View className="flex-row gap-2">
+                                        <Pressable
+                                            onPress={() => handleApprove(request.requestId, request.username)}
+                                            disabled={isProcessing}
+                                            className="bg-emerald-500/15 border border-emerald-500/30 w-10 h-10 rounded-xl items-center justify-center"
+                                            style={({ pressed }) => ({ opacity: (pressed || isProcessing) ? 0.6 : 1 })}
+                                        >
+                                            {isProcessing ? (
+                                                <ActivityIndicator size="small" color="#10B981" />
+                                            ) : (
+                                                <Ionicons name="checkmark" size={20} color="#10B981" />
+                                            )}
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => handleReject(request.requestId, request.username)}
+                                            disabled={isProcessing}
+                                            className="bg-red-500/15 border border-red-500/30 w-10 h-10 rounded-xl items-center justify-center"
+                                            style={({ pressed }) => ({ opacity: (pressed || isProcessing) ? 0.6 : 1 })}
+                                        >
+                                            <Ionicons name="close" size={20} color="#EF4444" />
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            );
+                        }}
+                        ListEmptyComponent={
                             <View className="items-center py-20">
                                 <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
                                     <Ionicons name="mail-outline" size={28} color="#334155" />
@@ -599,8 +602,8 @@ export default function HubMembersScreen() {
                                 <Text className="text-sm font-semibold text-slate-500">No pending requests</Text>
                                 <Text className="text-xs text-slate-600 mt-1">New join requests will appear here</Text>
                             </View>
-                        )}
-                    </ScrollView>
+                        }
+                    />
                 )
             )}
 
@@ -610,50 +613,51 @@ export default function HubMembersScreen() {
                         <ActivityIndicator size="large" color="#EF4444" />
                     </View>
                 ) : (
-                    <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 24 }}>
-                        {filteredBans.length > 0 ? (
-                            filteredBans.map((ban) => {
-                                const isProcessing = processingIds.has(ban.userId);
-                                return (
-                                    <View
-                                        key={ban.userId}
-                                        className="flex-row items-center justify-between py-4 border-b border-white/5"
-                                    >
-                                        <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                            <PlayerAvatar name={ban.username} src={ban.avatarUrl} size="md" />
-                                            <View className="flex-1">
-                                                <Text className="text-white font-semibold text-sm" numberOfLines={1}>
-                                                    {ban.username}
+                    <FlatList
+                        data={filteredBans}
+                        keyExtractor={(item) => item.userId}
+                        className="flex-1 px-4"
+                        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+                        removeClippedSubviews
+                        renderItem={({ item: ban }) => {
+                            const isProcessing = processingIds.has(ban.userId);
+                            return (
+                                <View className="flex-row items-center justify-between py-4 border-b border-white/5">
+                                    <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
+                                        <PlayerAvatar name={ban.username} src={ban.avatarUrl} size="md" />
+                                        <View className="flex-1">
+                                            <Text className="text-white font-semibold text-sm" numberOfLines={1}>
+                                                {ban.username}
+                                            </Text>
+                                            <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
+                                                <Ionicons name="ban-outline" size={11} color="#EF4444" />
+                                                <Text className="text-[11px] text-red-400">
+                                                    Banned{ban.bannedAt ? ` ${formatDateSafe(ban.bannedAt, '')}` : ''}
                                                 </Text>
-                                                <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
-                                                    <Ionicons name="ban-outline" size={11} color="#EF4444" />
-                                                    <Text className="text-[11px] text-red-400">
-                                                        Banned{ban.bannedAt ? ` ${new Date(ban.bannedAt).toLocaleDateString()}` : ''}
-                                                    </Text>
-                                                </View>
                                             </View>
                                         </View>
-
-                                        {isProcessing ? (
-                                            <View className="w-24 h-10 items-center justify-center">
-                                                <ActivityIndicator size="small" color="#10B981" />
-                                            </View>
-                                        ) : (
-                                            <Pressable
-                                                onPress={() => unbanMember(ban)}
-                                                className="bg-emerald-500/15 border border-emerald-500/30 px-4 h-10 rounded-xl items-center justify-center flex-row"
-                                                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, gap: 6 })}
-                                            >
-                                                <Ionicons name="checkmark-circle-outline" size={15} color="#10B981" />
-                                                <Text className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
-                                                    Unban
-                                                </Text>
-                                            </Pressable>
-                                        )}
                                     </View>
-                                );
-                            })
-                        ) : (
+
+                                    {isProcessing ? (
+                                        <View className="w-24 h-10 items-center justify-center">
+                                            <ActivityIndicator size="small" color="#10B981" />
+                                        </View>
+                                    ) : (
+                                        <Pressable
+                                            onPress={() => unbanMember(ban)}
+                                            className="bg-emerald-500/15 border border-emerald-500/30 px-4 h-10 rounded-xl items-center justify-center flex-row"
+                                            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, gap: 6 })}
+                                        >
+                                            <Ionicons name="checkmark-circle-outline" size={15} color="#10B981" />
+                                            <Text className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+                                                Unban
+                                            </Text>
+                                        </Pressable>
+                                    )}
+                                </View>
+                            );
+                        }}
+                        ListEmptyComponent={
                             <View className="items-center py-20">
                                 <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
                                     <Ionicons name="ban-outline" size={28} color="#334155" />
@@ -661,8 +665,8 @@ export default function HubMembersScreen() {
                                 <Text className="text-sm font-semibold text-slate-500">No banned users</Text>
                                 <Text className="text-xs text-slate-600 mt-1">Banned users will appear here</Text>
                             </View>
-                        )}
-                    </ScrollView>
+                        }
+                    />
                 )
             )}
         </SafeAreaView>

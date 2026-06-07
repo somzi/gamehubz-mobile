@@ -109,7 +109,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                     {/* Content */}
                     <FlatList<DashboardActivityDto>
                         data={paginatedActivities}
-                        keyExtractor={(_, index) => index.toString()}
+                        keyExtractor={(item, index) => `${item.createdOn || ''}-${item.hubName || ''}-${index}`}
                         contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 32, flexGrow: 1 }}
                         showsVerticalScrollIndicator={false}
                         renderItem={({ item }) => (
