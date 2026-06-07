@@ -171,24 +171,27 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
     const renderTimeGrid = (items: number[], current: number, onSelect: (val: number) => void, label: string) => (
         <View className="mt-6">
             <Text className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest">{label}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                <View className="flex-row gap-2 pb-2">
-                    {items.map((item) => {
-                        const active = item === current;
-                        return (
-                            <TouchableOpacity
-                                key={item}
-                                onPress={() => onSelect(item)}
-                                className={`w-12 h-12 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-[#131B2E] border-white/5'
-                                    }`}
-                            >
-                                <Text className={`font-bold ${active ? 'text-background' : 'text-white'}`}>
-                                    {String(item).padStart(2, '0')}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingBottom: 8 }}
+            >
+                {items.map((item) => {
+                    const active = item === current;
+                    return (
+                        <TouchableOpacity
+                            key={item}
+                            onPress={() => onSelect(item)}
+                            className={`w-12 h-12 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-[#131B2E] border-white/5'
+                                }`}
+                        >
+                            <Text className={`font-bold ${active ? 'text-background' : 'text-white'}`}>
+                                {String(item).padStart(2, '0')}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </ScrollView>
         </View>
     );
@@ -197,11 +200,17 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
 
     return (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-            <Pressable
-                className="flex-1 bg-black/80 justify-center px-4"
-                onPress={onClose}
-            >
-                <Pressable className="bg-[#0f172a] rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
+            <View className="flex-1 bg-black/80 justify-center px-4">
+                {/* Backdrop sits BEHIND the content as an absolute sibling so it
+                    doesn't claim touch responder over the inner ScrollViews.
+                    Previously, wrapping content in <Pressable> blocked the
+                    horizontal hour scroll on Android — taps inside the picker
+                    would race with Pressable's gesture and the scroll lost. */}
+                <Pressable
+                    onPress={onClose}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                />
+                <View className="bg-[#0f172a] rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
                     <View className="p-6 border-b border-white/5 bg-[#131B2E] flex-row justify-between items-center">
                         <Text className="text-xl font-bold text-white">{title}</Text>
                         <TouchableOpacity onPress={onClose} className="p-2 bg-white/5 rounded-full">
@@ -254,8 +263,8 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                             </TouchableOpacity>
                         )}
                     </View>
-                </Pressable>
-            </Pressable>
+                </View>
+            </View>
         </View>
     );
 }
