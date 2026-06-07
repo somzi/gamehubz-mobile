@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -93,22 +93,29 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const reqSeqRef = useRef(0);
 
     const load = useCallback(async (q: string = '') => {
+        const seq = ++reqSeqRef.current;
         try {
             const res = await authenticatedFetch(ENDPOINTS.GET_FRIENDS(q));
+            if (seq !== reqSeqRef.current) return;
             if (res.ok) {
                 const data = await res.json();
+                if (seq !== reqSeqRef.current) return;
                 setFriends(Array.isArray(data) ? data : []);
                 setError(null);
             } else {
                 setError('Failed to load friends');
             }
         } catch (e: any) {
+            if (seq !== reqSeqRef.current) return;
             setError(getErrorMessage(e));
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (seq === reqSeqRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     }, []);
 
@@ -194,18 +201,31 @@ function RequestsTab() {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const reqSeqRef = useRef(0);
 
     const load = useCallback(async (q: string = '') => {
+        const seq = ++reqSeqRef.current;
         try {
             const [inRes, outRes] = await Promise.all([
                 authenticatedFetch(ENDPOINTS.GET_INCOMING_REQUESTS(q)),
                 authenticatedFetch(ENDPOINTS.GET_OUTGOING_REQUESTS(q)),
             ]);
-            if (inRes.ok) setIncoming(await inRes.json());
-            if (outRes.ok) setOutgoing(await outRes.json());
+            if (seq !== reqSeqRef.current) return;
+            if (inRes.ok) {
+                const inData = await inRes.json();
+                if (seq !== reqSeqRef.current) return;
+                setIncoming(inData);
+            }
+            if (outRes.ok) {
+                const outData = await outRes.json();
+                if (seq !== reqSeqRef.current) return;
+                setOutgoing(outData);
+            }
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (seq === reqSeqRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     }, []);
 
@@ -381,17 +401,23 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const reqSeqRef = useRef(0);
 
     const load = useCallback(async (q: string = '') => {
+        const seq = ++reqSeqRef.current;
         try {
             const res = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHATS(q));
+            if (seq !== reqSeqRef.current) return;
             if (res.ok) {
                 const data = await res.json();
+                if (seq !== reqSeqRef.current) return;
                 setChats(Array.isArray(data) ? data : []);
             }
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (seq === reqSeqRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     }, []);
 

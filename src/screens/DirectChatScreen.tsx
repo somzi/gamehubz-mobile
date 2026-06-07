@@ -46,6 +46,13 @@ export default function DirectChatScreen() {
     // ─── Bootstrap: resolve chat (by id or by other user) + load messages ─
     useEffect(() => {
         let cancelled = false;
+        // Clear per-chat state immediately on switch so the previous chat's
+        // header, messages, and draft don't flash while the new chat loads.
+        setChat(null);
+        setMessages([]);
+        setInput('');
+        setSendError(null);
+        setError(null);
         (async () => {
             try {
                 setLoading(true);
@@ -103,7 +110,13 @@ export default function DirectChatScreen() {
 
     // ─── SignalR connection ──────────────────────────────────────────────
     useEffect(() => {
-        if (!chat?.id) return;
+        const currentChatId = chat?.id;
+        if (!currentChatId) return;
+
+        // Scope flag — flips false on cleanup. Used to discard late SignalR
+        // events and to skip JoinChatGroup if the user already switched away
+        // before connection.start() resolved.
+        let isActive = true;
 
         const connection = new HubConnectionBuilder()
             .withUrl(ENDPOINTS.SIGNALR_DM_HUB)
@@ -111,12 +124,8 @@ export default function DirectChatScreen() {
             .configureLogging(LogLevel.Warning)
             .build();
 
-        connection
-            .start()
-            .then(() => connection.invoke('JoinChatGroup', chat.id))
-            .catch((e) => console.warn('[DM] SignalR connect failed', e));
-
         connection.on('ReceiveMessage', (incoming: any) => {
+            if (!isActive) return;
             const m: DirectMessage = {
                 id: incoming.id || incoming.Id,
                 chatId: incoming.chatId || incoming.ChatId,
@@ -127,27 +136,45 @@ export default function DirectChatScreen() {
                 sentAt: incoming.sentAt || incoming.SentAt,
                 isRead: incoming.isRead ?? incoming.IsRead ?? false,
             };
+            // Defensive: ignore messages routed for a different chat
+            if (m.chatId && m.chatId !== currentChatId) return;
 
             setMessages((prev) => {
                 if (prev.some((p) => p.id === m.id)) return prev;
                 return [...prev, m];
             });
 
-            // Auto-mark read when message arrives while we're viewing
             if (m.senderId !== myUserId) {
-                authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chat.id), { method: 'POST' })
+                authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(currentChatId), { method: 'POST' })
                     .catch(() => { });
             }
 
             setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
         });
 
+        const startPromise = connection
+            .start()
+            .then(() => {
+                if (!isActive) return;
+                return connection.invoke('JoinChatGroup', currentChatId);
+            })
+            .catch((e) => console.warn('[DM] SignalR connect failed', e));
+
         connectionRef.current = connection;
 
         return () => {
+            isActive = false;
             connection.off('ReceiveMessage');
-            try { connection.invoke('LeaveChatGroup', chat.id).catch(() => { }); } catch { }
-            connection.stop().catch(() => { });
+            // Wait for start to settle before leaving/stopping so we don't
+            // invoke on a connection still in the Connecting state.
+            startPromise.finally(async () => {
+                try {
+                    if (connection.state === 'Connected') {
+                        await connection.invoke('LeaveChatGroup', currentChatId);
+                    }
+                } catch { /* ignore */ }
+                try { await connection.stop(); } catch { /* ignore */ }
+            });
             connectionRef.current = null;
         };
     }, [chat?.id, myUserId]);

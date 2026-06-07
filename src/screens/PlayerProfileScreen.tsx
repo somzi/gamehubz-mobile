@@ -51,10 +51,13 @@ export default function PlayerProfileScreen() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let cancelled = false;
         const fetchPlayerData = async () => {
             if (!id) return;
             setIsLoading(true);
             setError(null);
+            setUserInfo(null);
+            setPlayerMatches(null);
             setTournamentsPage(0);
             setHasMoreTournaments(true);
             setMatchesPage(0);
@@ -65,8 +68,11 @@ export default function PlayerProfileScreen() {
                     authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(id))
                 ]);
 
+                if (cancelled) return;
+
                 if (infoRes.ok) {
                     const infoData = await infoRes.json();
+                    if (cancelled) return;
                     const d = infoData.result || infoData;
                     setUserInfo({
                         ...d,
@@ -79,6 +85,7 @@ export default function PlayerProfileScreen() {
 
                 if (statsRes.ok) {
                     const statsData = await statsRes.json();
+                    if (cancelled) return;
                     const s = statsData.result || statsData;
                     const normalizedStats: PlayerMatchesDto = {
                         stats: s.stats || s.Stats ? {
@@ -100,14 +107,16 @@ export default function PlayerProfileScreen() {
                     throw new Error('Could not load player data');
                 }
             } catch (err: any) {
+                if (cancelled) return;
                 console.error('Player data fetch error:', err);
                 setError(err.message || 'Failed to load player profile');
             } finally {
-                setIsLoading(false);
+                if (!cancelled) setIsLoading(false);
             }
         };
 
         fetchPlayerData();
+        return () => { cancelled = true; };
     }, [id]);
 
     useEffect(() => {

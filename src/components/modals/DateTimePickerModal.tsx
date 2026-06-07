@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -29,14 +29,15 @@ const months = [
 export function DateTimePickerModal({ visible, onClose, onConfirm, title, initialValue, onClear, clearText, minDate }: DateTimePickerModalProps) {
     const now = new Date();
 
-    // Parse initial value or use now
-    let initialDate = now;
-    if (initialValue) {
-        const parsed = new Date(initialValue.replace(' ', 'T'));
-        if (!isNaN(parsed.getTime())) {
-            initialDate = parsed;
+    const parseInitial = (): Date => {
+        if (initialValue) {
+            const parsed = new Date(initialValue.replace(' ', 'T'));
+            if (!isNaN(parsed.getTime())) return parsed;
         }
-    }
+        return new Date();
+    };
+
+    const initialDate = parseInitial();
 
     const [day, setDay] = useState(initialDate.getDate());
     const [month, setMonth] = useState(initialDate.getMonth());
@@ -46,6 +47,21 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
     // State for viewing calendar (month/year can change without selecting a day yet)
     const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
     const [viewYear, setViewYear] = useState(initialDate.getFullYear());
+
+    // Re-sync state when the modal is opened or initialValue changes.
+    // Parent keeps the modal mounted between opens, so without this the picker
+    // would show whatever date the user last selected on a previous match/field.
+    useEffect(() => {
+        if (!visible) return;
+        const d = parseInitial();
+        setDay(d.getDate());
+        setMonth(d.getMonth());
+        setYear(d.getFullYear());
+        setHour(d.getHours());
+        setViewMonth(d.getMonth());
+        setViewYear(d.getFullYear());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visible, initialValue]);
 
     const years = Array.from({ length: 10 }, (_, i) => now.getFullYear() + i);
     const hours = Array.from({ length: 24 }, (_, i) => i);

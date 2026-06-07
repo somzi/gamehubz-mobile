@@ -60,6 +60,31 @@ const regionMapping: Record<string, number> = {
 
 const regionReverseMapping: Record<number, string> = Object.entries(regionMapping).reduce((acc, [key, val]) => ({ ...acc, [val]: key }), {});
 
+// Resolve whatever shape the backend returned (number, string-label, or numeric-string)
+// to the kebab-case key the dropdown uses. Returning 'global' silently when the value
+// is unrecognized causes regions to reset to Global on save, so we only fall back
+// when the input is genuinely missing.
+function resolveRegionKey(region: unknown): string {
+    if (region === null || region === undefined || region === '') return 'global';
+
+    if (typeof region === 'number') {
+        return regionReverseMapping[region] ?? 'global';
+    }
+
+    if (typeof region === 'string') {
+        // Numeric string ("2") → use as enum number
+        const asNum = Number(region);
+        if (!isNaN(asNum) && regionReverseMapping[asNum] !== undefined) {
+            return regionReverseMapping[asNum];
+        }
+        // Direct key match: "europe", "north-america"
+        const normalized = region.toLowerCase().replace(/[\s_]+/g, '-');
+        if (regionMapping[normalized] !== undefined) return normalized;
+    }
+
+    return 'global';
+}
+
 export function EditTournamentModal({ visible, onClose, tournament, onSaveSuccess }: EditTournamentModalProps) {
     const insets = useSafeAreaInsets();
     const tStatus = Number(tournament?.status !== undefined ? tournament.status : tournament?.Status);
@@ -76,7 +101,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [qualifiersPerGroup, setQualifiersPerGroup] = useState(String(tournament?.qualifiersPerGroup || '2'));
     const [prize, setPrize] = useState(String(tournament?.prize || ''));
     const [prizeCurrency, setPrizeCurrency] = useState(String(tournament?.prizeCurrency || '1'));
-    const [selectedRegion, setSelectedRegion] = useState(regionReverseMapping[tournament?.region] || 'global');
+    const [selectedRegion, setSelectedRegion] = useState(resolveRegionKey(tournament?.region));
     const [startDate, setStartDate] = useState(tournament?.startDate || '');
     const [registrationDeadline, setRegistrationDeadline] = useState(tournament?.registrationDeadline || '');
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
@@ -147,7 +172,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setQualifiersPerGroup(String(tournament?.qualifiersPerGroup || '2'));
         setPrize(String(tournament?.prize || ''));
         setPrizeCurrency(String(tournament?.prizeCurrency || '1'));
-        setSelectedRegion(regionReverseMapping[tournament?.region] || 'global');
+        setSelectedRegion(resolveRegionKey(tournament?.region));
         setStartDate(tournament?.startDate || '');
         setRegistrationDeadline(tournament?.registrationDeadline || '');
         setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));

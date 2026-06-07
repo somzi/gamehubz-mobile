@@ -218,6 +218,20 @@ export function TeamMatchDetailModal({
         }
     }, [matchId]);
 
+    // Clear per-match state when switching to a different team match.
+    // Modal stays mounted between opens, so without this the previous match's
+    // data/scores/evidence/tie-break flash on screen while the new fetch is in flight.
+    useEffect(() => {
+        setData(null);
+        setError(null);
+        setScoreInputs({});
+        setSelectedImages([]);
+        setPreviewImage(null);
+        setEditingMatchId(null);
+        setTieBreakStatus(null);
+        setIsEvidenceOpen(false);
+    }, [matchId]);
+
     useEffect(() => {
         if (visible && matchId) {
             fetchData();
