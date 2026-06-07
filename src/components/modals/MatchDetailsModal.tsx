@@ -128,6 +128,17 @@ export function MatchDetailsModal({
         return `${baseUrl}${path}`;
     };
 
+    // Reset per-match input state when the admin switches to a different match
+    // (the parent keeps the modal mounted and just swaps matchId).
+    useEffect(() => {
+        setHomeScore('');
+        setAwayScore('');
+        setSelectedImages([]);
+        setError(null);
+        setIsEditMode(false);
+        setIsEditingProposal(false);
+    }, [matchId]);
+
     useEffect(() => {
         if (visible && matchId) {
             fetchMatchDetails();
