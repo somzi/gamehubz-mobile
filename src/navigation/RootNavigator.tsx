@@ -5,7 +5,6 @@ import { MainTabNavigator } from './MainTabNavigator';
 import TournamentDetailsScreen from '../screens/TournamentDetailsScreen';
 import HubProfileScreen from '../screens/HubProfileScreen';
 import PlayerProfileScreen from '../screens/PlayerProfileScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
 import NotFoundScreen from '../screens/NotFoundScreen';
 import MyMatchesScreen from '../screens/MyMatchesScreen';
 import DirectChatScreen from '../screens/DirectChatScreen';
@@ -69,10 +68,6 @@ export function RootNavigator() {
                     <Stack.Screen
                         name="PlayerProfile"
                         component={PlayerProfileScreen}
-                    />
-                    <Stack.Screen
-                        name="Notifications"
-                        component={NotificationsScreen}
                     />
                     <Stack.Screen
                         name="EditProfile"

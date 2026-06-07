@@ -36,20 +36,10 @@ export default function SocialScreen() {
         <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
             {/* ─── Header ──────────────────────────────────────── */}
             <View className="px-5 pt-2 pb-3">
-                <View className="flex-row items-center justify-between">
-                    <View>
-                        <Text className="text-white text-2xl font-black tracking-tight">Social</Text>
-                        <Text className="text-slate-500 text-xs font-medium mt-0.5">
-                            Stay connected with your gaming circle
-                        </Text>
-                    </View>
-                    <Pressable
-                        onPress={() => navigation.navigate('Notifications')}
-                        className="w-10 h-10 rounded-2xl items-center justify-center bg-white/5 border border-white/10"
-                    >
-                        <Ionicons name="notifications-outline" size={20} color="#FAFAFA" />
-                    </Pressable>
-                </View>
+                <Text className="text-white text-2xl font-black tracking-tight">Social</Text>
+                <Text className="text-slate-500 text-xs font-medium mt-0.5">
+                    Stay connected with your gaming circle
+                </Text>
             </View>
 
             {/* ─── Segmented Tabs ──────────────────────────────── */}
