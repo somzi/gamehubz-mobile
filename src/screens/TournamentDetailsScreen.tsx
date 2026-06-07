@@ -15,7 +15,7 @@ import { BracketMatch } from '../components/bracket/BracketMatch';
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
-import { cn } from '../lib/utils';
+import { cn, getCurrencyLabel } from '../lib/utils';
 import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
@@ -1353,7 +1353,7 @@ export default function TournamentDetailsScreen() {
                                                     <Text className="text-sm text-slate-400 font-bold">Prize Pool</Text>
                                                 </View>
                                                 <Text className="text-base font-black text-white">
-                                                    {tournament.prize} {tournament.prizeCurrency === 1 ? 'EUR' : 'USD'}
+                                                    {tournament.prize} {getCurrencyLabel(tournament.prizeCurrency)}
                                                 </Text>
                                             </View>
                                             <View className="h-[1px] bg-white/5" />

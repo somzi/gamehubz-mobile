@@ -13,7 +13,7 @@ import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerMatchesDto } from '../types/user';
 import { SocialType } from '../types/auth';
-import { cn, parseUtcDate, formatDateSafe } from '../lib/utils';
+import { cn, parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
 import { TournamentCard } from '../components/cards/TournamentCard';
 
@@ -526,7 +526,7 @@ export default function ProfileScreen() {
                                                 status={getTournamentStatus(t.status)}
                                                 date={formatDateSafe(t.startDate, 'N/A')}
                                                 region="Global"
-                                                prizePool={`${t.prizeCurrency === 1 ? '$' : t.prizeCurrency === 2 ? '€' : ''}${t.prize}`}
+                                                prizePool={`${getCurrencySymbol(t.prizeCurrency)}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
                                                 onClick={() => navigation.navigate('TournamentDetails', { id: t.id })}
                                                 hubName={t.hubName || t.HubName}

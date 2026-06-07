@@ -11,7 +11,7 @@ import { HubRole } from '../types/hub';
 import { Ionicons } from '@expo/vector-icons';
 
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
-import { parseUtcDate, formatDateSafe } from '../lib/utils';
+import { parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { SocialLinks } from '../components/profile/SocialLinks';
 import { SocialType } from '../types/auth';
@@ -330,7 +330,7 @@ export default function HubProfileScreen() {
                             status={tournament.status === 3 ? 'live' : (tournament.status === 4 ? 'completed' : 'upcoming')}
                             date={formatDateSafe(tournament.startDate)}
                             region={tournament.region === 1 ? 'North America' : 'Europe'}
-                            prizePool={`${tournament.prizeCurrency === 1 ? '$' : '€'}${tournament.prize}`}
+                            prizePool={`${getCurrencySymbol(tournament.prizeCurrency)}${tournament.prize}`}
                             players={new Array(tournament.numberOfParticipants || 0).fill({})}
                             onClick={() => navigation.navigate('TournamentDetails', { id: tournament.id })}
                             index={index}

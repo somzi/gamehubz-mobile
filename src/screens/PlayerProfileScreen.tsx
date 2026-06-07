@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
-import { cn, formatDateSafe } from '../lib/utils';
+import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
 import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { Button } from '../components/ui/Button';
@@ -607,7 +607,7 @@ export default function PlayerProfileScreen() {
                                                 status={getTournamentStatus(t.status)}
                                                 date={formatDateSafe(t.startDate, 'N/A')}
                                                 region="Global"
-                                                prizePool={`${t.prizeCurrency === 1 ? '$' : t.prizeCurrency === 2 ? '€' : ''}${t.prize}`}
+                                                prizePool={`${getCurrencySymbol(t.prizeCurrency)}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
                                                 onClick={() => navigation.navigate('TournamentDetails', { id: t.id })}
                                                 hubName={t.hubName || t.HubName}

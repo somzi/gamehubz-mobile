@@ -9,7 +9,7 @@ import { TournamentCard } from '../components/cards/TournamentCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
-import { cn, formatDateSafe } from '../lib/utils';
+import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -126,23 +126,6 @@ export default function TournamentsScreen() {
             case TournamentRegion.Oceania: return 'Oceania';
             case TournamentRegion.Global:
             default: return 'Global';
-        }
-    };
-
-    const getCurrencySymbol = (currency?: number | string) => {
-        if (typeof currency === 'string') {
-            const lower = currency.toLowerCase();
-            if (lower === 'eur') return '€';
-            if (lower === 'usd') return '$';
-            if (lower === 'starpass') return 'SP';
-            if (lower === 'fcp') return 'FCP';
-        }
-        switch (currency) {
-            case 1: return '€';
-            case 2: return '$';
-            case 3: return 'SP';
-            case 4: return 'FCP';
-            default: return '€';
         }
     };
 
