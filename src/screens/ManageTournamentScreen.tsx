@@ -46,6 +46,7 @@ export default function ManageTournamentScreen() {
 
     const [tournament, setTournament] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [statusModalConfig, setStatusModalConfig] = useState<{
@@ -61,6 +62,7 @@ export default function ManageTournamentScreen() {
     const fetchTournamentDetails = async () => {
         try {
             setIsLoading(true);
+            setLoadError(null);
             const response = await authenticatedFetch(ENDPOINTS.GET_TOURNAMENT_OVERVIEW(id));
             if (response.ok) {
                 const data = await response.json();
@@ -72,9 +74,17 @@ export default function ManageTournamentScreen() {
                     name: rawData.name || rawData.Name,
                     createdBy: rawData.createdBy || rawData.createdby || rawData.CreatedBy,
                 });
+            } else if (response.status === 404) {
+                setTournament(null);
+                setLoadError('This tournament no longer exists. It may have been deleted.');
+            } else {
+                setTournament(null);
+                setLoadError('Failed to load tournament details. Please try again.');
             }
         } catch (error) {
             console.error('Error fetching tournament details:', error);
+            setTournament(null);
+            setLoadError('Could not reach the server. Check your connection and try again.');
         } finally {
             setIsLoading(false);
         }
@@ -173,6 +183,40 @@ export default function ManageTournamentScreen() {
                 <PageHeader title="Manage Tournament" showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#10B981" />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    // If fetch failed and we have no tournament loaded, lock the screen
+    // down to an error message so the user can't trigger destructive
+    // actions (delete, cancel) against an id that doesn't exist anymore.
+    if (!tournament) {
+        return (
+            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+                <PageHeader title="Manage Tournament" showBack />
+                <View className="flex-1 items-center justify-center px-8">
+                    <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center border border-red-500/20 mb-4">
+                        <Ionicons name="alert-circle-outline" size={32} color="#EF4444" />
+                    </View>
+                    <Text className="text-white font-black text-lg text-center">Can't load tournament</Text>
+                    <Text className="text-slate-400 text-sm text-center mt-2 font-medium">
+                        {loadError || 'Tournament not found.'}
+                    </Text>
+                    <View className="flex-row gap-3 mt-6">
+                        <Pressable
+                            onPress={fetchTournamentDetails}
+                            className="bg-emerald-500 px-5 py-3 rounded-2xl active:opacity-80"
+                        >
+                            <Text className="text-[#0F172A] font-black text-sm uppercase tracking-wider">Retry</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => navigation.goBack()}
+                            className="bg-white/5 border border-white/10 px-5 py-3 rounded-2xl active:opacity-80"
+                        >
+                            <Text className="text-slate-300 font-black text-sm uppercase tracking-wider">Go Back</Text>
+                        </Pressable>
+                    </View>
                 </View>
             </SafeAreaView>
         );

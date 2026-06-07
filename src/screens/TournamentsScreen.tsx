@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -154,6 +154,12 @@ export default function TournamentsScreen() {
         }
     };
 
+    const formatTournamentDate = (raw?: string) => {
+        if (!raw) return 'TBD';
+        const d = new Date(raw);
+        return isNaN(d.getTime()) ? 'TBD' : d.toLocaleDateString();
+    };
+
     const tabs = [
         { label: 'Live', value: 'live', icon: 'radio' as const },
         { label: 'Upcoming', value: 'upcoming', icon: 'time' as const },
@@ -168,87 +174,26 @@ export default function TournamentsScreen() {
         completed: { color: '#64748B', bg: 'bg-slate-500/10' },
     };
 
-    const handleScroll = (event: any) => {
-        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-        const paddingToBottom = 50;
-        if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-            loadMore();
-        }
-    };
-
-    const renderContent = () => {
-        if (isLoading) {
-            return (
-                <View className="items-center py-24">
-                    <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
-                        <ActivityIndicator size="small" color="#818CF8" />
-                    </View>
-                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading tournaments...</Text>
-                </View>
-            );
-        }
-
-        if (error) {
-            return (
-                <View className="items-center py-16 px-6">
-                    <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
-                        <Ionicons name="alert-circle" size={28} color="#EF4444" />
-                    </View>
-                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
-                    <Text className="text-xs text-slate-600 text-center mb-5">{error}</Text>
-                    <Pressable
-                        onPress={() => fetchTournaments(0, false)}
-                        className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
-                    >
-                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
-                    </Pressable>
-                </View>
-            );
-        }
-
-        if (tournaments.length === 0) {
-            return (
-                <View className="items-center py-20">
-                    <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
-                        <Ionicons name="trophy-outline" size={28} color="#334155" />
-                    </View>
-                    <Text className="text-sm font-semibold text-slate-500">No tournaments found</Text>
-                    <Text className="text-xs text-slate-600 mt-1">Check back later for new events</Text>
-                </View>
-            );
-        }
-
-        return (
-            <View className="mt-1">
-                {tournaments.map((tournament: any, index: number) => (
-                    <View key={`${tournament.Id || tournament.id || 'tournament'}-${index}`} className="mb-3">
-                        <TournamentCard
-                            name={tournament.Name || tournament.name}
-                            description={tournament.Description || tournament.description}
-                            status={getTournamentStatus(tournament.Status ?? tournament.status)}
-                            date={new Date(tournament.StartDate || tournament.startDate).toLocaleDateString()}
-                            region={getRegionName(tournament.Region ?? tournament.region)}
-                            prizePool={`${getCurrencySymbol(tournament.PrizeCurrency ?? tournament.prizeCurrency)}${tournament.Prize ?? tournament.prize}`}
-                            players={new Array(tournament.NumberOfParticipants ?? tournament.numberOfParticipants ?? tournament.participantsCount ?? tournament.tournamentParticipants?.length ?? 0).fill({})}
-                            onClick={() => {
-                                const tId = tournament.Id || tournament.id || tournament.tournamentId;
-                                navigation.navigate('TournamentDetails', { id: tId });
-                            }}
-                            index={index}
-                            hubName={tournament.HubName || tournament.hubName}
-                            hubAvatarUrl={tournament.HubAvatarUrl || tournament.hubAvatarUrl}
-                        />
-                    </View>
-                ))}
-
-                {hasMore && isMoreLoading && (
-                    <View className="py-6 items-center justify-center">
-                        <ActivityIndicator size="small" color="#818CF8" />
-                    </View>
-                )}
-            </View>
-        );
-    };
+    const renderTournament = useCallback(({ item: tournament, index }: { item: any; index: number }) => (
+        <View className="mb-3">
+            <TournamentCard
+                name={tournament.Name || tournament.name}
+                description={tournament.Description || tournament.description}
+                status={getTournamentStatus(tournament.Status ?? tournament.status)}
+                date={formatTournamentDate(tournament.StartDate || tournament.startDate)}
+                region={getRegionName(tournament.Region ?? tournament.region)}
+                prizePool={`${getCurrencySymbol(tournament.PrizeCurrency ?? tournament.prizeCurrency)}${tournament.Prize ?? tournament.prize}`}
+                players={new Array(tournament.NumberOfParticipants ?? tournament.numberOfParticipants ?? tournament.participantsCount ?? tournament.tournamentParticipants?.length ?? 0).fill({})}
+                onClick={() => {
+                    const tId = tournament.Id || tournament.id || tournament.tournamentId;
+                    navigation.navigate('TournamentDetails', { id: tId });
+                }}
+                index={index}
+                hubName={tournament.HubName || tournament.hubName}
+                hubAvatarUrl={tournament.HubAvatarUrl || tournament.hubAvatarUrl}
+            />
+        </View>
+    ), [navigation]);
 
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
@@ -299,19 +244,57 @@ export default function TournamentsScreen() {
                     </View>
             </View>
 
-            <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ paddingBottom: 24 }}
-                refreshControl={
-                    <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#818CF8" />
-                }
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-            >
-                <View className="px-5">
-                    {renderContent()}
+            {isLoading && tournaments.length === 0 ? (
+                <View className="flex-1 items-center justify-center">
+                    <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
+                        <ActivityIndicator size="small" color="#818CF8" />
+                    </View>
+                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading tournaments...</Text>
                 </View>
-            </ScrollView>
+            ) : error && tournaments.length === 0 ? (
+                <View className="flex-1 items-center justify-center px-6">
+                    <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
+                        <Ionicons name="alert-circle" size={28} color="#EF4444" />
+                    </View>
+                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
+                    <Text className="text-xs text-slate-600 text-center mb-5">{error}</Text>
+                    <Pressable
+                        onPress={() => fetchTournaments(0, false)}
+                        className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
+                    >
+                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
+                    </Pressable>
+                </View>
+            ) : (
+                <FlatList
+                    data={tournaments}
+                    keyExtractor={(item: any, index) => `${item.Id || item.id || 'tournament'}-${index}`}
+                    renderItem={renderTournament}
+                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
+                    refreshControl={
+                        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#818CF8" />
+                    }
+                    onEndReached={loadMore}
+                    onEndReachedThreshold={0.5}
+                    ListEmptyComponent={
+                        <View className="items-center py-20">
+                            <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
+                                <Ionicons name="trophy-outline" size={28} color="#334155" />
+                            </View>
+                            <Text className="text-sm font-semibold text-slate-500">No tournaments found</Text>
+                            <Text className="text-xs text-slate-600 mt-1">Check back later for new events</Text>
+                        </View>
+                    }
+                    ListFooterComponent={
+                        isMoreLoading ? (
+                            <View className="py-6 items-center justify-center">
+                                <ActivityIndicator size="small" color="#818CF8" />
+                            </View>
+                        ) : null
+                    }
+                    removeClippedSubviews
+                />
+            )}
         </SafeAreaView>
     );
 }

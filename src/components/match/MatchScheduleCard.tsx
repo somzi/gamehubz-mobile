@@ -297,25 +297,19 @@ export function MatchScheduleCard({
     useEffect(() => {
         if (!matchId || !modalVisible) return;
 
-        // 1. Configure Connection
+        // Scope flag — same pattern as DirectChatScreen. Prevents stale
+        // ReceiveMessage callbacks from writing to the next match's state
+        // and skips JoinMatchGroup if the modal closed before start() resolved.
+        let isActive = true;
+
         const connection = new HubConnectionBuilder()
             .withUrl(`${API_BASE_URL}/hubs/chat`)
             .withAutomaticReconnect()
             .configureLogging(LogLevel.Information)
             .build();
 
-        // 2. Start Connection
-        connection.start()
-            .then(() => {
-                console.log('SignalR Connected');
-                // Join the specific match group
-                connection.invoke("JoinMatchGroup", matchId);
-            })
-            .catch((err) => console.error('SignalR Connection Error:', err));
-
-        // 3. Listen for Messages
         connection.on("ReceiveMessage", (newMessage: any) => {
-            // Map explicitly to handle casing differences (Backend sends PascalCase)
+            if (!isActive) return;
             const mappedMessage: MatchComment = {
                 id: newMessage.id || newMessage.Id,
                 userId: newMessage.userId || newMessage.UserId,
@@ -325,23 +319,33 @@ export function MatchScheduleCard({
             };
 
             setComments((prevComments) => {
-                // Prevent duplicates if API POST also adds it locally
                 if (prevComments.some(c => c.id === mappedMessage.id)) return prevComments;
                 return [...prevComments, mappedMessage];
             });
 
-            // Auto-scroll to bottom on new message
             setTimeout(() => {
                 commentsScrollRef.current?.scrollToEnd({ animated: true });
             }, 100);
         });
 
+        const startPromise = connection.start()
+            .then(() => {
+                if (!isActive) return;
+                return connection.invoke("JoinMatchGroup", matchId);
+            })
+            .catch((err) => console.error('SignalR Connection Error:', err));
+
         connectionRef.current = connection;
 
-        // 4. Cleanup on unmount or modal close
         return () => {
+            isActive = false;
             connection.off("ReceiveMessage");
-            connection.stop();
+            // Wait for start to settle before stopping, otherwise stop() on a
+            // still-Connecting connection throws and leaves orphan sockets.
+            startPromise.finally(async () => {
+                try { await connection.stop(); } catch { /* ignore */ }
+            });
+            connectionRef.current = null;
         };
     }, [matchId, modalVisible]);
 

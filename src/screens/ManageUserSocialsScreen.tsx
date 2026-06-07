@@ -18,10 +18,12 @@ type ManageUserSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ManageUserSocialsScreen() {
     const navigation = useNavigation<ManageUserSocialsNavigationProp>();
-    const { user, saveUserSocial, deleteUserSocial, isLoading } = useAuth();
+    const { user, saveUserSocial, deleteUserSocial } = useAuth();
 
     const [newSocialType, setNewSocialType] = useState<SocialType | undefined>(undefined);
     const [newSocialUsername, setNewSocialUsername] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [removingId, setRemovingId] = useState<string | null>(null);
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [statusModalConfig, setStatusModalConfig] = useState<{
         type: 'success' | 'error' | 'info';
@@ -57,6 +59,7 @@ export default function ManageUserSocialsScreen() {
     };
 
     const handleAddSocial = async () => {
+        if (isSaving) return;
         if (!newSocialType) {
             setStatusModalConfig({ type: 'error', title: 'Missing Platform', message: 'Please select a social platform' });
             setShowStatusModal(true);
@@ -73,18 +76,24 @@ export default function ManageUserSocialsScreen() {
             return;
         }
 
-        const success = await saveUserSocial({ socialType: newSocialType, username: newSocialUsername.trim() });
-        if (success) {
-            setNewSocialType(undefined);
-            setNewSocialUsername('');
-        } else {
-            setStatusModalConfig({ type: 'error', title: 'Failed', message: 'Failed to add social account' });
-            setShowStatusModal(true);
+        setIsSaving(true);
+        try {
+            const success = await saveUserSocial({ socialType: newSocialType, username: newSocialUsername.trim() });
+            if (success) {
+                setNewSocialType(undefined);
+                setNewSocialUsername('');
+            } else {
+                setStatusModalConfig({ type: 'error', title: 'Failed', message: 'Failed to add social account' });
+                setShowStatusModal(true);
+            }
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleRemoveSocial = (social: UserSocial) => {
         if (!social.id) return;
+        if (removingId === social.id) return;
         Alert.alert(
             'Remove Social Account',
             `Are you sure you want to remove your ${getSocialLabel(social.socialType!)} account?`,
@@ -94,10 +103,15 @@ export default function ManageUserSocialsScreen() {
                     text: 'Remove',
                     style: 'destructive',
                     onPress: async () => {
-                        const success = await deleteUserSocial(social.id!);
-                        if (!success) {
-                            setStatusModalConfig({ type: 'error', title: 'Failed', message: 'Failed to remove social account' });
-                            setShowStatusModal(true);
+                        setRemovingId(social.id!);
+                        try {
+                            const success = await deleteUserSocial(social.id!);
+                            if (!success) {
+                                setStatusModalConfig({ type: 'error', title: 'Failed', message: 'Failed to remove social account' });
+                                setShowStatusModal(true);
+                            }
+                        } finally {
+                            setRemovingId(null);
                         }
                     }
                 }
@@ -137,9 +151,14 @@ export default function ManageUserSocialsScreen() {
                                         </View>
                                         <TouchableOpacity
                                             onPress={() => handleRemoveSocial(social)}
-                                            className="w-9 h-9 rounded-xl bg-red-500/10 items-center justify-center border border-red-500/20"
+                                            disabled={removingId === social.id}
+                                            className={`w-9 h-9 rounded-xl bg-red-500/10 items-center justify-center border border-red-500/20 ${removingId === social.id ? 'opacity-50' : ''}`}
                                         >
-                                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                                            {removingId === social.id ? (
+                                                <ActivityIndicator size="small" color="#EF4444" />
+                                            ) : (
+                                                <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                                            )}
                                         </TouchableOpacity>
                                     </View>
                                 ))}
@@ -181,8 +200,8 @@ export default function ManageUserSocialsScreen() {
                                 onPress={handleAddSocial}
                                 variant="outline"
                                 size="sm"
-                                disabled={!newSocialType || !newSocialUsername}
-                                loading={isLoading}
+                                disabled={!newSocialType || !newSocialUsername || isSaving}
+                                loading={isSaving}
                             >
                                 <View className="flex-row items-center gap-2">
                                     <Ionicons name="add" size={16} color="white" />
