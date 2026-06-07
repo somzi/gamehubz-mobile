@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -8,7 +8,7 @@ import { NavigationContainer, LinkingOptions, NavigationContainerRef } from '@re
 import { RootNavigator } from './src/navigation/RootNavigator';
 import './global.css';
 
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
 
@@ -46,64 +46,101 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
-export default function App() {
-  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
-  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
+function routeFromNotification(
+  nav: NavigationContainerRef<RootStackParamList>,
+  rawData: unknown,
+) {
+  if (!rawData || typeof rawData !== 'object') return;
+  const data = rawData as Record<string, any>;
 
-  // Handle notification taps (background / killed state)
+  const type = typeof data.type === 'string' ? data.type.toLowerCase() : undefined;
+  const chatId = data.chatId ? String(data.chatId) : undefined;
+  const tournamentId = data.tournamentId ? String(data.tournamentId) : undefined;
+  const matchId = data.matchId ? String(data.matchId) : undefined;
+  const userId = data.userId ? String(data.userId) : undefined;
+
+  // Explicit type wins
+  switch (type) {
+    case 'direct_message':
+      if (chatId) {
+        nav.navigate('DirectChat', { chatId });
+        return;
+      }
+      break;
+    case 'friend_request':
+      nav.navigate('MainTabs' as any, {
+        screen: 'Social',
+        params: { initialTab: 'requests' },
+      });
+      return;
+    case 'friend_accepted':
+      if (userId) {
+        nav.navigate('PlayerProfile', { id: userId });
+        return;
+      }
+      break;
+  }
+
+  // Fallback by id field (backend tournament/match pushes omit `type`)
+  if (chatId) {
+    nav.navigate('DirectChat', { chatId });
+    return;
+  }
+  if (matchId) {
+    nav.navigate('MyMatches' as any);
+    return;
+  }
+  if (tournamentId) {
+    nav.navigate('TournamentDetails', { id: tournamentId });
+    return;
+  }
+}
+
+function NotificationRouter({
+  navigationRef,
+  navReady,
+}: {
+  navigationRef: React.RefObject<NavigationContainerRef<RootStackParamList> | null>;
+  navReady: boolean;
+}) {
+  const { isAuthenticated } = useAuth();
+  const lastResponse = Notifications.useLastNotificationResponse();
+  const handledRef = useRef<string | null>(null);
+
   useEffect(() => {
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data as Record<string, string> | undefined;
-      if (!data?.type) return;
+    if (!lastResponse) return;
+    if (!isAuthenticated) return;
+    if (!navReady) return;
 
-      const nav = navigationRef.current;
-      if (!nav?.isReady()) return;
+    const nav = navigationRef.current;
+    if (!nav?.isReady()) return;
 
-      switch (data.type) {
-        case 'CHAT':
-          if (data.matchId) {
-            nav.navigate('MyMatches' as any);
-          }
-          break;
-        case 'TOURNAMENT_STATUS':
-        case 'NEW_TOURNAMENT':
-          if (data.tournamentId) {
-            nav.navigate('TournamentDetails', { id: data.tournamentId });
-          }
-          break;
-        case 'direct_message':
-          if (data.chatId) {
-            nav.navigate('DirectChat', { chatId: data.chatId });
-          }
-          break;
-        case 'friend_request':
-          nav.navigate('MainTabs' as any, {
-            screen: 'Social',
-            params: { initialTab: 'requests' },
-          });
-          break;
-        case 'friend_accepted':
-          if (data.userId) {
-            nav.navigate('PlayerProfile', { id: data.userId });
-          }
-          break;
-      }
-    });
+    const reqId = lastResponse.notification.request.identifier;
+    if (handledRef.current === reqId) return;
+    handledRef.current = reqId;
 
-    return () => {
-      if (responseListener.current) {
-        responseListener.current.remove();
-      }
-    };
-  }, []);
+    routeFromNotification(nav, lastResponse.notification.request.content.data);
+  }, [lastResponse, isAuthenticated, navReady, navigationRef]);
+
+  return null;
+}
+
+export default function App() {
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList> | null>(null);
+  const [navReady, setNavReady] = useState(false);
 
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <NavigationContainer ref={navigationRef} linking={linking}>
+          <NavigationContainer
+            ref={navigationRef}
+            linking={linking}
+            onReady={() => setNavReady(true)}
+          >
             <RootNavigator />
           </NavigationContainer>
+          <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
         </AuthProvider>
         <StatusBar style="light" />
       </QueryClientProvider>

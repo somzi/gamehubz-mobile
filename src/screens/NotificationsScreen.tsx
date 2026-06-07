@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { PageHeader } from '../components/layout/PageHeader';
 import { NotificationItem, Notification } from '../components/notifications/NotificationItem';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../components/ui/Button';
+import { RootStackParamList } from '../types/navigation';
+
+type Nav = StackNavigationProp<RootStackParamList>;
 
 // Mock data
 const mockNotifications: Notification[] = [
@@ -48,6 +53,7 @@ const mockNotifications: Notification[] = [
 ];
 
 export default function NotificationsScreen() {
+    const navigation = useNavigation<Nav>();
     const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
     const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -59,6 +65,17 @@ export default function NotificationsScreen() {
 
     const markAllAsRead = () => {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    };
+
+    const openNotification = (n: Notification) => {
+        if (n.matchId) {
+            navigation.navigate('MyMatches');
+            return;
+        }
+        if (n.tournamentId) {
+            navigation.navigate('TournamentDetails', { id: n.tournamentId });
+            return;
+        }
     };
 
     return (
@@ -91,6 +108,7 @@ export default function NotificationsScreen() {
                                 key={notification.id}
                                 notification={notification}
                                 onRead={() => markAsRead(notification.id)}
+                                onPress={() => openNotification(notification)}
                             />
                         ))}
                     </View>
