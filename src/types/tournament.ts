@@ -16,6 +16,7 @@ export const TEAM_TOURNAMENT_FORMATS = [
 export const TOURNAMENT_FORMAT_OPTIONS = [
     { value: String(TournamentFormat.League), label: 'League' },
     { value: String(TournamentFormat.SingleElimination), label: 'Single Bracket' },
+    { value: String(TournamentFormat.DoubleElimination), label: 'Double Bracket' },
     { value: String(TournamentFormat.GroupStageWithKnockout), label: 'Groups + Bracket' },
 ] as const;
 

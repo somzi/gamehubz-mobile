@@ -9,6 +9,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
+import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
 import { BracketMatch } from '../components/bracket/BracketMatch';
 
@@ -899,15 +900,27 @@ export default function TournamentDetailsScreen() {
         const currentStage = stages[selectedStageIndex];
         if (!currentStage) return null;
 
-        // The binary-tree bracket can't place a third-place play-off inline, so pull it out
-        // and render it on its own below the bracket.
+        // Stage type mirrors GameHubz.DataModels.Enums.StageType:
+        //   3 = SingleEliminationBracket, 4 = DE Winners Bracket, 5 = DE Losers Bracket.
+        const stageType = currentStage.type ?? currentStage.Type;
+        const isLosersBracket = stageType === 5;
+
+        // The binary-tree bracket can't place a third-place play-off or a Grand Final inline
+        // (the GF is fed by the LB winner from a different stage, not by another WB feeder),
+        // so we pull both out of the round list and render them on their own below.
         const stageRounds = currentStage.rounds || [];
-        const thirdPlaceMatch = stageRounds
-            .flatMap((r: any) => r.matches || [])
-            .find((m: any) => m.stage === MatchStage.ThirdPlace);
-        const bracketRounds = thirdPlaceMatch
+        const allStageMatches = stageRounds.flatMap((r: any) => r.matches || []);
+        const thirdPlaceMatch = allStageMatches.find((m: any) => m.stage === MatchStage.ThirdPlace);
+        const grandFinalMatch = allStageMatches.find((m: any) => m.stage === MatchStage.GrandFinal);
+
+        const bracketRounds = (thirdPlaceMatch || grandFinalMatch)
             ? stageRounds
-                .map((r: any) => ({ ...r, matches: (r.matches || []).filter((m: any) => m.stage !== MatchStage.ThirdPlace) }))
+                .map((r: any) => ({
+                    ...r,
+                    matches: (r.matches || []).filter(
+                        (m: any) => m.stage !== MatchStage.ThirdPlace && m.stage !== MatchStage.GrandFinal
+                    ),
+                }))
                 .filter((r: any) => r.matches.length > 0)
             : stageRounds;
 
@@ -948,16 +961,50 @@ export default function TournamentDetailsScreen() {
 
                 {stageRounds.length > 0 ? (
                     <>
-                        <TournamentBracket
-                            rounds={bracketRounds}
-                            onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
-                            currentUserId={user?.id}
-                            currentUsername={user?.username}
-                            isAdmin={canManage}
-                            onEditDeadline={handleEditDeadline}
-                            tournamentStatus={tournament?.status}
-                            isTeamTournament={tournament?.isTeamTournament}
-                        />
+                        {isLosersBracket ? (
+                            <LosersBracket
+                                rounds={bracketRounds}
+                                onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
+                                currentUserId={user?.id}
+                                currentUsername={user?.username}
+                                isAdmin={canManage}
+                                onEditDeadline={handleEditDeadline}
+                                tournamentStatus={tournament?.status}
+                                isTeamTournament={tournament?.isTeamTournament}
+                            />
+                        ) : (
+                            <TournamentBracket
+                                rounds={bracketRounds}
+                                onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
+                                currentUserId={user?.id}
+                                currentUsername={user?.username}
+                                isAdmin={canManage}
+                                onEditDeadline={handleEditDeadline}
+                                tournamentStatus={tournament?.status}
+                                isTeamTournament={tournament?.isTeamTournament}
+                            />
+                        )}
+                        {grandFinalMatch && (
+                            <View className="px-4 mt-6">
+                                <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
+                                    <Ionicons name="trophy" size={16} color="#FBBF24" />
+                                    <Text className="text-sm font-bold text-white">Grand Final</Text>
+                                </View>
+                                <View style={{ maxWidth: 320 }}>
+                                    <BracketMatch
+                                        home={grandFinalMatch.home}
+                                        away={grandFinalMatch.away}
+                                        startTime={grandFinalMatch.startTime}
+                                        status={grandFinalMatch.status}
+                                        onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(grandFinalMatch)}
+                                        currentUserId={user?.id}
+                                        currentUsername={user?.username}
+                                        isAdmin={canManage}
+                                        isTeamTournament={tournament?.isTeamTournament}
+                                    />
+                                </View>
+                            </View>
+                        )}
                         {thirdPlaceMatch && (thirdPlaceMatch.home || thirdPlaceMatch.away) && (
                             <View className="px-4 mt-4">
                                 <Pressable
