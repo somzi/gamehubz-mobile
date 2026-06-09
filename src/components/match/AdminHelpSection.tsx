@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
+import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
+
+// getErrorMessage swallows everything into "An unexpected error occurred" when there
+// is no usable text — for this surface we prefer a domain-specific fallback in that case.
+function extractErrorMessage(err: unknown, fallback: string): string {
+    const parsed = getErrorMessage(err);
+    if (!parsed || parsed === 'An unexpected error occurred') return fallback;
+    return parsed;
+}
 
 interface AdminHelpSectionProps {
     matchId: string;
@@ -63,7 +71,8 @@ export function AdminHelpSection({
             if (onChanged) onChanged();
         } catch (err: any) {
             console.error('[AdminHelpSection] Request error:', err);
-            setError('Could not notify the admins. Please try again.');
+            // Prefer the server's message so users see "Only match participants…" etc.
+            setError(extractErrorMessage(err, 'Could not notify the admins. Please try again.'));
         } finally {
             setIsSubmitting(false);
         }
@@ -97,7 +106,7 @@ export function AdminHelpSection({
             if (onChanged) onChanged();
         } catch (err: any) {
             console.error('[AdminHelpSection] Resolve error:', err);
-            setError('Could not resolve the request. Please try again.');
+            setError(extractErrorMessage(err, 'Could not resolve the request. Please try again.'));
         } finally {
             setIsResolving(false);
         }

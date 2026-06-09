@@ -62,6 +62,12 @@ interface MatchDetailsModalProps {
     isRoundLocked?: boolean;
     canRevert?: boolean;
     requireResultApproval?: boolean;
+    /**
+     * Which tab to show first when the modal opens. Defaults to "match".
+     * The TournamentDetailsScreen passes "chat" when an admin enters from the
+     * help-requests inbox so the conversation is one tap away.
+     */
+    defaultTab?: 'match' | 'chat';
 }
 
 export function MatchDetailsModal({
@@ -86,6 +92,7 @@ export function MatchDetailsModal({
     isRoundLocked = false,
     canRevert = false,
     requireResultApproval = false,
+    defaultTab = 'match',
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -124,8 +131,10 @@ export function MatchDetailsModal({
     const [isRejecting, setIsRejecting] = useState(false);
     const [isEditingProposal, setIsEditingProposal] = useState(false);
 
-    // Match / Chat tab state
-    const [activeTab, setActiveTab] = useState<'match' | 'chat'>('match');
+    // Match / Chat tab state — initial value mirrors defaultTab; the effects below
+    // re-apply it whenever the modal opens or the match changes so reopening on the
+    // same matchId still honors the host's intent.
+    const [activeTab, setActiveTab] = useState<'match' | 'chat'>(defaultTab);
 
     // Android-only: under Expo SDK 54 edge-to-edge the window no longer resizes for
     // the keyboard, so we track the real keyboard height and pad the chat ourselves.
@@ -159,8 +168,14 @@ export function MatchDetailsModal({
         setError(null);
         setIsEditMode(false);
         setIsEditingProposal(false);
-        setActiveTab('match');
     }, [matchId]);
+
+    // Apply the host-requested starting tab whenever the modal opens or the match
+    // changes — covers reopens on the same matchId (e.g. admin closes from chat,
+    // reopens via the help-requests inbox and expects chat again).
+    useEffect(() => {
+        if (visible) setActiveTab(defaultTab);
+    }, [matchId, visible, defaultTab]);
 
     useEffect(() => {
         if (visible && matchId) {

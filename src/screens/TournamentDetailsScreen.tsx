@@ -93,6 +93,9 @@ export default function TournamentDetailsScreen() {
     const [adminHelpRequests, setAdminHelpRequests] = useState<AdminHelpRequestItem[]>([]);
     const [showAdminHelpModal, setShowAdminHelpModal] = useState(false);
     const [isLoadingAdminHelp, setIsLoadingAdminHelp] = useState(false);
+    // Which tab MatchDetailsModal should open on. Bumped to 'chat' when an admin
+    // enters via the help-requests inbox; reset to 'match' for every other entry.
+    const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<'match' | 'chat'>('match');
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
 
@@ -382,7 +385,8 @@ export default function TournamentDetailsScreen() {
     }, [id, activeTab, canManage]);
 
     // The admin picked a problematic match — open it like a regular bracket match so
-    // the chat tab and the resolve action are available.
+    // the chat tab and the resolve action are available. Land on the chat tab since
+    // that's where the conversation that triggered the help request lives.
     const handleHelpRequestSelect = (item: AdminHelpRequestItem) => {
         setShowAdminHelpModal(false);
         setSelectedMatch({
@@ -399,6 +403,7 @@ export default function TournamentDetailsScreen() {
             canRevert: false,
             isRoundLocked: false,
         });
+        setMatchModalDefaultTab('chat');
         setShowReportModal(true);
     };
 
@@ -882,6 +887,7 @@ export default function TournamentDetailsScreen() {
 
         const backendCanRevert = match.canRevert ?? match.CanRevert ?? false;
         setSelectedMatch({ ...match, canRevert: backendCanRevert });
+        setMatchModalDefaultTab('match');
         setShowReportModal(true);
     };
 
@@ -2318,7 +2324,8 @@ export default function TournamentDetailsScreen() {
                 status={
                     selectedMatch?.status === 3 || selectedMatch?.status === 4 ? 'completed' :
                         selectedMatch?.status === 2 ? 'ready_phase' :
-                            selectedMatch?.status === 1 ? 'scheduled' : 'ready_phase'
+                            selectedMatch?.status === 1 ? 'scheduled' :
+                                selectedMatch?.status === 0 ? 'pending_availability' : 'ready_phase'
                 }
                 home={selectedMatch?.home}
                 away={selectedMatch?.away}
@@ -2328,6 +2335,7 @@ export default function TournamentDetailsScreen() {
                 isRoundLocked={selectedMatch?.isRoundLocked}
                 canRevert={selectedMatch?.canRevert}
                 requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
+                defaultTab={matchModalDefaultTab}
                 onMatchUpdate={() => {
                     fetchBracket(); // Refresh the bracket/league data
                     if (canManage) fetchAdminHelpRequests(); // Keep the help-request inbox in sync
