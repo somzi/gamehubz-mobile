@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Image } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
+import { MatchChatPanel } from '../match/MatchChatPanel';
+import { AdminHelpSection } from '../match/AdminHelpSection';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
@@ -34,6 +36,8 @@ export interface MatchResultDetailDto {
     proposedHomeScore?: number | null;
     proposedAwayScore?: number | null;
     proposedByUserId?: string | null;
+    adminHelpRequested?: boolean;
+    adminHelpRequestedByUserId?: string | null;
 }
 
 interface MatchDetailsModalProps {
@@ -120,6 +124,24 @@ export function MatchDetailsModal({
     const [isRejecting, setIsRejecting] = useState(false);
     const [isEditingProposal, setIsEditingProposal] = useState(false);
 
+    // Match / Chat tab state
+    const [activeTab, setActiveTab] = useState<'match' | 'chat'>('match');
+
+    // Android-only: under Expo SDK 54 edge-to-edge the window no longer resizes for
+    // the keyboard, so we track the real keyboard height and pad the chat ourselves.
+    // iOS keeps using KeyboardAvoidingView below.
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+    useEffect(() => {
+        if (Platform.OS !== 'android') return;
+        const showSub = Keyboard.addListener('keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height));
+        const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+        return () => {
+            showSub.remove();
+            hideSub.remove();
+        };
+    }, []);
+
     const formatAvatarUrl = (url?: string) => {
         if (!url) return '';
         if (url.startsWith('http')) return url;
@@ -137,6 +159,7 @@ export function MatchDetailsModal({
         setError(null);
         setIsEditMode(false);
         setIsEditingProposal(false);
+        setActiveTab('match');
     }, [matchId]);
 
     useEffect(() => {
@@ -172,6 +195,8 @@ export function MatchDetailsModal({
                     proposedHomeScore: data.proposedHomeScore ?? data.ProposedHomeScore ?? null,
                     proposedAwayScore: data.proposedAwayScore ?? data.ProposedAwayScore ?? null,
                     proposedByUserId: data.proposedByUserId ?? data.ProposedByUserId ?? null,
+                    adminHelpRequested: data.adminHelpRequested ?? data.AdminHelpRequested ?? false,
+                    adminHelpRequestedByUserId: data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null,
                 };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
@@ -444,6 +469,17 @@ export function MatchDetailsModal({
     const isPrivileged = isHubOwner || canManage;
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
+
+    // Chat & admin-help visibility — participants and privileged users only; spectators
+    // tapping a bracket match keep the read-only match view.
+    const showChatTab = isParticipant || isPrivileged;
+    const adminHelpRequested = !!matchDetails?.adminHelpRequested;
+    const adminHelpRequestedByMe = !!user?.id &&
+        matchDetails?.adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase();
+
+    const chatAvatars: Record<string, string | undefined> = {};
+    if (matchDetails?.homeUserId) chatAvatars[matchDetails.homeUserId.toLowerCase()] = matchDetails.homeUserAvatarUrl || undefined;
+    if (matchDetails?.awayUserId) chatAvatars[matchDetails.awayUserId.toLowerCase()] = matchDetails.awayUserAvatarUrl || undefined;
 
     // Determine winner for completed matches
     const getWinnerSide = () => {
@@ -1138,12 +1174,72 @@ export function MatchDetailsModal({
                     <View className="w-10" />
                 </View>
 
+                {/* Match / Chat tabs — only for participants & privileged users */}
+                {showChatTab && (
+                    <View className="flex-row mx-6 mt-3 mb-2 rounded-2xl p-1 bg-[#131B2E] border border-white/[0.04]">
+                        <Pressable
+                            onPress={() => setActiveTab('match')}
+                            className={cn(
+                                "flex-1 py-2.5 items-center rounded-xl",
+                                activeTab === 'match' ? "bg-[#10B981]/15" : "bg-transparent"
+                            )}
+                        >
+                            <Text className={cn(
+                                "text-xs font-black uppercase tracking-widest",
+                                activeTab === 'match' ? "text-[#10B981]" : "text-slate-500"
+                            )}>Match</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => setActiveTab('chat')}
+                            className={cn(
+                                "flex-1 py-2.5 items-center rounded-xl",
+                                activeTab === 'chat' ? "bg-[#10B981]/15" : "bg-transparent"
+                            )}
+                        >
+                            <View className="flex-row items-center gap-1.5">
+                                <Ionicons
+                                    name="chatbubbles-outline"
+                                    size={12}
+                                    color={activeTab === 'chat' ? '#10B981' : '#64748B'}
+                                />
+                                <Text className={cn(
+                                    "text-xs font-black uppercase tracking-widest",
+                                    activeTab === 'chat' ? "text-[#10B981]" : "text-slate-500"
+                                )}>Chat</Text>
+                                {adminHelpRequested && (
+                                    <View className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
+                                )}
+                            </View>
+                        </Pressable>
+                    </View>
+                )}
+
                 {isLoadingDetails && !matchDetails && (
                     <View className="py-2 items-center">
                         <ActivityIndicator size="small" color="#10B981" />
                     </View>
                 )}
 
+                {activeTab === 'chat' && showChatTab ? (
+                    (() => {
+                        // iOS keeps KeyboardAvoidingView; Android pads by the tracked keyboard height
+                        // (see the Keyboard listener effect above).
+                        const KeyboardWrapper: React.ComponentType<any> = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+                        const wrapperProps: any = Platform.OS === 'ios'
+                            ? { behavior: 'padding', keyboardVerticalOffset: 0, style: { flex: 1 } }
+                            : { style: { flex: 1, paddingBottom: keyboardHeight > 0 ? Math.max(0, keyboardHeight - insets.bottom) : 0 } };
+                        return (
+                            <KeyboardWrapper {...wrapperProps}>
+                                <MatchChatPanel
+                                    matchId={matchId}
+                                    active={visible && activeTab === 'chat'}
+                                    participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
+                                    avatarsByUserId={chatAvatars}
+                                />
+                            </KeyboardWrapper>
+                        );
+                    })()
+                ) : (
                 <ScrollView
                     className="flex-1"
                     showsVerticalScrollIndicator={false}
@@ -1198,7 +1294,25 @@ export function MatchDetailsModal({
                             )}
                         </View>
                     )}
+
+                    {/* Admin-help escalation — request (participants) / resolve (admins) */}
+                    {(isParticipant || isPrivileged) && matchDetails && (
+                        <View className="mx-5 mt-2 mb-6">
+                            <AdminHelpSection
+                                matchId={matchId}
+                                requested={adminHelpRequested}
+                                requestedByMe={adminHelpRequestedByMe}
+                                isParticipant={isParticipant}
+                                canResolve={isPrivileged}
+                                onChanged={() => {
+                                    fetchMatchDetails();
+                                    if (onMatchUpdate) onMatchUpdate();
+                                }}
+                            />
+                        </View>
+                    )}
                 </ScrollView>
+                )}
             </View>
 
             {/* Fullscreen Image Preview */}

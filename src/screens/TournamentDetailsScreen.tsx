@@ -21,6 +21,7 @@ import { buildDeepLink, shareDeepLink } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
+import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
 import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
 import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
@@ -87,6 +88,11 @@ export default function TournamentDetailsScreen() {
 
     const [showDeadlineModal, setShowDeadlineModal] = useState(false);
     const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null } | null>(null);
+
+    // Admin-help requests (problematic matches) — admins only
+    const [adminHelpRequests, setAdminHelpRequests] = useState<AdminHelpRequestItem[]>([]);
+    const [showAdminHelpModal, setShowAdminHelpModal] = useState(false);
+    const [isLoadingAdminHelp, setIsLoadingAdminHelp] = useState(false);
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
 
@@ -336,6 +342,64 @@ export default function TournamentDetailsScreen() {
         } finally {
             setLoadingBracket(false);
         }
+    };
+
+    const fetchAdminHelpRequests = async () => {
+        if (!id) return;
+        setIsLoadingAdminHelp(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_ADMIN_HELP_REQUESTS(id));
+            if (!response.ok) return;
+            const data = await response.json();
+            const normalized: AdminHelpRequestItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
+                matchId: it.matchId || it.MatchId,
+                roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
+                status: it.status ?? it.Status ?? 0,
+                scheduledStartTime: it.scheduledStartTime ?? it.ScheduledStartTime ?? null,
+                requestedByUserId: it.requestedByUserId ?? it.RequestedByUserId ?? null,
+                requestedByUsername: it.requestedByUsername ?? it.RequestedByUsername ?? null,
+                requestedOn: it.requestedOn ?? it.RequestedOn ?? null,
+                homeUserId: it.homeUserId ?? it.HomeUserId ?? null,
+                homeUsername: it.homeUsername ?? it.HomeUsername ?? null,
+                homeAvatarUrl: it.homeAvatarUrl ?? it.HomeAvatarUrl ?? null,
+                awayUserId: it.awayUserId ?? it.AwayUserId ?? null,
+                awayUsername: it.awayUsername ?? it.AwayUsername ?? null,
+                awayAvatarUrl: it.awayAvatarUrl ?? it.AwayAvatarUrl ?? null,
+            }));
+            setAdminHelpRequests(normalized);
+        } catch (err) {
+            console.error('Admin help requests fetch error:', err);
+        } finally {
+            setIsLoadingAdminHelp(false);
+        }
+    };
+
+    // Admins see the help-request inbox on the bracket tab; refresh whenever it opens.
+    useEffect(() => {
+        if (activeTab === 'bracket' && canManage) {
+            fetchAdminHelpRequests();
+        }
+    }, [id, activeTab, canManage]);
+
+    // The admin picked a problematic match — open it like a regular bracket match so
+    // the chat tab and the resolve action are available.
+    const handleHelpRequestSelect = (item: AdminHelpRequestItem) => {
+        setShowAdminHelpModal(false);
+        setSelectedMatch({
+            id: item.matchId,
+            status: item.status,
+            roundName: item.roundNumber ? `Round ${item.roundNumber}` : 'Match',
+            startTime: item.scheduledStartTime,
+            home: item.homeUserId
+                ? { userId: item.homeUserId, username: item.homeUsername || 'Player', score: null }
+                : null,
+            away: item.awayUserId
+                ? { userId: item.awayUserId, username: item.awayUsername || 'Player', score: null }
+                : null,
+            canRevert: false,
+            isRoundLocked: false,
+        });
+        setShowReportModal(true);
     };
 
     const handleCreateBracket = async () => {
@@ -1604,6 +1668,41 @@ export default function TournamentDetailsScreen() {
 
                     {activeTab === 'bracket' && (
                         <View className="py-4 pb-12">
+                            {/* Admin inbox for player help requests — sits in the free space
+                                opposite the zoom controls, above the bracket. */}
+                            {canManage && stages.length > 0 && (
+                                <View className="px-4 mb-1 flex-row">
+                                    <Pressable
+                                        onPress={() => {
+                                            setShowAdminHelpModal(true);
+                                            fetchAdminHelpRequests();
+                                        }}
+                                        className={cn(
+                                            "flex-row items-center gap-2 px-3.5 py-2 rounded-full border active:opacity-70",
+                                            adminHelpRequests.length > 0
+                                                ? "bg-[#F59E0B]/10 border-[#F59E0B]/30"
+                                                : "bg-white/[0.04] border-white/[0.08]"
+                                        )}
+                                    >
+                                        <Ionicons
+                                            name={adminHelpRequests.length > 0 ? "hand-left" : "hand-left-outline"}
+                                            size={14}
+                                            color={adminHelpRequests.length > 0 ? "#F59E0B" : "#64748B"}
+                                        />
+                                        <Text className={cn(
+                                            "text-[11px] font-black uppercase tracking-wider",
+                                            adminHelpRequests.length > 0 ? "text-[#F59E0B]" : "text-slate-500"
+                                        )}>
+                                            Help Requests
+                                        </Text>
+                                        {adminHelpRequests.length > 0 && (
+                                            <View className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#F59E0B] items-center justify-center">
+                                                <Text className="text-[10px] font-black text-[#0F172A]">{adminHelpRequests.length}</Text>
+                                            </View>
+                                        )}
+                                    </Pressable>
+                                </View>
+                            )}
                             {renderStages()}
                         </View>
                     )}
@@ -2226,8 +2325,16 @@ export default function TournamentDetailsScreen() {
                 requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
                 onMatchUpdate={() => {
                     fetchBracket(); // Refresh the bracket/league data
-                    // Refresh details if needed
+                    if (canManage) fetchAdminHelpRequests(); // Keep the help-request inbox in sync
                 }}
+            />
+
+            <AdminHelpRequestsModal
+                visible={showAdminHelpModal}
+                onClose={() => setShowAdminHelpModal(false)}
+                requests={adminHelpRequests}
+                isLoading={isLoadingAdminHelp}
+                onSelect={handleHelpRequestSelect}
             />
 
             {showStatusModal && (

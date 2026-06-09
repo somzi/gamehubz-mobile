@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { MatchComment } from '../../types/auth';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize, getOptimizedCloudinaryUrl } from '../../lib/image';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
+import { AdminHelpSection } from './AdminHelpSection';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -95,6 +96,8 @@ export function MatchScheduleCard({
     const [proposedByUserId, setProposedByUserId] = useState<string | null>(null);
     const [hubOwnerUserId, setHubOwnerUserId] = useState<string | null>(null);
     const [existingEvidences, setExistingEvidences] = useState<string[]>([]);
+    const [adminHelpRequested, setAdminHelpRequested] = useState(false);
+    const [adminHelpRequestedByUserId, setAdminHelpRequestedByUserId] = useState<string | null>(null);
     const [isApproving, setIsApproving] = useState(false);
     const [isRejecting, setIsRejecting] = useState(false);
     const [isEditingProposal, setIsEditingProposal] = useState(false);
@@ -218,6 +221,8 @@ export function MatchScheduleCard({
                 setProposedByUserId(data.proposedByUserId ?? data.ProposedByUserId ?? null);
                 setHubOwnerUserId(data.hubOwnerUserId ?? data.HubOwnerUserId ?? null);
                 setExistingEvidences(data.evidences || data.Evidences || []);
+                setAdminHelpRequested(Boolean(data.adminHelpRequested ?? data.AdminHelpRequested ?? false));
+                setAdminHelpRequestedByUserId(data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null);
                 return id;
             }
         } catch (error) {
@@ -287,8 +292,9 @@ export function MatchScheduleCard({
             fetchComments();
         }
 
-        // Fetch DB home/away roles so we can correctly map scores on submit
-        if (currentStatus === 'scheduled' || currentStatus === 'ready_phase') {
+        // Fetch DB home/away roles so we can correctly map scores on submit.
+        // pending_availability also needs the details for the admin-help flag state.
+        if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'pending_availability') {
             fetchDbHomeUserId();
         }
     }, [modalVisible, matchId]); // Removed currentStatus from dependencies to prevent re-fetching on status changes
@@ -1292,6 +1298,20 @@ export function MatchScheduleCard({
                                                 </View>
                                                 <Text className={cn("font-black mt-6 uppercase tracking-widest", isPremium ? "text-xl text-white" : "text-foreground")}>Completed</Text>
                                                 {isPremium && <Text className="text-sm font-medium text-slate-500 mt-2">Results have been recorded</Text>}
+                                            </View>
+                                        )}
+
+                                        {/* Admin-help escalation — the card is always the player's own match */}
+                                        {currentStatus !== 'completed' && (
+                                            <View className="mt-5 mb-4">
+                                                <AdminHelpSection
+                                                    matchId={matchId}
+                                                    requested={adminHelpRequested}
+                                                    requestedByMe={!!user?.id && adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase()}
+                                                    isParticipant={true}
+                                                    canResolve={!!user?.id && !!hubOwnerUserId && hubOwnerUserId.toLowerCase() === user.id.toLowerCase()}
+                                                    onChanged={() => { fetchDbHomeUserId(); }}
+                                                />
                                             </View>
                                         )}
                                     </ScrollView>

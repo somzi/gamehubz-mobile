@@ -93,6 +93,11 @@ export const ENDPOINTS = {
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
 
+    // ─── Match admin help ───────────────────────────────────────────────
+    REQUEST_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp`,
+    RESOLVE_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp/resolve`,
+    GET_ADMIN_HELP_REQUESTS: (tournamentId: string) => `${API_BASE_URL}/api/match/adminHelp/tournament/${tournamentId}`,
+
     // ─── Friends / Social ───────────────────────────────────────────────
     GET_FRIENDS: (search: string = "") => `${API_BASE_URL}/api/Friend${search ? `?search=${encodeURIComponent(search)}` : ""}`,
     GET_INCOMING_REQUESTS: (search: string = "") => `${API_BASE_URL}/api/Friend/requests/incoming${search ? `?search=${encodeURIComponent(search)}` : ""}`,
