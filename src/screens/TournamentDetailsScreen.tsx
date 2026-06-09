@@ -932,6 +932,40 @@ export default function TournamentDetailsScreen() {
         }
     };
 
+    // Admin inbox for player help requests — rendered inline with the bracket's
+    // zoom controls (left side of the same row).
+    const helpRequestsPill = canManage ? (
+        <Pressable
+            onPress={() => {
+                setShowAdminHelpModal(true);
+                fetchAdminHelpRequests();
+            }}
+            className={cn(
+                "flex-row items-center gap-2 px-3.5 py-2 rounded-full border active:opacity-70 self-start",
+                adminHelpRequests.length > 0
+                    ? "bg-[#F59E0B]/10 border-[#F59E0B]/30"
+                    : "bg-white/[0.04] border-white/[0.08]"
+            )}
+        >
+            <Ionicons
+                name={adminHelpRequests.length > 0 ? "hand-left" : "hand-left-outline"}
+                size={14}
+                color={adminHelpRequests.length > 0 ? "#F59E0B" : "#64748B"}
+            />
+            <Text className={cn(
+                "text-[11px] font-black uppercase tracking-wider",
+                adminHelpRequests.length > 0 ? "text-[#F59E0B]" : "text-slate-500"
+            )}>
+                Help Requests
+            </Text>
+            {adminHelpRequests.length > 0 && (
+                <View className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#F59E0B] items-center justify-center">
+                    <Text className="text-[10px] font-black text-[#0F172A]">{adminHelpRequests.length}</Text>
+                </View>
+            )}
+        </Pressable>
+    ) : null;
+
     const renderStages = () => {
         if (stages.length === 0) {
             const isCreator = canManage;
@@ -1035,6 +1069,7 @@ export default function TournamentDetailsScreen() {
                                 onEditDeadline={handleEditDeadline}
                                 tournamentStatus={tournament?.status}
                                 isTeamTournament={tournament?.isTeamTournament}
+                                headerLeft={helpRequestsPill}
                             />
                         ) : (
                             <TournamentBracket
@@ -1046,6 +1081,7 @@ export default function TournamentDetailsScreen() {
                                 onEditDeadline={handleEditDeadline}
                                 tournamentStatus={tournament?.status}
                                 isTeamTournament={tournament?.isTeamTournament}
+                                headerLeft={helpRequestsPill}
                             />
                         )}
                         {grandFinalMatch && (
@@ -1105,6 +1141,10 @@ export default function TournamentDetailsScreen() {
                     </>
                 ) : currentStage.groups && currentStage.groups.length > 0 ? (
                     <View>
+                        {/* Group stages have no zoom-controls row — show the admin pill on its own */}
+                        {helpRequestsPill && (
+                            <View className="px-4 mb-4 flex-row">{helpRequestsPill}</View>
+                        )}
                         {/* Sort groups alphabetically by name (Group A, Group B, …) */}
                         {(() => {
                             const sortedGroups = [...currentStage.groups].sort((a: any, b: any) => {
@@ -1668,41 +1708,6 @@ export default function TournamentDetailsScreen() {
 
                     {activeTab === 'bracket' && (
                         <View className="py-4 pb-12">
-                            {/* Admin inbox for player help requests — sits in the free space
-                                opposite the zoom controls, above the bracket. */}
-                            {canManage && stages.length > 0 && (
-                                <View className="px-4 mb-1 flex-row">
-                                    <Pressable
-                                        onPress={() => {
-                                            setShowAdminHelpModal(true);
-                                            fetchAdminHelpRequests();
-                                        }}
-                                        className={cn(
-                                            "flex-row items-center gap-2 px-3.5 py-2 rounded-full border active:opacity-70",
-                                            adminHelpRequests.length > 0
-                                                ? "bg-[#F59E0B]/10 border-[#F59E0B]/30"
-                                                : "bg-white/[0.04] border-white/[0.08]"
-                                        )}
-                                    >
-                                        <Ionicons
-                                            name={adminHelpRequests.length > 0 ? "hand-left" : "hand-left-outline"}
-                                            size={14}
-                                            color={adminHelpRequests.length > 0 ? "#F59E0B" : "#64748B"}
-                                        />
-                                        <Text className={cn(
-                                            "text-[11px] font-black uppercase tracking-wider",
-                                            adminHelpRequests.length > 0 ? "text-[#F59E0B]" : "text-slate-500"
-                                        )}>
-                                            Help Requests
-                                        </Text>
-                                        {adminHelpRequests.length > 0 && (
-                                            <View className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#F59E0B] items-center justify-center">
-                                                <Text className="text-[10px] font-black text-[#0F172A]">{adminHelpRequests.length}</Text>
-                                            </View>
-                                        )}
-                                    </Pressable>
-                                </View>
-                            )}
                             {renderStages()}
                         </View>
                     )}

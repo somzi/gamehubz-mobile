@@ -58,6 +58,8 @@ interface TournamentBracketProps {
     onEditDeadline?: (round: Round) => void;
     tournamentStatus?: number;
     isTeamTournament?: boolean;
+    /** Rendered on the left of the zoom-controls row (e.g. the admin Help Requests pill). */
+    headerLeft?: React.ReactNode;
 }
 
 type RoundStatus = 'completed' | 'active' | 'upcoming';
@@ -78,6 +80,7 @@ export function TournamentBracket({
     onEditDeadline,
     tournamentStatus,
     isTeamTournament,
+    headerLeft,
 }: TournamentBracketProps) {
     if (!rounds?.length) return null;
 
@@ -285,34 +288,37 @@ export function TournamentBracket({
 
     return (
         <View>
-            {/* Zoom controls — above the bracket, aligned right */}
-            <View style={{ flexDirection: 'row', gap: 8, paddingRight: 16, paddingBottom: 8, alignSelf: 'flex-end' }}>
-                <Pressable
-                    onPress={zoomOut}
-                    disabled={scale <= ZOOM_MIN}
-                    style={{
-                        width: 28, height: 28, borderRadius: 8,
-                        alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: 'rgba(255,255,255,0.06)',
-                        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-                        opacity: scale <= ZOOM_MIN ? 0.35 : 1,
-                    }}
-                >
-                    <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>−</Text>
-                </Pressable>
-                <Pressable
-                    onPress={zoomIn}
-                    disabled={scale >= ZOOM_MAX}
-                    style={{
-                        width: 28, height: 28, borderRadius: 8,
-                        alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: 'rgba(255,255,255,0.06)',
-                        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-                        opacity: scale >= ZOOM_MAX ? 0.35 : 1,
-                    }}
-                >
-                    <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>+</Text>
-                </Pressable>
+            {/* Header row — headerLeft (e.g. Help Requests pill) on the left, zoom controls on the right */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 }}>
+                <View style={{ flexShrink: 1 }}>{headerLeft ?? null}</View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable
+                        onPress={zoomOut}
+                        disabled={scale <= ZOOM_MIN}
+                        style={{
+                            width: 28, height: 28, borderRadius: 8,
+                            alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: 'rgba(255,255,255,0.06)',
+                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                            opacity: scale <= ZOOM_MIN ? 0.35 : 1,
+                        }}
+                    >
+                        <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>−</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={zoomIn}
+                        disabled={scale >= ZOOM_MAX}
+                        style={{
+                            width: 28, height: 28, borderRadius: 8,
+                            alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: 'rgba(255,255,255,0.06)',
+                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                            opacity: scale >= ZOOM_MAX ? 0.35 : 1,
+                        }}
+                    >
+                        <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>+</Text>
+                    </Pressable>
+                </View>
             </View>
 
             <ScrollView

@@ -67,7 +67,7 @@ export function AdminHelpRequestsModal({
 
                 <View
                     className="bg-[#0B1120] rounded-t-[32px] border-t border-x border-white/10"
-                    style={{ maxHeight: '78%' }}
+                    style={{ height: '92%' }}
                 >
                     {/* Drag handle */}
                     <View className="w-10 h-1 bg-white/10 rounded-full self-center mt-3 mb-1" />
@@ -96,7 +96,7 @@ export function AdminHelpRequestsModal({
                     </View>
 
                     <ScrollView
-                        className="px-5"
+                        className="px-5 flex-1"
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 36 }}
                     >
