@@ -43,6 +43,10 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
         }
     };
 
+    // A completed match with exactly one side is a bye (Swiss free win / walkover) —
+    // label the empty slot BYE instead of TBD since nobody is coming.
+    const isCompletedBye = (status === 3 || status === 4) && (!home !== !away);
+
     const renderParticipant = (participant: Participant | null, position: 'top' | 'bottom') => {
         const isTop = position === 'top';
 
@@ -56,7 +60,9 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         className="w-7 h-7 rounded-full items-center justify-center"
                         style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed' }}
                     />
-                    <Text className="text-xs text-slate-700 italic ml-3 flex-1 font-medium">TBD</Text>
+                    <Text className="text-xs text-slate-700 italic ml-3 flex-1 font-medium">
+                        {isCompletedBye ? 'BYE' : 'TBD'}
+                    </Text>
                     <View className="w-8 h-8 rounded-xl bg-white/[0.02] items-center justify-center">
                         <Text className="text-xs text-slate-700 font-black">—</Text>
                     </View>

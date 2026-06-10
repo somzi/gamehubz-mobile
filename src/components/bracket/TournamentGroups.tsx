@@ -20,6 +20,8 @@ interface Standing {
     goalsFor: number;
     goalsAgainst: number;
     goalDifference: number;
+    // Swiss only: sum of opponents' points (Buchholz). Null on non-Swiss groups.
+    opponentPointsSum?: number | null;
 }
 
 interface Participant {
@@ -60,9 +62,16 @@ interface TournamentGroupsProps {
     isAdmin?: boolean;
     onEditDeadline?: (roundInfo: { roundNumber: number; roundDeadline?: string | null; roundOpenAt?: string | null }) => void;
     tournamentStatus?: number;
+    // Swiss: explicit qualification zones — positions <= direct go straight to the knockout
+    // (green), positions <= playInEnd enter the play-in (amber). When omitted, the legacy
+    // top-2 group highlight is used.
+    qualificationZones?: { direct: number; playInEnd: number };
+    // Swiss: total rounds scheduled — drives the "Round X of Y" header on the matches list.
+    // When omitted, only "Round X" is shown (legacy group/league behaviour).
+    totalRounds?: number;
 }
 
-export function TournamentGroups({ groups, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus }: TournamentGroupsProps) {
+export function TournamentGroups({ groups, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, qualificationZones, totalRounds }: TournamentGroupsProps) {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [selectedRounds, setSelectedRounds] = useState<Record<string, number>>({});
 
@@ -99,6 +108,10 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                 const activeRound = selectedRounds[group.groupId] || (rounds.length > 0 ? rounds[0] : 1);
                 const currentRoundMatches = groupedMatches[activeRound] || [];
 
+                // Buchholz column visible when at least one row carries it — i.e. on Swiss groups.
+                // Sits between Pts and W/D/L since it ranks tied players right after Pts.
+                const showBuchholz = group.standings.some(s => s.opponentPointsSum != null);
+
                 return (
                     <View key={group.groupId} className="flex-col gap-6">
                         <View>
@@ -111,6 +124,9 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                             <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">#</Text>
                                             <Text className="w-32 text-[10px] font-black text-slate-500 ml-2 uppercase tracking-wider">Player</Text>
                                             <Text className="w-12 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">Pts</Text>
+                                            {showBuchholz && (
+                                                <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">OPP</Text>
+                                            )}
                                             <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">P</Text>
                                             <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">W</Text>
                                             <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">D</Text>
@@ -132,20 +148,33 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 })}
                                             >
                                                 <View className="w-8 items-center justify-center">
-                                                    <View className={cn(
-                                                        "w-5 h-5 rounded-md items-center justify-center",
-                                                        standing.position <= 2 ? "bg-emerald-500/15" : "bg-white/[0.04]"
-                                                    )}>
-                                                        <Text className={cn(
-                                                            "text-[10px] font-black",
-                                                            standing.position <= 2 ? "text-emerald-400" : "text-slate-500"
-                                                        )}>{standing.position}</Text>
-                                                    </View>
+                                                    {(() => {
+                                                        const isDirect = qualificationZones
+                                                            ? standing.position <= qualificationZones.direct
+                                                            : standing.position <= 2;
+                                                        const isPlayIn = !!qualificationZones
+                                                            && !isDirect
+                                                            && standing.position <= qualificationZones.playInEnd;
+                                                        return (
+                                                            <View className={cn(
+                                                                "w-5 h-5 rounded-md items-center justify-center",
+                                                                isDirect ? "bg-emerald-500/15" : isPlayIn ? "bg-amber-500/15" : "bg-white/[0.04]"
+                                                            )}>
+                                                                <Text className={cn(
+                                                                    "text-[10px] font-black",
+                                                                    isDirect ? "text-emerald-400" : isPlayIn ? "text-amber-400" : "text-slate-500"
+                                                                )}>{standing.position}</Text>
+                                                            </View>
+                                                        );
+                                                    })()}
                                                 </View>
                                                 <Text className="w-32 text-xs font-bold text-slate-300 ml-2" numberOfLines={1}>
                                                     {standing.username || getUsername(standing.userId, group.matches)}
                                                 </Text>
                                                 <Text className="w-12 text-xs text-center font-black text-indigo-400">{standing.points}</Text>
+                                                {showBuchholz && (
+                                                    <Text className="w-10 text-xs text-center font-semibold text-slate-400">{standing.opponentPointsSum ?? 0}</Text>
+                                                )}
                                                 <Text className="w-8 text-xs text-center text-slate-500">{standing.matchesPlayed}</Text>
                                                 <Text className="w-8 text-xs text-center text-slate-500">{standing.wins}</Text>
                                                 <Text className="w-8 text-xs text-center text-slate-500">{standing.draws}</Text>
@@ -164,8 +193,15 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                         </View>
 
                         <View>
-                            <Text className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Matches</Text>
-                            
+                            <View className="flex-row items-center justify-between mb-4">
+                                <Text className="text-xs font-black text-slate-500 uppercase tracking-widest">Matches</Text>
+                                {totalRounds != null && totalRounds > 0 && (
+                                    <Text className="text-[11px] font-bold text-slate-500">
+                                        Round {activeRound} of {totalRounds}
+                                    </Text>
+                                )}
+                            </View>
+
                             {/* Horizontal Round Tabs */}
                             {rounds.length > 0 && (
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ gap: 6 }}>

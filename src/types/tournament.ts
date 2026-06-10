@@ -4,7 +4,8 @@ export enum TournamentFormat {
     GroupsThenDoubleElimination = 2,
     SingleElimination = 3,
     DoubleElimination = 4,
-    GroupStageWithKnockout = 5
+    GroupStageWithKnockout = 5,
+    Swiss = 6
 }
 
 export const TEAM_TOURNAMENT_FORMATS = [
@@ -18,6 +19,18 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
     { value: String(TournamentFormat.SingleElimination), label: 'Single Bracket' },
     { value: String(TournamentFormat.DoubleElimination), label: 'Double Bracket' },
     { value: String(TournamentFormat.GroupStageWithKnockout), label: 'Groups + Bracket' },
+    { value: String(TournamentFormat.Swiss), label: 'Swiss' },
+] as const;
+
+// Knockout bracket sizes selectable after the Swiss rounds. 'None' = pure Swiss
+// (the standings leader wins the tournament outright).
+export const SWISS_KNOCKOUT_OPTIONS = [
+    { value: '0', label: 'None (winner by standings)' },
+    { value: '2', label: 'Top 2 (final)' },
+    { value: '4', label: 'Top 4' },
+    { value: '8', label: 'Top 8' },
+    { value: '16', label: 'Top 16' },
+    { value: '32', label: 'Top 32' },
 ] as const;
 
 export function getTournamentFormatLabel(format?: number | null) {
@@ -34,6 +47,8 @@ export function getTournamentFormatLabel(format?: number | null) {
             return 'Double Elimination';
         case TournamentFormat.GroupStageWithKnockout:
             return 'Groups + Bracket';
+        case TournamentFormat.Swiss:
+            return 'Swiss';
         default:
             return 'Unknown';
     }
@@ -56,6 +71,7 @@ export enum MatchStage {
     RoundOf256 = 13,
     RoundOf512 = 14,
     RoundOf1024 = 15,
+    PlayIn = 16,
 }
 
 export enum TournamentRegion {

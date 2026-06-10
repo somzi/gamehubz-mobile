@@ -1005,9 +1005,40 @@ export default function TournamentDetailsScreen() {
         if (!currentStage) return null;
 
         // Stage type mirrors GameHubz.DataModels.Enums.StageType:
-        //   3 = SingleEliminationBracket, 4 = DE Winners Bracket, 5 = DE Losers Bracket.
+        //   3 = SingleEliminationBracket, 4 = DE Winners Bracket, 5 = DE Losers Bracket,
+        //   6 = Swiss (renders as groups), 7 = Play-In (renders as a one-round bracket).
         const stageType = currentStage.type ?? currentStage.Type;
         const isLosersBracket = stageType === 5;
+
+        // Swiss qualification zones for the standings table: top D direct to knockout (green),
+        // D+1 .. D+2(N-D) into the play-in (amber). Pure Swiss (no knockout) highlights nothing.
+        const swissKnockoutSize = Number(tournament?.swissKnockoutQualifiers ?? 0) || 0;
+        const swissDirectCount = swissKnockoutSize > 0
+            ? Math.min(Number(tournament?.swissDirectQualifiers ?? swissKnockoutSize), swissKnockoutSize)
+            : 0;
+        const swissPlayInEnd = swissKnockoutSize > 0
+            ? swissDirectCount + 2 * (swissKnockoutSize - swissDirectCount)
+            : 0;
+        const swissZones = stageType === 6
+            ? { direct: swissDirectCount, playInEnd: swissPlayInEnd }
+            : undefined;
+
+        // Total Swiss rounds for the "Round X of Y" header — mirrors backend GetSwissTotalRounds:
+        // configured value (clamped to the no-rematch maximum) or ceil(log2(N)). N comes from the
+        // Swiss group's standings (the exact participant count); maxPlayers is only a last-resort
+        // fallback since it is the registration cap, not the real entrant count.
+        const swissParticipantCount = currentStage.groups?.[0]?.standings?.length
+            || Number(tournament?.numberOfParticipants ?? 0)
+            || Number(tournament?.maxPlayers ?? 0)
+            || 0;
+        const swissMaxRounds = swissParticipantCount >= 2
+            ? (swissParticipantCount % 2 === 0 ? swissParticipantCount - 1 : swissParticipantCount)
+            : 0;
+        const swissConfiguredRounds = Number(tournament?.swissRoundsCount ?? 0)
+            || (swissParticipantCount >= 2 ? Math.ceil(Math.log2(swissParticipantCount)) : 0);
+        const swissTotalRounds = stageType === 6 && swissMaxRounds > 0
+            ? Math.max(1, Math.min(swissConfiguredRounds, swissMaxRounds))
+            : undefined;
 
         // The binary-tree bracket can't place a third-place play-off or a Grand Final inline
         // (the GF is fed by the LB winner from a different stage, not by another WB feeder),
@@ -1196,6 +1227,8 @@ export default function TournamentDetailsScreen() {
                                             isAdmin={canManage}
                                             onEditDeadline={handleEditDeadline}
                                             tournamentStatus={tournament?.status}
+                                            qualificationZones={swissZones}
+                                            totalRounds={swissTotalRounds}
                                         />
                                     )}
                                 </>
@@ -1203,8 +1236,20 @@ export default function TournamentDetailsScreen() {
                         })()}
                     </View>
                 ) : (
-                    <View className="py-10 items-center justify-center">
-                        <Text className="text-muted-foreground italic">No rounds or groups found for this stage</Text>
+                    <View className="py-12 items-center justify-center px-6">
+                        <Ionicons name="time-outline" size={32} color="#475569" />
+                        <Text className="text-sm font-bold text-slate-400 mt-3 text-center">
+                            {stageType === 7
+                                ? 'Waiting for the Swiss rounds to finish'
+                                : stageType === 3 && (stages.length > 1)
+                                    ? (stages.some((s: any) => (s.type ?? s.Type) === 7)
+                                        ? 'Waiting for the play-in matches to finish'
+                                        : 'Waiting for the previous stage to finish')
+                                    : 'No rounds or groups found for this stage'}
+                        </Text>
+                        <Text className="text-xs text-slate-600 mt-1 text-center">
+                            Matches will appear here once the previous stage completes.
+                        </Text>
                     </View>
                 )}
             </View>

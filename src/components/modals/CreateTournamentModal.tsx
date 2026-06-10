@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { DateTimePickerModal } from './DateTimePickerModal';
-import { TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
+import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
 
@@ -91,6 +91,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [qualifiersPerGroup, setQualifiersPerGroup] = useState('2');
     const [inviteFollowers, setInviteFollowers] = useState(false);
 
+    // Swiss format config: rounds (empty = auto), knockout size ('0' = pure Swiss),
+    // direct berths (empty = everyone qualifies directly, no play-in).
+    const [swissRounds, setSwissRounds] = useState('');
+    const [swissKnockout, setSwissKnockout] = useState('0');
+    const [swissDirect, setSwissDirect] = useState('');
+
     // Round Duration
     const [roundDurationValue, setRoundDurationValue] = useState('');
     const [roundDurationUnit, setRoundDurationUnit] = useState('Minutes'); // Minutes | Hours | Days
@@ -121,6 +127,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [showFormatPicker, setShowFormatPicker] = useState(false);
     const [showDurationUnitPicker, setShowDurationUnitPicker] = useState(false);
     const [showTeamWinConditionPicker, setShowTeamWinConditionPicker] = useState(false);
+    const [showSwissKnockoutPicker, setShowSwissKnockoutPicker] = useState(false);
 
     // Fetch Hubs
     useEffect(() => {
@@ -209,6 +216,16 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Third place only makes sense for a single-elimination bracket with more than 2 entrants.
     const canShowThirdPlace = selectedFormat === String(TournamentFormat.SingleElimination) && participantCount > 2;
 
+    const isSwiss = selectedFormat === String(TournamentFormat.Swiss);
+    const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
+    // Empty direct input = every knockout slot is a direct berth (no play-in).
+    const swissDirectCount = swissKnockout !== '0' && swissDirect !== ''
+        ? parseInt(swissDirect)
+        : swissKnockoutSize;
+    const swissPlayInPlayers = swissKnockoutSize > 0 && swissDirectCount < swissKnockoutSize
+        ? 2 * (swissKnockoutSize - swissDirectCount)
+        : 0;
+
     useEffect(() => {
         if (!isTeamTournament) {
             return;
@@ -258,6 +275,21 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             }
         }
 
+        if (isSwiss && swissKnockoutSize > 0) {
+            if (swissKnockoutSize > participantCount) {
+                setError(`Knockout qualifiers (${swissKnockoutSize}) cannot exceed Max Players (${participantCount})`);
+                return;
+            }
+            if (isNaN(swissDirectCount) || swissDirectCount < 0 || swissDirectCount > swissKnockoutSize) {
+                setError(`Direct qualifiers must be between 0 and ${swissKnockoutSize}`);
+                return;
+            }
+            if (swissPlayInPlayers > 0 && swissDirectCount + swissPlayInPlayers > participantCount) {
+                setError(`Play-in needs ${swissDirectCount + swissPlayInPlayers} players (${swissDirectCount} direct + ${swissPlayInPlayers} play-in) but Max Players is ${participantCount}`);
+                return;
+            }
+        }
+
         if (!startDate || !registrationDeadline) {
             setError('Please set both Registration Deadline and Start Date');
             return;
@@ -293,7 +325,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             };
 
             let roundDurationMinutes: number | null = null;
-            if ((selectedFormat === '0' || selectedFormat === '5') && roundDurationValue) {
+            if ((selectedFormat === '0' || selectedFormat === '5' || isSwiss) && roundDurationValue) {
                 const val = parseInt(roundDurationValue);
                 if (!isNaN(val)) {
                     if (roundDurationUnit === 'Minutes') roundDurationMinutes = val;
@@ -319,6 +351,11 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 Format: parseInt(selectedFormat),
                 GroupsCount: selectedFormat === '5' ? parseInt(groupsCount) : null,
                 QualifiersPerGroup: selectedFormat === '5' ? parseInt(qualifiersPerGroup) : null,
+                SwissRoundsCount: isSwiss && swissRounds ? parseInt(swissRounds) : null,
+                SwissKnockoutQualifiers: isSwiss && swissKnockoutSize > 0 ? swissKnockoutSize : null,
+                SwissDirectQualifiers: isSwiss && swissKnockoutSize > 0 && swissDirectCount < swissKnockoutSize
+                    ? swissDirectCount
+                    : null,
                 RoundDurationMinutes: roundDurationMinutes,
                 IsTeamTournament: isTeamTournament,
                 TeamSize: isTeamTournament ? parseInt(teamSize) : null,
@@ -713,7 +750,68 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                 </View>
                             )}
 
-                            {(selectedFormat === '0' || selectedFormat === '5') && (
+                            {isSwiss && (
+                                <View className="flex flex-col gap-y-6">
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1">
+                                            <View className="flex-row items-center mb-3">
+                                                <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                                <Text className="text-sm font-bold text-white">Swiss Rounds</Text>
+                                            </View>
+                                            <TextInput
+                                                className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
+                                                placeholder="Auto"
+                                                placeholderTextColor="#6b7280"
+                                                keyboardType="numeric"
+                                                value={swissRounds}
+                                                onChangeText={setSwissRounds}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <View className="flex-row items-center mb-3">
+                                                <Ionicons name="git-merge-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                                <Text className="text-sm font-bold text-white">Knockout Stage</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => setShowSwissKnockoutPicker(true)}
+                                                className="bg-[#131B2E] px-4 h-12 rounded-xl border border-white/10 flex-row items-center justify-between"
+                                            >
+                                                <Text className="text-white text-sm" numberOfLines={1}>
+                                                    {SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None'}
+                                                </Text>
+                                                <Ionicons name="chevron-down" size={16} color="#94A3B8" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 -mt-3">
+                                        Everyone plays every round against opponents on a similar score. Leave rounds empty for the standard count.
+                                    </Text>
+
+                                    {swissKnockoutSize > 0 && (
+                                        <View>
+                                            <View className="flex-row items-center mb-3">
+                                                <Ionicons name="flash-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                                <Text className="text-sm font-bold text-white">Direct Qualifiers (optional play-in)</Text>
+                                            </View>
+                                            <TextInput
+                                                className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
+                                                placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
+                                                placeholderTextColor="#6b7280"
+                                                keyboardType="numeric"
+                                                value={swissDirect}
+                                                onChangeText={setSwissDirect}
+                                            />
+                                            <Text className="text-[11px] text-zinc-500 mt-2">
+                                                {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
+                                                    ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round (best vs worst) for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
+                                                    : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+
+                            {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
                                 <View>
                                     <Text className="text-sm font-bold text-white mb-3">How long should each round last? (optional)</Text>
                                     <View className="flex-row gap-4">
@@ -855,6 +953,13 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         teamWinConditions,
                         teamWinCondition,
                         setTeamWinCondition
+                    )}
+                    {renderOptionsModal(
+                        showSwissKnockoutPicker,
+                        () => setShowSwissKnockoutPicker(false),
+                        SWISS_KNOCKOUT_OPTIONS,
+                        swissKnockout,
+                        setSwissKnockout
                     )}
                     <DateTimePickerModal
                         visible={showStartDatePicker}

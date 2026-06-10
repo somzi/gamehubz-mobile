@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
-import { TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
+import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { DateTimePickerModal } from './DateTimePickerModal';
 
 interface EditTournamentModalProps {
@@ -107,6 +107,14 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
     const [requireResultApproval, setRequireResultApproval] = useState(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
 
+    // Swiss format config: rounds (empty = auto), knockout size ('0' = pure Swiss),
+    // direct berths (empty = everyone qualifies directly, no play-in).
+    const [swissRounds, setSwissRounds] = useState(tournament?.swissRoundsCount ? String(tournament.swissRoundsCount) : '');
+    const [swissKnockout, setSwissKnockout] = useState(String(tournament?.swissKnockoutQualifiers || '0'));
+    const [swissDirect, setSwissDirect] = useState(
+        tournament?.swissDirectQualifiers != null ? String(tournament.swissDirectQualifiers) : '');
+    const [showSwissKnockoutPicker, setShowSwissKnockoutPicker] = useState(false);
+
     const initialDurationMinutes = tournament?.roundDurationMinutes;
     let initialDurVal = '';
     let initialDurUnit = 'Minutes';
@@ -144,6 +152,15 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         : (parseInt(maxPlayers) || 0);
     const canShowThirdPlace = selectedFormat === String(TournamentFormat.SingleElimination) && participantCount > 2;
 
+    const isSwiss = selectedFormat === String(TournamentFormat.Swiss);
+    const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
+    const swissDirectCount = swissKnockout !== '0' && swissDirect !== ''
+        ? parseInt(swissDirect)
+        : swissKnockoutSize;
+    const swissPlayInPlayers = swissKnockoutSize > 0 && swissDirectCount < swissKnockoutSize
+        ? 2 * (swissKnockoutSize - swissDirectCount)
+        : 0;
+
     useEffect(() => {
         if (!isTeamTournament) {
             return;
@@ -177,6 +194,9 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setRegistrationDeadline(tournament?.registrationDeadline || '');
         setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
         setRequireResultApproval(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
+        setSwissRounds(tournament?.swissRoundsCount ? String(tournament.swissRoundsCount) : '');
+        setSwissKnockout(String(tournament?.swissKnockoutQualifiers || '0'));
+        setSwissDirect(tournament?.swissDirectQualifiers != null ? String(tournament.swissDirectQualifiers) : '');
 
         const durMinutes = tournament?.roundDurationMinutes;
         if (durMinutes != null) {
@@ -226,6 +246,21 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             }
         }
 
+        if (isSwiss && swissKnockoutSize > 0) {
+            if (swissKnockoutSize > participantCount) {
+                setError(`Knockout qualifiers (${swissKnockoutSize}) cannot exceed Max Players (${participantCount})`);
+                return;
+            }
+            if (isNaN(swissDirectCount) || swissDirectCount < 0 || swissDirectCount > swissKnockoutSize) {
+                setError(`Direct qualifiers must be between 0 and ${swissKnockoutSize}`);
+                return;
+            }
+            if (swissPlayInPlayers > 0 && swissDirectCount + swissPlayInPlayers > participantCount) {
+                setError(`Play-in needs ${swissDirectCount + swissPlayInPlayers} players (${swissDirectCount} direct + ${swissPlayInPlayers} play-in) but Max Players is ${participantCount}`);
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         setError(null);
 
@@ -243,7 +278,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 }
             };
             let roundDurationMinutes: number | null = null;
-            if ((selectedFormat === '0' || selectedFormat === '5') && roundDurationValue) {
+            if ((selectedFormat === '0' || selectedFormat === '5' || isSwiss) && roundDurationValue) {
                 const val = parseInt(roundDurationValue);
                 if (!isNaN(val)) {
                     if (roundDurationUnit === 'Minutes') roundDurationMinutes = val;
@@ -264,6 +299,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 Format: parseInt(selectedFormat),
                 QualifiersPerGroup: selectedFormat === '5' ? parseInt(qualifiersPerGroup) : null,
                 GroupsCount: selectedFormat === '5' ? parseInt(groupsCount) : null,
+                SwissRoundsCount: isSwiss && swissRounds ? parseInt(swissRounds) : null,
+                SwissKnockoutQualifiers: isSwiss && swissKnockoutSize > 0 ? swissKnockoutSize : null,
+                SwissDirectQualifiers: isSwiss && swissKnockoutSize > 0 && swissDirectCount < swissKnockoutSize
+                    ? swissDirectCount
+                    : null,
                 RegistrationDeadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
                 Prize: parseInt(prize) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
@@ -493,7 +533,55 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 </View>
                             )}
 
-                            {(selectedFormat === '0' || selectedFormat === '5') && (
+                            {isSwiss && (
+                                <View className="mb-6">
+                                    <View className="flex-row gap-4 mb-3">
+                                        <View className="flex-1">
+                                            <Text className="text-sm font-bold text-white mb-3">Swiss Rounds</Text>
+                                            <TextInput
+                                                className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                                placeholder="Auto"
+                                                placeholderTextColor="#6b7280"
+                                                keyboardType="numeric"
+                                                value={swissRounds}
+                                                onChangeText={setSwissRounds}
+                                                editable={canEditAll}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            {renderSelectField(
+                                                'Knockout Stage',
+                                                SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None',
+                                                'git-merge-outline',
+                                                () => setShowSwissKnockoutPicker(true),
+                                                !canEditAll
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    {swissKnockoutSize > 0 && (
+                                        <View>
+                                            <Text className="text-sm font-bold text-white mb-3">Direct Qualifiers (optional play-in)</Text>
+                                            <TextInput
+                                                className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                                placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
+                                                placeholderTextColor="#6b7280"
+                                                keyboardType="numeric"
+                                                value={swissDirect}
+                                                onChangeText={setSwissDirect}
+                                                editable={canEditAll}
+                                            />
+                                            <Text className="text-[11px] text-zinc-500 mt-2">
+                                                {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
+                                                    ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
+                                                    : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+
+                            {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
                                 <View className="mb-6">
                                     <Text className="text-sm font-bold text-white mb-3">How long should each round last? (optional)</Text>
                                     <View className="flex-row gap-4">
@@ -642,6 +730,14 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     durationUnits,
                     roundDurationUnit,
                     setRoundDurationUnit
+                )}
+
+                {renderOptionsModal(
+                    showSwissKnockoutPicker,
+                    () => setShowSwissKnockoutPicker(false),
+                    SWISS_KNOCKOUT_OPTIONS,
+                    swissKnockout,
+                    setSwissKnockout
                 )}
 
                 {renderOptionsModal(
