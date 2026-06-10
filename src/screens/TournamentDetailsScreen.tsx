@@ -409,6 +409,20 @@ export default function TournamentDetailsScreen() {
 
     const handleCreateBracket = async () => {
         if (!id) return;
+
+        // Double Elimination needs at least 4 entrants — fail fast with a clear message
+        // instead of letting the backend reject the generation mid-request.
+        const entrantCount = Number(tournament?.numberOfParticipants ?? 0);
+        if (tournament?.format === 4 && entrantCount > 0 && entrantCount < 4) {
+            setStatusModalConfig({
+                type: 'error',
+                title: 'Cannot Create Bracket',
+                message: `Double Elimination requires at least 4 participants (currently ${entrantCount}).`
+            });
+            setShowStatusModal(true);
+            return;
+        }
+
         setIsCreatingBracket(true);
         try {
             const isGroupStage = tournament?.format === 5;

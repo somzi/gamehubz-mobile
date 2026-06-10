@@ -275,6 +275,11 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             }
         }
 
+        if (selectedFormat === String(TournamentFormat.DoubleElimination) && participantCount > 0 && participantCount < 4) {
+            setError('Double Elimination requires at least 4 players — raise Max Players');
+            return;
+        }
+
         if (isSwiss && swissKnockoutSize > 0) {
             if (swissKnockoutSize > participantCount) {
                 setError(`Knockout qualifiers (${swissKnockoutSize}) cannot exceed Max Players (${participantCount})`);
