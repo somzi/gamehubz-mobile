@@ -2386,6 +2386,7 @@ export default function TournamentDetailsScreen() {
                 isRoundLocked={selectedMatch?.isRoundLocked}
                 canRevert={selectedMatch?.canRevert}
                 requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
+                tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
                 defaultTab={matchModalDefaultTab}
                 onMatchUpdate={() => {
                     fetchBracket(); // Refresh the bracket/league data

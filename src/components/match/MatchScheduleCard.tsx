@@ -1395,7 +1395,18 @@ export function MatchScheduleCard({
                                 )}
                             </View>
 
-                            {activeModalTab === 'chat' && (
+                            {/* Completed matches keep the chat visible but read-only. */}
+                            {activeModalTab === 'chat' && currentStatus === 'completed' && (
+                                <View className="p-2 border-t border-white/5 pt-4 items-center">
+                                    <View className="flex-row items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.03] border border-white/10">
+                                        <Ionicons name="lock-closed-outline" size={13} color="#64748B" />
+                                        <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                            Match completed — chat is read-only
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                            {activeModalTab === 'chat' && currentStatus !== 'completed' && (
                                 <View className="p-2 border-t border-white/5 pt-4">
                                     <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
                                         <TextInput

@@ -62,6 +62,8 @@ interface MatchDetailsModalProps {
     isRoundLocked?: boolean;
     canRevert?: boolean;
     requireResultApproval?: boolean;
+    /** Backend tournament status (4 = Completed). When completed, the chat tab is hidden for everyone. */
+    tournamentStatus?: number;
     /**
      * Which tab to show first when the modal opens. Defaults to "match".
      * The TournamentDetailsScreen passes "chat" when an admin enters from the
@@ -92,6 +94,7 @@ export function MatchDetailsModal({
     isRoundLocked = false,
     canRevert = false,
     requireResultApproval = false,
+    tournamentStatus,
     defaultTab = 'match',
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
@@ -485,10 +488,16 @@ export function MatchDetailsModal({
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
-    // Chat & admin-help visibility — participants and privileged users only; spectators
-    // tapping a bracket match keep the read-only match view.
-    const showChatTab = isParticipant || isPrivileged;
     const adminHelpRequested = !!matchDetails?.adminHelpRequested;
+    // Chat & admin-help visibility:
+    //  - tournament completed → nobody sees the chat tab (not even admins)
+    //  - participants see it for their own matches
+    //  - privileged users (hub owner/admin) only see it while a help request is open
+    //  - spectators tapping a bracket match keep the read-only match view
+    const isTournamentCompleted = Number(tournamentStatus) === 4;
+    const showChatTab = !isTournamentCompleted && (isParticipant || (isPrivileged && adminHelpRequested));
+    // Completed matches keep the conversation visible but block new messages.
+    const isChatReadOnly = status === 'completed';
     const adminHelpRequestedByMe = !!user?.id &&
         matchDetails?.adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase();
 
@@ -1189,7 +1198,7 @@ export function MatchDetailsModal({
                     <View className="w-10" />
                 </View>
 
-                {/* Match / Chat tabs — only for participants & privileged users */}
+                {/* Match / Chat tabs — visibility rules in showChatTab above */}
                 {showChatTab && (
                     <View className="flex-row mx-6 mt-3 mb-2 rounded-2xl p-1 bg-[#131B2E] border border-white/[0.04]">
                         <Pressable
@@ -1250,6 +1259,7 @@ export function MatchDetailsModal({
                                     active={visible && activeTab === 'chat'}
                                     participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
                                     avatarsByUserId={chatAvatars}
+                                    readOnly={isChatReadOnly}
                                 />
                             </KeyboardWrapper>
                         );

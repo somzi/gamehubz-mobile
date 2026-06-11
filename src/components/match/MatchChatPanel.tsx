@@ -17,6 +17,8 @@ interface MatchChatPanelProps {
     participantIds?: (string | null | undefined)[];
     /** Optional avatar lookup keyed by lower-cased user id. */
     avatarsByUserId?: Record<string, string | undefined>;
+    /** Completed matches keep the history visible but hide the composer. */
+    readOnly?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ interface MatchChatPanelProps {
  * SignalR group, and a send box. Mirrors the chat tab in MatchScheduleCard so
  * admins opening a match from the bracket get the same conversation.
  */
-export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {} }: MatchChatPanelProps) {
+export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false }: MatchChatPanelProps) {
     const { user } = useAuth();
     const [comments, setComments] = useState<MatchComment[]>([]);
     const [newComment, setNewComment] = useState('');
@@ -227,7 +229,17 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 </View>
             )}
 
-            {/* Composer */}
+            {/* Composer — hidden for completed matches (chat stays visible, read-only) */}
+            {readOnly ? (
+                <View className="py-3 border-t border-white/5 items-center">
+                    <View className="flex-row items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.03] border border-white/10">
+                        <Ionicons name="lock-closed-outline" size={13} color="#64748B" />
+                        <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            Match completed — chat is read-only
+                        </Text>
+                    </View>
+                </View>
+            ) : (
             <View className="py-3 border-t border-white/5">
                 <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
                     <TextInput
@@ -260,6 +272,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     </Pressable>
                 </View>
             </View>
+            )}
         </View>
     );
 }
