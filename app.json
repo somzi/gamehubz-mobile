@@ -3,7 +3,7 @@
     "name": "GameHubz",
     "scheme": "gamehubz",
     "slug": "gamehubz-mobile",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,6 +16,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.codespheresolutions.gamehubzmobile",
+      "associatedDomains": [
+        "applinks:share.codespheresolutions.dev"
+      ],
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -35,6 +38,33 @@
       "package": "com.codespheresolutions.gamehubzmobile",
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "share.codespheresolutions.dev",
+              "pathPrefix": "/tournament"
+            },
+            {
+              "scheme": "https",
+              "host": "share.codespheresolutions.dev",
+              "pathPrefix": "/hub"
+            },
+            {
+              "scheme": "https",
+              "host": "share.codespheresolutions.dev",
+              "pathPrefix": "/user"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",

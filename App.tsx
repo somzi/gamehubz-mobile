@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { NavigationContainer, LinkingOptions, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions, NavigationContainerRef, getStateFromPath } from '@react-navigation/native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import './global.css';
 
@@ -25,7 +25,7 @@ Notifications.setNotificationHandler({
 const queryClient = new QueryClient();
 
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ['gamehubz://'],
+  prefixes: ['gamehubz://', 'https://share.codespheresolutions.dev'],
   config: {
     screens: {
       MainTabs: {
@@ -44,6 +44,9 @@ const linking: LinkingOptions<RootStackParamList> = {
       Login: 'login',
     },
   },
+  // Share links use /user/:id for player profiles; the in-app route is player/:id.
+  getStateFromPath: (path, options) =>
+    getStateFromPath(path.replace(/^\/*user\//, 'player/'), options),
 };
 
 function routeFromNotification(

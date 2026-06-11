@@ -17,7 +17,7 @@ import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, getCurrencyLabel } from '../lib/utils';
-import { buildDeepLink, shareDeepLink } from '../lib/share';
+import { shareTournament } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
@@ -226,15 +226,7 @@ export default function TournamentDetailsScreen() {
 
     const handleShare = async () => {
         if (!tournament) return;
-        try {
-            await shareDeepLink({
-                title: tournament.name,
-                description: `Join ${tournament.name} on GameHubz.`,
-                deepLink: buildDeepLink('tournament', id),
-            });
-        } catch (error) {
-            console.error('Share error:', error);
-        }
+        await shareTournament(id, tournament.name);
     };
 
     const checkRegistrationStatus = async () => {

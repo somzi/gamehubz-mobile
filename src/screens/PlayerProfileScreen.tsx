@@ -13,7 +13,7 @@ import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
 import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
-import { buildDeepLink, shareDeepLink } from '../lib/share';
+import { shareUser } from '../lib/share';
 import { Button } from '../components/ui/Button';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { FriendActionBar } from '../components/profile/FriendActionBar';
@@ -297,16 +297,7 @@ export default function PlayerProfileScreen() {
     };
 
     const handleShare = async () => {
-        try {
-            const playerName = userInfo?.username || userInfo?.nickName || 'this player';
-            await shareDeepLink({
-                title: userInfo?.username || 'Player Profile',
-                description: `View ${playerName} on GameHubz.`,
-                deepLink: buildDeepLink('player', id),
-            });
-        } catch (error) {
-            console.error('Share error:', error);
-        }
+        await shareUser(id, userInfo?.username || userInfo?.nickName);
     };
 
     return (

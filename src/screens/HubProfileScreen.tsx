@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { SocialLinks } from '../components/profile/SocialLinks';
 import { SocialType } from '../types/auth';
 import { getSocialUrl } from '../lib/social';
-import { buildDeepLink, shareDeepLink } from '../lib/share';
+import { shareHub } from '../lib/share';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 
 type HubProfileRouteProp = RouteProp<RootStackParamList, 'HubProfile'>;
@@ -397,16 +397,7 @@ export default function HubProfileScreen() {
     }
 
     const handleShare = async () => {
-        try {
-            const hubName = hubData?.name || 'this hub';
-            await shareDeepLink({
-                title: hubData?.name || 'Hub',
-                description: `Check out ${hubName} on GameHubz.`,
-                deepLink: buildDeepLink('hub', id),
-            });
-        } catch (error) {
-            console.error('Share error:', error);
-        }
+        await shareHub(id, hubData?.name);
     };
 
     return (
