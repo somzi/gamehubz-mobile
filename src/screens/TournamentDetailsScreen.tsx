@@ -1307,7 +1307,13 @@ export default function TournamentDetailsScreen() {
                                 )}
                             </Pressable>
                         )}
-{/* Share button hidden - coming soon */}
+                        <Pressable
+                            onPress={handleShare}
+                            className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
+                            accessibilityLabel="Share tournament"
+                        >
+                            <Ionicons name="share-outline" size={20} color="#FAFAFA" />
+                        </Pressable>
                         {canManage && (
                             <Pressable
                                 onPress={() => navigation.navigate('ManageTournament' as any, { id })}

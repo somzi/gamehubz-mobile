@@ -311,7 +311,13 @@ export default function PlayerProfileScreen() {
                     <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                 </Pressable>
                 <Text className="text-lg font-black text-white tracking-tight">Player Profile</Text>
-                <View className="w-10 h-10" />
+                <Pressable
+                    onPress={handleShare}
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
+                    accessibilityLabel="Share profile"
+                >
+                    <Ionicons name="share-outline" size={20} color="#FAFAFA" />
+                </Pressable>
             </View>
 
             <ScrollView

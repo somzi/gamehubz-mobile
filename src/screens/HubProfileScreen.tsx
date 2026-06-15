@@ -412,7 +412,13 @@ export default function HubProfileScreen() {
                 </Pressable>
                 <Text className="text-lg font-black text-white tracking-tight">Hub</Text>
                 <View className="flex-row items-center gap-2">
-{/* Share button hidden - coming soon */}
+                    <Pressable
+                        onPress={handleShare}
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
+                        accessibilityLabel="Share hub"
+                    >
+                        <Ionicons name="share-outline" size={20} color="#FAFAFA" />
+                    </Pressable>
                     {(isOwner || isAdmin) && (
                         <Pressable
                             onPress={() => navigation.navigate('ManageHub', { hubId: id })}
