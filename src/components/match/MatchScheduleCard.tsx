@@ -860,6 +860,7 @@ export function MatchScheduleCard({
                                                     matchId={matchId}
                                                     deadline={localDeadline}
                                                     opponentName={opponentName}
+                                                    opponentAvatarUrl={opponentAvatarUrl}
                                                     opponentAvailability={opponentSlots}
                                                     initialSlots={mySlots}
                                                     onSubmit={handleAvailabilitySubmit}
