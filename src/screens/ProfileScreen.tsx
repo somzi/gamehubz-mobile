@@ -15,6 +15,7 @@ import { PlayerMatchesDto } from '../types/user';
 import { SocialType } from '../types/auth';
 import { cn, parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
+import { shareUser } from '../lib/share';
 import { TournamentCard } from '../components/cards/TournamentCard';
 
 
@@ -237,12 +238,21 @@ export default function ProfileScreen() {
             {/* Top Bar */}
             <View className="flex-row justify-between items-center px-6 py-2">
                 <Text className="text-lg font-black text-white tracking-tight">Profile</Text>
-                <Pressable
-                    onPress={() => navigation.navigate('EditProfile')}
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10"
-                >
-                    <Ionicons name="settings-outline" size={20} color="#FAFAFA" />
-                </Pressable>
+                <View className="flex-row items-center gap-2">
+                    <Pressable
+                        onPress={() => { if (user?.id) shareUser(user.id, user.username); }}
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
+                        accessibilityLabel="Share profile"
+                    >
+                        <Ionicons name="share-outline" size={20} color="#FAFAFA" />
+                    </Pressable>
+                    <Pressable
+                        onPress={() => navigation.navigate('EditProfile')}
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10"
+                    >
+                        <Ionicons name="settings-outline" size={20} color="#FAFAFA" />
+                    </Pressable>
+                </View>
             </View>
 
             <ScrollView

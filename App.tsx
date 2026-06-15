@@ -27,6 +27,13 @@ const queryClient = new QueryClient();
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['gamehubz://', 'https://share.codespheresolutions.dev'],
   config: {
+    // When a deep/share link cold-starts the app straight into a detail screen
+    // (TournamentDetails / HubProfile / PlayerProfile / DirectChat), React
+    // Navigation places MainTabs beneath it in the stack so the back arrow and
+    // the Android hardware back land on the home tabs instead of doing nothing.
+    // On a warm app the link resolves to a plain navigate, so the existing stack
+    // is preserved.
+    initialRouteName: 'MainTabs',
     screens: {
       MainTabs: {
         screens: {
