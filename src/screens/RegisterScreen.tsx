@@ -104,8 +104,8 @@ export default function RegisterScreen() {
             userRoleId: "6AB87F80-2DE2-4F95-BCE5-7B86F38E426F"
         };
 
-        const success = await register(payload);
-        if (success) {
+        const result = await register(payload);
+        if (result.success) {
             // Auto-login so the user lands straight in the app. On success,
             // isAuthenticated flips and RootNavigator swaps to the app stack.
             const loginResult = await login(formData.email, formData.password);
@@ -123,7 +123,7 @@ export default function RegisterScreen() {
             setStatusModalConfig({
                 type: 'error',
                 title: 'Registration Failed',
-                message: 'Unable to create account. Please try again.'
+                message: result.message || 'Unable to create account. Please try again.'
             });
             setShowStatusModal(true);
         }

@@ -12,7 +12,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-    register: (data: any) => Promise<boolean>;
+    register: (data: any) => Promise<{ success: boolean; message?: string }>;
     logout: () => void;
     updateProfile: (data: any) => Promise<boolean>;
     saveUserSocial: (social: UserSocial) => Promise<boolean>;
@@ -283,7 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    const register = useCallback(async (formData: any): Promise<boolean> => {
+    const register = useCallback(async (formData: any): Promise<{ success: boolean; message?: string }> => {
         setIsLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/api/Auth/registerUser`, {
@@ -297,19 +297,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const text = await response.text();
 
             if (response.ok) {
-                return true;
-            } else {
-                let errorMessage = text;
-                try {
-                    const errorData = JSON.parse(text);
-                    errorMessage = errorData.messages || errorData;
-                } catch (e) { }
-                console.error('Register failed response:', errorMessage);
-                return false;
+                return { success: true };
             }
-        } catch (error) {
+
+            let data: any = text;
+            try { data = JSON.parse(text); } catch { }
+
+            let msg: string | undefined;
+            if (Array.isArray(data) && data.length > 0) {
+                msg = String(data[0]);
+            } else if (data && typeof data === 'object') {
+                const single = data.Message || data.message;
+                const messages = data.messages || data.Messages;
+                if (typeof single === 'string' && single.length > 0) msg = single;
+                else if (Array.isArray(messages) && messages.length > 0) msg = String(messages[0]);
+                else if (typeof messages === 'string') msg = messages;
+            } else if (typeof data === 'string' && data.length > 0) {
+                msg = data;
+            }
+
+            // Backend may serialize as "Namespace.ExceptionType: human message" — strip the namespace prefix.
+            if (msg) {
+                const match = msg.match(/Exception:\s*'?(.+?)'?$/s);
+                if (match) msg = match[1].split(/\r?\n/)[0].trim();
+            }
+
+            console.error('Register failed response:', msg, '- Raw data:', data);
+            return { success: false, message: msg };
+        } catch (error: any) {
             console.error('Register error:', error);
-            return false;
+            return { success: false, message: error?.message };
         } finally {
             setIsLoading(false);
         }
