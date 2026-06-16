@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { cn } from '../../lib/utils';
 
@@ -14,6 +15,8 @@ interface FeedCardProps {
     className?: string;
     variant?: 'default' | 'compact';
 }
+
+const ACCENT = '#A78BFA';
 
 export function FeedCard({
     hubName,
@@ -30,26 +33,43 @@ export function FeedCard({
             <Pressable
                 onPress={onClick}
                 className={cn(
-                    "w-[260px] bg-[#131B2E] rounded-3xl p-5 mr-3",
+                    'w-[260px] bg-[#131B2E] rounded-3xl p-5 mr-3 active:opacity-90',
                     className
                 )}
             >
                 <View className="flex-row items-center gap-3 mb-4">
-                    <PlayerAvatar src={hubAvatar} name={hubName} size="md" className="rounded-xl" />
+                    <PlayerAvatar
+                        src={hubAvatar}
+                        name={hubName}
+                        size="md"
+                        className="rounded-xl"
+                    />
                     <View className="flex-1">
-                        <Text className="font-bold text-white text-sm" numberOfLines={1}>{hubName}</Text>
-                        <Text className="text-[10px] text-slate-600 uppercase tracking-widest">{timestamp}</Text>
+                        <Text
+                            className="font-bold text-white text-sm"
+                            numberOfLines={1}
+                        >
+                            {hubName}
+                        </Text>
+                        <Text className="text-[10px] text-slate-600 uppercase tracking-widest">
+                            {timestamp}
+                        </Text>
                     </View>
                 </View>
 
-                <Text className="text-sm text-slate-400 leading-tight mb-4 h-[40px]" numberOfLines={2}>
+                <Text
+                    className="text-sm text-slate-300 leading-tight mb-4 h-[40px]"
+                    numberOfLines={2}
+                >
                     {message}
                 </Text>
 
                 {tournamentName && (
-                    <View className="flex-row items-center gap-1.5 bg-emerald-500/[0.06] self-start px-2 py-1 rounded-lg">
-                        <Ionicons name="trophy-outline" size={10} color="#10B981" />
-                        <Text className="text-[10px] font-black text-emerald-400 uppercase tracking-tight">{tournamentName}</Text>
+                    <View className="flex-row items-center gap-1.5 bg-emerald-500/[0.08] self-start px-2 py-1 rounded-lg">
+                        <Ionicons name="trophy-outline" size={10} color="#34D399" />
+                        <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">
+                            {tournamentName}
+                        </Text>
                     </View>
                 )}
             </Pressable>
@@ -57,27 +77,125 @@ export function FeedCard({
     }
 
     return (
-        <Pressable onPress={onClick} className="active:opacity-80">
-            <View className={cn("bg-[#131B2E] rounded-3xl overflow-hidden", className)}>
-                <View className="flex-row">
-                    <View style={{ width: 4, backgroundColor: '#6366F1', opacity: 0.4 }} className="rounded-l-3xl" />
+        <Pressable onPress={onClick} className="active:opacity-90">
+            <View
+                className={cn('rounded-[22px] overflow-hidden', className)}
+                style={{
+                    backgroundColor: '#131B2E',
+                    shadowColor: ACCENT,
+                    shadowOpacity: 0.12,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 6 },
+                    elevation: 6,
+                }}
+            >
+                {/* Subtle purple-tinted gradient */}
+                <LinearGradient
+                    colors={['rgba(167, 139, 250, 0.10)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.7, y: 0 }}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                />
 
-                    <View className="flex-1 p-4">
-                        <View className="flex-row items-center gap-3">
-                            <PlayerAvatar src={hubAvatar} name={hubName} size="md" className="rounded-xl" />
-                            <View className="flex-1 min-w-0">
-                                <View className="flex-row justify-between items-center">
-                                    <Text className="font-black text-white text-sm" numberOfLines={1}>{hubName}</Text>
-                                    <Text className="text-[9px] font-medium text-slate-700 uppercase tracking-wider">{timestamp}</Text>
-                                </View>
-                                <Text className="text-[12px] text-slate-500 mt-1 leading-5" numberOfLines={2}>{message}</Text>
-                                {tournamentName && (
-                                    <View className="flex-row items-center gap-1.5 mt-2 bg-emerald-500/[0.06] self-start px-2 py-1 rounded-lg">
-                                        <Ionicons name="trophy-outline" size={10} color="#10B981" />
-                                        <Text className="text-[10px] font-black text-emerald-400 uppercase tracking-tight">{tournamentName}</Text>
-                                    </View>
-                                )}
+                {/* Soft hairline border */}
+                <View
+                    pointerEvents="none"
+                    className="absolute inset-0 rounded-[22px]"
+                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}
+                />
+
+                {/* Left accent line (glowing) */}
+                <View
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 14,
+                        bottom: 14,
+                        width: 3,
+                        backgroundColor: ACCENT,
+                        borderTopRightRadius: 3,
+                        borderBottomRightRadius: 3,
+                        shadowColor: ACCENT,
+                        shadowOpacity: 0.7,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 0 },
+                    }}
+                />
+
+                <View className="p-4 pl-5">
+                    <View className="flex-row items-start gap-3.5">
+                        <View
+                            style={{
+                                shadowColor: ACCENT,
+                                shadowOpacity: 0.35,
+                                shadowRadius: 10,
+                                shadowOffset: { width: 0, height: 2 },
+                            }}
+                        >
+                            <View
+                                style={{
+                                    borderWidth: 1.5,
+                                    borderColor: 'rgba(167, 139, 250, 0.55)',
+                                    borderRadius: 16,
+                                    padding: 2,
+                                }}
+                            >
+                                <PlayerAvatar
+                                    src={hubAvatar}
+                                    name={hubName}
+                                    size="md"
+                                    className="rounded-[12px]"
+                                />
                             </View>
+                        </View>
+
+                        <View className="flex-1 min-w-0">
+                            <View className="flex-row items-baseline gap-2 mb-1">
+                                <Text
+                                    className="font-black text-white text-[14px] tracking-tight flex-1"
+                                    numberOfLines={1}
+                                >
+                                    {hubName}
+                                </Text>
+                                <View className="flex-row items-center gap-1">
+                                    <View
+                                        style={{
+                                            width: 3,
+                                            height: 3,
+                                            borderRadius: 1.5,
+                                            backgroundColor: ACCENT,
+                                            opacity: 0.6,
+                                        }}
+                                    />
+                                    <Text className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[1.5px]">
+                                        {timestamp}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Text
+                                className="text-[13px] text-slate-300 leading-[18px]"
+                                numberOfLines={2}
+                            >
+                                {message}
+                            </Text>
+                            {tournamentName && (
+                                <View
+                                    className="flex-row items-center gap-1.5 mt-2.5 self-start px-2.5 py-1 rounded-lg"
+                                    style={{
+                                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(16, 185, 129, 0.28)',
+                                    }}
+                                >
+                                    <Ionicons name="trophy" size={10} color="#34D399" />
+                                    <Text
+                                        className="text-[10px] font-black text-emerald-300 uppercase tracking-tight"
+                                        numberOfLines={1}
+                                    >
+                                        {tournamentName}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -85,4 +203,3 @@ export function FeedCard({
         </Pressable>
     );
 }
-

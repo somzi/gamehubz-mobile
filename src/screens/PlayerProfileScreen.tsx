@@ -370,14 +370,35 @@ export default function PlayerProfileScreen() {
                                         </Text>
                                     </View>
                                 </View>
-                                <View className="flex-row items-center mt-1.5">
-                                    <Ionicons name="globe-outline" size={11} color="#64748B" />
-                                    <Text className="text-slate-500 font-bold text-[10px] ml-1.5 uppercase tracking-widest">
-                                        {displayData.countryName
-                                            ? `${displayData.countryFlag ?? ''} ${displayData.countryName} · ${displayData.region}`
-                                            : displayData.region}
-                                    </Text>
-                                </View>
+                                {displayData.countryName ? (
+                                    <View className="mt-2">
+                                        <View className="flex-row items-center mb-1">
+                                            <View style={{ width: 18, alignItems: 'center' }}>
+                                                <Text style={{ fontSize: 13 }}>
+                                                    {displayData.countryFlag ?? '🌐'}
+                                                </Text>
+                                            </View>
+                                            <Text className="text-slate-200 font-black text-[11px] ml-1.5 uppercase tracking-[2px]">
+                                                {displayData.countryName}
+                                            </Text>
+                                        </View>
+                                        <View className="flex-row items-center">
+                                            <View style={{ width: 18, alignItems: 'center' }}>
+                                                <Ionicons name="globe-outline" size={11} color="#94A3B8" />
+                                            </View>
+                                            <Text className="text-slate-400 font-bold text-[10px] ml-1.5 uppercase tracking-[2px]">
+                                                {displayData.region}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ) : (
+                                    <View className="flex-row items-center mt-1.5">
+                                        <Ionicons name="globe-outline" size={11} color="#64748B" />
+                                        <Text className="text-slate-500 font-bold text-[10px] ml-1.5 uppercase tracking-widest">
+                                            {displayData.region}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
                         {displayData.socials.length > 0 && (

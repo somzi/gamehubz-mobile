@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { FeedCard } from '../components/cards/FeedCard';
 import { MatchScheduleCard } from '../components/match/MatchScheduleCard';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
-import { cn, parseUtcDate } from '../lib/utils';
+import { parseUtcDate } from '../lib/utils';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -31,6 +31,8 @@ interface MatchOverviewDto {
     isRoundLocked?: boolean;
 }
 
+const SECTION_GAP = 28;
+
 export default function HomeScreen() {
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const { user } = useAuth();
@@ -39,9 +41,6 @@ export default function HomeScreen() {
     const [hubActivities, setHubActivities] = useState<DashboardActivityDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [showHighlightsModal, setShowHighlightsModal] = useState(false);
-    const [isActionRequiredCollapsed, setIsActionRequiredCollapsed] = useState(false);
-    const [isActiveMatchesCollapsed, setIsActiveMatchesCollapsed] = useState(false);
-    const [isHighlightsCollapsed, setIsHighlightsCollapsed] = useState(false);
 
     const fetchMatches = async () => {
         if (!user?.id) return;
@@ -49,7 +48,7 @@ export default function HomeScreen() {
             const response = await authenticatedFetch(ENDPOINTS.GET_USER_HOME_MATCHES(user.id));
             if (response.ok) {
                 const data: any[] = await response.json();
-                const normalizedData: MatchOverviewDto[] = data.map(m => ({
+                const normalizedData: MatchOverviewDto[] = data.map((m) => ({
                     id: m.id || m.Id,
                     matchId: m.matchId || m.MatchId,
                     tournamentId: m.tournamentId || m.TournamentId,
@@ -61,11 +60,11 @@ export default function HomeScreen() {
                     opponentNickname: m.opponentNickname || m.OpponentNickname,
                     userNickname: m.userNickname || m.UserNickname,
                     status: m.status !== undefined ? m.status : m.Status,
-                    isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked
+                    isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
                 }));
-                const openMatches = normalizedData.filter(m => !m.isRoundLocked);
-                setActionRequiredMatches(openMatches.filter(m => !m.scheduledTime));
-                setMyMatches(openMatches.filter(m => m.scheduledTime));
+                const openMatches = normalizedData.filter((m) => !m.isRoundLocked);
+                setActionRequiredMatches(openMatches.filter((m) => !m.scheduledTime));
+                setMyMatches(openMatches.filter((m) => m.scheduledTime));
             }
         } catch (error) {
             console.error('Error fetching home matches:', error);
@@ -77,7 +76,7 @@ export default function HomeScreen() {
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_ACTIVITY_HOME);
             if (response.ok) {
                 const data: any[] = await response.json();
-                const activities: DashboardActivityDto[] = data.map(a => ({
+                const activities: DashboardActivityDto[] = data.map((a) => ({
                     hubName: a.hubName || a.HubName,
                     message: a.message || a.Message,
                     tournamentName: a.tournamentName || a.TournamentName,
@@ -85,7 +84,7 @@ export default function HomeScreen() {
                     createdOn: a.createdOn || a.CreatedOn,
                     type: a.type || a.Type,
                     hubAvatar: a.hubAvatar || a.HubAvatar,
-                    hubAvatarUrl: a.hubAvatarUrl || a.HubAvatarUrl
+                    hubAvatarUrl: a.hubAvatarUrl || a.HubAvatarUrl,
                 }));
                 setHubActivities(activities);
             }
@@ -106,214 +105,209 @@ export default function HomeScreen() {
         }, [user?.id])
     );
 
-    const totalMatches = actionRequiredMatches.length + myMatches.length;
-
-    const getGreeting = () => {
-        const hour = new Date().getHours();
-        if (hour < 12) return 'Good morning';
-        if (hour < 17) return 'Good afternoon';
+    const greeting = useMemo(() => {
+        const h = new Date().getHours();
+        if (h < 5) return 'Still up';
+        if (h < 12) return 'Good morning';
+        if (h < 17) return 'Good afternoon';
         return 'Good evening';
-    };
+    }, []);
+
+    const dateLabel = useMemo(() => {
+        const d = new Date();
+        const day = d.toLocaleDateString([], { weekday: 'short' });
+        const monthDay = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        return `${day.toUpperCase()} · ${monthDay.toUpperCase()}`;
+    }, []);
+
+    const sortedActiveMatches = useMemo(() => {
+        return [...myMatches].sort((a, b) => {
+            const da = a.scheduledTime ? parseUtcDate(a.scheduledTime).getTime() : 0;
+            const db = b.scheduledTime ? parseUtcDate(b.scheduledTime).getTime() : 0;
+            return da - db;
+        });
+    }, [myMatches]);
+
+    const subtitle = useMemo(() => {
+        if (actionRequiredMatches.length && myMatches.length) {
+            return `${myMatches.length} scheduled · ${actionRequiredMatches.length} need${actionRequiredMatches.length === 1 ? 's' : ''} action`;
+        }
+        if (actionRequiredMatches.length) {
+            return `${actionRequiredMatches.length} match${actionRequiredMatches.length === 1 ? '' : 'es'} need your attention`;
+        }
+        if (myMatches.length) {
+            return `${myMatches.length} match${myMatches.length === 1 ? '' : 'es'} scheduled today`;
+        }
+        return 'Ready when you are';
+    }, [actionRequiredMatches.length, myMatches.length]);
 
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
             <ScrollView
                 className="flex-1"
-                refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} tintColor="#10B981" />}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={loading}
+                        onRefresh={loadData}
+                        tintColor="#10B981"
+                    />
+                }
+                contentContainerStyle={{ paddingBottom: 32 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ─── Premium Header & Hero ─── */}
-                <View className="px-5 pt-8 pb-6">
-                    <View className="flex-row items-center justify-between mb-8">
-                        <View className="flex-1">
-                            <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px] mb-1">
-                                {getGreeting()}
-                            </Text>
-                            <Text className="text-white text-3xl font-black tracking-tighter">
-                                {user?.username || user?.nickName || 'Player'}
-                            </Text>
-                        </View>
-                        <View className="relative">
-                            <View className="absolute -inset-1.5 bg-primary/20 rounded-full" />
-                            <PlayerAvatar
-                                src={user?.avatarUrl || undefined}
-                                name={user?.username || 'P'}
-                                size="lg"
-                                className="border-2 border-primary/20"
-                            />
-                        </View>
-                    </View>
-
-                    {/* Quick Stats Summary Ribbon */}
-                    <View className="flex-row bg-[#131B2E] rounded-3xl p-1.5 border border-white/5 shadow-2xl">
-                        <View className="flex-1 py-3 items-center">
-                            <Text className="text-white text-lg font-black">{totalMatches}</Text>
-                            <Text className="text-slate-500 text-[8px] uppercase font-black tracking-widest mt-0.5">Matches</Text>
-                        </View>
-                        <View className="w-[1px] bg-white/5 my-2.5" />
-                        <View className="flex-1 py-3 items-center">
-                            <Text className="text-white text-lg font-black">{actionRequiredMatches.length}</Text>
-                            <Text className="text-slate-500 text-[8px] uppercase font-black tracking-widest mt-0.5">Alerts</Text>
-                        </View>
+                {/* ── Top date strip ── */}
+                <View className="flex-row items-center px-5 pt-3 pb-1">
+                    <View className="flex-row items-center gap-2">
+                        <View className="w-1 h-1 rounded-full bg-emerald-400/60" />
+                        <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px]">
+                            {dateLabel}
+                        </Text>
                     </View>
                 </View>
 
-                <View className="px-5 gap-10">
+                {/* ── Greeting hero ── */}
+                <View className="px-5 pt-4 pb-7 flex-row items-start">
+                    <View className="flex-1 mr-4">
+                        <Text className="text-slate-500 text-sm font-medium mb-1">
+                            {greeting},
+                        </Text>
+                        <Text
+                            className="text-white font-black tracking-tighter"
+                            style={{ fontSize: 36, lineHeight: 40 }}
+                            numberOfLines={1}
+                        >
+                            {user?.username || user?.nickName || 'Player'}
+                        </Text>
+                        <Text className="text-slate-400 text-[13px] font-medium mt-3 leading-5">
+                            {subtitle}
+                        </Text>
+                    </View>
+                    <PlayerAvatar
+                        src={user?.avatarUrl || undefined}
+                        name={user?.username || 'P'}
+                        size="lg"
+                        className="border-2 border-white/10"
+                    />
+                </View>
 
-                    {/* ── Section: Action Required ── */}
+                <View className="px-5">
+                    {/* ── Section: Needs Attention ── */}
                     {actionRequiredMatches.length > 0 && (
                         <View>
-                            <View className="flex-row items-center justify-between mb-4">
-                                <Pressable
-                                    onPress={() => setIsActionRequiredCollapsed(!isActionRequiredCollapsed)}
-                                    className="flex-row items-center gap-3"
-                                >
-                                    <View className="w-10 h-10 rounded-2xl bg-yellow-500/10 items-center justify-center border border-yellow-500/20">
-                                        <Ionicons name="alert-circle" size={20} color="#EAB308" />
-                                    </View>
-                                    <View>
-                                        <Text className="text-white font-black text-lg tracking-tight">Needs Attention</Text>
-                                        <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Requires your action</Text>
-                                    </View>
-                                </Pressable>
-                                <Pressable
-                                    onPress={() => navigation.navigate('MyMatches')}
-                                    className="bg-white/5 py-2 px-4 rounded-xl border border-white/5"
-                                >
-                                    <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">See All</Text>
-                                </Pressable>
+                            <SectionHeader
+                                icon="alert-circle"
+                                iconColor="#F59E0B"
+                                iconBg="rgba(245, 158, 11, 0.12)"
+                                iconBorder="rgba(245, 158, 11, 0.25)"
+                                title="Needs Attention"
+                                subtitle="Requires your action"
+                                onSeeAll={() => navigation.navigate('MyMatches')}
+                            />
+                            <View className="gap-3">
+                                {actionRequiredMatches.slice(0, 3).map((match, index) => (
+                                    <MatchScheduleCard
+                                        key={match.matchId || `pending-${index}`}
+                                        matchId={match.id || match.matchId || ''}
+                                        tournamentId={match.tournamentId || ''}
+                                        tournamentName={match.tournamentName}
+                                        roundName={match.hubName}
+                                        opponentName={match.opponentName}
+                                        opponentAvatarUrl={match.opponentAvatarUrl}
+                                        opponentNickname={match.opponentNickname}
+                                        userNickname={match.userNickname}
+                                        status="pending_availability"
+                                        onMatchUpdate={fetchMatches}
+                                    />
+                                ))}
                             </View>
-
-                            {!isActionRequiredCollapsed && (
-                                <View className="gap-3">
-                                    {actionRequiredMatches.slice(0, 3).map((match, index) => (
-                                        <MatchScheduleCard
-                                            key={match.matchId || `pending-${index}`}
-                                            matchId={match.id || match.matchId || ''}
-                                            tournamentId={match.tournamentId || ''}
-                                            tournamentName={match.tournamentName}
-                                            roundName={match.hubName}
-                                            opponentName={match.opponentName}
-                                            opponentAvatarUrl={match.opponentAvatarUrl}
-                                            opponentNickname={match.opponentNickname}
-                                            userNickname={match.userNickname}
-                                            status="pending_availability"
-                                            onMatchUpdate={fetchMatches}
-                                        />
-                                    ))}
-                                </View>
-                            )}
                         </View>
                     )}
 
                     {/* ── Section: Active Matches ── */}
-                    <View>
-                        <View className="flex-row items-center justify-between mb-4">
-                            <Pressable
-                                onPress={() => setIsActiveMatchesCollapsed(!isActiveMatchesCollapsed)}
-                                className="flex-row items-center gap-3"
-                            >
-                                <View className="w-10 h-10 rounded-2xl bg-primary/10 items-center justify-center border border-primary/20">
-                                    <Ionicons name="game-controller" size={20} color="#10B981" />
-                                </View>
-                                <View>
-                                    <Text className="text-white font-black text-lg tracking-tight">Active Matches</Text>
-                                    <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">In progress & scheduled</Text>
-                                </View>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => navigation.navigate('MyMatches')}
-                                className="bg-white/5 py-2 px-4 rounded-xl border border-white/5"
-                            >
-                                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">See All</Text>
-                            </Pressable>
-                        </View>
+                    <View style={{ marginTop: actionRequiredMatches.length > 0 ? SECTION_GAP : 0 }}>
+                        <SectionHeader
+                            icon="game-controller"
+                            iconColor="#10B981"
+                            iconBg="rgba(16, 185, 129, 0.12)"
+                            iconBorder="rgba(16, 185, 129, 0.25)"
+                            title="Active Matches"
+                            subtitle="In progress & scheduled"
+                            onSeeAll={() => navigation.navigate('MyMatches')}
+                        />
 
-                        {!isActiveMatchesCollapsed && (
-                            myMatches.length > 0 ? (
-                                <View className="gap-3">
-                                    {myMatches.slice(0, 3).map((match, index) => (
-                                        <MatchScheduleCard
-                                            key={match.matchId || `scheduled-${index}`}
-                                            matchId={match.id || ''}
-                                            tournamentId={match.tournamentId || ''}
-                                            tournamentName={match.tournamentName}
-                                            roundName={match.hubName}
-                                            opponentName={match.opponentName}
-                                            opponentAvatarUrl={match.opponentAvatarUrl}
-                                            opponentNickname={match.opponentNickname}
-                                            userNickname={match.userNickname}
-                                            status="scheduled"
-                                            scheduledTime={match.scheduledTime
-                                                ? parseUtcDate(match.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                                : 'TBD'}
-                                            onMatchUpdate={fetchMatches}
-                                        />
-                                    ))}
-                                </View>
-                            ) : (
-                                <View className="py-12 items-center justify-center bg-[#131B2E] rounded-[32px] border border-white/5">
-                                    <View className="w-16 h-16 rounded-[24px] bg-primary/10 items-center justify-center mb-4">
-                                        <Ionicons name="game-controller-outline" size={32} color="#10B981" />
-                                    </View>
-                                    <Text className="text-white font-black text-base">No active matches</Text>
-                                    <Text className="text-slate-500 text-xs mt-1 text-center px-10">Your competitive matches will appear here once they start</Text>
-                                </View>
-                            )
+                        {sortedActiveMatches.length > 0 ? (
+                            <View className="gap-3">
+                                {sortedActiveMatches.slice(0, 3).map((match, index) => (
+                                    <MatchScheduleCard
+                                        key={match.matchId || `scheduled-${index}`}
+                                        matchId={match.id || ''}
+                                        tournamentId={match.tournamentId || ''}
+                                        tournamentName={match.tournamentName}
+                                        roundName={match.hubName}
+                                        opponentName={match.opponentName}
+                                        opponentAvatarUrl={match.opponentAvatarUrl}
+                                        opponentNickname={match.opponentNickname}
+                                        userNickname={match.userNickname}
+                                        status="scheduled"
+                                        scheduledTime={
+                                            match.scheduledTime
+                                                ? parseUtcDate(match.scheduledTime).toLocaleString([], {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })
+                                                : 'TBD'
+                                        }
+                                        onMatchUpdate={fetchMatches}
+                                    />
+                                ))}
+                            </View>
+                        ) : (
+                            <EmptyState
+                                iconName="game-controller-outline"
+                                iconColor="#10B981"
+                                title="No active matches"
+                                description="Your competitive matches will appear here once they start"
+                            />
                         )}
                     </View>
 
-                    {/* ── Section: Community Highlights ── */}
-                    <View>
-                        <View className="flex-row items-center justify-between mb-4">
-                            <Pressable
-                                onPress={() => setIsHighlightsCollapsed(!isHighlightsCollapsed)}
-                                className="flex-row items-center gap-3"
-                            >
-                                <View className="w-10 h-10 rounded-2xl bg-indigo-500/10 items-center justify-center border border-indigo-500/20">
-                                    <Ionicons name="flash" size={20} color="#6366F1" />
-                                </View>
-                                <View>
-                                    <Text className="text-white font-black text-lg tracking-tight">Highlights</Text>
-                                    <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Latest from your hubs</Text>
-                                </View>
-                            </Pressable>
-                            <Pressable
-                                onPress={() => setShowHighlightsModal(true)}
-                                className="bg-white/5 py-2 px-4 rounded-xl border border-white/5"
-                            >
-                                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">See All</Text>
-                            </Pressable>
-                        </View>
+                    {/* ── Section: Highlights ── */}
+                    <View style={{ marginTop: SECTION_GAP }}>
+                        <SectionHeader
+                            icon="sparkles"
+                            iconColor="#A78BFA"
+                            iconBg="rgba(167, 139, 250, 0.12)"
+                            iconBorder="rgba(167, 139, 250, 0.25)"
+                            title="Highlights"
+                            subtitle="Latest from your hubs"
+                            onSeeAll={() => setShowHighlightsModal(true)}
+                        />
 
-                        {!isHighlightsCollapsed && (
-                            hubActivities.length > 0 ? (
-                                <View className="gap-2.5">
-                                    {hubActivities.slice(0, 3).map((item, index) => (
-                                        <FeedCard
-                                            key={index}
-                                            hubName={item.hubName}
-                                            hubAvatar={item.hubAvatarUrl || item.hubAvatar}
-                                            message={item.message}
-                                            tournamentName={item.tournamentName}
-                                            timestamp={item.timeAgo}
-                                            onClick={() => { }}
-                                        />
-                                    ))}
-                                </View>
-                            ) : (
-                                <View className="py-10 items-center justify-center bg-white/[0.02] rounded-3xl border border-white/5">
-                                    <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-3">
-                                        <Ionicons name="planet-outline" size={28} color="#6366F1" />
-                                    </View>
-                                    <Text className="text-white font-bold text-sm">No highlights yet</Text>
-                                    <Text className="text-slate-500 text-xs mt-1">Activity from your hubs will appear here</Text>
-                                </View>
-                            )
+                        {hubActivities.length > 0 ? (
+                            <View className="gap-2.5">
+                                {hubActivities.slice(0, 3).map((item, index) => (
+                                    <FeedCard
+                                        key={index}
+                                        hubName={item.hubName}
+                                        hubAvatar={item.hubAvatarUrl || item.hubAvatar}
+                                        message={item.message}
+                                        tournamentName={item.tournamentName}
+                                        timestamp={item.timeAgo}
+                                        onClick={() => { }}
+                                    />
+                                ))}
+                            </View>
+                        ) : (
+                            <EmptyState
+                                iconName="planet-outline"
+                                iconColor="#A78BFA"
+                                title="No highlights yet"
+                                description="Activity from your hubs will appear here"
+                            />
                         )}
                     </View>
-
                 </View>
             </ScrollView>
 
@@ -322,5 +316,86 @@ export default function HomeScreen() {
                 onClose={() => setShowHighlightsModal(false)}
             />
         </SafeAreaView>
+    );
+}
+
+interface SectionHeaderProps {
+    icon: keyof typeof Ionicons.glyphMap;
+    iconColor: string;
+    iconBg: string;
+    iconBorder: string;
+    title: string;
+    subtitle: string;
+    onSeeAll?: () => void;
+}
+
+function SectionHeader({
+    icon,
+    iconColor,
+    iconBg,
+    iconBorder,
+    title,
+    subtitle,
+    onSeeAll,
+}: SectionHeaderProps) {
+    return (
+        <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center gap-3 flex-1">
+                <View
+                    className="w-10 h-10 rounded-2xl items-center justify-center"
+                    style={{
+                        backgroundColor: iconBg,
+                        borderWidth: 1,
+                        borderColor: iconBorder,
+                    }}
+                >
+                    <Ionicons name={icon} size={18} color={iconColor} />
+                </View>
+                <View className="flex-1">
+                    <Text className="text-white font-black text-base tracking-tight">
+                        {title}
+                    </Text>
+                    <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-[1.5px] mt-0.5">
+                        {subtitle}
+                    </Text>
+                </View>
+            </View>
+            {onSeeAll && (
+                <Pressable
+                    onPress={onSeeAll}
+                    className="bg-white/[0.04] py-2 px-3.5 rounded-xl border border-white/[0.06] active:opacity-70 flex-row items-center gap-1"
+                    hitSlop={6}
+                >
+                    <Text className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                        See All
+                    </Text>
+                    <Ionicons name="chevron-forward" size={12} color="#CBD5E1" />
+                </Pressable>
+            )}
+        </View>
+    );
+}
+
+interface EmptyStateProps {
+    iconName: keyof typeof Ionicons.glyphMap;
+    iconColor: string;
+    title: string;
+    description: string;
+}
+
+function EmptyState({ iconName, iconColor, title, description }: EmptyStateProps) {
+    return (
+        <View className="py-12 items-center justify-center bg-white/[0.02] rounded-3xl border border-white/[0.04]">
+            <View
+                className="w-14 h-14 rounded-2xl items-center justify-center mb-3"
+                style={{ backgroundColor: iconColor + '22' }}
+            >
+                <Ionicons name={iconName} size={26} color={iconColor} />
+            </View>
+            <Text className="text-white font-black text-sm">{title}</Text>
+            <Text className="text-slate-500 text-xs mt-1 text-center px-10">
+                {description}
+            </Text>
+        </View>
     );
 }

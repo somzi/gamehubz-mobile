@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -597,23 +598,50 @@ export function MatchScheduleCard({
         switch (currentStatus) {
             case 'pending_availability':
                 return (
-                    <View className="flex-row items-center gap-1.5 bg-yellow-500/10 self-start px-2 py-0.5 rounded-md border border-yellow-500/20">
-                        <Ionicons name="calendar-outline" size={12} color="#EAB308" />
-                        <Text className="text-[10px] font-black text-yellow-500 uppercase tracking-tighter">Set Availability</Text>
+                    <View
+                        className="flex-row items-center gap-1.5 self-start px-2.5 py-1 rounded-lg"
+                        style={{
+                            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(245, 158, 11, 0.28)',
+                        }}
+                    >
+                        <Ionicons name="calendar" size={11} color="#FBBF24" />
+                        <Text className="text-[10px] font-black text-amber-300 uppercase tracking-tight">
+                            Set Availability
+                        </Text>
                     </View>
                 );
             case 'scheduled':
                 return (
-                    <View className="flex-row items-center gap-1.5 bg-primary/10 self-start px-2 py-0.5 rounded-md border border-primary/20">
-                        <Ionicons name="time-outline" size={12} color="#10B981" />
-                        <Text className="text-[10px] font-black text-primary uppercase tracking-tighter">{matchTime}</Text>
+                    <View
+                        className="flex-row items-center gap-1.5 self-start px-2.5 py-1 rounded-lg"
+                        style={{
+                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(16, 185, 129, 0.28)',
+                        }}
+                    >
+                        <Ionicons name="time" size={11} color="#34D399" />
+                        <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">
+                            {matchTime}
+                        </Text>
                     </View>
                 );
             case 'ready_phase':
                 return (
-                    <View className="flex-row items-center gap-1.5 bg-indigo-500/10 self-start px-2 py-0.5 rounded-md border border-indigo-500/20">
-                        <Ionicons name="flash-outline" size={12} color="#6366F1" />
-                        <Text className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter">Ready Check</Text>
+                    <View
+                        className="flex-row items-center gap-1.5 self-start px-2.5 py-1 rounded-lg"
+                        style={{
+                            backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(99, 102, 241, 0.28)',
+                        }}
+                    >
+                        <Ionicons name="flash" size={11} color="#A5B4FC" />
+                        <Text className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">
+                            Ready Check
+                        </Text>
                     </View>
                 );
             default:
@@ -688,49 +716,146 @@ export function MatchScheduleCard({
         );
     }
 
-    const statusColor = currentStatus === 'pending_availability' ? '#EAB308'
+    const statusColor = currentStatus === 'pending_availability' ? '#F59E0B'
         : currentStatus === 'scheduled' ? '#10B981' : '#6366F1';
 
     return (
         <>
             <Pressable
                 onPress={() => setModalVisible(true)}
-                className="active:opacity-80"
+                className="active:opacity-90"
             >
-                <View className={cn(
-                    "bg-[#131B2E] rounded-3xl overflow-hidden",
-                    currentStatus === 'ready_phase' && "border border-indigo-500/20"
-                )}>
-                    <View className="flex-row">
-                        <View style={{ width: 4, backgroundColor: statusColor, opacity: 0.6 }} className="rounded-l-3xl" />
+                <View
+                    className={cn(
+                        "rounded-[22px] overflow-hidden",
+                        currentStatus === 'ready_phase' && "border border-indigo-500/30"
+                    )}
+                    style={{
+                        backgroundColor: '#131B2E',
+                        shadowColor: statusColor,
+                        shadowOpacity: 0.12,
+                        shadowRadius: 14,
+                        shadowOffset: { width: 0, height: 6 },
+                        elevation: 6,
+                    }}
+                >
+                    {/* Subtle status-tinted gradient (left-to-right) */}
+                    <LinearGradient
+                        colors={[statusColor + '14', 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 0.7, y: 0 }}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    />
 
-                        <View className="flex-1 p-4">
-                            {/* Top row: hub + tournament */}
-                            <View className="flex-row items-center justify-between mb-3">
-                                <Text className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex-1" numberOfLines={1}>
+                    {/* Soft hairline border */}
+                    <View
+                        pointerEvents="none"
+                        className="absolute inset-0 rounded-[22px]"
+                        style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}
+                    />
+
+                    {/* Left accent line (glowing) */}
+                    <View
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 14,
+                            bottom: 14,
+                            width: 3,
+                            backgroundColor: statusColor,
+                            borderTopRightRadius: 3,
+                            borderBottomRightRadius: 3,
+                            shadowColor: statusColor,
+                            shadowOpacity: 0.7,
+                            shadowRadius: 8,
+                            shadowOffset: { width: 0, height: 0 },
+                        }}
+                    />
+
+                    <View className="p-4 pl-5">
+                        {/* Top row: hub badge + tournament */}
+                        <View className="flex-row items-center justify-between mb-3.5">
+                            <View className="flex-row items-center gap-1.5 flex-1 mr-2">
+                                <View
+                                    style={{
+                                        width: 4,
+                                        height: 4,
+                                        borderRadius: 2,
+                                        backgroundColor: statusColor,
+                                    }}
+                                />
+                                <Text
+                                    className="text-[10px] font-black uppercase tracking-[2px] flex-1"
+                                    style={{ color: statusColor + 'DD' }}
+                                    numberOfLines={1}
+                                >
                                     {roundName}
                                 </Text>
-                                <Text className="text-[10px] font-medium text-slate-600" numberOfLines={1}>
-                                    {tournamentName}
-                                </Text>
+                            </View>
+                            <Text
+                                className="text-[10px] font-bold text-slate-500 tracking-wider"
+                                numberOfLines={1}
+                            >
+                                {tournamentName}
+                            </Text>
+                        </View>
+
+                        {/* Main content row */}
+                        <View className="flex-row items-center">
+                            <View
+                                style={{
+                                    shadowColor: statusColor,
+                                    shadowOpacity: 0.35,
+                                    shadowRadius: 10,
+                                    shadowOffset: { width: 0, height: 2 },
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        borderWidth: 1.5,
+                                        borderColor: statusColor + '55',
+                                        borderRadius: 16,
+                                        padding: 2,
+                                    }}
+                                >
+                                    <PlayerAvatar
+                                        src={opponentAvatarUrl}
+                                        name={opponentName}
+                                        size="md"
+                                        className="rounded-[12px]"
+                                    />
+                                </View>
                             </View>
 
-                            {/* Main content row */}
-                            <View className="flex-row items-center">
-                                <View className="w-11 h-11 items-center justify-center">
-                                    <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="rounded-xl" />
-                                </View>
-
-                                <View className="flex-1 ml-3 min-w-0">
-                                    <Text className="text-base font-black text-white tracking-tight" numberOfLines={1}>
-                                        vs {opponentName}
+                            <View className="flex-1 ml-3.5 min-w-0">
+                                <View className="flex-row items-baseline gap-1.5">
+                                    <Text
+                                        className="text-[11px] font-black uppercase tracking-widest"
+                                        style={{ color: statusColor }}
+                                    >
+                                        vs
                                     </Text>
-                                    <View className="flex-row items-center mt-1.5">
-                                        {getStatusContent()}
-                                    </View>
+                                    <Text
+                                        className="text-[15px] font-black text-white tracking-tight flex-1"
+                                        numberOfLines={1}
+                                    >
+                                        {opponentName}
+                                    </Text>
                                 </View>
+                                <View className="flex-row items-center mt-2">
+                                    {getStatusContent()}
+                                </View>
+                            </View>
 
-                                <Ionicons name="chevron-forward" size={14} color="#1E293B" />
+                            <View
+                                className="w-8 h-8 rounded-full items-center justify-center ml-2"
+                                style={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.07)',
+                                }}
+                            >
+                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
                             </View>
                         </View>
                     </View>
