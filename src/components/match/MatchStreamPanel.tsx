@@ -295,33 +295,98 @@ function StreamCard({
 
     return (
         <View
-            className="rounded-3xl overflow-hidden bg-[#0D1525] border"
-            style={{ borderColor: isMine ? `${meta.color}3A` : 'rgba(255,255,255,0.06)' }}
+            className="rounded-[24px] overflow-hidden"
+            style={{
+                backgroundColor: '#131B2E',
+                shadowColor: '#000000',
+                shadowOpacity: 0.22,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 3,
+            }}
         >
-            {/* Header: just avatar + name + (You) + pause when playing. Nothing more — pills
-                live in the footer below the player so the header reads at a glance. */}
+            {/* Hairline border */}
+            <View
+                pointerEvents="none"
+                className="absolute inset-0 rounded-[24px]"
+                style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
+            />
+
+            {/* Header: avatar + streamer + status·platform subtitle + pause */}
             <View className="flex-row items-center gap-3 px-4 pt-4 pb-3">
-                <PlayerAvatar src={stream.streamerAvatarUrl || undefined} name={label} size="md" />
-                <View className="flex-1 min-w-0 flex-row items-center gap-2">
-                    <Text className="text-[15px] font-black text-white flex-shrink" numberOfLines={1}>{label}</Text>
-                    {isMine && (
-                        <View className="bg-primary/15 px-1.5 py-0.5 rounded">
-                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">You</Text>
+                <PlayerAvatar
+                    src={stream.streamerAvatarUrl || undefined}
+                    name={label}
+                    size="md"
+                />
+                <View className="flex-1 min-w-0">
+                    <View className="flex-row items-center gap-2">
+                        <Text
+                            className="text-[15px] font-black text-white flex-shrink"
+                            numberOfLines={1}
+                        >
+                            {label}
+                        </Text>
+                        {isMine && (
+                            <View
+                                className="px-1.5 py-0.5 rounded"
+                                style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)' }}
+                            >
+                                <Text className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">
+                                    You
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Status · platform — single inline row */}
+                    <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
+                        {live ? (
+                            <View className="flex-row items-center" style={{ gap: 5 }}>
+                                <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                <Text className="text-[10.5px] font-black text-red-400 uppercase" style={{ letterSpacing: 1.4 }}>
+                                    Live
+                                </Text>
+                            </View>
+                        ) : hasReplay ? (
+                            <Text className="text-[10.5px] font-black text-slate-400 uppercase" style={{ letterSpacing: 1.4 }}>
+                                Replay
+                            </Text>
+                        ) : (
+                            <Text className="text-[10.5px] font-black text-amber-300 uppercase" style={{ letterSpacing: 1.4 }}>
+                                Pending
+                            </Text>
+                        )}
+                        <Text className="text-[11px] font-bold text-slate-600">·</Text>
+                        <View className="flex-row items-center" style={{ gap: 4 }}>
+                            <PlatformIcon platform={stream.platform} size={11} color={meta.color} />
+                            <Text
+                                className="text-[10.5px] font-black uppercase"
+                                style={{ color: meta.color, letterSpacing: 1.2 }}
+                            >
+                                {meta.name}
+                            </Text>
                         </View>
-                    )}
+                    </View>
                 </View>
+
                 {isPlaying && (
                     <Pressable
                         onPress={onPause}
-                        className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] items-center justify-center active:opacity-60"
+                        className="w-9 h-9 rounded-full items-center justify-center active:opacity-60"
+                        style={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(255, 255, 255, 0.07)',
+                        }}
                     >
-                        <Ionicons name="pause" size={14} color="#94A3B8" />
+                        <Ionicons name="pause" size={13} color="#CBD5E1" />
                     </Pressable>
                 )}
             </View>
 
-            {/* Player slot — clean, just the player or its poster, no overlays */}
-            <View className="px-4">
+            {/* Player slot */}
+            <View className="px-4 pb-4">
                 {live ? (
                     <StreamPlayer
                         source={getLiveEmbed(stream.platform, stream.channelHandle)}
@@ -344,51 +409,72 @@ function StreamCard({
                 )}
             </View>
 
-            {/* Footer: platform pill + status pill, breathing room from the player above */}
-            <View className="flex-row items-center gap-2 px-4 pt-3 pb-3">
-                <View
-                    className="flex-row items-center gap-1.5 px-2 py-1 rounded-md"
-                    style={{ backgroundColor: `${meta.color}1A` }}
-                >
-                    <PlatformIcon platform={stream.platform} size={11} color={meta.color} />
-                    <Text className="text-[10px] font-black uppercase tracking-widest" style={{ color: meta.color }}>
-                        {meta.name}
-                    </Text>
-                </View>
-                {live ? (
-                    <View className="flex-row items-center gap-1 bg-red-500/15 px-2 py-1 rounded-md">
-                        <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        <Text className="text-[10px] font-black text-red-400 uppercase tracking-widest">Live</Text>
-                    </View>
-                ) : hasReplay ? (
-                    <View className="bg-white/[0.05] px-2 py-1 rounded-md">
-                        <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Replay</Text>
-                    </View>
-                ) : (
-                    <View className="bg-yellow-500/10 px-2 py-1 rounded-md">
-                        <Text className="text-[10px] font-black text-yellow-500/90 uppercase tracking-widest">Pending</Text>
-                    </View>
-                )}
-            </View>
-
-            {/* Owner controls — divider above to clearly mark "actions" zone */}
+            {/* Owner controls */}
             {isMine && (
                 <>
-                    <View className="h-px bg-white/[0.04] mx-4" />
-                    <View className="px-4 pt-3 pb-4 gap-2.5">
+                    <View
+                        style={{
+                            height: 1,
+                            backgroundColor: 'rgba(255,255,255,0.04)',
+                            marginHorizontal: 16,
+                        }}
+                    />
+                    <View className="px-4 pt-3 pb-4" style={{ gap: 10 }}>
                         {live && (
-                            <Button onPress={onEnd} loading={submitting} variant="outline" className="h-11 rounded-2xl">
-                                <View className="flex-row items-center gap-2">
-                                    <Ionicons name="stop-circle-outline" size={15} color="#F87171" />
-                                    <Text className="text-[11px] font-black text-red-400 uppercase tracking-widest">End stream</Text>
-                                </View>
-                            </Button>
+                            <Pressable
+                                onPress={onEnd}
+                                disabled={submitting}
+                                className="h-11 rounded-2xl flex-row items-center justify-center active:opacity-80"
+                                style={{
+                                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(239, 68, 68, 0.25)',
+                                    gap: 6,
+                                }}
+                            >
+                                {submitting ? (
+                                    <ActivityIndicator size="small" color="#FCA5A5" />
+                                ) : (
+                                    <>
+                                        <Ionicons name="stop-circle" size={15} color="#FCA5A5" />
+                                        <Text
+                                            className="text-[11px] font-black text-red-300 uppercase"
+                                            style={{ letterSpacing: 1.4 }}
+                                        >
+                                            End Stream
+                                        </Text>
+                                    </>
+                                )}
+                            </Pressable>
                         )}
                         {!live && stream.vodPending && (
-                            <View className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 gap-2.5">
-                                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Paste the replay link</Text>
-                                <Input placeholder="https://..." value={vodInput} onChangeText={setVodInput} autoCapitalize="none" />
-                                <Button onPress={onSubmitVod} loading={submitting} disabled={!vodInput.trim()} size="sm">
+                            <View
+                                className="rounded-2xl p-3"
+                                style={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.025)',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.05)',
+                                    gap: 10,
+                                }}
+                            >
+                                <Text
+                                    className="text-[10px] font-black text-slate-400 uppercase"
+                                    style={{ letterSpacing: 1.4 }}
+                                >
+                                    Paste the replay link
+                                </Text>
+                                <Input
+                                    placeholder="https://..."
+                                    value={vodInput}
+                                    onChangeText={setVodInput}
+                                    autoCapitalize="none"
+                                />
+                                <Button
+                                    onPress={onSubmitVod}
+                                    loading={submitting}
+                                    disabled={!vodInput.trim()}
+                                    size="sm"
+                                >
                                     <Text className="text-white font-bold">Save replay link</Text>
                                 </Button>
                             </View>
@@ -396,10 +482,16 @@ function StreamCard({
                         <Pressable
                             onPress={onDelete}
                             disabled={submitting}
-                            className="flex-row items-center justify-center gap-1.5 py-1 active:opacity-60"
+                            className="flex-row items-center justify-center py-1 active:opacity-60"
+                            style={{ gap: 6 }}
                         >
                             <Ionicons name="trash-outline" size={12} color="#64748B" />
-                            <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Delete stream</Text>
+                            <Text
+                                className="text-[10px] font-bold text-slate-500 uppercase"
+                                style={{ letterSpacing: 1.2 }}
+                            >
+                                Delete stream
+                            </Text>
                         </Pressable>
                     </View>
                 </>

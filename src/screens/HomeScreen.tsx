@@ -197,8 +197,8 @@ export default function HomeScreen() {
                             <SectionHeader
                                 icon="alert-circle"
                                 iconColor="#F59E0B"
-                                iconBg="rgba(245, 158, 11, 0.12)"
-                                iconBorder="rgba(245, 158, 11, 0.25)"
+                                iconBg="rgba(245, 158, 11, 0.01)"
+                                iconBorder="rgba(245, 158, 11, 0.1)"
                                 title="Needs Attention"
                                 subtitle="Requires your action"
                                 onSeeAll={() => navigation.navigate('MyMatches')}
@@ -228,8 +228,8 @@ export default function HomeScreen() {
                         <SectionHeader
                             icon="game-controller"
                             iconColor="#10B981"
-                            iconBg="rgba(16, 185, 129, 0.12)"
-                            iconBorder="rgba(16, 185, 129, 0.25)"
+                            iconBg="rgba(16, 185, 129, 0.01)"
+                            iconBorder="rgba(16, 185, 129, 0.1)"
                             title="Active Matches"
                             subtitle="In progress & scheduled"
                             onSeeAll={() => navigation.navigate('MyMatches')}
@@ -278,8 +278,8 @@ export default function HomeScreen() {
                         <SectionHeader
                             icon="sparkles"
                             iconColor="#A78BFA"
-                            iconBg="rgba(167, 139, 250, 0.12)"
-                            iconBorder="rgba(167, 139, 250, 0.25)"
+                            iconBg="rgba(167, 139, 250, 0.01)"
+                            iconBorder="rgba(167, 139, 250, 0.1)"
                             title="Highlights"
                             subtitle="Latest from your hubs"
                             onSeeAll={() => setShowHighlightsModal(true)}
