@@ -9,7 +9,20 @@ import { Button } from '../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { StatusModal } from '../components/modals/StatusModal';
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
+
+const friendlyForgotError = (raw: string): string => {
+    const msg = raw.toLowerCase();
+
+    if (msg.includes('userentity') || msg.includes('not found') || msg.includes('does not exist')) {
+        return 'We could not find an account with that email address.';
+    }
+    if (msg.includes('email') && msg.includes('empty')) {
+        return 'Please enter your email address.';
+    }
+
+    return 'Could not send the reset code. Please check the email and try again.';
+};
 
 export default function ForgotPasswordScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -50,10 +63,11 @@ export default function ForgotPasswordScreen() {
                 navigation.navigate('ResetPassword', { email: email.trim() });
             } else {
                 const text = await response.text();
+                const parsed = getErrorMessage(text);
                 setStatusModalConfig({
                     type: 'error',
                     title: 'Request Failed',
-                    message: text || 'Could not process your request. Please check the email and try again.'
+                    message: friendlyForgotError(parsed)
                 });
                 setShowStatusModal(true);
             }

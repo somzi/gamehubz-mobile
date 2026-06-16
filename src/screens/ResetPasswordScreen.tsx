@@ -9,7 +9,26 @@ import { Button } from '../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { StatusModal } from '../components/modals/StatusModal';
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
+
+const friendlyResetError = (raw: string): string => {
+    const msg = raw.toLowerCase();
+
+    if (msg.includes('forgot password token') || msg.includes('not found')) {
+        return 'The code you entered is invalid. Double-check it or request a new one.';
+    }
+    if (msg.includes('expired') || msg.includes('invalidforgotpassword')) {
+        return 'This code has expired. Please go back and request a new one.';
+    }
+    if (msg.includes('password') && msg.includes('match')) {
+        return 'Passwords do not match. Please re-enter them.';
+    }
+    if (msg.includes('password')) {
+        return 'Your new password does not meet the requirements.';
+    }
+
+    return 'We could not reset your password. The code might be invalid or expired — please try again.';
+};
 
 type ResetPasswordRouteProp = RouteProp<RootStackParamList, 'ResetPassword'>;
 
@@ -102,10 +121,11 @@ export default function ResetPasswordScreen() {
                 setShowStatusModal(true);
             } else {
                 const text = await response.text();
+                const parsed = getErrorMessage(text);
                 setStatusModalConfig({
                     type: 'error',
                     title: 'Reset Failed',
-                    message: text || 'Failed to reset password. The code might be invalid or expired.'
+                    message: friendlyResetError(parsed)
                 });
                 setShowStatusModal(true);
             }
