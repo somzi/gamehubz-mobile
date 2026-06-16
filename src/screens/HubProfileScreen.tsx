@@ -19,6 +19,7 @@ import { getSocialUrl } from '../lib/social';
 import { shareHub } from '../lib/share';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
 
 type HubProfileRouteProp = RouteProp<RootStackParamList, 'HubProfile'>;
 
@@ -556,102 +557,59 @@ export default function HubProfileScreen() {
                 {/* ═══════════════════════════════════════════ */}
                 {hubTab === 'overview' && (
                     <View className="px-4 pb-12">
-                        {/* General Info - Collapsible (matches tournament details design) */}
-                        <View className="bg-[#131B2E] rounded-2xl border border-white/5 mb-3 overflow-hidden">
-                            <Pressable
-                                onPress={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
-                                className="flex-row items-center justify-between p-4"
-                            >
-                                <View className="flex-row items-center gap-2.5">
-                                    <View className="w-8 h-8 rounded-xl bg-[#F59E0B]/10 items-center justify-center">
-                                        <Ionicons name="information-circle-outline" size={18} color="#F59E0B" />
-                                    </View>
-                                    <Text className="text-[11px] font-black text-white uppercase tracking-widest">General Info</Text>
-                                </View>
-                                <Ionicons name={isGeneralInfoOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
-                            </Pressable>
-                            {isGeneralInfoOpen && (
-                                <View className="px-4 pb-4">
-                                    <View className="border-t border-white/5 pt-4">
-                                        {/* Followers */}
-                                        <View className="flex-row items-center justify-between py-3">
-                                            <View className="flex-row items-center gap-3">
-                                                <View className="w-8 h-8 rounded-xl bg-[#818CF8]/10 items-center justify-center">
-                                                    <Ionicons name="people-outline" size={16} color="#818CF8" />
-                                                </View>
-                                                <Text className="text-sm text-slate-400 font-bold">Followers</Text>
-                                            </View>
-                                            <Text className="text-base font-black text-white">
-                                                {(hubData.numberOfUsers || 0).toLocaleString()}
-                                            </Text>
-                                        </View>
-                                        <View className="h-[1px] bg-white/5" />
-                                        {/* Tournaments */}
-                                        <View className="flex-row items-center justify-between py-3">
-                                            <View className="flex-row items-center gap-3">
-                                                <View className="w-8 h-8 rounded-xl bg-[#FBBF24]/10 items-center justify-center">
-                                                    <Ionicons name="trophy-outline" size={16} color="#FBBF24" />
-                                                </View>
-                                                <Text className="text-sm text-slate-400 font-bold">Tournaments</Text>
-                                            </View>
-                                            <Text className="text-base font-black text-white">
-                                                {hubData.numberOfTournaments || 0}
-                                            </Text>
-                                        </View>
-                                        {/* Owner */}
-                                        {(hubData.ownerName || hubData.OwnerName) && (
-                                            <>
-                                                <View className="h-[1px] bg-white/5" />
-                                                <View className="flex-row items-center justify-between py-3">
-                                                    <View className="flex-row items-center gap-3">
-                                                        <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
-                                                            <Ionicons name="person-outline" size={16} color="#10B981" />
-                                                        </View>
-                                                        <Text className="text-sm text-slate-400 font-bold">Owner</Text>
-                                                    </View>
-                                                    <Pressable onPress={() => {
-                                                        const ownerIdValue = hubData.ownerId || hubData.OwnerId || hubData.userId || hubData.UserId || hubData.createdBy || hubData.CreatedBy;
-                                                        if (ownerIdValue) {
-                                                            navigation.navigate('PlayerProfile', { id: ownerIdValue });
-                                                        }
-                                                    }}>
-                                                        <Text className="text-base font-black text-[#10B981] underline">
-                                                            {hubData.ownerName || hubData.OwnerName}
-                                                        </Text>
-                                                    </Pressable>
-                                                </View>
-                                            </>
-                                        )}
-                                    </View>
-                                </View>
+                        {/* General Info */}
+                        <CollapsibleCard
+                            icon="information-circle"
+                            iconColor="#F59E0B"
+                            title="General Info"
+                            isOpen={isGeneralInfoOpen}
+                            onToggle={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
+                        >
+                            <InfoRow
+                                icon="people"
+                                iconColor="#818CF8"
+                                label="Followers"
+                                value={(hubData.numberOfUsers || 0).toLocaleString()}
+                            />
+                            <InfoRow
+                                icon="trophy"
+                                iconColor="#FBBF24"
+                                label="Tournaments"
+                                value={String(hubData.numberOfTournaments || 0)}
+                            />
+                            {(hubData.ownerName || hubData.OwnerName) && (
+                                <InfoRow
+                                    icon="person"
+                                    iconColor="#34D399"
+                                    label="Owner"
+                                    value={
+                                        <Text className="text-[14px] font-black text-emerald-300" numberOfLines={1}>
+                                            {hubData.ownerName || hubData.OwnerName}
+                                        </Text>
+                                    }
+                                    onPress={() => {
+                                        const ownerIdValue = hubData.ownerId || hubData.OwnerId || hubData.userId || hubData.UserId || hubData.createdBy || hubData.CreatedBy;
+                                        if (ownerIdValue) {
+                                            navigation.navigate('PlayerProfile', { id: ownerIdValue });
+                                        }
+                                    }}
+                                />
                             )}
-                        </View>
+                        </CollapsibleCard>
 
-                        {/* About / Description - Collapsible */}
+                        {/* About */}
                         {hubData.description && (
-                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 mb-3 overflow-hidden">
-                                <Pressable
-                                    onPress={() => setIsAboutOpen(!isAboutOpen)}
-                                    className="flex-row items-center justify-between p-4"
-                                >
-                                    <View className="flex-row items-center gap-2.5">
-                                        <View className="w-8 h-8 rounded-xl bg-[#F59E0B]/10 items-center justify-center">
-                                            <Ionicons name="document-text-outline" size={18} color="#F59E0B" />
-                                        </View>
-                                        <Text className="text-[11px] font-black text-white uppercase tracking-widest">About</Text>
-                                    </View>
-                                    <Ionicons name={isAboutOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
-                                </Pressable>
-                                {isAboutOpen && (
-                                    <View className="px-4 pb-4">
-                                        <View className="border-t border-white/5 pt-4">
-                                            <Text className="text-slate-400 leading-6 text-sm">
-                                                {hubData.description}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
-                            </View>
+                            <CollapsibleCard
+                                icon="document-text"
+                                iconColor="#FBBF24"
+                                title="About"
+                                isOpen={isAboutOpen}
+                                onToggle={() => setIsAboutOpen(!isAboutOpen)}
+                            >
+                                <QuoteBlock accentColor="#FBBF24">
+                                    {hubData.description}
+                                </QuoteBlock>
+                            </CollapsibleCard>
                         )}
                     </View>
                 )}

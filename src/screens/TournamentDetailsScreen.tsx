@@ -21,6 +21,8 @@ import { shareTournament } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { LinearGradient } from 'expo-linear-gradient';
+import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
 import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
@@ -1526,231 +1528,127 @@ export default function TournamentDetailsScreen() {
                                 </Pressable>
                             )}
 
-                            {/* General Info - Collapsible */}
-                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 mb-3 overflow-hidden">
-                                <Pressable
-                                    onPress={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
-                                    className="flex-row items-center justify-between p-4"
-                                >
-                                    <View className="flex-row items-center gap-2.5">
-                                        <View className="w-8 h-8 rounded-xl bg-[#F59E0B]/10 items-center justify-center">
-                                            <Ionicons name="information-circle-outline" size={18} color="#F59E0B" />
-                                        </View>
-                                        <Text className="text-[11px] font-black text-white uppercase tracking-widest">General Info</Text>
-                                    </View>
-                                    <Ionicons name={isGeneralInfoOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
-                                </Pressable>
-                                {isGeneralInfoOpen && (
-                                    <View className="px-4 pb-4">
-                                        <View className="border-t border-white/5 pt-4">
-                                            {/* Prize Pool */}
-                                            <View className="flex-row items-center justify-between py-3">
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-xl bg-[#F59E0B]/10 items-center justify-center">
-                                                        <Ionicons name="trophy-outline" size={16} color="#F59E0B" />
-                                                    </View>
-                                                    <Text className="text-sm text-slate-400 font-bold">Prize Pool</Text>
-                                                </View>
-                                                <Text className="text-base font-black text-white">
-                                                    {tournament.prize} {getCurrencyLabel(tournament.prizeCurrency)}
-                                                </Text>
-                                            </View>
-                                            <View className="h-[1px] bg-white/5" />
-                                            {/* Max Players */}
-                                            <View className="flex-row items-center justify-between py-3">
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-xl bg-[#4F46E5]/10 items-center justify-center">
-                                                        <Ionicons name="people-outline" size={16} color="#4F46E5" />
-                                                    </View>
-                                                    <Text className="text-sm text-slate-400 font-bold">Max Players</Text>
-                                                </View>
-                                                <Text className="text-base font-black text-white">
-                                                    {tournament.maxPlayers || 'No Limit'}
-                                                </Text>
-                                            </View>
-                                            <View className="h-[1px] bg-white/5" />
-                                            {/* Format */}
-                                            <View className="flex-row items-center justify-between py-3">
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-xl bg-[#8B5CF6]/10 items-center justify-center">
-                                                        <Ionicons name="list-outline" size={16} color="#8B5CF6" />
-                                                    </View>
-                                                    <Text className="text-sm text-slate-400 font-bold">Format</Text>
-                                                </View>
-                                                <Text className="text-base font-black text-white text-right max-w-[60%]">
-                                                    {getTournamentFormatLabel(Number(tournament.format))}
-                                                </Text>
-                                            </View>
-                                            <View className="h-[1px] bg-white/5" />
-                                            {/* Mode */}
-                                            <View className="flex-row items-center justify-between py-3">
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-xl bg-[#00E5A0]/10 items-center justify-center">
-                                                        <Ionicons name="game-controller-outline" size={16} color="#00E5A0" />
-                                                    </View>
-                                                    <Text className="text-sm text-slate-400 font-bold">Mode</Text>
-                                                </View>
-                                                <Text className="text-base font-black text-white">
-                                                    {tournament.isTeamTournament ? 'Team' : 'Solo'}
-                                                </Text>
-                                            </View>
-                                            <View className="h-[1px] bg-white/5" />
-                                            {/* Team Size */}
-                                            {tournament.isTeamTournament && (
-                                                <>
-                                                    <View className="flex-row items-center justify-between py-3">
-                                                        <View className="flex-row items-center gap-3">
-                                                            <View className="w-8 h-8 rounded-xl bg-[#EC4899]/10 items-center justify-center">
-                                                                <Ionicons name="people-circle-outline" size={16} color="#EC4899" />
-                                                            </View>
-                                                            <Text className="text-sm text-slate-400 font-bold">Team Size</Text>
-                                                        </View>
-                                                        <Text className="text-base font-black text-white">
-                                                            {tournament.teamSize || '?'}v{tournament.teamSize || '?'}
-                                                        </Text>
-                                                    </View>
-                                                    <View className="h-[1px] bg-white/5" />
-                                                </>
-                                            )}
-                                            {/* Date */}
-                                            <View className="flex-row items-center justify-between py-3">
-                                                <View className="flex-row items-center gap-3">
-                                                    <View className="w-8 h-8 rounded-xl bg-[#3B82F6]/10 items-center justify-center">
-                                                        <Ionicons name="calendar-outline" size={16} color="#3B82F6" />
-                                                    </View>
-                                                    <Text className="text-sm text-slate-400 font-bold">Start Date</Text>
-                                                </View>
-                                                <Text className="text-base font-black text-white">
-                                                    {tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD'}
-                                                </Text>
-                                            </View>
-                                            <View className="h-[1px] bg-white/5" />
-                                            {/* Region (or Countries when the tournament is country-scoped) */}
-                                            {(tournament.countries && tournament.countries.length > 0) ? (
-                                                tournament.countries.length === 1 ? (
-                                                    <View className="flex-row items-center justify-between py-3">
-                                                        <View className="flex-row items-center gap-3">
-                                                            <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
-                                                                <Ionicons name="flag-outline" size={16} color="#10B981" />
-                                                            </View>
-                                                            <Text className="text-sm text-slate-400 font-bold">Country</Text>
-                                                        </View>
-                                                        <Text className="flex-1 text-right text-base font-black text-white ml-3" style={{ flexShrink: 1 }}>
-                                                            {`${tournament.countryFlags?.[0] ? tournament.countryFlags[0] + ' ' : ''}${tournament.countryNames?.[0] ?? tournament.countries[0]}`}
-                                                        </Text>
-                                                    </View>
-                                                ) : (
-                                                    <Pressable
-                                                        onPress={() => setShowCountriesModal(true)}
-                                                        className="flex-row items-center justify-between py-3"
-                                                    >
-                                                        <View className="flex-row items-center gap-3">
-                                                            <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
-                                                                <Ionicons name="flag-outline" size={16} color="#10B981" />
-                                                            </View>
-                                                            <Text className="text-sm text-slate-400 font-bold">Countries</Text>
-                                                        </View>
-                                                        <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                            <Text className="text-base font-black text-white">
-                                                                {tournament.countries.length} countries
-                                                            </Text>
-                                                            <Ionicons name="chevron-forward" size={16} color="#475569" />
-                                                        </View>
-                                                    </Pressable>
-                                                )
-                                            ) : (
-                                                <View className="flex-row items-center justify-between py-3">
-                                                    <View className="flex-row items-center gap-3">
-                                                        <View className="w-8 h-8 rounded-xl bg-[#10B981]/10 items-center justify-center">
-                                                            <Ionicons name="globe-outline" size={16} color="#10B981" />
-                                                        </View>
-                                                        <Text className="text-sm text-slate-400 font-bold">Region</Text>
-                                                    </View>
-                                                    <Text className="text-base font-black text-white uppercase">
-                                                        {tournament.region === TournamentRegion.Europe ? 'EU'
-                                                            : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
-                                                                : tournament.region === TournamentRegion.Asia ? 'Asia'
-                                                                    : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
-                                                                        : tournament.region === TournamentRegion.Africa ? 'AFR'
-                                                                            : tournament.region === TournamentRegion.Oceania ? 'OCE'
-                                                                                : 'Global'}
-                                                    </Text>
-                                                </View>
-                                            )}
-
-                                            {/* Hub */}
-                                            {tournament.hubName && tournament.hubId && (
-                                                <>
-                                                    <View className="h-[1px] bg-white/5" />
-                                                    <View className="flex-row items-center justify-between py-3">
-                                                        <View className="flex-row items-center gap-3">
-                                                            <View className="w-8 h-8 rounded-xl bg-indigo-500/10 items-center justify-center">
-                                                                <Ionicons name="home-outline" size={16} color="#6366F1" />
-                                                            </View>
-                                                            <Text className="text-sm text-slate-400 font-bold">Hub</Text>
-                                                        </View>
-                                                        <Pressable onPress={() => navigation.navigate('HubProfile', { id: tournament.hubId })}>
-                                                            <Text className="text-base font-black text-[#10B981] underline">
-                                                                {tournament.hubName}
-                                                            </Text>
-                                                        </Pressable>
-                                                    </View>
-                                                </>
-                                            )}
-                                        </View>
-                                    </View>
+                            {/* General Info */}
+                            <CollapsibleCard
+                                icon="information-circle"
+                                iconColor="#F59E0B"
+                                title="General Info"
+                                isOpen={isGeneralInfoOpen}
+                                onToggle={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
+                            >
+                                <InfoRow
+                                    icon="trophy"
+                                    iconColor="#F59E0B"
+                                    label="Prize Pool"
+                                    value={tournament.prize && Number(tournament.prize) > 0
+                                        ? `${tournament.prize} ${getCurrencyLabel(tournament.prizeCurrency)}`
+                                        : 'No Prize'}
+                                />
+                                <InfoRow
+                                    icon="people"
+                                    iconColor="#818CF8"
+                                    label="Max Players"
+                                    value={String(tournament.maxPlayers || 'No Limit')}
+                                />
+                                <InfoRow
+                                    icon="list"
+                                    iconColor="#A78BFA"
+                                    label="Format"
+                                    value={getTournamentFormatLabel(Number(tournament.format))}
+                                />
+                                <InfoRow
+                                    icon="game-controller"
+                                    iconColor="#34D399"
+                                    label="Mode"
+                                    value={tournament.isTeamTournament ? 'Team' : 'Solo'}
+                                />
+                                {tournament.isTeamTournament && (
+                                    <InfoRow
+                                        icon="people-circle"
+                                        iconColor="#F472B6"
+                                        label="Team Size"
+                                        value={`${tournament.teamSize || '?'}v${tournament.teamSize || '?'}`}
+                                    />
                                 )}
-                            </View>
-
-                            {/* Description - Collapsible */}
-                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 mb-3 overflow-hidden">
-                                <Pressable
-                                    onPress={() => setIsDescriptionOpen(!isDescriptionOpen)}
-                                    className="flex-row items-center justify-between p-4"
-                                >
-                                    <View className="flex-row items-center gap-2.5">
-                                        <View className="w-8 h-8 rounded-xl bg-[#F59E0B]/10 items-center justify-center">
-                                            <Ionicons name="flash-outline" size={18} color="#F59E0B" />
-                                        </View>
-                                        <Text className="text-[11px] font-black text-white uppercase tracking-widest">Description</Text>
-                                    </View>
-                                    <Ionicons name={isDescriptionOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
-                                </Pressable>
-                                {isDescriptionOpen && (
-                                    <View className="px-4 pb-4">
-                                        <View className="border-t border-white/5 pt-4">
-                                            <Text className="text-slate-400 leading-6 text-sm">
-                                                {tournament.description || 'Join this competitive tournament and prove your skills to climb the leaderboard.'}
+                                <InfoRow
+                                    icon="calendar"
+                                    iconColor="#60A5FA"
+                                    label="Start Date"
+                                    value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD'}
+                                />
+                                {(tournament.countries && tournament.countries.length > 0) ? (
+                                    tournament.countries.length === 1 ? (
+                                        <InfoRow
+                                            icon="flag"
+                                            iconColor="#34D399"
+                                            label="Country"
+                                            value={`${tournament.countryFlags?.[0] ? tournament.countryFlags[0] + ' ' : ''}${tournament.countryNames?.[0] ?? tournament.countries[0]}`}
+                                        />
+                                    ) : (
+                                        <InfoRow
+                                            icon="flag"
+                                            iconColor="#34D399"
+                                            label="Countries"
+                                            value={`${tournament.countries.length} countries`}
+                                            onPress={() => setShowCountriesModal(true)}
+                                        />
+                                    )
+                                ) : (
+                                    <InfoRow
+                                        icon="globe"
+                                        iconColor="#34D399"
+                                        label="Region"
+                                        value={
+                                            tournament.region === TournamentRegion.Europe ? 'EU'
+                                                : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
+                                                    : tournament.region === TournamentRegion.Asia ? 'Asia'
+                                                        : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
+                                                            : tournament.region === TournamentRegion.Africa ? 'AFR'
+                                                                : tournament.region === TournamentRegion.Oceania ? 'OCE'
+                                                                    : 'Global'
+                                        }
+                                    />
+                                )}
+                                {tournament.hubName && tournament.hubId && (
+                                    <InfoRow
+                                        icon="home"
+                                        iconColor="#A5B4FC"
+                                        label="Hub"
+                                        value={
+                                            <Text className="text-[14px] font-black text-emerald-300" numberOfLines={1}>
+                                                {tournament.hubName}
                                             </Text>
-                                        </View>
-                                    </View>
+                                        }
+                                        onPress={() => navigation.navigate('HubProfile', { id: tournament.hubId })}
+                                    />
                                 )}
-                            </View>
+                            </CollapsibleCard>
 
-                            {/* Rules & Regulations - Collapsible */}
-                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 mb-3 overflow-hidden">
-                                <Pressable
-                                    onPress={() => setIsRulesOpen(!isRulesOpen)}
-                                    className="flex-row items-center justify-between p-4"
-                                >
-                                    <View className="flex-row items-center gap-2.5">
-                                        <View className="w-8 h-8 rounded-xl bg-[#4F46E5]/10 items-center justify-center">
-                                            <Ionicons name="shield-outline" size={18} color="#4F46E5" />
-                                        </View>
-                                        <Text className="text-[11px] font-black text-white uppercase tracking-widest">Rules & Regulations</Text>
-                                    </View>
-                                    <Ionicons name={isRulesOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
-                                </Pressable>
-                                {isRulesOpen && (
-                                    <View className="px-4 pb-4">
-                                        <View className="border-t border-white/5 pt-4">
-                                            <Text className="text-slate-400 leading-6 text-sm">
-                                                {tournament.rules || '• Fair play is mandatory\n• No toxic behavior\n• Tournament organizers\' decisions are final.'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
-                            </View>
+                            {/* Description */}
+                            <CollapsibleCard
+                                icon="document-text"
+                                iconColor="#FBBF24"
+                                title="Description"
+                                isOpen={isDescriptionOpen}
+                                onToggle={() => setIsDescriptionOpen(!isDescriptionOpen)}
+                            >
+                                <QuoteBlock accentColor="#FBBF24">
+                                    {tournament.description || 'Join this competitive tournament and prove your skills to climb the leaderboard.'}
+                                </QuoteBlock>
+                            </CollapsibleCard>
+
+                            {/* Rules & Regulations */}
+                            <CollapsibleCard
+                                icon="shield-checkmark"
+                                iconColor="#A78BFA"
+                                title="Rules & Regulations"
+                                isOpen={isRulesOpen}
+                                onToggle={() => setIsRulesOpen(!isRulesOpen)}
+                            >
+                                <QuoteBlock accentColor="#A78BFA">
+                                    {tournament.rules || '• Fair play is mandatory\n• No toxic behavior\n• Tournament organizers\' decisions are final.'}
+                                </QuoteBlock>
+                            </CollapsibleCard>
                         </View>
                     )}
 
@@ -2431,4 +2329,5 @@ export default function TournamentDetailsScreen() {
         </SafeAreaView>
     );
 }
+
 

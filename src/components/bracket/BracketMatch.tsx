@@ -186,7 +186,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         : isAwaitingApproval
                             ? "bg-[#F59E0B]/[0.10]"
                             : isLive
-                                ? "bg-amber-500/[0.08]"
+                                ? "bg-emerald-500/[0.06]"
                                 : "bg-white/[0.02]"
                 )}>
                     {canReport && (
@@ -213,9 +213,9 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                     )}
                     {!canReport && !isAwaitingApproval && isLive && (
                         <View className="flex-row items-center gap-1.5">
-                            <View className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                            <Text className="text-[10px] font-black text-amber-400 uppercase tracking-[1.5px]">
-                                In Progress
+                            <Ionicons name="time-outline" size={11} color="#34D399" />
+                            <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
+                                Scheduled
                             </Text>
                         </View>
                     )}
