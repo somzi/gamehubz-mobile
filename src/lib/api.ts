@@ -93,6 +93,15 @@ export const ENDPOINTS = {
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
 
+    // ─── Match streaming ────────────────────────────────────────────────
+    GET_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream`,
+    GET_MATCH_STREAMS: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/streams`,
+    START_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream/start`,
+    END_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream/end`,
+    SET_MATCH_STREAM_VOD: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream/vod`,
+    DELETE_MATCH_STREAM: (matchId: string, streamerUserId?: string) =>
+        `${API_BASE_URL}/api/match/${matchId}/stream${streamerUserId ? `?streamerUserId=${encodeURIComponent(streamerUserId)}` : ''}`,
+
     // ─── Match admin help ───────────────────────────────────────────────
     REQUEST_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp`,
     RESOLVE_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp/resolve`,

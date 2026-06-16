@@ -14,6 +14,8 @@ import { MatchComment } from '../../types/auth';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize, getOptimizedCloudinaryUrl } from '../../lib/image';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { AdminHelpSection } from './AdminHelpSection';
+import { MatchStreamPanel } from './MatchStreamPanel';
+import { MatchStream, MatchStreamStatus } from '../../types/stream';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -88,6 +90,7 @@ export function MatchScheduleCard({
     const [homeScore, setHomeScore] = useState('');
     const [awayScore, setAwayScore] = useState('');
     const [dbHomeUserId, setDbHomeUserId] = useState<string | null>(null);
+    const [dbAwayUserId, setDbAwayUserId] = useState<string | null>(null);
     const [dbHomeUsername, setDbHomeUsername] = useState<string | null>(null);
     const [dbAwayUsername, setDbAwayUsername] = useState<string | null>(null);
     const [requireResultApproval, setRequireResultApproval] = useState(false);
@@ -117,7 +120,15 @@ export function MatchScheduleCard({
     const [isEvidenceExpanded, setIsEvidenceExpanded] = useState(true);
     const [isChatExpanded, setIsChatExpanded] = useState(true);
     const [isAvailabilityExpanded, setIsAvailabilityExpanded] = useState(true);
-    const [activeModalTab, setActiveModalTab] = useState<'match' | 'chat'>('match');
+    const [activeModalTab, setActiveModalTab] = useState<'match' | 'chat' | 'stream'>('match');
+
+    // Streaming — both opponents can stream, so we track a list.
+    const [streams, setStreams] = useState<MatchStream[]>([]);
+
+    const isMatchParticipant = !!user?.id && (
+        (!!dbHomeUserId && dbHomeUserId.toLowerCase() === user.id.toLowerCase()) ||
+        (!!dbAwayUserId && dbAwayUserId.toLowerCase() === user.id.toLowerCase())
+    );
 
     const fetchAvailability = async () => {
         if (!user?.id || !matchId) return;
@@ -157,6 +168,19 @@ export function MatchScheduleCard({
             console.error('Error fetching comments:', error);
         } finally {
             if (!silent) setIsLoadingComments(false);
+        }
+    };
+
+    const fetchStreams = async () => {
+        if (!matchId) return;
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_STREAMS(matchId));
+            if (response.ok) {
+                const data = await response.json();
+                setStreams(Array.isArray(data) ? data : []);
+            }
+        } catch (error) {
+            console.error('Error fetching streams:', error);
         }
     };
 
@@ -213,6 +237,7 @@ export function MatchScheduleCard({
                 const data = await response.json();
                 const id = data.homeUserId || data.HomeUserId || null;
                 setDbHomeUserId(id);
+                setDbAwayUserId(data.awayUserId || data.AwayUserId || null);
                 setDbHomeUsername(data.homeUser || data.HomeUser || null);
                 setDbAwayUsername(data.awayUser || data.AwayUser || null);
                 setRequireResultApproval(Boolean(data.requireResultApproval ?? data.RequireResultApproval ?? false));
@@ -296,6 +321,11 @@ export function MatchScheduleCard({
         // pending_availability also needs the details for the admin-help flag state.
         if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'pending_availability') {
             fetchDbHomeUserId();
+        }
+
+        // Stream availability — relevant once a match is scheduled, in ready phase, or completed (replay).
+        if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'completed') {
+            fetchStreams();
         }
     }, [modalVisible, matchId]); // Removed currentStatus from dependencies to prevent re-fetching on status changes
 
@@ -841,6 +871,32 @@ export function MatchScheduleCard({
                                         )}
                                     </View>
                                 </Pressable>
+                                {/* Streaming only matters once the match is scheduled (live POVs) or
+                                    done (replay) — hide the tab while still collecting availability. */}
+                                {currentStatus !== 'pending_availability' && (
+                                <Pressable
+                                    onPress={() => setActiveModalTab('stream')}
+                                    className={cn(
+                                        "flex-1 py-2.5 items-center rounded-xl",
+                                        activeModalTab === 'stream'
+                                            ? (isPremium ? "bg-primary/15" : "bg-primary/10")
+                                            : "bg-transparent"
+                                    )}
+                                >
+                                    <View className="flex-row items-center gap-1.5">
+                                        <Text className={cn(
+                                            "text-xs font-black uppercase tracking-widest",
+                                            activeModalTab === 'stream' ? "text-primary" : "text-slate-500"
+                                        )}>Stream</Text>
+                                        {streams.some(s => s.status === MatchStreamStatus.Live) && (
+                                            <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
+                                                <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                                <Text className="text-[8px] font-black text-red-400 uppercase">Live</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </Pressable>
+                                )}
                             </View>
 
                             <View className="flex-1">
@@ -1316,6 +1372,15 @@ export function MatchScheduleCard({
                                             </View>
                                         )}
                                     </ScrollView>
+                                ) : activeModalTab === 'stream' ? (
+                                    <MatchStreamPanel
+                                        matchId={matchId}
+                                        isParticipant={isMatchParticipant}
+                                        isCompleted={currentStatus === 'completed'}
+                                        currentUserId={user?.id}
+                                        initialStreams={streams}
+                                        onStreamsChange={setStreams}
+                                    />
                                 ) : (
                                     <View className="flex-1">
                                         <View className="flex-row items-center gap-2 mb-4">

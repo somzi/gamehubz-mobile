@@ -2,9 +2,10 @@ import React from 'react';
 import { View, Text, Pressable, Linking, Alert, Share } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
+import { KickIcon } from '../icons/KickIcon';
 
 interface SocialLink {
-    platform: "discord" | "tiktok" | "instagram" | "twitter" | "youtube" | "facebook" | "telegram";
+    platform: "discord" | "tiktok" | "instagram" | "twitter" | "youtube" | "facebook" | "telegram" | "twitch" | "kick";
     username: string;
     url?: string;
 }
@@ -50,6 +51,17 @@ const platformConfig: any = {
         color: "text-[#0088cc]",
         bgColor: "bg-[#0088cc]/20",
     },
+    twitch: {
+        icon: <Ionicons name="logo-twitch" size={20} />,
+        color: "text-[#9146FF]",
+        bgColor: "bg-[#9146FF]/20",
+    },
+    kick: {
+        // SVG logo can't nest inside <Text>; rendered directly in the map below.
+        icon: <KickIcon size={20} color="#53fc18" />,
+        color: "text-[#53fc18]",
+        bgColor: "bg-[#53fc18]/20",
+    },
 };
 
 export function SocialLinks({ links, className }: SocialLinksProps) {
@@ -89,7 +101,9 @@ export function SocialLinks({ links, className }: SocialLinksProps) {
                         )}
                         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     >
-                        <Text className={config.color}>{config.icon}</Text>
+                        {link.platform === 'kick'
+                            ? config.icon
+                            : <Text className={config.color}>{config.icon}</Text>}
                     </Pressable>
                 );
             })}

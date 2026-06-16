@@ -208,9 +208,9 @@ export default function PlayerProfileScreen() {
     };
 
     const mapSocialsToLinks = (socials: any[]) => {
-        return socials.map(s => {
+        return socials.flatMap(s => {
             const type = s.socialType !== undefined ? s.socialType : s.type;
-            let platform: any = 'discord';
+            let platform: any = null;
 
             switch (type) {
                 case SocialType.Instagram: platform = 'instagram'; break;
@@ -220,10 +220,13 @@ export default function PlayerProfileScreen() {
                 case SocialType.YouTube: platform = 'youtube'; break;
                 case SocialType.Discord: platform = 'discord'; break;
                 case SocialType.Telegram: platform = 'telegram'; break;
+                case SocialType.Twitch: platform = 'twitch'; break;
+                case SocialType.Kick: platform = 'kick'; break;
             }
 
+            if (!platform) return [];
             const url = s.url && s.url !== '#' ? s.url : getSocialUrl(platform, s.username);
-            return { platform, username: s.username, url };
+            return [{ platform, username: s.username, url }];
         });
     };
 

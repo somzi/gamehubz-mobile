@@ -4,7 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchChatPanel } from '../match/MatchChatPanel';
+import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
+import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
@@ -137,7 +139,10 @@ export function MatchDetailsModal({
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
     // same matchId still honors the host's intent.
-    const [activeTab, setActiveTab] = useState<'match' | 'chat'>(defaultTab);
+    const [activeTab, setActiveTab] = useState<'match' | 'chat' | 'stream'>(defaultTab);
+
+    // Streams for this match — drives the Stream tab (live POVs + replays) and its LIVE dot.
+    const [streams, setStreams] = useState<MatchStream[]>([]);
 
     // Android-only: under Expo SDK 54 edge-to-edge the window no longer resizes for
     // the keyboard, so we track the real keyboard height and pad the chat ourselves.
@@ -153,6 +158,23 @@ export function MatchDetailsModal({
             hideSub.remove();
         };
     }, []);
+
+    // Load streams when the Stream tab is relevant (scheduled / ready / completed) so the tab can
+    // show a LIVE dot and the panel has data immediately.
+    useEffect(() => {
+        if (!visible || !matchId || status === 'pending_availability') return;
+        let active = true;
+        (async () => {
+            try {
+                const res = await authenticatedFetch(ENDPOINTS.GET_MATCH_STREAMS(matchId));
+                if (res.ok && active) {
+                    const data = await res.json();
+                    setStreams(Array.isArray(data) ? data : []);
+                }
+            } catch { /* keep whatever we have */ }
+        })();
+        return () => { active = false; };
+    }, [visible, matchId, status]);
 
     const formatAvatarUrl = (url?: string) => {
         if (!url) return '';
@@ -496,6 +518,10 @@ export function MatchDetailsModal({
     //  - spectators tapping a bracket match keep the read-only match view
     const isTournamentCompleted = Number(tournamentStatus) === 4;
     const showChatTab = !isTournamentCompleted && (isParticipant || (isPrivileged && adminHelpRequested));
+    // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
+    // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
+    const showStreamTab = status !== 'pending_availability';
+    const hasLiveStream = streams.some(s => s.status === MatchStreamStatus.Live);
     // Completed matches keep the conversation visible but block new messages.
     const isChatReadOnly = status === 'completed';
     const adminHelpRequestedByMe = !!user?.id &&
@@ -1198,8 +1224,9 @@ export function MatchDetailsModal({
                     <View className="w-10" />
                 </View>
 
-                {/* Match / Chat tabs — visibility rules in showChatTab above */}
-                {showChatTab && (
+                {/* Match / Chat / Stream tabs. The bar appears if chat OR stream is available;
+                    Match is always present, the other two are gated (showChatTab / showStreamTab). */}
+                {(showChatTab || showStreamTab) && (
                     <View className="flex-row mx-6 mt-3 mb-2 rounded-2xl p-1 bg-[#131B2E] border border-white/[0.04]">
                         <Pressable
                             onPress={() => setActiveTab('match')}
@@ -1213,6 +1240,7 @@ export function MatchDetailsModal({
                                 activeTab === 'match' ? "text-[#10B981]" : "text-slate-500"
                             )}>Match</Text>
                         </Pressable>
+                        {showChatTab && (
                         <Pressable
                             onPress={() => setActiveTab('chat')}
                             className={cn(
@@ -1235,6 +1263,29 @@ export function MatchDetailsModal({
                                 )}
                             </View>
                         </Pressable>
+                        )}
+                        {showStreamTab && (
+                        <Pressable
+                            onPress={() => setActiveTab('stream')}
+                            className={cn(
+                                "flex-1 py-2.5 items-center rounded-xl",
+                                activeTab === 'stream' ? "bg-[#10B981]/15" : "bg-transparent"
+                            )}
+                        >
+                            <View className="flex-row items-center gap-1.5">
+                                <Text className={cn(
+                                    "text-xs font-black uppercase tracking-widest",
+                                    activeTab === 'stream' ? "text-[#10B981]" : "text-slate-500"
+                                )}>Stream</Text>
+                                {hasLiveStream && (
+                                    <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
+                                        <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                        <Text className="text-[8px] font-black text-red-400 uppercase">Live</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </Pressable>
+                        )}
                     </View>
                 )}
 
@@ -1244,7 +1295,18 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {activeTab === 'chat' && showChatTab ? (
+                {activeTab === 'stream' && showStreamTab ? (
+                    <View className="flex-1 px-6 pt-2">
+                        <MatchStreamPanel
+                            matchId={matchId}
+                            isParticipant={isParticipant}
+                            isCompleted={status === 'completed'}
+                            currentUserId={user?.id}
+                            initialStreams={streams}
+                            onStreamsChange={setStreams}
+                        />
+                    </View>
+                ) : activeTab === 'chat' && showChatTab ? (
                     (() => {
                         // iOS keeps KeyboardAvoidingView; Android pads by the tracked keyboard height
                         // (see the Keyboard listener effect above).

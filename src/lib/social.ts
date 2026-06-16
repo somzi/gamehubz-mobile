@@ -17,6 +17,10 @@ export const getSocialUrl = (platform: string, username: string): string => {
         case 'youtube':
             // YouTube can have /c/, /user/, or /@ depending on the type, but /@ is most common now
             return `https://youtube.com/@${cleanUsername}`;
+        case 'twitch':
+            return `https://twitch.tv/${cleanUsername}`;
+        case 'kick':
+            return `https://kick.com/${cleanUsername}`;
         case 'discord': {
             // If it's already a full URL containing discord.gg, normalize it
             if (cleanUsername.includes('discord.gg/')) {

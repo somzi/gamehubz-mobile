@@ -39,6 +39,8 @@ export default function ManageUserSocialsScreen() {
         { label: 'YouTube', value: SocialType.YouTube },
         { label: 'Discord', value: SocialType.Discord },
         { label: 'Telegram', value: SocialType.Telegram },
+        { label: 'Twitch', value: SocialType.Twitch },
+        { label: 'Kick', value: SocialType.Kick },
     ];
 
     const getSocialIcon = (type: SocialType): keyof typeof Ionicons.glyphMap => {
@@ -50,6 +52,8 @@ export default function ManageUserSocialsScreen() {
             case SocialType.YouTube: return 'logo-youtube';
             case SocialType.Discord: return 'logo-discord';
             case SocialType.Telegram: return 'paper-plane';
+            case SocialType.Twitch: return 'logo-twitch';
+            case SocialType.Kick: return 'play-circle';
             default: return 'link-outline';
         }
     };
