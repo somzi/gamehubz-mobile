@@ -20,6 +20,7 @@ import { cn, getCurrencyLabel } from '../lib/utils';
 import { shareTournament } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
 import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
@@ -925,12 +926,12 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const tabs = [
-        { label: 'Overview', value: 'overview' },
-        { label: 'Bracket', value: 'bracket' },
+    const tabs: PremiumTabItem[] = [
+        { label: 'Overview', value: 'overview', icon: 'grid-outline' },
+        { label: 'Bracket', value: 'bracket', icon: 'git-merge-outline' },
         ...(tournament?.isTeamTournament
-            ? [{ label: 'Teams', value: 'teams' }]
-            : [{ label: 'Players', value: 'players' }]),
+            ? [{ label: 'Teams', value: 'teams', icon: 'people-outline' as const }]
+            : [{ label: 'Players', value: 'players', icon: 'people-outline' as const }]),
     ];
 
     const getStatusText = (status: number) => {
@@ -1450,27 +1451,11 @@ export default function TournamentDetailsScreen() {
                     </View>
 
                     <View className="px-5 mt-2 mb-4">
-                        <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1.5" style={{ gap: 6 }}>
-                            {tabs.map((tab) => {
-                                const isActive = activeTab === tab.value;
-                                const iconMap: Record<string, string> = { overview: 'grid-outline', bracket: 'git-merge-outline', players: 'people-outline', teams: 'people-outline' };
-                                return (
-                                    <Pressable
-                                        key={tab.value}
-                                        onPress={() => setActiveTab(tab.value)}
-                                        className={`flex-1 flex-row items-center justify-center gap-1.5 py-3.5 rounded-xl ${
-                                            isActive ? 'bg-indigo-500/15 border border-indigo-500/25' : ''
-                                        }`}
-                                        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                                    >
-                                        <Ionicons name={(iconMap[tab.value] || 'ellipse') as any} size={14} color={isActive ? '#818CF8' : '#475569'} />
-                                        <Text className={`text-xs font-black ${
-                                            isActive ? 'text-white' : 'text-slate-600'
-                                        }`}>{tab.label}</Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
+                        <PremiumTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                        />
                     </View>
 
                     {activeTab === 'overview' && (
@@ -1784,29 +1769,16 @@ export default function TournamentDetailsScreen() {
                             </View>
 
                             {/* Sub Tabs */}
-                            <View className="flex-row bg-[#131B2E] p-1 rounded-2xl border border-white/5 mb-4 shadow-sm shadow-black/20">
-                                <Pressable
-                                    onPress={() => setTeamsTab('confirmed')}
-                                    className={`flex-1 py-2.5 items-center justify-center rounded-xl ${teamsTab === 'confirmed' ? 'bg-[#00E5A0]/10 border border-[#00E5A0]/20' : 'bg-transparent'}`}
-                                >
-                                    <Text className={`font-black text-[10px] uppercase tracking-wider ${teamsTab === 'confirmed' ? 'text-[#00E5A0]' : 'text-slate-500'}`}>Confirmed</Text>
-                                </Pressable>
-                                {tournament?.status < 3 && (
-                                    <Pressable
-                                        onPress={() => setTeamsTab('open')}
-                                        className={`flex-1 py-2.5 items-center justify-center rounded-xl ${teamsTab === 'open' ? 'bg-[#3B82F6]/10 border border-[#3B82F6]/20' : 'bg-transparent'}`}
-                                    >
-                                        <Text className={`font-black text-[10px] uppercase tracking-wider ${teamsTab === 'open' ? 'text-[#3B82F6]' : 'text-slate-500'}`}>Registred</Text>
-                                    </Pressable>
-                                )}
-                                {canManage && (
-                                    <Pressable
-                                        onPress={() => setTeamsTab('registrations')}
-                                        className={`flex-1 py-2.5 items-center justify-center rounded-xl ${teamsTab === 'registrations' ? 'bg-[#F59E0B]/10 border border-[#F59E0B]/20' : 'bg-transparent'}`}
-                                    >
-                                        <Text className={`font-black text-[10px] uppercase tracking-wider ${teamsTab === 'registrations' ? 'text-[#F59E0B]' : 'text-slate-500'}`}>Requests</Text>
-                                    </Pressable>
-                                )}
+                            <View className="mb-4">
+                                <PremiumTabs
+                                    tabs={[
+                                        { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
+                                        ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: 'Registred', icon: 'open-outline' as const }] : []),
+                                        ...(canManage ? [{ value: 'registrations', label: 'Requests', icon: 'hourglass-outline' as const }] : []),
+                                    ]}
+                                    activeTab={teamsTab}
+                                    onTabChange={setTeamsTab}
+                                />
                             </View>
 
                             {/* Confirmed Teams */}
@@ -2208,31 +2180,25 @@ export default function TournamentDetailsScreen() {
                             </View>
 
                             {/* Sub-tabs */}
-                            <View className="flex-row bg-[#131B2E] p-1 rounded-2xl border border-white/5 mb-2 shadow-sm shadow-black/20">
-                                <Pressable
-                                    onPress={() => setPlayersTab('confirmed')}
-                                    className={`flex-1 py-2.5 items-center justify-center rounded-xl ${playersTab === 'confirmed' ? 'bg-[#3B82F6]/10 border border-[#3B82F6]/20' : 'bg-transparent'}`}
-                                >
-                                    <Text className={`font-black text-[10px] uppercase tracking-wider ${playersTab === 'confirmed' ? 'text-[#3B82F6]' : 'text-slate-500'}`}>Confirmed</Text>
-                                </Pressable>
-                                {canManage && (
-                                    <Pressable
-                                        onPress={() => {
-                                            setPlayersTab('registrations');
-                                            if (pendingRegistrations.length === 0) fetchPendingRegistrations();
-                                        }}
-                                        className={`flex-1 py-2.5 items-center justify-center rounded-xl ${playersTab === 'registrations' ? 'bg-[#F59E0B]/10 border border-[#F59E0B]/20' : 'bg-transparent'}`}
-                                    >
-                                        <View className="flex-row items-center gap-1.5">
-                                            <Text className={`font-black text-[10px] uppercase tracking-wider ${playersTab === 'registrations' ? 'text-[#F59E0B]' : 'text-slate-500'}`}>Registrations</Text>
-                                            {pendingRegistrations.length > 0 && (
-                                                <View className="w-5 h-5 rounded-full bg-[#F59E0B] items-center justify-center">
-                                                    <Text className="text-[9px] font-black text-[#0F172A]">{pendingRegistrations.length}</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    </Pressable>
-                                )}
+                            <View className="mb-2">
+                                <PremiumTabs
+                                    tabs={[
+                                        { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
+                                        ...(canManage ? [{
+                                            value: 'registrations',
+                                            label: 'Registrations',
+                                            icon: 'hourglass-outline' as const,
+                                            badge: pendingRegistrations.length > 0 ? pendingRegistrations.length : undefined,
+                                        }] : []),
+                                    ]}
+                                    activeTab={playersTab}
+                                    onTabChange={(val) => {
+                                        setPlayersTab(val as 'confirmed' | 'registrations');
+                                        if (val === 'registrations' && pendingRegistrations.length === 0) {
+                                            fetchPendingRegistrations();
+                                        }
+                                    }}
+                                />
                             </View>
 
                             {/* Confirmed Players */}

@@ -867,7 +867,7 @@ export function MatchScheduleCard({
     );
 
     function renderModal() {
-        const isPremium = variant === 'compact';
+        const isPremium = true;
 
         // iOS keeps the original KeyboardAvoidingView; Android uses a plain View with
         // keyboard-height padding (see the Keyboard listener effect above).
@@ -906,121 +906,114 @@ export function MatchScheduleCard({
                             {/* Drag Handle */}
                             <View className="w-10 h-1 bg-white/10 rounded-full self-center mb-4" />
 
-                            {/* Premium Header Card */}
-                            <View className={cn(
-                                "rounded-[20px] p-4 mb-5",
-                                isPremium
-                                    ? "bg-[#131B2E] border border-white/[0.06]"
-                                    : "bg-card border border-border/10"
-                            )}>
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-1 mr-3">
-                                        <View className="flex-row items-center gap-2 mb-1.5">
-                                            <View className="w-2 h-2 rounded-full bg-primary" />
-                                            <Text className={cn(
-                                                "text-[10px] font-black uppercase tracking-[2px]",
-                                                isPremium ? "text-primary/80" : "text-primary"
-                                            )}>
-                                                {roundName}
-                                            </Text>
-                                        </View>
-                                        <Text className={cn(
-                                            "font-black tracking-tight",
-                                            isPremium ? "text-xl text-white" : "text-lg text-foreground"
-                                        )} numberOfLines={2}>
-                                            {tournamentName}
-                                        </Text>
-                                    </View>
-                                    <Pressable
-                                        onPress={() => setModalVisible(false)}
-                                        className={cn(
-                                            "rounded-2xl items-center justify-center",
-                                            isPremium
-                                                ? "w-10 h-10 bg-white/[0.04] border border-white/[0.06]"
-                                                : "w-8 h-8 bg-secondary"
-                                        )}
-                                        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, transform: [{ scale: pressed ? 0.9 : 1 }] })}
-                                    >
-                                        <Ionicons
-                                            name="close"
-                                            size={18}
-                                            color={isPremium ? "#64748B" : "hsl(220, 15%, 55%)"}
-                                        />
-                                    </Pressable>
+                            {/* Header — minimal monochrome with trophy icon */}
+                            <View className="flex-row items-center mb-6">
+                                <View
+                                    className="w-12 h-12 rounded-2xl items-center justify-center mr-3.5"
+                                    style={{
+                                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(255, 255, 255, 0.06)',
+                                    }}
+                                >
+                                    <Ionicons name="trophy" size={20} color="#CBD5E1" />
                                 </View>
+                                <View className="flex-1 mr-3">
+                                    <Text
+                                        className="text-white font-black tracking-tight"
+                                        style={{ fontSize: 20, lineHeight: 24 }}
+                                        numberOfLines={2}
+                                    >
+                                        {tournamentName}
+                                    </Text>
+                                    <Text
+                                        className="text-slate-500 text-[11px] font-bold uppercase tracking-[2px] mt-1"
+                                        numberOfLines={1}
+                                    >
+                                        in {roundName}
+                                    </Text>
+                                </View>
+                                <Pressable
+                                    onPress={() => setModalVisible(false)}
+                                    className="w-10 h-10 rounded-2xl items-center justify-center"
+                                    style={({ pressed }) => ({
+                                        opacity: pressed ? 0.6 : 1,
+                                        transform: [{ scale: pressed ? 0.9 : 1 }],
+                                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(255, 255, 255, 0.07)',
+                                    })}
+                                >
+                                    <Ionicons name="close" size={18} color="#94A3B8" />
+                                </Pressable>
                             </View>
 
-                            {/* Tab Bar */}
-                            <View className={cn(
-                                "flex-row mb-5 rounded-2xl p-1",
-                                isPremium ? "bg-[#131B2E] border border-white/[0.04]" : "bg-muted/10"
-                            )}>
-                                <Pressable
+                            {/* Slim divider under header */}
+                            <View
+                                className="mb-5"
+                                style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
+                            />
+
+                            {/* Tab Bar — premium segmented control */}
+                            <View
+                                className="flex-row mb-5 rounded-2xl p-1"
+                                style={{
+                                    backgroundColor: '#131B2E',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.05)',
+                                }}
+                            >
+                                <ModalTabButton
+                                    active={activeModalTab === 'match'}
                                     onPress={() => setActiveModalTab('match')}
-                                    className={cn(
-                                        "flex-1 py-2.5 items-center rounded-xl",
-                                        activeModalTab === 'match'
-                                            ? (isPremium ? "bg-primary/15" : "bg-primary/10")
-                                            : "bg-transparent"
-                                    )}
                                 >
                                     <Text className={cn(
                                         "text-xs font-black uppercase tracking-widest",
-                                        activeModalTab === 'match' ? "text-primary" : "text-slate-500"
+                                        activeModalTab === 'match' ? "text-emerald-300" : "text-slate-500"
                                     )}>Match</Text>
-                                </Pressable>
-                                <Pressable
+                                </ModalTabButton>
+                                <ModalTabButton
+                                    active={activeModalTab === 'chat'}
                                     onPress={() => setActiveModalTab('chat')}
-                                    className={cn(
-                                        "flex-1 py-2.5 items-center rounded-xl",
-                                        activeModalTab === 'chat'
-                                            ? (isPremium ? "bg-primary/15" : "bg-primary/10")
-                                            : "bg-transparent"
-                                    )}
                                 >
                                     <View className="flex-row items-center gap-2">
                                         <Text className={cn(
                                             "text-xs font-black uppercase tracking-widest",
-                                            activeModalTab === 'chat' ? "text-primary" : "text-slate-500"
+                                            activeModalTab === 'chat' ? "text-emerald-300" : "text-slate-500"
                                         )}>Chat</Text>
                                         {comments.length > 0 && (
                                             <View className={cn(
                                                 "min-w-[20px] h-5 items-center justify-center rounded-full px-1.5",
-                                                activeModalTab === 'chat' ? "bg-primary/30" : "bg-white/[0.06]"
+                                                activeModalTab === 'chat' ? "bg-emerald-400/30" : "bg-white/[0.06]"
                                             )}>
                                                 <Text className={cn(
                                                     "text-[10px] font-black",
-                                                    activeModalTab === 'chat' ? "text-primary" : "text-slate-500"
+                                                    activeModalTab === 'chat' ? "text-emerald-200" : "text-slate-500"
                                                 )}>{comments.length}</Text>
                                             </View>
                                         )}
                                     </View>
-                                </Pressable>
+                                </ModalTabButton>
                                 {/* Streaming only matters once the match is scheduled (live POVs) or
                                     done (replay) — hide the tab while still collecting availability. */}
                                 {currentStatus !== 'pending_availability' && (
-                                <Pressable
-                                    onPress={() => setActiveModalTab('stream')}
-                                    className={cn(
-                                        "flex-1 py-2.5 items-center rounded-xl",
-                                        activeModalTab === 'stream'
-                                            ? (isPremium ? "bg-primary/15" : "bg-primary/10")
-                                            : "bg-transparent"
-                                    )}
-                                >
-                                    <View className="flex-row items-center gap-1.5">
-                                        <Text className={cn(
-                                            "text-xs font-black uppercase tracking-widest",
-                                            activeModalTab === 'stream' ? "text-primary" : "text-slate-500"
-                                        )}>Stream</Text>
-                                        {streams.some(s => s.status === MatchStreamStatus.Live) && (
-                                            <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
-                                                <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                                <Text className="text-[8px] font-black text-red-400 uppercase">Live</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </Pressable>
+                                    <ModalTabButton
+                                        active={activeModalTab === 'stream'}
+                                        onPress={() => setActiveModalTab('stream')}
+                                    >
+                                        <View className="flex-row items-center gap-1.5">
+                                            <Text className={cn(
+                                                "text-xs font-black uppercase tracking-widest",
+                                                activeModalTab === 'stream' ? "text-emerald-300" : "text-slate-500"
+                                            )}>Stream</Text>
+                                            {streams.some(s => s.status === MatchStreamStatus.Live) && (
+                                                <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
+                                                    <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                                    <Text className="text-[8px] font-black text-red-400 uppercase">Live</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </ModalTabButton>
                                 )}
                             </View>
 
@@ -1071,7 +1064,7 @@ export function MatchScheduleCard({
                                                 : (dbAwayUsername || 'Opponent');
 
                                             return (
-                                            <View className={cn("gap-5", !isPremium && "space-y-4")}>
+                                            <View className={cn("gap-3", !isPremium && "space-y-3")}>
                                                 {/* Pending Proposal Card — hidden while editing so the edit form gets the full stage. */}
                                                 {hasPendingProposal && !isEditingProposal && (
                                                     <View className={cn(
@@ -1153,27 +1146,6 @@ export function MatchScheduleCard({
                                                 {/* Slim divider before the evidence section */}
                                                 {hasPendingProposal && !isEditingProposal && (
                                                     <View className={cn("h-px mx-2", isPremium ? "bg-white/[0.06]" : "bg-muted/20")} />
-                                                )}
-
-                                                {/* Match Time Pill — hidden when a proposal is pending; the proposal card
-                                                    is the focus, the start time is irrelevant once the match has been played. */}
-                                                {!hasPendingProposal && (
-                                                <View className={cn(
-                                                    "items-center rounded-2xl py-4 px-6",
-                                                    isPremium ? "bg-[#131B2E] border border-white/[0.06]" : "bg-muted/10"
-                                                )}>
-                                                    <View className="flex-row items-center gap-2 mb-1.5">
-                                                        <Ionicons name="time-outline" size={14} color="#10B981" />
-                                                        <Text className={cn(
-                                                            "text-[10px] font-black uppercase tracking-[2px]",
-                                                            isPremium ? "text-slate-400" : "text-muted-foreground"
-                                                        )}>Match Time</Text>
-                                                    </View>
-                                                    <Text className={cn(
-                                                        "font-black text-primary",
-                                                        isPremium ? "text-xl" : "text-lg"
-                                                    )}>{matchTime}</Text>
-                                                </View>
                                                 )}
 
                                                 {/* Error */}
@@ -1321,7 +1293,7 @@ export function MatchScheduleCard({
                                                 </View>
 
                                                 {/* Submit Button */}
-                                                <View className="mt-6 mb-4 flex-row gap-3">
+                                                <View className="mt-1 flex-row gap-3">
                                                     {isEditingProposal && (
                                                         <Pressable
                                                             onPress={() => { setIsEditingProposal(false); setHomeScore(''); setAwayScore(''); setError(null); }}
@@ -1330,23 +1302,47 @@ export function MatchScheduleCard({
                                                             <Text className="text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</Text>
                                                         </Pressable>
                                                     )}
-                                                    <Button
-                                                        className={cn("h-14 rounded-2xl", isEditingProposal ? "flex-1" : "w-full")}
+                                                    <Pressable
                                                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
-                                                        loading={isSubmitting}
-                                                        disabled={isRoundLocked}
+                                                        disabled={isSubmitting || isRoundLocked}
+                                                        className={cn("h-14 rounded-2xl overflow-hidden active:opacity-90", isEditingProposal ? "flex-1" : "w-full")}
+                                                        style={{
+                                                            shadowColor: isRoundLocked ? '#475569' : '#10B981',
+                                                            shadowOpacity: isRoundLocked ? 0.15 : 0.38,
+                                                            shadowRadius: 18,
+                                                            shadowOffset: { width: 0, height: 8 },
+                                                            elevation: 10,
+                                                        }}
                                                     >
-                                                        <View className="flex-row items-center gap-2">
-                                                            <Ionicons name="checkmark-circle" size={18} color={isPremium ? "#0B1120" : "#fff"} />
-                                                            <Text className={cn("font-black uppercase tracking-widest text-xs", isPremium ? "text-slate-900" : "text-white")}>
-                                                                {isRoundLocked
-                                                                    ? "Round not open yet"
-                                                                    : isEditingProposal
-                                                                        ? "Update Report"
-                                                                        : (requireResultApproval ? "Report Result" : "Submit Result")}
-                                                            </Text>
-                                                        </View>
-                                                    </Button>
+                                                        <LinearGradient
+                                                            colors={isRoundLocked ? ['#475569', '#334155'] : ['#10B981', '#059669']}
+                                                            start={{ x: 0, y: 0 }}
+                                                            end={{ x: 1, y: 1 }}
+                                                            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                                                        >
+                                                            {isSubmitting ? (
+                                                                <ActivityIndicator size="small" color="#022C22" />
+                                                            ) : (
+                                                                <View className="flex-row items-center gap-2">
+                                                                    <Ionicons
+                                                                        name={isRoundLocked ? "lock-closed" : "checkmark-circle"}
+                                                                        size={18}
+                                                                        color={isRoundLocked ? "#CBD5E1" : "#022C22"}
+                                                                    />
+                                                                    <Text className={cn(
+                                                                        "font-black uppercase tracking-widest text-xs",
+                                                                        isRoundLocked ? "text-slate-200" : "text-emerald-950"
+                                                                    )}>
+                                                                        {isRoundLocked
+                                                                            ? "Round not open yet"
+                                                                            : isEditingProposal
+                                                                                ? "Update Report"
+                                                                                : (requireResultApproval ? "Report Result" : "Submit Result")}
+                                                                    </Text>
+                                                                </View>
+                                                            )}
+                                                        </LinearGradient>
+                                                    </Pressable>
                                                 </View>
                                                 </>)}
 
@@ -1643,4 +1639,39 @@ export function MatchScheduleCard({
             </Modal>
         );
     }
+}
+
+interface ModalTabButtonProps {
+    active: boolean;
+    onPress: () => void;
+    children: React.ReactNode;
+}
+
+function ModalTabButton({ active, onPress, children }: ModalTabButtonProps) {
+    return (
+        <Pressable
+            onPress={onPress}
+            className="flex-1 py-2.5 items-center rounded-xl overflow-hidden"
+            style={
+                active
+                    ? {
+                        shadowColor: '#10B981',
+                        shadowOpacity: 0.35,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 2 },
+                    }
+                    : undefined
+            }
+        >
+            {active && (
+                <LinearGradient
+                    colors={['rgba(16, 185, 129, 0.28)', 'rgba(16, 185, 129, 0.10)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                />
+            )}
+            {children}
+        </Pressable>
+    );
 }

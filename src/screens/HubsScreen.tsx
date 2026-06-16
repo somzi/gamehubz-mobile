@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { HubCard } from '../components/cards/HubCard';
 import { StatusModal } from '../components/modals/StatusModal';
 import { Toggle } from '../components/ui/Toggle';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 import { API_BASE_URL, ENDPOINTS, authenticatedFetch } from '../lib/api';
 
@@ -241,15 +242,10 @@ export default function HubsScreen() {
         fetchHubs(true);
     };
 
-    const tabs = [
-        { label: 'Joined', value: 'joined', icon: 'checkmark-circle' as const },
-        { label: 'Discovery', value: 'discovery', icon: 'compass' as const },
+    const tabs: PremiumTabItem[] = [
+        { label: 'Joined', value: 'joined', icon: 'checkmark-circle' },
+        { label: 'Discovery', value: 'discovery', icon: 'compass' },
     ];
-
-    const activeTabConfig: Record<string, { color: string; bg: string }> = {
-        joined: { color: '#10B981', bg: 'bg-emerald-500/10' },
-        discovery: { color: '#818CF8', bg: 'bg-indigo-500/10' },
-    };
 
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
@@ -282,36 +278,11 @@ export default function HubsScreen() {
 
             {/* Tabs */}
             <View className="px-5 pb-3 pt-1">
-                <View className="flex-row gap-1.5">
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.value;
-                        const tabCfg = activeTabConfig[tab.value];
-                        return (
-                            <Pressable
-                                key={tab.value}
-                                onPress={() => setActiveTab(tab.value)}
-                                className={cn(
-                                    "flex-1 flex-row items-center justify-center py-2.5 rounded-2xl border",
-                                    isActive
-                                        ? `${tabCfg.bg} border-white/[0.08]`
-                                        : "bg-transparent border-white/[0.04]"
-                                )}
-                            >
-                                <Ionicons
-                                    name={tab.icon}
-                                    size={13}
-                                    color={isActive ? tabCfg.color : '#475569'}
-                                />
-                                <Text className={cn(
-                                    "text-[10px] font-bold ml-1 tracking-wide",
-                                    isActive ? "text-white" : "text-slate-600"
-                                )}>
-                                    {tab.label}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
-                </View>
+                <PremiumTabs
+                    tabs={tabs}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                />
             </View>
 
             {/* Content */}

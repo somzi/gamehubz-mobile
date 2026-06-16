@@ -17,12 +17,13 @@ import { cn, parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/util
 import { getSocialUrl } from '../lib/social';
 import { shareUser } from '../lib/share';
 import { TournamentCard } from '../components/cards/TournamentCard';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 
-const tabs = [
-    { label: 'Stats', value: 'stats' },
-    { label: 'Tournaments', value: 'tournaments' },
-    { label: 'Matches', value: 'matches' },
+const tabs: PremiumTabItem[] = [
+    { label: 'Stats', value: 'stats', icon: 'stats-chart' },
+    { label: 'Tournaments', value: 'tournaments', icon: 'trophy-outline' },
+    { label: 'Matches', value: 'matches', icon: 'game-controller-outline' },
 ];
 
 export default function ProfileScreen() {
@@ -347,27 +348,11 @@ export default function ProfileScreen() {
                 {/* ─── Tabs ─── */}
                 <View className="mt-2">
                     <View className="px-5 mb-3">
-                        <View className="flex-row bg-[#131B2E] rounded-2xl border border-white/[0.06] p-1" style={{ gap: 4 }}>
-                            {tabs.map((tab) => {
-                                const isActive = activeTab === tab.value;
-                                const iconMap: Record<string, string> = { stats: 'stats-chart', tournaments: 'trophy-outline', matches: 'game-controller-outline' };
-                                return (
-                                    <Pressable
-                                        key={tab.value}
-                                        onPress={() => setActiveTab(tab.value)}
-                                        className={`flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl ${
-                                            isActive ? 'bg-indigo-500/15 border border-indigo-500/25' : ''
-                                        }`}
-                                        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                                    >
-                                        <Ionicons name={(iconMap[tab.value] || 'ellipse') as any} size={14} color={isActive ? '#818CF8' : '#475569'} />
-                                        <Text className={`text-xs font-black ${
-                                            isActive ? 'text-white' : 'text-slate-600'
-                                        }`}>{tab.label}</Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </View>
+                        <PremiumTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                        />
                     </View>
 
                     <View className="px-5 pb-12">

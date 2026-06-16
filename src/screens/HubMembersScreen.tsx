@@ -10,6 +10,7 @@ import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { formatDateSafe } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
 
@@ -403,10 +404,10 @@ export default function HubMembersScreen() {
 
     const adminCount = members.filter(m => m.hubRole === HubRole.HubAdmin).length;
 
-    const tabs = [
-        { value: 'members' as const, label: 'Members', icon: 'people-outline' as const, count: members.length },
-        { value: 'requests' as const, label: 'Requests', icon: 'mail-outline' as const, count: requests.length },
-        { value: 'blacklisted' as const, label: 'Banned', icon: 'ban-outline' as const, count: bans.length },
+    const tabs: PremiumTabItem[] = [
+        { value: 'members', label: 'Members', icon: 'people-outline', badge: members.length > 0 ? members.length : undefined },
+        { value: 'requests', label: 'Requests', icon: 'mail-outline', badge: requests.length > 0 ? requests.length : undefined },
+        { value: 'blacklisted', label: 'Banned', icon: 'ban-outline', badge: bans.length > 0 ? bans.length : undefined },
     ];
 
     const searchPlaceholder =
@@ -420,34 +421,11 @@ export default function HubMembersScreen() {
 
             {/* Tabs */}
             <View className="px-4 pt-2 pb-1">
-                <View className="flex-row bg-[#0D1525] rounded-2xl border border-white/[0.06] p-1" style={{ gap: 4 }}>
-                    {tabs.map((tab) => {
-                        const isActive = activeTab === tab.value;
-                        return (
-                            <Pressable
-                                key={tab.value}
-                                onPress={() => setActiveTab(tab.value)}
-                                className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl border ${isActive ? 'bg-indigo-500/20 border-indigo-400/40' : 'border-transparent'}`}
-                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, gap: 5 })}
-                            >
-                                <Ionicons name={tab.icon} size={13} color={isActive ? '#A5B4FC' : '#475569'} />
-                                <Text
-                                    className={`text-[12px] font-black ${isActive ? 'text-white' : 'text-slate-500'}`}
-                                    numberOfLines={1}
-                                >
-                                    {tab.label}
-                                </Text>
-                                {tab.count > 0 && (
-                                    <View className={`px-1.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-white/10'}`} style={{ minWidth: 20, height: 16, alignItems: 'center', justifyContent: 'center' }}>
-                                        <Text className={`text-[10px] font-black text-center ${isActive ? 'text-white' : 'text-slate-200'}`}>
-                                            {tab.count}
-                                        </Text>
-                                    </View>
-                                )}
-                            </Pressable>
-                        );
-                    })}
-                </View>
+                <PremiumTabs
+                    tabs={tabs}
+                    activeTab={activeTab}
+                    onTabChange={(v) => setActiveTab(v as 'members' | 'requests' | 'blacklisted')}
+                />
             </View>
 
             {activeTab === 'members' && adminCount > 0 && (

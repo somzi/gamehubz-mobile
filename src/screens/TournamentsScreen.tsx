@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
 import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -138,19 +139,12 @@ export default function TournamentsScreen() {
     };
 
 
-    const tabs = [
-        { label: 'Live', value: 'live', icon: 'radio' as const },
-        { label: 'Upcoming', value: 'upcoming', icon: 'time' as const },
-        { label: 'Open', value: 'open', icon: 'add-circle' as const },
-        { label: 'Completed', value: 'completed', icon: 'checkmark-circle' as const },
+    const tabs: PremiumTabItem[] = [
+        { label: 'Live', value: 'live', icon: 'radio' },
+        { label: 'Upcoming', value: 'upcoming', icon: 'time' },
+        { label: 'Open', value: 'open', icon: 'add-circle' },
+        { label: 'Completed', value: 'completed', icon: 'checkmark-circle' },
     ];
-
-    const activeTabConfig: Record<string, { color: string; bg: string }> = {
-        live: { color: '#EF4444', bg: 'bg-red-500/10' },
-        upcoming: { color: '#818CF8', bg: 'bg-indigo-500/10' },
-        open: { color: '#10B981', bg: 'bg-emerald-500/10' },
-        completed: { color: '#64748B', bg: 'bg-slate-500/10' },
-    };
 
     const renderTournament = useCallback(({ item: tournament, index }: { item: any; index: number }) => (
         <View className="mb-3">
@@ -190,36 +184,11 @@ export default function TournamentsScreen() {
 
             {/* Tabs - full width */}
             <View className="px-5 pb-3 pt-2">
-                    <View className="flex-row gap-1.5">
-                        {tabs.map((tab) => {
-                            const isActive = activeTab === tab.value;
-                            const tabCfg = activeTabConfig[tab.value];
-                            return (
-                                <Pressable
-                                    key={tab.value}
-                                    onPress={() => setActiveTab(tab.value)}
-                                    className={cn(
-                                        "flex-1 flex-row items-center justify-center py-2.5 rounded-2xl border",
-                                        isActive
-                                            ? `${tabCfg.bg} border-white/[0.08]`
-                                            : "bg-transparent border-white/[0.04]"
-                                    )}
-                                >
-                                    <Ionicons
-                                        name={tab.icon}
-                                        size={13}
-                                        color={isActive ? tabCfg.color : '#475569'}
-                                    />
-                                    <Text className={cn(
-                                        "text-[10px] font-bold ml-1 tracking-wide",
-                                        isActive ? "text-white" : "text-slate-600"
-                                    )}>
-                                        {tab.label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
-                    </View>
+                <PremiumTabs
+                    tabs={tabs}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                />
             </View>
 
             {isLoading && tournaments.length === 0 ? (

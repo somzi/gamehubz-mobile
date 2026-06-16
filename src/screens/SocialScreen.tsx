@@ -8,15 +8,16 @@ import { RootStackParamList, MainTabParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 type TabKey = 'friends' | 'requests' | 'chats';
 type NavProp = StackNavigationProp<RootStackParamList>;
 type SocialRoute = RouteProp<MainTabParamList, 'Social'>;
 
-const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { key: 'friends', label: 'Friends', icon: 'people' },
-    { key: 'requests', label: 'Requests', icon: 'person-add' },
-    { key: 'chats', label: 'Chats', icon: 'chatbubble-ellipses' },
+const tabs: PremiumTabItem[] = [
+    { value: 'friends', label: 'Friends', icon: 'people' },
+    { value: 'requests', label: 'Requests', icon: 'person-add' },
+    { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses' },
 ];
 
 export default function SocialScreen() {
@@ -44,33 +45,11 @@ export default function SocialScreen() {
 
             {/* ─── Segmented Tabs ──────────────────────────────── */}
             <View className="px-5 mb-3">
-                <View
-                    className="flex-row bg-[#131B2E] rounded-2xl border border-white/[0.06] p-1"
-                    style={{ gap: 4 }}
-                >
-                    {tabs.map((t) => {
-                        const isActive = activeTab === t.key;
-                        return (
-                            <Pressable
-                                key={t.key}
-                                onPress={() => setActiveTab(t.key)}
-                                className={`flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl ${
-                                    isActive ? 'bg-emerald-500/15 border border-emerald-500/25' : ''
-                                }`}
-                                style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                            >
-                                <Ionicons name={t.icon} size={14} color={isActive ? '#10B981' : '#475569'} />
-                                <Text
-                                    className={`text-xs font-black ${
-                                        isActive ? 'text-white' : 'text-slate-600'
-                                    }`}
-                                >
-                                    {t.label}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
-                </View>
+                <PremiumTabs
+                    tabs={tabs}
+                    activeTab={activeTab}
+                    onTabChange={(v) => setActiveTab(v as TabKey)}
+                />
             </View>
 
             {/* ─── Tab Content ─────────────────────────────────── */}
@@ -264,45 +243,14 @@ function RequestsTab() {
     return (
         <View className="flex-1">
             <View className="px-5 mb-2">
-                <View className="flex-row bg-white/[0.03] rounded-xl p-1" style={{ gap: 2 }}>
-                    {(['incoming', 'outgoing'] as const).map((k) => {
-                        const isActive = subTab === k;
-                        const count = k === 'incoming' ? incoming.length : outgoing.length;
-                        return (
-                            <Pressable
-                                key={k}
-                                onPress={() => setSubTab(k)}
-                                className={`flex-1 py-2 rounded-lg flex-row items-center justify-center ${
-                                    isActive ? 'bg-emerald-500/15' : ''
-                                }`}
-                                style={{ gap: 6 }}
-                            >
-                                <Text
-                                    className={`text-[11px] font-bold uppercase tracking-wider ${
-                                        isActive ? 'text-emerald-400' : 'text-slate-500'
-                                    }`}
-                                >
-                                    {k}
-                                </Text>
-                                {count > 0 && (
-                                    <View
-                                        className={`px-1.5 rounded-full min-w-[18px] items-center ${
-                                            isActive ? 'bg-emerald-500/30' : 'bg-white/10'
-                                        }`}
-                                    >
-                                        <Text
-                                            className={`text-[10px] font-black ${
-                                                isActive ? 'text-white' : 'text-slate-400'
-                                            }`}
-                                        >
-                                            {count}
-                                        </Text>
-                                    </View>
-                                )}
-                            </Pressable>
-                        );
-                    })}
-                </View>
+                <PremiumTabs
+                    tabs={[
+                        { value: 'incoming', label: 'Incoming', icon: 'arrow-down-circle-outline', badge: incoming.length > 0 ? incoming.length : undefined },
+                        { value: 'outgoing', label: 'Outgoing', icon: 'arrow-up-circle-outline', badge: outgoing.length > 0 ? outgoing.length : undefined },
+                    ]}
+                    activeTab={subTab}
+                    onTabChange={(v) => setSubTab(v as 'incoming' | 'outgoing')}
+                />
             </View>
 
             <FlatList

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { TEAM_LABELS } from '../lib/teamConstants';
 import {
     renameTeam,
@@ -436,34 +437,19 @@ export default function TeamDashboardScreen() {
 
                 {/* ── Tabs ── */}
                 <View className="px-5 pb-3">
-                    <View className="flex-row bg-[#131B2E] p-1 rounded-2xl border border-white/5">
-                        <Pressable
-                            onPress={() => setActiveTab('members')}
-                            className={`flex-1 py-2.5 items-center justify-center rounded-xl ${activeTab === 'members' ? 'bg-[#00E5A0]/10 border border-[#00E5A0]/20' : ''}`}
-                        >
-                            <Text className={`font-black text-[11px] uppercase tracking-wider ${activeTab === 'members' ? 'text-[#00E5A0]' : 'text-slate-500'}`}>
-                                Members
-                            </Text>
-                        </Pressable>
-
-                        {showRequestsTab && (
-                            <Pressable
-                                onPress={() => setActiveTab('requests')}
-                                className={`flex-1 py-2.5 items-center justify-center rounded-xl ${activeTab === 'requests' ? 'bg-[#F59E0B]/10 border border-[#F59E0B]/20' : ''}`}
-                            >
-                                <View className="flex-row items-center gap-1.5">
-                                    <Text className={`font-black text-[11px] uppercase tracking-wider ${activeTab === 'requests' ? 'text-[#F59E0B]' : 'text-slate-500'}`}>
-                                        Requests
-                                    </Text>
-                                    {joinRequests.length > 0 && (
-                                        <View className="w-5 h-5 rounded-full bg-[#F59E0B] items-center justify-center">
-                                            <Text className="text-[9px] font-black text-[#0F172A]">{joinRequests.length}</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </Pressable>
-                        )}
-                    </View>
+                    <PremiumTabs
+                        tabs={[
+                            { value: 'members', label: 'Members', icon: 'people-outline' } as PremiumTabItem,
+                            ...(showRequestsTab ? [{
+                                value: 'requests',
+                                label: 'Requests',
+                                icon: 'hourglass-outline' as const,
+                                badge: joinRequests.length > 0 ? joinRequests.length : undefined,
+                            }] : []),
+                        ]}
+                        activeTab={activeTab}
+                        onTabChange={(v) => setActiveTab(v as 'members' | 'requests')}
+                    />
                 </View>
 
                 {/* Members List */}
