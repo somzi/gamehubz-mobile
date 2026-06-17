@@ -115,9 +115,20 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                 return (
                     <View key={group.groupId} className="flex-col gap-6">
                         <View>
-                            <Text className="text-lg font-black text-white mb-4">{group.name}</Text>
+                            <View className="flex-row items-center gap-2.5 mb-4">
+                                <View
+                                    className="w-9 h-9 rounded-2xl items-center justify-center"
+                                    style={{ backgroundColor: 'rgba(99,102,241,0.12)', borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)' }}
+                                >
+                                    <Ionicons name="grid" size={16} color="#818CF8" />
+                                </View>
+                                <Text className="text-lg font-black text-white flex-1" numberOfLines={1}>{group.name}</Text>
+                            </View>
 
-                            <View className="bg-[#0D1525] rounded-2xl border border-white/[0.06] overflow-hidden">
+                            <View
+                                className="rounded-[22px] border border-white/[0.06] overflow-hidden"
+                                style={{ backgroundColor: '#131B2E', shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}
+                            >
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                     <View className="min-w-full">
                                         <View className="flex-row bg-white/[0.03] py-3 px-4 border-b border-white/[0.04]">
@@ -135,58 +146,75 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                             <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GA</Text>
                                             <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GD</Text>
                                         </View>
-                                        {group.standings.map((standing, index) => (
-                                            <Pressable
-                                                key={standing.participantId}
-                                                onPress={() => handlePlayerPress(standing)}
-                                                className={cn(
-                                                    "flex-row py-3 px-4 border-b border-white/[0.03] items-center",
-                                                    index === group.standings.length - 1 && "border-b-0"
-                                                )}
-                                                style={({ pressed }: { pressed: boolean }) => ({
-                                                    backgroundColor: pressed ? 'rgba(255, 255, 255, 0.03)' : 'transparent'
-                                                })}
-                                            >
-                                                <View className="w-8 items-center justify-center">
-                                                    {(() => {
-                                                        const isDirect = qualificationZones
-                                                            ? standing.position <= qualificationZones.direct
-                                                            : standing.position <= 2;
-                                                        const isPlayIn = !!qualificationZones
-                                                            && !isDirect
-                                                            && standing.position <= qualificationZones.playInEnd;
-                                                        return (
-                                                            <View className={cn(
-                                                                "w-5 h-5 rounded-md items-center justify-center",
-                                                                isDirect ? "bg-emerald-500/15" : isPlayIn ? "bg-amber-500/15" : "bg-white/[0.04]"
-                                                            )}>
-                                                                <Text className={cn(
-                                                                    "text-[10px] font-black",
-                                                                    isDirect ? "text-emerald-400" : isPlayIn ? "text-amber-400" : "text-slate-500"
-                                                                )}>{standing.position}</Text>
+                                        {group.standings.map((standing, index) => {
+                                            const isMe = (!!currentUserId && !!standing.userId && standing.userId.toLowerCase() === currentUserId.toLowerCase())
+                                                || (!!currentUsername && !!standing.username && standing.username.toLowerCase() === currentUsername.toLowerCase());
+                                            const isDirect = qualificationZones
+                                                ? standing.position <= qualificationZones.direct
+                                                : standing.position <= 2;
+                                            const isPlayIn = !!qualificationZones
+                                                && !isDirect
+                                                && standing.position <= qualificationZones.playInEnd;
+                                            const zoneColor = isDirect ? '#10B981' : isPlayIn ? '#F59E0B' : null;
+                                            return (
+                                                <Pressable
+                                                    key={standing.participantId}
+                                                    onPress={() => handlePlayerPress(standing)}
+                                                    className={cn(
+                                                        "flex-row py-3 px-4 border-b border-white/[0.03] items-center",
+                                                        index === group.standings.length - 1 && "border-b-0"
+                                                    )}
+                                                    style={({ pressed }: { pressed: boolean }) => ({
+                                                        backgroundColor: pressed
+                                                            ? 'rgba(255,255,255,0.05)'
+                                                            : isMe
+                                                                ? 'rgba(16,185,129,0.08)'
+                                                                : 'transparent',
+                                                    })}
+                                                >
+                                                    {zoneColor && (
+                                                        <View
+                                                            style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderTopRightRadius: 3, borderBottomRightRadius: 3, backgroundColor: zoneColor }}
+                                                        />
+                                                    )}
+                                                    <View className="w-8 items-center justify-center">
+                                                        <View className={cn(
+                                                            "w-5 h-5 rounded-md items-center justify-center",
+                                                            isDirect ? "bg-emerald-500/15" : isPlayIn ? "bg-amber-500/15" : "bg-white/[0.04]"
+                                                        )}>
+                                                            <Text className={cn(
+                                                                "text-[10px] font-black",
+                                                                isDirect ? "text-emerald-400" : isPlayIn ? "text-amber-400" : "text-slate-500"
+                                                            )}>{standing.position}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View className="w-32 ml-2 flex-row items-center gap-1.5">
+                                                        <Text className={cn("text-xs font-bold flex-1", isMe ? "text-emerald-300" : "text-slate-200")} numberOfLines={1}>
+                                                            {standing.username || getUsername(standing.userId, group.matches)}
+                                                        </Text>
+                                                        {isMe && (
+                                                            <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
+                                                                <Text className="text-[8px] font-black uppercase tracking-wider text-emerald-300">You</Text>
                                                             </View>
-                                                        );
-                                                    })()}
-                                                </View>
-                                                <Text className="w-32 text-xs font-bold text-slate-300 ml-2" numberOfLines={1}>
-                                                    {standing.username || getUsername(standing.userId, group.matches)}
-                                                </Text>
-                                                <Text className="w-12 text-xs text-center font-black text-indigo-400">{standing.points}</Text>
-                                                {showBuchholz && (
-                                                    <Text className="w-10 text-xs text-center font-semibold text-slate-400">{standing.opponentPointsSum ?? 0}</Text>
-                                                )}
-                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.matchesPlayed}</Text>
-                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.wins}</Text>
-                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.draws}</Text>
-                                                <Text className="w-8 text-xs text-center text-slate-500">{standing.losses}</Text>
-                                                <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsFor}</Text>
-                                                <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsAgainst}</Text>
-                                                <Text className={cn(
-                                                    "w-10 text-xs text-center font-bold",
-                                                    standing.goalDifference > 0 ? "text-emerald-400" : standing.goalDifference < 0 ? "text-red-400" : "text-slate-500"
-                                                )}>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</Text>
-                                            </Pressable>
-                                        ))}
+                                                        )}
+                                                    </View>
+                                                    <Text className="w-12 text-xs text-center font-black text-indigo-400">{standing.points}</Text>
+                                                    {showBuchholz && (
+                                                        <Text className="w-10 text-xs text-center font-semibold text-slate-400">{standing.opponentPointsSum ?? 0}</Text>
+                                                    )}
+                                                    <Text className="w-8 text-xs text-center text-slate-500">{standing.matchesPlayed}</Text>
+                                                    <Text className="w-8 text-xs text-center text-slate-400">{standing.wins}</Text>
+                                                    <Text className="w-8 text-xs text-center text-slate-500">{standing.draws}</Text>
+                                                    <Text className="w-8 text-xs text-center text-slate-500">{standing.losses}</Text>
+                                                    <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsFor}</Text>
+                                                    <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsAgainst}</Text>
+                                                    <Text className={cn(
+                                                        "w-10 text-xs text-center font-bold",
+                                                        standing.goalDifference > 0 ? "text-emerald-400" : standing.goalDifference < 0 ? "text-red-400" : "text-slate-500"
+                                                    )}>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</Text>
+                                                </Pressable>
+                                            );
+                                        })}
                                     </View>
                                 </ScrollView>
                             </View>

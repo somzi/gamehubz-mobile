@@ -1,4 +1,5 @@
 import { View, Text, Pressable } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -98,7 +99,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         <Ionicons name="people" size={13} color={isWinner ? '#34D399' : '#475569'} />
                     </View>
                 ) : (
-                    <PlayerAvatar name={participant.username} size="sm" className="w-7 h-7" />
+                    <PlayerAvatar name={participant.username} size="sm" className={isWinner ? "border-emerald-400/70" : "border-white/10"} />
                 )}
 
                 <Text
@@ -163,20 +164,36 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     // While a proposal is pending we hide the "Report Result" CTA — the opponent should Approve / Reject instead.
     const canReport = canShowDetails && !isAlreadyReported && !isAwaitingApproval && canUserReport && (status === 2 || status === 1);
 
+    const glow = canReport || isLive ? '#10B981' : isAwaitingApproval ? '#F59E0B' : null;
+
     return (
         <Pressable
             onPress={canShowDetails ? onPress : undefined}
             disabled={!canShowDetails}
             className={cn(
-                "rounded-2xl bg-[#0D1525] border overflow-hidden",
-                canReport ? "border-emerald-500/25" : isCompleted ? "border-white/[0.06]" : "border-white/[0.06]",
+                "rounded-[20px] bg-[#131B2E] border overflow-hidden",
+                canReport ? "border-emerald-500/30" : isAwaitingApproval ? "border-[#F59E0B]/25" : "border-white/[0.06]",
                 className
             )}
             style={({ pressed }) => ({
-                opacity: pressed && canShowDetails ? 0.75 : 1,
-                transform: [{ scale: pressed && canShowDetails ? 0.985 : 1 }]
+                opacity: pressed && canShowDetails ? 0.8 : 1,
+                transform: [{ scale: pressed && canShowDetails ? 0.985 : 1 }],
+                shadowColor: glow ?? '#000000',
+                shadowOpacity: glow ? 0.2 : 0.28,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 5 },
+                elevation: 5,
             })}
         >
+            {glow && (
+                <LinearGradient
+                    colors={[glow + '1F', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.9, y: 0 }}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                />
+            )}
+
             {/* Status / action header */}
             {(canReport || isAwaitingApproval || isLive || isCompleted) && (
                 <View className={cn(

@@ -2116,26 +2116,86 @@ export default function TournamentDetailsScreen() {
                                         const isCurrentUser = user?.id?.toLowerCase() === pUserId?.toLowerCase();
 
                                         return (
-                                            <View key={p.participantId || p.id || pUserId || i} className="flex-row items-center gap-2 mb-2">
+                                            <View key={p.participantId || p.id || pUserId || i} className="flex-row items-center gap-2.5">
                                                 <Pressable
                                                     onPress={() => { if (pUserId) navigation.navigate('PlayerProfile', { id: pUserId }); }}
-                                                    className="bg-[#131B2E]/60 p-4 rounded-[22px] border border-white/5 flex-row items-center gap-3 flex-1 active:opacity-70"
+                                                    className="flex-1 active:opacity-80"
                                                 >
-                                                    <View className="w-7 items-center justify-center">
-                                                        <Text className="text-slate-500 font-black text-sm">{i + 1}</Text>
-                                                    </View>
-                                                    <PlayerAvatar src={p.avatarUrl || p.AvatarUrl} name={p.username || p.Username || 'Player'} size="md" />
-                                                    <View className="flex-1 justify-center">
-                                                        <View className="flex-row items-center gap-2">
-                                                            <Text className="font-bold text-base text-white">{p.username || p.Username}</Text>
-                                                            {isCurrentUser && (
-                                                                <View className="bg-white/10 px-1.5 py-0.5 rounded-full">
-                                                                    <Text className="text-[9px] text-slate-400 font-black uppercase">You</Text>
+                                                    <View
+                                                        className="rounded-[22px] overflow-hidden"
+                                                        style={{
+                                                            backgroundColor: '#131B2E',
+                                                            shadowColor: isCurrentUser ? '#10B981' : '#000000',
+                                                            shadowOpacity: isCurrentUser ? 0.18 : 0.22,
+                                                            shadowRadius: 12,
+                                                            shadowOffset: { width: 0, height: 5 },
+                                                            elevation: 4,
+                                                        }}
+                                                    >
+                                                        <LinearGradient
+                                                            colors={[isCurrentUser ? 'rgba(16,185,129,0.16)' : 'rgba(255,255,255,0.035)', 'transparent']}
+                                                            start={{ x: 0, y: 0 }}
+                                                            end={{ x: 0.85, y: 0 }}
+                                                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                                        />
+                                                        <View
+                                                            pointerEvents="none"
+                                                            className="absolute inset-0 rounded-[22px]"
+                                                            style={{ borderWidth: 1, borderColor: isCurrentUser ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.06)' }}
+                                                        />
+                                                        {isCurrentUser && (
+                                                            <View
+                                                                style={{
+                                                                    position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
+                                                                    backgroundColor: '#10B981', borderTopRightRadius: 3, borderBottomRightRadius: 3,
+                                                                    shadowColor: '#10B981', shadowOpacity: 0.7, shadowRadius: 8, shadowOffset: { width: 0, height: 0 },
+                                                                }}
+                                                            />
+                                                        )}
+                                                        <View className="flex-row items-center p-3.5 pl-4">
+                                                            <View
+                                                                className="w-8 h-8 rounded-xl items-center justify-center mr-3"
+                                                                style={{
+                                                                    backgroundColor: isCurrentUser ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
+                                                                    borderWidth: 1,
+                                                                    borderColor: isCurrentUser ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.07)',
+                                                                }}
+                                                            >
+                                                                <Text className="font-black text-[13px]" style={{ color: isCurrentUser ? '#34D399' : '#64748B' }}>{i + 1}</Text>
+                                                            </View>
+                                                            <View style={{ shadowColor: '#10B981', shadowOpacity: 0.3, shadowRadius: 7, shadowOffset: { width: 0, height: 2 } }}>
+                                                                <View style={{ borderWidth: 1.5, borderColor: isCurrentUser ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)', borderRadius: 999, padding: 2 }}>
+                                                                    <PlayerAvatar src={p.avatarUrl || p.AvatarUrl} name={p.username || p.Username || 'Player'} size="md" />
                                                                 </View>
-                                                            )}
+                                                                <View
+                                                                    className="absolute items-center justify-center"
+                                                                    style={{ bottom: -2, right: -2, width: 18, height: 18, borderRadius: 999, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#131B2E' }}
+                                                                >
+                                                                    <Ionicons name="checkmark" size={9} color="#0F172A" />
+                                                                </View>
+                                                            </View>
+                                                            <View className="flex-1 ml-3 justify-center">
+                                                                <View className="flex-row items-center gap-2">
+                                                                    <Text className="font-black text-base text-white" numberOfLines={1}>{p.username || p.Username}</Text>
+                                                                    {isCurrentUser && (
+                                                                        <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
+                                                                            <Text className="text-[9px] font-black uppercase tracking-wider text-emerald-300">You</Text>
+                                                                        </View>
+                                                                    )}
+                                                                </View>
+                                                                <View className="flex-row items-center gap-1 mt-1">
+                                                                    <View className="w-1 h-1 rounded-full" style={{ backgroundColor: '#10B981' }} />
+                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: 'rgba(16,185,129,0.8)' }}>Confirmed</Text>
+                                                                </View>
+                                                            </View>
+                                                            <View
+                                                                className="w-8 h-8 rounded-full items-center justify-center ml-2"
+                                                                style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}
+                                                            >
+                                                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                                                            </View>
                                                         </View>
                                                     </View>
-                                                    <Ionicons name="chevron-forward" size={16} color="#475569" />
                                                 </Pressable>
                                                 {canRemove && (
                                                     <Pressable
@@ -2183,38 +2243,70 @@ export default function TournamentDetailsScreen() {
                                         pendingRegistrations.map((reg) => {
                                             const regId = reg.id || reg.registrationId || reg.Id;
                                             return (
-                                                <View key={regId || Math.random().toString()} className="bg-[#F59E0B]/5 p-4 mb-2 rounded-[22px] border border-[#F59E0B]/15 flex-row items-center gap-3">
-                                                    <PlayerAvatar src={reg.avatarUrl || reg.AvatarUrl} name={reg.username || reg.Username || 'Unknown'} size="md" />
-                                                    <View className="flex-1 justify-center">
-                                                        <Text className="font-bold text-base text-white">{reg.username || reg.Username}</Text>
-                                                        <View className="flex-row items-center gap-1 mt-0.5">
-                                                            <Ionicons name="person-add-outline" size={11} color="#F59E0B" />
-                                                            <Text className="text-[10px] text-[#F59E0B] font-bold">Wants to join</Text>
+                                                <View key={regId || Math.random().toString()} className="rounded-[22px] overflow-hidden" style={{ backgroundColor: '#131B2E', shadowColor: '#F59E0B', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}>
+                                                    <LinearGradient
+                                                        colors={['rgba(245,158,11,0.14)', 'transparent']}
+                                                        start={{ x: 0, y: 0 }}
+                                                        end={{ x: 0.85, y: 0 }}
+                                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                                    />
+                                                    <View
+                                                        pointerEvents="none"
+                                                        className="absolute inset-0 rounded-[22px]"
+                                                        style={{ borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' }}
+                                                    />
+                                                    <View
+                                                        style={{
+                                                            position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
+                                                            backgroundColor: '#F59E0B', borderTopRightRadius: 3, borderBottomRightRadius: 3,
+                                                            shadowColor: '#F59E0B', shadowOpacity: 0.7, shadowRadius: 8, shadowOffset: { width: 0, height: 0 },
+                                                        }}
+                                                    />
+                                                    <View className="flex-row items-center p-3.5 pl-4">
+                                                        <View style={{ shadowColor: '#F59E0B', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
+                                                            <View style={{ borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.5)', borderRadius: 999, padding: 2 }}>
+                                                                <PlayerAvatar src={reg.avatarUrl || reg.AvatarUrl} name={reg.username || reg.Username || 'Unknown'} size="md" />
+                                                            </View>
+                                                            <View
+                                                                className="absolute items-center justify-center"
+                                                                style={{ bottom: -2, right: -2, width: 18, height: 18, borderRadius: 999, backgroundColor: '#F59E0B', borderWidth: 2, borderColor: '#131B2E' }}
+                                                            >
+                                                                <Ionicons name="hourglass" size={9} color="#0F172A" />
+                                                            </View>
                                                         </View>
-                                                    </View>
-                                                    <View className="flex-row gap-2 items-center">
-                                                        <Pressable
-                                                            onPress={() => handleReject(regId)}
-                                                            disabled={processingId !== null}
-                                                            className="w-10 h-10 rounded-xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
-                                                        >
-                                                            {processingId === regId ? (
-                                                                <ActivityIndicator size="small" color="#EF4444" />
-                                                            ) : (
-                                                                <Ionicons name="close" size={18} color="#EF4444" />
-                                                            )}
-                                                        </Pressable>
-                                                        <Pressable
-                                                            onPress={() => handleApprove(regId)}
-                                                            disabled={processingId !== null}
-                                                            className="w-10 h-10 rounded-xl bg-[#10B981]/10 items-center justify-center border border-[#10B981]/20 active:opacity-60"
-                                                        >
-                                                            {processingId === regId ? (
-                                                                <ActivityIndicator size="small" color="#10B981" />
-                                                            ) : (
-                                                                <Ionicons name="checkmark" size={18} color="#10B981" />
-                                                            )}
-                                                        </Pressable>
+                                                        <View className="flex-1 ml-3 justify-center">
+                                                            <Text className="font-black text-base text-white" numberOfLines={1}>{reg.username || reg.Username}</Text>
+                                                            <View className="flex-row items-center gap-1 mt-1">
+                                                                <Ionicons name="person-add" size={11} color="#FBBF24" />
+                                                                <Text className="text-[10px] font-bold uppercase tracking-[1px]" style={{ color: '#FCD34D' }}>Wants to join</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View className="flex-row gap-2 items-center">
+                                                            <Pressable
+                                                                onPress={() => handleReject(regId)}
+                                                                disabled={processingId !== null}
+                                                                className="w-11 h-11 rounded-2xl items-center justify-center active:opacity-60"
+                                                                style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)' }}
+                                                            >
+                                                                {processingId === regId ? (
+                                                                    <ActivityIndicator size="small" color="#EF4444" />
+                                                                ) : (
+                                                                    <Ionicons name="close" size={18} color="#F87171" />
+                                                                )}
+                                                            </Pressable>
+                                                            <Pressable
+                                                                onPress={() => handleApprove(regId)}
+                                                                disabled={processingId !== null}
+                                                                className="w-11 h-11 rounded-2xl items-center justify-center active:opacity-80"
+                                                                style={{ backgroundColor: '#10B981', shadowColor: '#10B981', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
+                                                            >
+                                                                {processingId === regId ? (
+                                                                    <ActivityIndicator size="small" color="#0F172A" />
+                                                                ) : (
+                                                                    <Ionicons name="checkmark" size={20} color="#0F172A" />
+                                                                )}
+                                                            </Pressable>
+                                                        </View>
                                                     </View>
                                                 </View>
                                             );
