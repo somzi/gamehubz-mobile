@@ -89,6 +89,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [selectedFormat, setSelectedFormat] = useState('3'); // Default to Single Elimination (or choose a safer default)
     const [groupsCount, setGroupsCount] = useState('4');
     const [qualifiersPerGroup, setQualifiersPerGroup] = useState('2');
+    // League / Groups: each pair plays twice when on (home + away leg).
+    const [doubleRoundRobin, setDoubleRoundRobin] = useState(false);
     const [inviteFollowers, setInviteFollowers] = useState(false);
 
     // Swiss format config: rounds (empty = auto), knockout size ('0' = pure Swiss),
@@ -367,6 +369,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
+                DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
             };
 
             const requestBody = {
@@ -740,6 +743,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             value={groupsCount}
                                             onChangeText={setGroupsCount}
                                         />
+                                        <Text className="text-[11px] text-zinc-500 mt-2">
+                                            How many groups players will be split into.
+                                        </Text>
                                     </View>
                                     <View className="flex-1">
                                         <Text className="text-sm font-bold text-white mb-3">Qualifiers / Group</Text>
@@ -751,7 +757,41 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             value={qualifiersPerGroup}
                                             onChangeText={setQualifiersPerGroup}
                                         />
+                                        <Text className="text-[11px] text-zinc-500 mt-2">
+                                            How many players from each group advance to the knockout bracket.
+                                        </Text>
                                     </View>
+                                </View>
+                            )}
+
+                            {/* Double round robin — every pair plays twice (home + away). Shown for League and Groups+Bracket. */}
+                            {(selectedFormat === '0' || selectedFormat === '5') && (
+                                <View>
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Double Round Robin</Text>
+                                    </View>
+                                    <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                        <Pressable
+                                            onPress={() => setDoubleRoundRobin(false)}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!doubleRoundRobin ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${!doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
+                                                NO
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => setDoubleRoundRobin(true)}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${doubleRoundRobin ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
+                                                YES
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Every pair plays twice — one home leg and one away leg. Doubles the match count.
+                                    </Text>
                                 </View>
                             )}
 
