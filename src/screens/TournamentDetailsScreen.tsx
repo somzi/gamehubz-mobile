@@ -286,6 +286,10 @@ export default function TournamentDetailsScreen() {
                 hubName: rawData.hubName || rawData.HubName,
                 isTeamTournament: rawData.isTeamTournament ?? rawData.IsTeamTournament ?? false,
                 teamSize: rawData.teamSize ?? rawData.TeamSize ?? null,
+                isExclusive: rawData.isExclusive ?? rawData.IsExclusive ?? false,
+                // Server (v2 overview) tells us whether the caller passes the exclusivity gate.
+                // Omitted (=> false) when the user lacks access; non-exclusive tournaments don't use it.
+                hasExclusiveAccess: rawData.hasExclusiveAccess ?? rawData.HasExclusiveAccess ?? false,
             };
 
             setTournament(normalizedTournament);
@@ -1392,14 +1396,20 @@ export default function TournamentDetailsScreen() {
                             // hub-navigation path can't surface a Join button the user can't use.
                             const tournamentCountries: string[] = tournament.countries || [];
                             const isCountryScoped = tournamentCountries.length > 0;
-                            const isEligible = isCountryScoped
+                            const isRegionCountryEligible = isCountryScoped
                                 ? (!!user?.country && tournamentCountries.includes(user.country))
                                 : (tournament.region === TournamentRegion.Global || tournament.region === user?.region);
-                            const restrictionLabel = isCountryScoped
-                                ? (tournamentCountries.length <= 3
-                                    ? `${(tournament.countryFlags || []).join(' ')} ${(tournament.countryNames || tournamentCountries).join(', ')}`.trim()
-                                    : `${tournamentCountries.length} countries`)
-                                : 'this region';
+                            // Exclusive tournaments need an Exclusive-or-higher hub role; the server
+                            // reports this via hasExclusiveAccess so plain members don't see Join.
+                            const isExclusiveEligible = !tournament.isExclusive || tournament.hasExclusiveAccess === true;
+                            const isEligible = isRegionCountryEligible && isExclusiveEligible;
+                            const restrictionLabel = !isExclusiveEligible
+                                ? 'exclusive members of this hub'
+                                : isCountryScoped
+                                    ? (tournamentCountries.length <= 3
+                                        ? `${(tournament.countryFlags || []).join(' ')} ${(tournament.countryNames || tournamentCountries).join(', ')}`.trim()
+                                        : `${tournamentCountries.length} countries`)
+                                    : 'this region';
 
                             const buttons = [];
 
@@ -1606,6 +1616,18 @@ export default function TournamentDetailsScreen() {
                                                             : tournament.region === TournamentRegion.Africa ? 'AFR'
                                                                 : tournament.region === TournamentRegion.Oceania ? 'OCE'
                                                                     : 'Global'
+                                        }
+                                    />
+                                )}
+                                {tournament.isExclusive && (
+                                    <InfoRow
+                                        icon="sparkles"
+                                        iconColor="#E879F9"
+                                        label="Access"
+                                        value={
+                                            <Text className="text-[14px] font-black text-fuchsia-300" numberOfLines={1}>
+                                                Exclusive members
+                                            </Text>
                                         }
                                     />
                                 )}

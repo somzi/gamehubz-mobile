@@ -271,6 +271,37 @@ export function HourlyAvailabilityPicker({
                         <Ionicons name="create-outline" size={16} color="#94A3B8" />
                         <Text className="text-xs font-black text-slate-300 uppercase tracking-widest">Edit Slots</Text>
                     </Pressable>
+
+                    {/* Even after availability is sent, let the user break the "waiting for opponent"
+                        lock if they already agreed on a time outside the app. */}
+                    {onMarkScheduled && (
+                        <>
+                            <View className="flex-row items-center w-full" style={{ marginVertical: 12 }}>
+                                <View className="flex-1 h-[1px] bg-white/[0.06]" />
+                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">OR</Text>
+                                <View className="flex-1 h-[1px] bg-white/[0.06]" />
+                            </View>
+
+                            <Pressable
+                                onPress={onMarkScheduled}
+                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                                className="w-full rounded-2xl bg-emerald-500/[0.08] border border-emerald-500/20 flex-row items-center px-4 py-3.5 gap-3"
+                            >
+                                <View className="w-9 h-9 rounded-xl bg-emerald-500/12 border border-emerald-500/20 items-center justify-center">
+                                    <Ionicons name="checkmark-circle-outline" size={18} color="#10B981" />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-[13px] font-black text-white leading-tight">
+                                        Already agreed on a time?
+                                    </Text>
+                                    <Text className="text-[11px] text-slate-400 mt-0.5">
+                                        Schedule now without waiting and report directly
+                                    </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                            </Pressable>
+                        </>
+                    )}
                 </View>
             ) : (
                 /* ───────── Choice cards ───────── */

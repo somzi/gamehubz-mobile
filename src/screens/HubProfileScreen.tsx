@@ -182,6 +182,9 @@ export default function HubProfileScreen() {
         if (role === HubRole.HubAdmin) {
             return { label: 'Admin', color: 'text-indigo-300', bg: 'bg-indigo-500/15 border border-indigo-500/30', icon: 'star', iconColor: '#A5B4FC' };
         }
+        if (role === HubRole.HubExclusive) {
+            return { label: 'Exclusive', color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/15 border border-fuchsia-500/30', icon: 'sparkles', iconColor: '#E879F9' };
+        }
         return { label: 'Member', color: 'text-slate-400', bg: 'bg-white/[0.05] border border-white/10', icon: 'person', iconColor: '#94A3B8' };
     };
 

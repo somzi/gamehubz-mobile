@@ -114,6 +114,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Result approval — when on, reported scores need opponent (or admin) confirmation.
     const [requireResultApproval, setRequireResultApproval] = useState(false);
 
+    // Exclusive — when on, only Exclusive-or-higher hub members can see/join the tournament.
+    const [isExclusive, setIsExclusive] = useState(false);
+
     // Data State
     const [hubs, setHubs] = useState<{ id: string; name: string }[]>([]);
     const [isLoadingHubs, setIsLoadingHubs] = useState(false);
@@ -369,6 +372,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
+                IsExclusive: isExclusive,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
             };
 
@@ -697,6 +701,35 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                 </View>
                                 <Text className="text-[11px] text-zinc-500 mt-2">
                                     When ON, the opposing participant must confirm a reported result. The hub owner or admin can override.
+                                </Text>
+                            </View>
+
+                            {/* Exclusive members only */}
+                            <View>
+                                <View className="flex-row items-center mb-3">
+                                    <Ionicons name="sparkles-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text className="text-sm font-bold text-white">Exclusive Members Only</Text>
+                                </View>
+                                <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                    <Pressable
+                                        onPress={() => setIsExclusive(false)}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isExclusive ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${!isExclusive ? 'text-white' : 'text-zinc-500'}`}>
+                                            NO
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => setIsExclusive(true)}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isExclusive ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${isExclusive ? 'text-white' : 'text-zinc-500'}`}>
+                                            YES
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                                <Text className="text-[11px] text-zinc-500 mt-2">
+                                    When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
                                 </Text>
                             </View>
 

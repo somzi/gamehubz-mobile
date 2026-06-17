@@ -51,6 +51,12 @@ const ROLE_META: Record<HubRole, { label: string; container: string; text: strin
         text: 'text-indigo-300',
         icon: 'star',
     },
+    [HubRole.HubExclusive]: {
+        label: 'Exclusive',
+        container: 'bg-fuchsia-500/15 border border-fuchsia-500/30',
+        text: 'text-fuchsia-300',
+        icon: 'sparkles',
+    },
     [HubRole.HubMember]: {
         label: 'Member',
         container: 'bg-white/[0.05] border border-white/10',
@@ -74,7 +80,10 @@ function RoleBadge({ role }: { role: HubRole }) {
     return (
         <View className={`flex-row items-center px-2 py-1 rounded-full ${meta.container}`} style={{ gap: 4 }}>
             <Ionicons name={meta.icon} size={11} color={
-                role === HubRole.HubOwner ? '#FBBF24' : role === HubRole.HubAdmin ? '#A5B4FC' : '#94A3B8'
+                role === HubRole.HubOwner ? '#FBBF24'
+                    : role === HubRole.HubAdmin ? '#A5B4FC'
+                        : role === HubRole.HubExclusive ? '#E879F9'
+                            : '#94A3B8'
             } />
             <Text className={`text-[10px] font-black uppercase tracking-wide ${meta.text}`}>
                 {meta.label}
@@ -310,14 +319,31 @@ export default function HubMembersScreen() {
     const openMemberActions = (member: MemberRow) => {
         const buttons: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [];
 
-        // Only the Owner can grant/revoke admin privileges.
+        // Only the Owner can grant/revoke elevated roles (admin / exclusive).
         if (isOwner) {
             if (member.hubRole === HubRole.HubMember) {
                 buttons.push({
                     text: 'Promote to admin',
                     onPress: () => changeRole(member, HubRole.HubAdmin),
                 });
+                buttons.push({
+                    text: 'Promote to exclusive',
+                    onPress: () => changeRole(member, HubRole.HubExclusive),
+                });
+            } else if (member.hubRole === HubRole.HubExclusive) {
+                buttons.push({
+                    text: 'Promote to admin',
+                    onPress: () => changeRole(member, HubRole.HubAdmin),
+                });
+                buttons.push({
+                    text: 'Demote to member',
+                    onPress: () => changeRole(member, HubRole.HubMember),
+                });
             } else if (member.hubRole === HubRole.HubAdmin) {
+                buttons.push({
+                    text: 'Demote to exclusive',
+                    onPress: () => changeRole(member, HubRole.HubExclusive),
+                });
                 buttons.push({
                     text: 'Demote to member',
                     onPress: () => changeRole(member, HubRole.HubMember),
