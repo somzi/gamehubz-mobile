@@ -204,9 +204,9 @@ export default function HomeScreen() {
                                 onSeeAll={() => navigation.navigate('MyMatches')}
                             />
                             <View className="gap-3">
-                                {actionRequiredMatches.slice(0, 3).map((match, index) => (
+                                {actionRequiredMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
-                                        key={match.matchId || `pending-${index}`}
+                                        key={match.id || match.matchId}
                                         matchId={match.id || match.matchId || ''}
                                         tournamentId={match.tournamentId || ''}
                                         tournamentName={match.tournamentName}
@@ -237,10 +237,10 @@ export default function HomeScreen() {
 
                         {sortedActiveMatches.length > 0 ? (
                             <View className="gap-3">
-                                {sortedActiveMatches.slice(0, 3).map((match, index) => (
+                                {sortedActiveMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
-                                        key={match.matchId || `scheduled-${index}`}
-                                        matchId={match.id || ''}
+                                        key={match.id || match.matchId}
+                                        matchId={match.id || match.matchId || ''}
                                         tournamentId={match.tournamentId || ''}
                                         tournamentName={match.tournamentName}
                                         roundName={match.hubName}
