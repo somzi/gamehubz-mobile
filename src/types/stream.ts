@@ -14,6 +14,18 @@ export const STREAMING_PLATFORMS: SocialType[] = [
     SocialType.Kick,
 ];
 
+// Platforms temporarily disabled for starting NEW streams (e.g. Twitch pending app 2FA setup).
+// Existing/live streams on these platforms keep playing — only starting a new one is blocked.
+// Re-enable a platform simply by removing it from this list.
+export const DISABLED_STREAMING_PLATFORMS: SocialType[] = [
+    SocialType.Twitch,
+];
+
+// Platforms a user can currently start a stream on (used to build pickers / quick-pick).
+export const ACTIVE_STREAMING_PLATFORMS: SocialType[] = STREAMING_PLATFORMS.filter(
+    p => !DISABLED_STREAMING_PLATFORMS.includes(p)
+);
+
 export interface MatchStream {
     id: string;
     matchId: string;

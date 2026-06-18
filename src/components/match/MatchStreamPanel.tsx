@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { SocialType } from '../../types/auth';
-import { MatchStream, MatchStreamStatus, STREAMING_PLATFORMS } from '../../types/stream';
+import { MatchStream, MatchStreamStatus, ACTIVE_STREAMING_PLATFORMS, DISABLED_STREAMING_PLATFORMS } from '../../types/stream';
 import { getLiveEmbed, getVodEmbed, getPlatformMeta } from '../../lib/stream';
 import { StreamPlayer } from './StreamPlayer';
 import { PlatformIcon } from './PlatformIcon';
@@ -22,7 +22,8 @@ interface MatchStreamPanelProps {
     onStreamsChange?: (streams: MatchStream[]) => void;
 }
 
-const platformOptions = STREAMING_PLATFORMS.map(p => ({ label: getPlatformMeta(p).name, value: p }));
+// Only platforms not currently disabled (e.g. Twitch pending 2FA) are offered when starting a stream.
+const platformOptions = ACTIVE_STREAMING_PLATFORMS.map(p => ({ label: getPlatformMeta(p).name, value: p }));
 
 export function MatchStreamPanel({
     matchId,
@@ -80,10 +81,11 @@ export function MatchStreamPanel({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [matchId]);
 
-    // Saved streaming channels from socials (quick-pick when starting).
+    // Saved streaming channels from socials (quick-pick when starting). Disabled platforms
+    // (e.g. Twitch pending 2FA) are excluded so they can't be picked as a stream source.
     const savedChannels = (user?.userSocials || [])
         .map(s => ({ platform: (s.type ?? s.socialType) as SocialType, username: s.username }))
-        .filter(s => STREAMING_PLATFORMS.includes(s.platform) && !!s.username);
+        .filter(s => ACTIVE_STREAMING_PLATFORMS.includes(s.platform) && !!s.username);
 
     const myLiveStream = streams.find(
         s => s.streamerUserId?.toLowerCase() === currentUserId?.toLowerCase() && s.status === MatchStreamStatus.Live
@@ -91,6 +93,11 @@ export function MatchStreamPanel({
     const canStartMine = isParticipant && !isCompleted && !myLiveStream;
 
     const startStream = async (chosenPlatform: SocialType, chosenHandle?: string) => {
+        // Guard: a temporarily disabled platform (e.g. Twitch pending 2FA) can't be streamed yet.
+        if (DISABLED_STREAMING_PLATFORMS.includes(chosenPlatform)) {
+            setError(`${getPlatformMeta(chosenPlatform).name} streaming is temporarily unavailable.`);
+            return;
+        }
         setSubmitting(true);
         setError(null);
         try {
@@ -543,6 +550,15 @@ function StartArea({
     return (
         <View className="gap-3">
             <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Stream this match</Text>
+
+            {DISABLED_STREAMING_PLATFORMS.length > 0 && (
+                <View className="flex-row items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/[0.08] border border-amber-500/20">
+                    <Ionicons name="information-circle-outline" size={14} color="#FBBF24" />
+                    <Text className="text-[11px] text-amber-300/90 flex-1">
+                        {DISABLED_STREAMING_PLATFORMS.map(p => getPlatformMeta(p).name).join(', ')} streaming is temporarily unavailable.
+                    </Text>
+                </View>
+            )}
 
             {!showForm ? (
                 <View className="gap-3">
