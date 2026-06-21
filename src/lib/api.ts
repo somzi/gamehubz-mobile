@@ -139,6 +139,13 @@ export const ENDPOINTS = {
 
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+// Sent on every request so server-side ErrorLog rows record which app build/platform hit
+// the bug — set once at startup.
+const APP_VERSION = Constants.expoConfig?.version ?? 'unknown';
+const APP_PLATFORM = Platform.OS;
 
 let authToken: string | null = null;
 export const setAuthToken = (token: string | null) => { authToken = token; };
@@ -155,6 +162,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
+    config.headers['X-App-Version'] = APP_VERSION;
+    config.headers['X-Platform'] = APP_PLATFORM;
     try {
         const token = await SecureStore.getItemAsync('access_token');
         if (token) {
@@ -257,6 +266,9 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             // KLJUČNO: Brišemo Content-Type da bi fetch sam dodao boundary
             delete formHeaders['Content-Type'];
 
+            formHeaders['X-App-Version'] = APP_VERSION;
+            formHeaders['X-Platform'] = APP_PLATFORM;
+
             if (token) formHeaders['Authorization'] = `Bearer ${token}`;
 
             const fetchResponse = await fetch(url, {
@@ -268,15 +280,17 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             // Ako server vrati grešku (npr. 400, 413, 500)
             if (!fetchResponse.ok) {
                 const errText = await fetchResponse.text().catch(() => 'Upload failed');
+                // Never surface the raw error body (stack trace / JSON) to the UI.
+                const friendly = getApiErrorMessage(errText, 'Upload failed');
                 return {
                     ok: false,
                     status: fetchResponse.status,
                     statusText: fetchResponse.statusText,
                     json: async () => {
                         try { return JSON.parse(errText); }
-                        catch { throw new Error(errText); }
+                        catch { throw new Error(friendly); }
                     },
-                    text: async () => errText,
+                    text: async () => friendly,
                 } as unknown as Response;
             }
 
@@ -313,18 +327,17 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     } catch (error: any) {
         // 4. ERROR HANDLING (Mreža, Timeout, Axios errori)
         const response = error.response;
+        // Surface a clean, human message (+ support reference) — never the raw response
+        // body. The backend no longer ships stack traces, and we never dump JSON at the user.
+        const friendly = response
+            ? getApiErrorMessage(response.data, error.message || 'API Error')
+            : (error.message || 'Network error');
         return {
             ok: false,
             status: response ? response.status : 500,
             statusText: response ? response.statusText : error.message,
-            json: async () => {
-                const errData = response?.data?.messages || response?.data || 'API Error';
-                throw new Error(typeof errData === 'string' ? errData : JSON.stringify(errData));
-            },
-            text: async () => {
-                if (!response) return error.message;
-                return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-            },
+            json: async () => { throw new Error(friendly); },
+            text: async () => friendly,
         } as unknown as Response;
     }
 };
@@ -408,4 +421,49 @@ export function getErrorMessage(error: any): string {
     }
 
     return String(error);
+}
+
+/**
+ * Pull the ErrorLog reference id (if any) out of an API error payload so users can quote
+ * a short code when reporting a problem. Accepts an object or a JSON string.
+ */
+function extractErrorId(data: any): string | null {
+    if (data == null) return null;
+
+    if (typeof data === 'string') {
+        const trimmed = data.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try { return extractErrorId(JSON.parse(trimmed)); } catch { return null; }
+        }
+        return null;
+    }
+
+    if (typeof data === 'object') {
+        const id = (data as any).errorId ?? (data as any).ErrorId;
+        return typeof id === 'string' && id.length > 0 ? id : null;
+    }
+
+    return null;
+}
+
+/**
+ * Build a clean, user-facing error string from an API error payload: the server's human
+ * message only — never a stack trace or raw JSON — with the support reference appended
+ * when the server provides one.
+ */
+export function getApiErrorMessage(data: any, fallback = 'An unexpected error occurred'): string {
+    let message: string;
+    try { message = getErrorMessage(data); } catch { message = fallback; }
+
+    if (!message || message.trim() === '' || message === '{}' || message === '[]') {
+        message = fallback;
+    }
+
+    const errorId = extractErrorId(data);
+    if (errorId) {
+        const shortRef = errorId.split('-')[0];
+        return `${message}\n(Ref: ${shortRef})`;
+    }
+
+    return message;
 }
