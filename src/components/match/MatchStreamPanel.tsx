@@ -486,6 +486,7 @@ function StreamCard({
                                 </Button>
                             </View>
                         )}
+                        <TwitchHighlighterButton stream={stream} />
                         <Pressable
                             onPress={onDelete}
                             disabled={submitting}
@@ -505,6 +506,36 @@ function StreamCard({
             )}
             {!isMine && <View className="h-1" />}
         </View>
+    );
+}
+
+// Deep-link to the streamer's Twitch Highlighter for THIS archive VOD. Twitch has no public
+// API to create highlights, but the Highlighter web tool accepts a video id in its URL — so
+// one tap from the app drops the user straight onto the right page in their account.
+// Visible only when the stream has an Ended archive URL with an extractable video id; if the
+// VOD is already a highlight or has been deleted, the button gracefully won't appear.
+function TwitchHighlighterButton({ stream }: { stream: MatchStream }) {
+    if (stream.platform !== SocialType.Twitch || stream.status !== MatchStreamStatus.Ended) return null;
+    if (!stream.vodUrl) return null;
+
+    const videoId = stream.vodUrl.match(/twitch\.tv\/videos\/(\d+)/)?.[1];
+    if (!videoId) return null;
+
+    const channel = (stream.channelHandle || '').trim().replace(/^@/, '');
+    if (!channel) return null;
+
+    const url = `https://www.twitch.tv/${channel}/manager/content/video-producer/highlighter/${videoId}`;
+    return (
+        <Pressable
+            onPress={() => Linking.openURL(url)}
+            className="flex-row items-center justify-center gap-2 py-2.5 rounded-2xl active:opacity-70"
+            style={{ backgroundColor: '#9146FF1A', borderWidth: 1, borderColor: '#9146FF40' }}
+        >
+            <Ionicons name="bookmark-outline" size={13} color="#A472FF" />
+            <Text className="text-[11px] font-black uppercase tracking-widest" style={{ color: '#A472FF' }}>
+                Make replay permanent
+            </Text>
+        </Pressable>
     );
 }
 

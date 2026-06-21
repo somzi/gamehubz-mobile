@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
@@ -135,6 +135,9 @@ export function MatchDetailsModal({
     const [isApproving, setIsApproving] = useState(false);
     const [isRejecting, setIsRejecting] = useState(false);
     const [isEditingProposal, setIsEditingProposal] = useState(false);
+
+    // Delete-result (revert) state — reopens a completed match as Scheduled.
+    const [isDeletingResult, setIsDeletingResult] = useState(false);
 
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
@@ -480,6 +483,42 @@ export function MatchDetailsModal({
         setIsEditMode(true);
     };
 
+    const submitDeleteResult = async () => {
+        if (!matchId) return;
+        setIsDeletingResult(true);
+        setError(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.REVERT_MATCH_RESULT, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || 'Failed to delete result');
+            }
+            if (onMatchUpdate) onMatchUpdate();
+            onClose();
+        } catch (err: any) {
+            console.error('Delete result error:', err);
+            setError(err.message || 'An error occurred while deleting the result');
+        } finally {
+            setIsDeletingResult(false);
+        }
+    };
+
+    // Deleting a result is destructive (clears the score/winner and reopens the match),
+    // so confirm first. Backend re-checks permissions and the downstream lock.
+    const handleDeleteResult = () => {
+        Alert.alert(
+            'Delete result?',
+            'This clears the score and winner and reopens the match as Scheduled. You can report the result again afterwards.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: submitDeleteResult },
+            ],
+        );
+    };
+
     const handleCancelEdit = () => {
         setIsEditMode(false);
         setHomeScore('');
@@ -718,9 +757,14 @@ export function MatchDetailsModal({
                     )}
                 </View>
 
-                {/* Edit Result Button */}
+                {/* Edit / Delete Result Buttons */}
                 {canEditResult && (
-                    <View className="mx-5 mb-6">
+                    <View className="mx-5 mb-6 gap-3">
+                        {error && (
+                            <View className="bg-red-500/10 p-3 rounded-2xl border border-red-500/20">
+                                <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
+                            </View>
+                        )}
                         <Pressable
                             onPress={handleEditResult}
                             className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 flex-row items-center justify-center gap-2.5 active:opacity-70"
@@ -729,6 +773,22 @@ export function MatchDetailsModal({
                                 <Ionicons name="create-outline" size={16} color="#10B981" />
                             </View>
                             <Text className="text-sm font-black text-[#10B981] uppercase tracking-widest">Edit Result</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={handleDeleteResult}
+                            disabled={isDeletingResult}
+                            className="bg-red-500/[0.06] rounded-2xl border border-red-500/20 p-4 flex-row items-center justify-center gap-2.5 active:opacity-70"
+                        >
+                            {isDeletingResult ? (
+                                <ActivityIndicator size="small" color="#F87171" />
+                            ) : (
+                                <>
+                                    <View className="w-8 h-8 rounded-xl bg-red-500/10 items-center justify-center">
+                                        <Ionicons name="trash-outline" size={16} color="#F87171" />
+                                    </View>
+                                    <Text className="text-sm font-black text-red-400 uppercase tracking-widest">Delete Result</Text>
+                                </>
+                            )}
                         </Pressable>
                     </View>
                 )}

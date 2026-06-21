@@ -40,6 +40,7 @@ export const ENDPOINTS = {
     REPORT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult`,
     APPROVE_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/approve`,
     REJECT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/reject`,
+    REVERT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/revert`,
     GET_HUB_TOURNAMENTS: (hubId: string, status: number, page: number, pageSize: number = 10) =>
         `${API_BASE_URL}/api/Hub/${hubId}/tournaments?Status=${status}&Page=${page}&PageSize=${pageSize}`,
     FOLLOW_HUB: `${API_BASE_URL}/api/userHub`,

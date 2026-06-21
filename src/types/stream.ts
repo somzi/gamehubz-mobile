@@ -14,12 +14,10 @@ export const STREAMING_PLATFORMS: SocialType[] = [
     SocialType.Kick,
 ];
 
-// Platforms temporarily disabled for starting NEW streams (e.g. Twitch pending app 2FA setup).
-// Existing/live streams on these platforms keep playing — only starting a new one is blocked.
-// Re-enable a platform simply by removing it from this list.
-export const DISABLED_STREAMING_PLATFORMS: SocialType[] = [
-    SocialType.Twitch,
-];
+// Platforms temporarily disabled for starting NEW streams (e.g. while waiting on app credentials
+// or 2FA). Existing/live streams on these platforms keep playing — only starting a new one is
+// blocked. Add a SocialType here to flip a platform off; clear to re-enable.
+export const DISABLED_STREAMING_PLATFORMS: SocialType[] = [];
 
 // Platforms a user can currently start a stream on (used to build pickers / quick-pick).
 export const ACTIVE_STREAMING_PLATFORMS: SocialType[] = STREAMING_PLATFORMS.filter(

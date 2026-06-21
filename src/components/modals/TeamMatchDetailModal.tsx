@@ -9,6 +9,7 @@ import {
     Modal,
     AppState,
     Image,
+    Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getOptimizedCloudinaryUrl, MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../../lib/image';
@@ -464,6 +465,42 @@ export function TeamMatchDetailModal({
         } finally {
             setSubmittingScoreId(null);
         }
+    };
+
+    const submitDeleteSubMatch = async (subMatch: SubMatchDto) => {
+        setSubmittingScoreId(subMatch.matchId);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.REVERT_MATCH_RESULT, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: subMatch.matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'Failed');
+                throw new Error(text);
+            }
+            setEditingMatchId(null);
+            fetchData();
+            onMatchUpdate?.();
+        } catch (err: unknown) {
+            const message = getErrorMessage(err);
+            setStatusConfig({ type: 'error', title: 'Error', message });
+            setShowStatusModal(true);
+        } finally {
+            setSubmittingScoreId(null);
+        }
+    };
+
+    // Destructive: clears this game's score and reopens it (and the team match, if it was the
+    // deciding game). Confirm first; the backend re-checks permissions and the downstream lock.
+    const handleDeleteSubMatch = (subMatch: SubMatchDto) => {
+        Alert.alert(
+            'Delete result?',
+            "This clears this game's score and reopens it. If it was the deciding game, the team match reopens too.",
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => submitDeleteSubMatch(subMatch) },
+            ],
+        );
     };
 
     const handleSelectRepresentative = async (member: TeamMemberDto) => {
@@ -1010,18 +1047,46 @@ export function TeamMatchDetailModal({
                                             </View>
                                         </View>
                                     ) : (
-                                        <>
-                                            {isHubOwner && sm.status !== 'Pending' && (
-                                                <View className="flex-row justify-end mt-2 pt-2 border-t border-border/10">
-                                                    <Pressable 
-                                                        onPress={() => handleEditSubMatch(sm)}
-                                                        className="bg-[#10B981]/10 px-3 py-1 rounded-md border border-[#10B981]/20 active:opacity-70"
-                                                    >
-                                                        <Text className="text-[9px] font-black text-[#10B981] uppercase tracking-wider">Edit Result</Text>
-                                                    </Pressable>
+                                        (() => {
+                                            // Owner/admin can edit & delete any completed sub-match. A player of THIS
+                                            // game can also delete their own result (mirrors solo), except in approval
+                                            // mode where a confirmed result stays locked to managers. Reporting/editing
+                                            // remains owner-driven in this modal.
+                                            const homeId = (sm.homePlayer?.userId || sm.HomePlayer?.userId || '').toLowerCase();
+                                            const awayId = (sm.awayPlayer?.userId || sm.AwayPlayer?.userId || '').toLowerCase();
+                                            const me = (currentUserId || '').toLowerCase();
+                                            const isPlayerOfSub = !!me && (me === homeId || me === awayId);
+                                            const approvalRequired = !!(data?.requireResultApproval ?? data?.RequireResultApproval);
+                                            const hasResult = sm.status !== 'Pending';
+                                            const canEdit = hasResult && isHubOwner;
+                                            const canDelete = hasResult && (isHubOwner || (isPlayerOfSub && !approvalRequired));
+                                            if (!canEdit && !canDelete) return null;
+                                            return (
+                                                <View className="flex-row justify-end gap-2 mt-2 pt-2 border-t border-border/10">
+                                                    {canEdit && (
+                                                        <Pressable
+                                                            onPress={() => handleEditSubMatch(sm)}
+                                                            className="bg-[#10B981]/10 px-3 py-1 rounded-md border border-[#10B981]/20 active:opacity-70"
+                                                        >
+                                                            <Text className="text-[9px] font-black text-[#10B981] uppercase tracking-wider">Edit Result</Text>
+                                                        </Pressable>
+                                                    )}
+                                                    {canDelete && (
+                                                        <Pressable
+                                                            onPress={() => handleDeleteSubMatch(sm)}
+                                                            disabled={submittingScoreId === sm.matchId}
+                                                            className="bg-red-500/10 px-3 py-1 rounded-md border border-red-500/20 active:opacity-70 flex-row items-center"
+                                                        >
+                                                            {submittingScoreId === sm.matchId ? (
+                                                                <ActivityIndicator size="small" color="#F87171" />
+                                                            ) : (
+                                                                <Text className="text-[9px] font-black text-red-400 uppercase tracking-wider">Delete</Text>
+                                                            )}
+                                                        </Pressable>
+                                                    )}
                                                 </View>
-                                            )}
-                                        </>
+                                            );
+                                        })()
                                     )}
                                 </View>
                             ))}
