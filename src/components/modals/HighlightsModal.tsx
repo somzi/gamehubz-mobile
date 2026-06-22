@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { FeedCard } from '../cards/FeedCard';
 import { DashboardActivityDto } from '../../types/dashboard';
 import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
 import { Button } from '../ui/Button';
+import { RootStackParamList } from '../../types/navigation';
 
 interface HighlightsModalProps {
     visible: boolean;
@@ -12,10 +15,17 @@ interface HighlightsModalProps {
 }
 
 export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [paginatedActivities, setPaginatedActivities] = useState<DashboardActivityDto[]>([]);
     const [page, setPage] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
+
+    const handleActivityPress = (tournamentId?: string) => {
+        if (!tournamentId) return;
+        onClose();
+        navigation.navigate('TournamentDetails', { id: tournamentId });
+    };
 
     useEffect(() => {
         if (visible) {
@@ -39,6 +49,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                 const normalizedData: DashboardActivityDto[] = itemsList.map(a => ({
                     hubName: a.hubName || a.HubName,
                     message: a.message || a.Message,
+                    tournamentId: a.tournamentId || a.TournamentId,
                     tournamentName: a.tournamentName || a.TournamentName,
                     timeAgo: a.timeAgo || a.TimeAgo,
                     createdOn: a.createdOn || a.CreatedOn,
@@ -120,7 +131,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                                     message={item.message}
                                     tournamentName={item.tournamentName}
                                     timestamp={item.timeAgo}
-                                    onClick={() => { }}
+                                    onClick={item.tournamentId ? () => handleActivityPress(item.tournamentId) : undefined}
                                 />
                             </View>
                         )}

@@ -79,6 +79,7 @@ export default function HomeScreen() {
                 const activities: DashboardActivityDto[] = data.map((a) => ({
                     hubName: a.hubName || a.HubName,
                     message: a.message || a.Message,
+                    tournamentId: a.tournamentId || a.TournamentId,
                     tournamentName: a.tournamentName || a.TournamentName,
                     timeAgo: a.timeAgo || a.TimeAgo,
                     createdOn: a.createdOn || a.CreatedOn,
@@ -295,7 +296,11 @@ export default function HomeScreen() {
                                         message={item.message}
                                         tournamentName={item.tournamentName}
                                         timestamp={item.timeAgo}
-                                        onClick={() => { }}
+                                        onClick={
+                                            item.tournamentId
+                                                ? () => navigation.navigate('TournamentDetails', { id: item.tournamentId! })
+                                                : undefined
+                                        }
                                     />
                                 ))}
                             </View>

@@ -8,6 +8,7 @@ export enum HubActivityType {
 export interface DashboardActivityDto {
     hubName: string;
     message: string;
+    tournamentId?: string;
     tournamentName: string;
     timeAgo: string;
     createdOn: string; // ISO Date string
