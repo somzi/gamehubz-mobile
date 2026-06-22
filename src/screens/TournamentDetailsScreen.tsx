@@ -1427,6 +1427,22 @@ export default function TournamentDetailsScreen() {
                                         </Text>
                                     </View>
                                 );
+                            } else if (!isParticipant && isUserRegistered && isOpenOrUpcoming && !tournament.isTeamTournament) {
+                                buttons.push(
+                                    <View key="pending-approval" className="w-full bg-[#1A1607] border border-amber-500/20 rounded-2xl p-4 flex-row items-center gap-3">
+                                        <View className="w-9 h-9 rounded-xl bg-amber-500/10 items-center justify-center">
+                                            <Ionicons name="hourglass-outline" size={18} color="#F59E0B" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-amber-300 text-sm font-black tracking-tight">
+                                                Pending approval
+                                            </Text>
+                                            <Text className="text-slate-400 text-xs mt-0.5">
+                                                Your registration is waiting for hub review.
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
                             } else if (tournament.isTeamTournament) {
                                 // Show nothing while teams are still loading (prevents flash of register button)
                                 if (isLoadingTeams) {
