@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { createTeam, joinTeam, getPendingTournamentTeams } from '../../lib/teamApi';
 import { getErrorMessage } from '../../lib/api';
@@ -34,7 +33,6 @@ export function TeamRegistrationModal({
     tournamentId,
     onTeamJoined,
 }: TeamRegistrationModalProps) {
-    const insets = useSafeAreaInsets();
     const [teamName, setTeamName] = useState('');
     const [isCreating, setIsCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
@@ -73,20 +71,21 @@ export function TeamRegistrationModal({
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
+            animationType="fade"
             onRequestClose={onClose}
         >
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 className="flex-1"
-                style={{
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    paddingTop: insets.top,
-                    paddingBottom: insets.bottom,
-                }}
             >
-                <View className="flex-1 justify-end">
-                    <View className="bg-[#0f172a] rounded-t-[40px] border-t border-white/10 shadow-2xl max-h-[85%]">
+                <Pressable
+                    className="flex-1 bg-black/60 justify-center items-center px-5"
+                    onPress={onClose}
+                >
+                    <Pressable
+                        className="bg-[#0f172a] rounded-3xl border border-white/10 shadow-2xl w-full max-w-md max-h-[85%]"
+                        onPress={(e) => e.stopPropagation()}
+                    >
                         {/* Header */}
                         <View className="flex-row justify-between items-center p-6 border-b border-white/5">
                             <Text className="text-xl font-bold text-white">
@@ -162,8 +161,8 @@ export function TeamRegistrationModal({
                                     </Button>
                                 </View>
                         </ScrollView>
-                    </View>
-                </View>
+                    </Pressable>
+                </Pressable>
             </KeyboardAvoidingView>
         </Modal>
     );

@@ -15,6 +15,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
@@ -312,8 +313,13 @@ export default function TeamDashboardScreen() {
         );
     }
 
-    const memberProgress = actualMemberCount / actualTeamSize;
-    const members = team.members || team.Members || [];
+    const isRosterFull = actualMemberCount >= actualTeamSize;
+    const teamInitials = (() => {
+        const words = (team.teamName || '').trim().split(/\s+/).filter(Boolean);
+        if (words.length === 0) return 'T';
+        if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+        return (words[0][0] + words[1][0]).toUpperCase();
+    })();
 
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]">
@@ -325,93 +331,115 @@ export default function TeamDashboardScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 {/* ── Hero Section ── */}
-                <View className="px-5 pt-5 pb-4">
-                    {/* Team name row */}
-                    <View className="flex-row items-center gap-3 mb-5">
-                        {isEditingName ? (
-                            <View className="flex-1 flex-row items-center gap-2">
-                                <TextInput
-                                    className="flex-1 bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-[#00E5A0]/30 text-lg font-bold"
-                                    value={editedName}
-                                    onChangeText={setEditedName}
-                                    autoFocus
-                                    placeholderTextColor="#6b7280"
-                                />
-                                <Pressable
-                                    onPress={handleSaveName}
-                                    disabled={isSavingName}
-                                    className="w-10 h-10 rounded-xl bg-[#00E5A0]/20 items-center justify-center border border-[#00E5A0]/30"
-                                >
-                                    {isSavingName ? (
-                                        <ActivityIndicator size="small" color="#00E5A0" />
-                                    ) : (
-                                        <Ionicons name="checkmark" size={20} color="#00E5A0" />
-                                    )}
-                                </Pressable>
-                                <Pressable
-                                    onPress={() => setIsEditingName(false)}
-                                    className="w-10 h-10 rounded-xl bg-white/5 items-center justify-center border border-white/10"
-                                >
-                                    <Ionicons name="close" size={20} color="#94A3B8" />
-                                </Pressable>
-                            </View>
-                        ) : (
-                            <>
-                                <View className="flex-1">
-                                    <Text className="text-3xl font-black text-white" numberOfLines={2}>
-                                        {team.teamName}
-                                    </Text>
-                                    <Text className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-                                        {isCaptain ? 'You are the Captain' : 'Team Member'}
-                                    </Text>
-                                </View>
-
-                                {isCaptain && Number(tournamentStatus) === 1 && !isRegistrationAccepted && (
+                <View className="px-5 pt-4 pb-2">
+                    <LinearGradient
+                        colors={['#18273F', '#0F1A2E']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{ borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}
+                    >
+                        <View className="p-5">
+                            {isEditingName ? (
+                                <View className="flex-row items-center gap-2">
+                                    <TextInput
+                                        className="flex-1 bg-black/30 px-4 h-12 rounded-2xl text-white border border-[#00E5A0]/40 text-lg font-bold"
+                                        value={editedName}
+                                        onChangeText={setEditedName}
+                                        autoFocus
+                                        placeholderTextColor="#6b7280"
+                                    />
                                     <Pressable
-                                        onPress={handleStartEditName}
-                                        className="w-10 h-10 rounded-xl bg-white/5 items-center justify-center border border-white/10"
+                                        onPress={handleSaveName}
+                                        disabled={isSavingName}
+                                        className="w-11 h-11 rounded-2xl bg-[#00E5A0] items-center justify-center"
                                     >
-                                        <Ionicons name="pencil" size={18} color="#94A3B8" />
+                                        {isSavingName ? (
+                                            <ActivityIndicator size="small" color="#06251D" />
+                                        ) : (
+                                            <Ionicons name="checkmark" size={22} color="#06251D" />
+                                        )}
                                     </Pressable>
-                                )}
-                            </>
-                        )}
-                    </View>
+                                    <Pressable
+                                        onPress={() => setIsEditingName(false)}
+                                        className="w-11 h-11 rounded-2xl bg-white/5 items-center justify-center border border-white/10"
+                                    >
+                                        <Ionicons name="close" size={22} color="#94A3B8" />
+                                    </Pressable>
+                                </View>
+                            ) : (
+                                <View className="flex-row items-center gap-4">
+                                    {/* Team crest */}
+                                    <LinearGradient
+                                        colors={['#00E5A0', '#0AA6C9']}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                        style={{ width: 60, height: 60, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
+                                    >
+                                        <Text className="text-2xl font-black text-[#06251D]">{teamInitials}</Text>
+                                    </LinearGradient>
 
-                    {/* Member count card */}
-                    <View className="bg-[#131B2E] rounded-3xl border border-white/5 p-5 shadow-md shadow-black/20">
-                        <View className="flex-row items-center justify-between mb-3">
-                            <View className="flex-row items-center gap-2">
-                                <Ionicons name="people" size={18} color="#00E5A0" />
-                                <Text className="text-sm font-bold text-white">{TEAM_LABELS.MEMBERS_LABEL}</Text>
-                            </View>
-                            <Text className="text-sm font-black text-[#00E5A0]">
-                                {actualMemberCount} / {actualTeamSize}
-                            </Text>
-                        </View>
+                                    <View className="flex-1">
+                                        <Text className="text-2xl font-black text-white" numberOfLines={2}>
+                                            {team.teamName}
+                                        </Text>
+                                        <View className="flex-row items-center gap-1.5 mt-1.5">
+                                            <Ionicons
+                                                name={isCaptain ? 'shield-checkmark' : 'person'}
+                                                size={12}
+                                                color={isCaptain ? '#F59E0B' : '#64748B'}
+                                            />
+                                            <Text
+                                                className="text-[11px] font-black uppercase tracking-widest"
+                                                style={{ color: isCaptain ? '#F59E0B' : '#64748B' }}
+                                            >
+                                                {isCaptain ? 'Captain' : 'Member'}
+                                            </Text>
+                                        </View>
+                                    </View>
 
-                        {/* Progress bar */}
-                        <View className="h-2 bg-white/5 rounded-full overflow-hidden">
-                            <View
-                                className="h-full rounded-full"
-                                style={{
-                                    width: `${Math.min(memberProgress * 100, 100)}%`,
-                                    backgroundColor: memberProgress >= 1 ? '#00E5A0' : '#F59E0B',
-                                }}
-                            />
-                        </View>
+                                    {isCaptain && Number(tournamentStatus) === 1 && !isRegistrationAccepted && (
+                                        <Pressable
+                                            onPress={handleStartEditName}
+                                            className="w-10 h-10 rounded-2xl bg-white/[0.06] items-center justify-center border border-white/10 active:opacity-70"
+                                        >
+                                            <Ionicons name="pencil" size={16} color="#94A3B8" />
+                                        </Pressable>
+                                    )}
+                                </View>
+                            )}
 
-                        {/* Dot indicators */}
-                        <View className="flex-row gap-2 mt-3 justify-center">
-                            {Array.from({ length: actualTeamSize }).map((_, i) => (
-                                <View
-                                    key={i}
-                                    className="w-3 h-3 rounded-full"
-                                    style={{ backgroundColor: i < actualMemberCount ? '#00E5A0' : 'rgba(255,255,255,0.1)' }}
-                                />
-                            ))}
+                            {/* Roster capacity */}
+                            {!isEditingName && (
+                                <View className="mt-5 pt-4 border-t border-white/[0.06]">
+                                    <View className="flex-row items-center justify-between mb-2.5">
+                                        <View className="flex-row items-center gap-1.5">
+                                            <Ionicons name="people" size={13} color="#64748B" />
+                                            <Text className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                                Roster
+                                            </Text>
+                                        </View>
+                                        <Text className="text-[13px] font-black">
+                                            <Text style={{ color: isRosterFull ? '#00E5A0' : '#F59E0B' }}>{actualMemberCount}</Text>
+                                            <Text className="text-slate-500"> / {actualTeamSize}</Text>
+                                        </Text>
+                                    </View>
+                                    <View className="flex-row gap-1.5">
+                                        {Array.from({ length: actualTeamSize }).map((_, i) => (
+                                            <View
+                                                key={i}
+                                                className="flex-1 h-2 rounded-full"
+                                                style={{
+                                                    backgroundColor: i < actualMemberCount
+                                                        ? (isRosterFull ? '#00E5A0' : '#F59E0B')
+                                                        : 'rgba(255,255,255,0.07)',
+                                                }}
+                                            />
+                                        ))}
+                                    </View>
+                                </View>
+                            )}
                         </View>
-                    </View>
+                    </LinearGradient>
                 </View>
 
                 {/* ── Registration Status Banner ── */}
@@ -428,9 +456,33 @@ export default function TeamDashboardScreen() {
                                 <Text className="text-[#F59E0B] font-black uppercase tracking-widest text-sm">Registered – Pending Approval</Text>
                             </View>
                         ) : (
-                            <Button className="w-full bg-[#00E5A0]" onPress={handleRegisterTeam} loading={isRegistering}>
-                                {TEAM_LABELS.REGISTER_TEAM_BUTTON}
-                            </Button>
+                            <Pressable
+                                onPress={handleRegisterTeam}
+                                disabled={isRegistering}
+                                className="active:opacity-80"
+                                style={{
+                                    shadowColor: '#00E5A0',
+                                    shadowOpacity: 0.4,
+                                    shadowRadius: 16,
+                                    shadowOffset: { width: 0, height: 6 },
+                                }}
+                            >
+                                <LinearGradient
+                                    colors={['#00E5A0', '#0AA6C9']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={{ borderRadius: 18, height: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                                >
+                                    {isRegistering ? (
+                                        <ActivityIndicator color="#06251D" />
+                                    ) : (
+                                        <>
+                                            <Ionicons name="rocket" size={18} color="#06251D" />
+                                            <Text className="text-[#06251D] font-black text-[15px]">{TEAM_LABELS.REGISTER_TEAM_BUTTON}</Text>
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </Pressable>
                         )}
                     </View>
                 )}
@@ -475,7 +527,7 @@ export default function TeamDashboardScreen() {
                                 );
                             }
 
-                            return sortedMembers.map((member: any) => {
+                            const memberCards = sortedMembers.map((member: any) => {
                                 const memberId = member.userId || member.UserId;
                                 const memberUsername = member.username || member.Username;
                                 const memberAvatar = member.avatarUrl || member.AvatarUrl;
@@ -485,29 +537,33 @@ export default function TeamDashboardScreen() {
                                 return (
                                     <View
                                         key={memberId}
-                                        className={`p-4 rounded-[22px] border flex-row items-center gap-3 shadow-sm ${memIsCaptain ? 'bg-[#F59E0B]/5 border-[#F59E0B]/15' : 'bg-[#131B2E]/60 border-white/5'}`}
+                                        className={`p-3.5 rounded-[20px] border flex-row items-center gap-3.5 ${memIsCaptain ? 'bg-[#F59E0B]/[0.06] border-[#F59E0B]/20' : 'bg-[#131B2E]/70 border-white/[0.06]'}`}
                                     >
-                                        <PlayerAvatar
-                                            name={memberUsername}
-                                            src={memberAvatar}
-                                            size="md"
-                                        />
+                                        <View className={`rounded-full p-[3px] ${memIsCaptain ? 'border-2 border-[#F59E0B]/50' : 'border border-white/10'}`}>
+                                            <PlayerAvatar
+                                                name={memberUsername}
+                                                src={memberAvatar}
+                                                size="md"
+                                            />
+                                        </View>
                                         <View className="flex-1">
-                                            <View className="flex-row items-center gap-2">
-                                                <Text className="font-bold text-base text-white">{memberUsername}</Text>
+                                            <View className="flex-row items-center gap-2 flex-wrap">
+                                                <Text className="font-bold text-[15px] text-white">{memberUsername}</Text>
                                                 {isCurrentUser && (
-                                                    <View className="bg-white/10 px-1.5 py-0.5 rounded-full">
-                                                        <Text className="text-[9px] text-slate-400 font-black uppercase">You</Text>
+                                                    <View className="bg-white/10 px-2 py-0.5 rounded-full">
+                                                        <Text className="text-[9px] text-slate-300 font-black uppercase tracking-wider">You</Text>
                                                     </View>
                                                 )}
                                             </View>
-                                            {memIsCaptain && (
-                                                <View className="flex-row items-center gap-1 mt-0.5">
+                                            {memIsCaptain ? (
+                                                <View className="flex-row items-center gap-1 mt-1">
                                                     <Ionicons name="shield-checkmark" size={11} color="#F59E0B" />
                                                     <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-wider">
                                                         {TEAM_LABELS.CAPTAIN_BADGE}
                                                     </Text>
                                                 </View>
+                                            ) : (
+                                                <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">Player</Text>
                                             )}
                                         </View>
 
@@ -517,12 +573,31 @@ export default function TeamDashboardScreen() {
                                                 onPress={() => handleKickMember(memberId, memberUsername)}
                                                 className="w-9 h-9 rounded-xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
                                             >
-                                                <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                                                <Ionicons name="close" size={18} color="#EF4444" />
                                             </Pressable>
                                         )}
                                     </View>
                                 );
                             });
+
+                            const emptyCount = Math.max(0, actualTeamSize - sortedMembers.length);
+                            const emptySlots = Array.from({ length: emptyCount }).map((_, i) => (
+                                <View
+                                    key={`empty-${i}`}
+                                    className="p-3.5 rounded-[20px] border border-white/10 bg-white/[0.02] flex-row items-center gap-3.5"
+                                    style={{ borderStyle: 'dashed' }}
+                                >
+                                    <View
+                                        className="w-10 h-10 rounded-full border border-white/15 items-center justify-center"
+                                        style={{ borderStyle: 'dashed' }}
+                                    >
+                                        <Ionicons name="person-add-outline" size={16} color="#475569" />
+                                    </View>
+                                    <Text className="text-slate-600 text-sm font-semibold">Open slot</Text>
+                                </View>
+                            ));
+
+                            return [...memberCards, ...emptySlots];
                         })()}
                     </View>
                 )}
@@ -579,24 +654,29 @@ export default function TeamDashboardScreen() {
 
                 {/* ── Danger Zone (Leave / Delete) ── */}
                 {Number(tournamentStatus) === 1 && !isAlreadyRegistered && !isRegistrationAccepted && (
-                    <View className="px-5 mt-6 gap-3">
-                        <Button
-                            variant="outline"
-                            className="w-full border-red-500/30"
-                            onPress={handleLeaveTeam}
-                        >
-                            {TEAM_LABELS.LEAVE_TEAM_BUTTON}
-                        </Button>
-
-                        {isCaptain && (
-                            <Button
-                                variant="destructive"
-                                className="w-full"
-                                onPress={handleDeleteTeam}
+                    <View className="px-5 mt-7">
+                        <Text className="text-[10px] font-black uppercase tracking-[2px] text-slate-600 mb-3 ml-1">
+                            Danger Zone
+                        </Text>
+                        <View className="gap-2.5">
+                            <Pressable
+                                onPress={handleLeaveTeam}
+                                className="flex-row items-center justify-center gap-2 h-[52px] rounded-2xl border border-white/10 bg-white/[0.03] active:opacity-70"
                             >
-                                {TEAM_LABELS.DELETE_TEAM_BUTTON}
-                            </Button>
-                        )}
+                                <Ionicons name="exit-outline" size={18} color="#94A3B8" />
+                                <Text className="text-slate-200 font-bold text-[15px]">{TEAM_LABELS.LEAVE_TEAM_BUTTON}</Text>
+                            </Pressable>
+
+                            {isCaptain && (
+                                <Pressable
+                                    onPress={handleDeleteTeam}
+                                    className="flex-row items-center justify-center gap-2 h-[52px] rounded-2xl bg-[#EF4444]/10 border border-[#EF4444]/25 active:opacity-70"
+                                >
+                                    <Ionicons name="trash-outline" size={18} color="#F87171" />
+                                    <Text className="text-[#F87171] font-bold text-[15px]">{TEAM_LABELS.DELETE_TEAM_BUTTON}</Text>
+                                </Pressable>
+                            )}
+                        </View>
                     </View>
                 )}
             </ScrollView>
