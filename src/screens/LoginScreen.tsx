@@ -37,7 +37,8 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (!validate()) return;
 
-        const result = await login(email, password);
+        // Backend treats email as case-insensitive — canonicalize on the client too.
+        const result = await login(email.trim().toLowerCase(), password);
         if (!result.success) {
             setStatusModalConfig({
                 type: 'error',

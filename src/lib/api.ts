@@ -2,7 +2,7 @@
 const IS_PROD = !__DEV__;
 const PROD_URL = 'https://codespheresolutions.dev';
 // For local development on physical devices, use your computer's local IP
-const LOCAL_IP = '192.168.0.13';
+const LOCAL_IP = '192.168.1.2';
 const LOCAL_PORT = '5057';
 const LOCAL_URL = `http://${LOCAL_IP}:${LOCAL_PORT}`;
 

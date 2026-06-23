@@ -89,13 +89,16 @@ export default function RegisterScreen() {
     const handleRegister = async () => {
         if (!validate()) return;
 
+        // Backend stores email lowercased — canonicalize on the client to keep register + login in sync.
+        const normalizedEmail = formData.email.trim().toLowerCase();
+
         // Construct the payload expected by backend
         // If backend expects specific fields, this map should be adjusted.
         // Based on user object provided, we send what we have.
         const payload = {
             userName: formData.username,
             nickName: formData.nickName,
-            email: formData.email,
+            email: normalizedEmail,
             password: formData.password,
             region: formData.region,
             country: formData.country,
@@ -108,7 +111,7 @@ export default function RegisterScreen() {
         if (result.success) {
             // Auto-login so the user lands straight in the app. On success,
             // isAuthenticated flips and RootNavigator swaps to the app stack.
-            const loginResult = await login(formData.email, formData.password);
+            const loginResult = await login(normalizedEmail, formData.password);
             if (loginResult.success) return;
 
             // Account created but auto-login failed (e.g. needs verification) — send to Login.

@@ -51,16 +51,19 @@ export default function ForgotPasswordScreen() {
         setError(undefined);
         setIsLoading(true);
 
+        // Backend stores email lowercased — canonicalize here so the OTP lookup matches.
+        const normalizedEmail = email.trim().toLowerCase();
+
         try {
             const response = await authenticatedFetch(ENDPOINTS.FORGOT_PASSWORD, {
                 method: 'POST',
-                body: JSON.stringify(email.trim()) // Explicitly sending just the string if backend expects [FromBody] string, or adapt if it expects JSON object { email }
+                body: JSON.stringify(normalizedEmail) // Explicitly sending just the string if backend expects [FromBody] string, or adapt if it expects JSON object { email }
                 // Let's assume sending pure JSON string as requested by standard .NET minimal API for [FromBody] string, OR it might be an object. The user said "POST you send mail via body", let's send just string. If it fails, we will adjust to { email }.
             });
 
             if (response.ok) {
                 // Navigate to ResetPassword Screen
-                navigation.navigate('ResetPassword', { email: email.trim() });
+                navigation.navigate('ResetPassword', { email: normalizedEmail });
             } else {
                 const text = await response.text();
                 const parsed = getErrorMessage(text);
