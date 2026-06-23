@@ -9,6 +9,7 @@ import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { cn } from '../../lib/utils';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { useBadges } from '../../context/BadgesContext';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as ImagePicker from 'expo-image-picker';
 import { MatchComment } from '../../types/auth';
@@ -37,6 +38,8 @@ interface MatchScheduleCardProps {
     onPress?: () => void;
     variant?: 'default' | 'compact';
     isRoundLocked?: boolean;
+    /** Unread chat messages for the current user — drives the per-match chat badge. */
+    unreadMessages?: number;
 }
 
 export function MatchScheduleCard({
@@ -56,9 +59,16 @@ export function MatchScheduleCard({
     onPress,
     variant = 'default',
     isRoundLocked = false,
+    unreadMessages = 0,
 }: MatchScheduleCardProps) {
     const { user } = useAuth();
+    const { refresh: refreshBadges } = useBadges();
     const insets = useSafeAreaInsets();
+
+    // Local copy so the card badge clears the moment the user opens the chat,
+    // without waiting for the parent list to refetch.
+    const [chatRead, setChatRead] = useState(false);
+    const showUnreadBadge = unreadMessages > 0 && !chatRead && initialStatus !== 'completed';
 
     // Android-only: under Expo SDK 54 edge-to-edge, the window no longer resizes for
     // the keyboard and KeyboardAvoidingView mis-measures inside a statusBarTranslucent
@@ -184,6 +194,24 @@ export function MatchScheduleCard({
             console.error('Error fetching streams:', error);
         }
     };
+
+    // Mark the match chat read for the current user, clear the card badge, and
+    // refresh the global counts.
+    const markChatRead = async () => {
+        if (!matchId) return;
+        setChatRead(true);
+        try {
+            await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(matchId), { method: 'POST' });
+            refreshBadges();
+        } catch { /* best-effort */ }
+    };
+
+    // Clear unread as soon as the user opens the Chat tab.
+    useEffect(() => {
+        if (modalVisible && activeModalTab === 'chat') {
+            markChatRead();
+        }
+    }, [modalVisible, activeModalTab, matchId]);
 
     const handleSendComment = async () => {
         if (!newComment.trim() || !matchId) return;
@@ -846,6 +874,18 @@ export function MatchScheduleCard({
                                     {getStatusContent()}
                                 </View>
                             </View>
+
+                            {showUnreadBadge && (
+                                <View
+                                    className="flex-row items-center gap-1 ml-2 px-2 h-6 rounded-full"
+                                    style={{ backgroundColor: '#EF4444' }}
+                                >
+                                    <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
+                                    <Text className="text-white font-black" style={{ fontSize: 10 }}>
+                                        {unreadMessages > 99 ? '99+' : unreadMessages}
+                                    </Text>
+                                </View>
+                            )}
 
                             <View
                                 className="w-8 h-8 rounded-full items-center justify-center ml-2"

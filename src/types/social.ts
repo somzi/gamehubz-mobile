@@ -72,3 +72,17 @@ export interface DirectMessage {
     sentAt: string;
     isRead: boolean;
 }
+
+/**
+ * Aggregate unread / pending counters driving the notification badges
+ * (bottom tabs + Social sub-tabs). Mirrors backend BadgeCountsDto.
+ */
+export interface BadgeCounts {
+    friendRequests: number;
+    unreadDirectMessages: number;
+    unreadMatchMessages: number;
+    matchesWithUnreadChat: number;
+    matchesToSchedule: number;
+    socialTotal: number;
+    matchesTotal: number;
+}

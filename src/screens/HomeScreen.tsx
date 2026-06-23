@@ -29,6 +29,7 @@ interface MatchOverviewDto {
     userNickname?: string;
     status: number;
     isRoundLocked?: boolean;
+    unreadMessages?: number;
 }
 
 const SECTION_GAP = 28;
@@ -61,6 +62,7 @@ export default function HomeScreen() {
                     userNickname: m.userNickname || m.UserNickname,
                     status: m.status !== undefined ? m.status : m.Status,
                     isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
+                    unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
                 }));
                 const openMatches = normalizedData.filter((m) => !m.isRoundLocked);
                 setActionRequiredMatches(openMatches.filter((m) => !m.scheduledTime));
@@ -218,6 +220,7 @@ export default function HomeScreen() {
                                         userNickname={match.userNickname}
                                         status="pending_availability"
                                         onMatchUpdate={fetchMatches}
+                                        unreadMessages={match.unreadMessages}
                                     />
                                 ))}
                             </View>
@@ -261,6 +264,7 @@ export default function HomeScreen() {
                                                 : 'TBD'
                                         }
                                         onMatchUpdate={fetchMatches}
+                                        unreadMessages={match.unreadMessages}
                                     />
                                 ))}
                             </View>

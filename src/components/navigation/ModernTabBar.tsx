@@ -10,6 +10,7 @@ import {
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBadges } from '../../context/BadgesContext';
 
 const { width } = Dimensions.get('window');
 const TAB_WIDTH = width / 4;
@@ -17,6 +18,17 @@ const TAB_WIDTH = width / 4;
 export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const insets = useSafeAreaInsets();
     const translateX = useRef(new Animated.Value(0)).current;
+    const { badges } = useBadges();
+
+    // Notification badge count per tab. Matches surface on Home (dashboard + My Matches);
+    // friend requests / unread DMs surface under Social.
+    const badgeForTab = (name: string): number => {
+        switch (name) {
+            case 'Home': return badges.matchesTotal;
+            case 'Social': return badges.socialTotal;
+            default: return 0;
+        }
+    };
 
     const tabWidth = width / state.routes.length;
 
@@ -88,6 +100,8 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                                 ? options.title
                                 : route.name;
 
+                    const badgeCount = badgeForTab(route.name);
+
                     return (
                         <TouchableOpacity
                             key={route.key}
@@ -96,12 +110,21 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                             style={styles.tabButton}
                         >
                             <View style={styles.contentWrapper}>
-                                <Ionicons
-                                    name={getIconName(route.name, isFocused)}
-                                    size={22}
-                                    color={isFocused ? '#10B981' : '#64748B'}
-                                    style={isFocused && styles.activeIconGlow}
-                                />
+                                <View>
+                                    <Ionicons
+                                        name={getIconName(route.name, isFocused)}
+                                        size={22}
+                                        color={isFocused ? '#10B981' : '#64748B'}
+                                        style={isFocused && styles.activeIconGlow}
+                                    />
+                                    {badgeCount > 0 && (
+                                        <View style={styles.badge}>
+                                            <Text style={styles.badgeText} numberOfLines={1}>
+                                                {badgeCount > 99 ? '99+' : badgeCount}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
                                 <Text
                                     numberOfLines={1}
                                     adjustsFontSizeToFit
@@ -193,5 +216,25 @@ const styles = StyleSheet.create({
         marginTop: 4,
         letterSpacing: 0.2,
         textAlign: 'center',
+    },
+    badge: {
+        position: 'absolute',
+        top: -6,
+        left: 12,
+        minWidth: 17,
+        height: 17,
+        borderRadius: 9,
+        backgroundColor: '#EF4444',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: '#0B1120',
+    },
+    badgeText: {
+        color: '#FFFFFF',
+        fontSize: 9,
+        fontWeight: '900',
+        lineHeight: 12,
     },
 });

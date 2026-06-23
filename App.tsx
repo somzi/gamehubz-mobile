@@ -9,6 +9,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import './global.css';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { BadgesProvider } from './src/context/BadgesContext';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
 
@@ -143,14 +144,16 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <NavigationContainer
-            ref={navigationRef}
-            linking={linking}
-            onReady={() => setNavReady(true)}
-          >
-            <RootNavigator />
-          </NavigationContainer>
-          <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
+          <BadgesProvider>
+            <NavigationContainer
+              ref={navigationRef}
+              linking={linking}
+              onReady={() => setNavReady(true)}
+            >
+              <RootNavigator />
+            </NavigationContainer>
+            <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
+          </BadgesProvider>
         </AuthProvider>
         <StatusBar style="light" />
       </QueryClientProvider>

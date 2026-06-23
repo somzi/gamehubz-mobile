@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import { useBadges } from '../../context/BadgesContext';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
@@ -28,6 +29,7 @@ interface MatchChatPanelProps {
  */
 export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false }: MatchChatPanelProps) {
     const { user } = useAuth();
+    const { refresh: refreshBadges } = useBadges();
     const [comments, setComments] = useState<MatchComment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -55,10 +57,20 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         }
     };
 
+    // Mark the chat read for the current user and refresh the badge counts.
+    const markRead = async () => {
+        if (!matchId) return;
+        try {
+            await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(matchId), { method: 'POST' });
+            refreshBadges();
+        } catch { /* best-effort */ }
+    };
+
     useEffect(() => {
         if (!active || !matchId) return;
         setComments([]);
         fetchComments();
+        markRead();
     }, [matchId, active]);
 
     // SignalR live updates — same scope-flag pattern as MatchScheduleCard.
@@ -86,6 +98,11 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 if (prev.some(c => c.id === mapped.id)) return prev;
                 return [...prev, mapped];
             });
+            // We're actively viewing the chat — keep it marked read so the badge
+            // doesn't re-appear for a message the user is looking at right now.
+            if ((mapped.userId || '').toLowerCase() !== user?.id?.toLowerCase()) {
+                markRead();
+            }
             setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         });
 

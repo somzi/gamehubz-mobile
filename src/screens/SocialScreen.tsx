@@ -9,21 +9,23 @@ import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { useBadges } from '../context/BadgesContext';
 
 type TabKey = 'friends' | 'requests' | 'chats';
 type NavProp = StackNavigationProp<RootStackParamList>;
 type SocialRoute = RouteProp<MainTabParamList, 'Social'>;
 
-const tabs: PremiumTabItem[] = [
-    { value: 'friends', label: 'Friends', icon: 'people' },
-    { value: 'requests', label: 'Requests', icon: 'person-add' },
-    { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses' },
-];
-
 export default function SocialScreen() {
     const navigation = useNavigation<NavProp>();
     const route = useRoute<SocialRoute>();
+    const { badges } = useBadges();
     const [activeTab, setActiveTab] = useState<TabKey>(route.params?.initialTab ?? 'friends');
+
+    const tabs: PremiumTabItem[] = [
+        { value: 'friends', label: 'Friends', icon: 'people' },
+        { value: 'requests', label: 'Requests', icon: 'person-add', badge: badges.friendRequests > 0 ? badges.friendRequests : undefined },
+        { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses', badge: badges.unreadDirectMessages > 0 ? badges.unreadDirectMessages : undefined },
+    ];
 
     useFocusEffect(
         useCallback(() => {
@@ -174,6 +176,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
 // ═════════════════════════════════════════════════════════════════════
 
 function RequestsTab() {
+    const { refresh: refreshBadges } = useBadges();
     const [subTab, setSubTab] = useState<'incoming' | 'outgoing'>('incoming');
     const [incoming, setIncoming] = useState<FriendRequest[]>([]);
     const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
@@ -219,6 +222,7 @@ function RequestsTab() {
         try {
             await authenticatedFetch(ENDPOINTS.ACCEPT_FRIEND_REQUEST(req.id), { method: 'POST' });
             setIncoming((prev) => prev.filter((r) => r.id !== req.id));
+            refreshBadges();
         } catch { /* ignore */ }
     };
 
@@ -226,6 +230,7 @@ function RequestsTab() {
         try {
             await authenticatedFetch(ENDPOINTS.REJECT_FRIEND_REQUEST(req.id), { method: 'POST' });
             setIncoming((prev) => prev.filter((r) => r.id !== req.id));
+            refreshBadges();
         } catch { /* ignore */ }
     };
 
@@ -233,6 +238,7 @@ function RequestsTab() {
         try {
             await authenticatedFetch(ENDPOINTS.CANCEL_FRIEND_REQUEST(req.id), { method: 'POST' });
             setOutgoing((prev) => prev.filter((r) => r.id !== req.id));
+            refreshBadges();
         } catch { /* ignore */ }
     };
 

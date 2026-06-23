@@ -19,6 +19,7 @@ interface MatchOverviewDto {
     opponentAvatarUrl?: string;
     status: number;
     isRoundLocked?: boolean;
+    unreadMessages?: number;
 }
 
 export default function MyMatchesScreen() {
@@ -44,7 +45,8 @@ export default function MyMatchesScreen() {
                     opponentName: m.opponentName || m.OpponentName,
                     opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
                     status: m.status !== undefined ? m.status : m.Status,
-                    isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked
+                    isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
+                    unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages
                 }));
                 // Optionally filter them out completely if the user expects them gone from here too.
                 // The user explicitly requested filtering in "Home panel", but keeping them here with locks is better UI.
@@ -124,6 +126,7 @@ export default function MyMatchesScreen() {
                                 scheduledTime={match.scheduledTime ? new Date(match.scheduledTime).toLocaleString() : undefined}
                                 onMatchUpdate={fetchMatches}
                                 isRoundLocked={match.isRoundLocked}
+                                unreadMessages={match.unreadMessages}
                             />
                         ))
                     ) : (

@@ -82,6 +82,7 @@ export const ENDPOINTS = {
     GET_MATCH_DETAILS: (id: string) => `${API_BASE_URL}/api/match/${id}/details`,
     GET_MATCH_COMMENTS: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/history`,
     POST_MATCH_COMMENT: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}`,
+    MARK_MATCH_CHAT_READ: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/read`,
     UPLOAD_AVATAR: `${API_BASE_URL}/api/userProfile/avatar`,
     UPLOAD_HUB_AVATAR: (id: string) => `${API_BASE_URL}/api/hub/${id}/avatar`,
     DELETE_HUB: (id: string) => `${API_BASE_URL}/api/hub/${id}`,
@@ -133,8 +134,12 @@ export const ENDPOINTS = {
     // ─── Country catalog ────────────────────────────────────────────────
     GET_COUNTRIES: `${API_BASE_URL}/api/Country`,
 
+    // ─── Notification badges ────────────────────────────────────────────
+    GET_BADGES: `${API_BASE_URL}/api/v2/badges`,
+
     // ─── SignalR hub URLs ───────────────────────────────────────────────
     SIGNALR_DM_HUB: `${API_BASE_URL}/hubs/dm`,
+    SIGNALR_USER_HUB: `${API_BASE_URL}/hubs/user`,
 };
 
 import axios from 'axios';
