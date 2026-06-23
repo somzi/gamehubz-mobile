@@ -145,11 +145,11 @@ export function InfoRow({ icon, iconColor, label, value, onPress }: InfoRowProps
                 </View>
                 <Text className="text-[13px] text-slate-300 font-bold">{label}</Text>
             </View>
-            <View className="flex-row items-center" style={{ gap: 6, maxWidth: '55%' }}>
+            <View className="flex-row items-center" style={{ gap: 6, maxWidth: '64%' }}>
                 {typeof value === 'string' ? (
                     <Text
                         className="text-[14px] font-black text-white text-right"
-                        numberOfLines={1}
+                        numberOfLines={2}
                     >
                         {value}
                     </Text>

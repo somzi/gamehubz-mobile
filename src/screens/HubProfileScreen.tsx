@@ -586,7 +586,7 @@ export default function HubProfileScreen() {
                                     iconColor="#34D399"
                                     label="Owner"
                                     value={
-                                        <Text className="text-[14px] font-black text-emerald-300" numberOfLines={1}>
+                                        <Text className="text-[14px] font-black text-emerald-300 text-right" numberOfLines={2}>
                                             {hubData.ownerName || hubData.OwnerName}
                                         </Text>
                                     }

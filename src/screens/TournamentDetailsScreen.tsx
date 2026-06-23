@@ -1653,7 +1653,7 @@ export default function TournamentDetailsScreen() {
                                         iconColor="#A5B4FC"
                                         label="Hub"
                                         value={
-                                            <Text className="text-[14px] font-black text-emerald-300" numberOfLines={1}>
+                                            <Text className="text-[14px] font-black text-emerald-300 text-right" numberOfLines={2}>
                                                 {tournament.hubName}
                                             </Text>
                                         }

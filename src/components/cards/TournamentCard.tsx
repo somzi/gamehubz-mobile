@@ -82,6 +82,15 @@ export function TournamentCard({
                     elevation: 3,
                 }}
             >
+                {/* Status-tinted glow */}
+                <LinearGradient
+                    colors={[theme.tint.replace('0.05', '0.14'), 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.85, y: 0.9 }}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    pointerEvents="none"
+                />
+
                 {/* Hairline border */}
                 <View
                     pointerEvents="none"
@@ -91,9 +100,9 @@ export function TournamentCard({
 
                 <View className="p-5">
                     {/* Top row */}
-                    <View className="flex-row items-center gap-4">
+                    <View className="flex-row items-center gap-3">
                         <View
-                            className="w-14 h-14 rounded-2xl items-center justify-center overflow-hidden"
+                            className="w-12 h-12 rounded-2xl items-center justify-center overflow-hidden"
                             style={{
                                 backgroundColor: avatarStyle.bg,
                                 borderWidth: 1,
@@ -108,26 +117,29 @@ export function TournamentCard({
                                     className="w-full h-full rounded-none border-0"
                                 />
                             ) : (
-                                <Ionicons name="trophy" size={26} color={avatarStyle.icon} />
+                                <Ionicons name="trophy" size={22} color={avatarStyle.icon} />
                             )}
                         </View>
 
                         <View className="flex-1 min-w-0">
                             <Text
-                                className="text-lg font-black text-white leading-tight mb-0.5"
+                                className="text-lg font-black text-white leading-tight"
                                 numberOfLines={1}
                                 adjustsFontSizeToFit
-                                minimumFontScale={0.75}
+                                minimumFontScale={0.8}
                             >
                                 {name}
                             </Text>
-                            <Text
-                                className="text-xs font-bold uppercase tracking-wider"
-                                style={{ color: '#34D399' }}
-                                numberOfLines={1}
-                            >
-                                {hubName || 'Official Hub'}
-                            </Text>
+                            <View className="flex-row items-center gap-1 mt-1">
+                                <Ionicons name="people" size={12} color="#34D399" />
+                                <Text
+                                    className="text-[11px] font-bold uppercase tracking-wider flex-1"
+                                    style={{ color: '#34D399' }}
+                                    numberOfLines={2}
+                                >
+                                    {hubName || 'Official Hub'}
+                                </Text>
+                            </View>
                         </View>
 
                         {/* Status pill */}
@@ -201,9 +213,16 @@ export function TournamentCard({
                             </View>
                         </View>
 
-                        <View className="flex-row items-center gap-1.5">
-                            <Ionicons name="cash" size={16} color="#FBBF24" />
-                            <Text className="text-[13px] font-black tracking-tight" style={{ color: '#FBBF24' }}>
+                        <View
+                            className="flex-row items-center px-3 py-1.5 rounded-xl"
+                            style={{
+                                backgroundColor: 'rgba(251, 191, 36, 0.08)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(251, 191, 36, 0.20)',
+                            }}
+                        >
+                            <Ionicons name="trophy" size={13} color="#FBBF24" />
+                            <Text className="text-[11px] font-black ml-1.5" style={{ color: '#FBBF24' }}>
                                 {prizePool}
                             </Text>
                         </View>
