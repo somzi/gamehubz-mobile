@@ -16,6 +16,8 @@ import { Button } from '../ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
+import { TEAM_LABELS } from '../../lib/teamConstants';
+import { CountryPicker } from '../ui/CountryPicker';
 import { DateTimePickerModal } from './DateTimePickerModal';
 
 interface EditTournamentModalProps {
@@ -46,6 +48,11 @@ const prizeCurrencies = [
     { value: '2', label: 'USD' },
     { value: '3', label: 'StarPass' },
     { value: '4', label: 'FCP' },
+];
+
+const teamWinConditions = [
+    { value: '0', label: 'Match Wins' },
+    { value: '1', label: 'Aggregate Score' },
 ];
 
 const regionMapping: Record<string, number> = {
@@ -106,6 +113,27 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [registrationDeadline, setRegistrationDeadline] = useState(tournament?.registrationDeadline || '');
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
     const [requireResultApproval, setRequireResultApproval] = useState(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
+    const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
+    const [doubleRoundRobin, setDoubleRoundRobin] = useState(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
+    const [teamSize, setTeamSize] = useState(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
+    const [teamWinCondition, setTeamWinCondition] = useState(
+        String((tournament?.teamWinCondition ?? tournament?.TeamWinCondition) ?? '0')
+    );
+
+    // Scope: country list overrides region. Pre-fill the scope toggle from the persisted Countries.
+    const initialCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
+        ? (tournament?.countries ?? tournament?.Countries)
+        : [];
+    const [scopeMode, setScopeMode] = useState<'region' | 'country'>(
+        initialCountries.length > 0 ? 'country' : 'region'
+    );
+    const [selectedCountries, setSelectedCountries] = useState<string[]>(initialCountries);
+
+    const toggleCountry = (code: string) => {
+        setSelectedCountries(prev =>
+            prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code]
+        );
+    };
 
     // Swiss format config: rounds (empty = auto), knockout size ('0' = pure Swiss),
     // direct berths (empty = everyone qualifies directly, no play-in).
@@ -139,14 +167,16 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showRegDeadlinePicker, setShowRegDeadlinePicker] = useState(false);
+    const [showTeamWinConditionPicker, setShowTeamWinConditionPicker] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const getFormatLabel = () => {
         return TOURNAMENT_FORMAT_OPTIONS.find(f => f.value === selectedFormat)?.label || 'Select Format';
     };
 
-    // Number of bracket entrants: players for solo, teams for team tournaments (team size is fixed after creation).
-    const teamSizeNum = Number(tournament?.teamSize ?? tournament?.TeamSize ?? 0);
+    // Number of bracket entrants: players for solo, teams for team tournaments.
+    // Use the editable teamSize so the format/third-place gates reflect the user's pending edit.
+    const teamSizeNum = parseInt(teamSize) || 0;
     const participantCount = isTeamTournament
         ? (teamSizeNum > 0 && parseInt(maxPlayers) ? Math.floor(parseInt(maxPlayers) / teamSizeNum) : 0)
         : (parseInt(maxPlayers) || 0);
@@ -194,6 +224,15 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setRegistrationDeadline(tournament?.registrationDeadline || '');
         setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
         setRequireResultApproval(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
+        setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
+        setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
+        setTeamSize(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
+        setTeamWinCondition(String((tournament?.teamWinCondition ?? tournament?.TeamWinCondition) ?? '0'));
+        const refreshedCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
+            ? (tournament?.countries ?? tournament?.Countries)
+            : [];
+        setSelectedCountries(refreshedCountries);
+        setScopeMode(refreshedCountries.length > 0 ? 'country' : 'region');
         setSwissRounds(tournament?.swissRoundsCount ? String(tournament.swissRoundsCount) : '');
         setSwissKnockout(String(tournament?.swissKnockoutQualifiers || '0'));
         setSwissDirect(tournament?.swissDirectQualifiers != null ? String(tournament.swissDirectQualifiers) : '');
@@ -244,6 +283,24 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 setError('Team tournaments only support Single Bracket');
                 return;
             }
+            // Team size and Max Players must still produce ≥ 2 teams once the bracket is built.
+            if (canEditAll) {
+                const ts = parseInt(teamSize);
+                if (!teamSize || isNaN(ts) || ts < 2 || ts > 11) {
+                    setError('Team size must be between 2 and 11');
+                    return;
+                }
+                const mp = parseInt(maxPlayers);
+                if (mp < ts * 2) {
+                    setError(`Max Players must be at least ${ts * 2} (Team Size × 2) to allow a minimum of 2 teams`);
+                    return;
+                }
+            }
+        }
+
+        if (canEditAll && scopeMode === 'country' && selectedCountries.length === 0) {
+            setError('Please select at least one country for a country-based tournament');
+            return;
         }
 
         if (selectedFormat === String(TournamentFormat.DoubleElimination) && participantCount > 0 && participantCount < 4) {
@@ -292,6 +349,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 }
             }
 
+            const isLeagueOrGroup = selectedFormat === '0' || selectedFormat === '5';
             const payload = {
                 Id: tournament.id,
                 HubId: tournament.hubId || tournament.HubId,
@@ -313,10 +371,20 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 Prize: parseInt(prize) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
                 Region: regionMapping[selectedRegion] ?? 0,
+                Countries: scopeMode === 'country' ? selectedCountries : null,
                 RoundDurationMinutes: roundDurationMinutes,
                 // Always sent so an edit never silently resets it; only changeable before the bracket is generated.
                 HasThirdPlaceMatch: hasThirdPlaceMatch,
                 RequireResultApproval: requireResultApproval,
+                // Structural fields the backend will only honour when AllowStructuralEdits=true and the
+                // tournament hasn't started; otherwise it preserves the persisted values regardless of
+                // what we send. IsTeamTournament is locked forever — sent for completeness only.
+                IsTeamTournament: isTeamTournament,
+                TeamSize: isTeamTournament ? (parseInt(teamSize) || null) : null,
+                TeamWinCondition: parseInt(teamWinCondition) || 0,
+                IsExclusive: isExclusive,
+                DoubleRoundRobin: isLeagueOrGroup ? doubleRoundRobin : false,
+                AllowStructuralEdits: true,
             };
 
             const response = await authenticatedFetch(ENDPOINTS.CREATE_TOURNAMENT, {
@@ -484,9 +552,41 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                             </View>
 
                             <View className="mb-6">
-                                {renderSelectField('Region', getRegionLabel(), 'globe-outline', () =>
-                                    setShowRegionPicker(true)
-                                    , !canEditAll)}
+                                <View className="flex-row items-center mb-3">
+                                    <Ionicons name="globe-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text className="text-sm font-bold text-white">Tournament Scope</Text>
+                                </View>
+                                <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 mb-3 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                    <Pressable
+                                        onPress={() => { if (canEditAll) setScopeMode('region'); }}
+                                        disabled={!canEditAll}
+                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'region' ? 'bg-primary' : ''}`}
+                                    >
+                                        <Text className={`text-sm font-bold ${scopeMode === 'region' ? 'text-[#0F172A]' : 'text-slate-400'}`}>By Region</Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => { if (canEditAll) setScopeMode('country'); }}
+                                        disabled={!canEditAll}
+                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'country' ? 'bg-primary' : ''}`}
+                                    >
+                                        <Text className={`text-sm font-bold ${scopeMode === 'country' ? 'text-[#0F172A]' : 'text-slate-400'}`}>By Country</Text>
+                                    </Pressable>
+                                </View>
+
+                                {scopeMode === 'region' ? (
+                                    renderSelectField('Region', getRegionLabel(), 'globe-outline', () =>
+                                        setShowRegionPicker(true)
+                                        , !canEditAll)
+                                ) : (
+                                    <View pointerEvents={canEditAll ? 'auto' : 'none'} style={{ opacity: canEditAll ? 1 : 0.5 }}>
+                                        <CountryPicker
+                                            placeholder="Select countries"
+                                            multiple
+                                            values={selectedCountries}
+                                            onToggle={toggleCountry}
+                                        />
+                                    </View>
+                                )}
                             </View>
 
                             <View className="flex-row gap-4 mb-6">
@@ -508,6 +608,42 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         , !canEditAll)}
                                 </View>
                             </View>
+
+                            {isTeamTournament && (
+                                <View className="flex-row gap-4 mb-6">
+                                    <View className="flex-1">
+                                        <View className="flex-row items-center mb-3">
+                                            <Ionicons name="grid-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                            <Text className="text-sm font-bold text-white">{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
+                                        </View>
+                                        <TextInput
+                                            className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 text-sm ${!canEditAll ? 'opacity-50' : ''}`}
+                                            placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
+                                            placeholderTextColor="#6b7280"
+                                            keyboardType="numeric"
+                                            value={teamSize}
+                                            onChangeText={setTeamSize}
+                                            editable={canEditAll}
+                                        />
+                                    </View>
+                                    <View className="flex-1">
+                                        <View className="flex-row items-center mb-3">
+                                            <Ionicons name="trophy-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                            <Text className="text-sm font-bold text-white">Win Condition</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => { if (canEditAll) setShowTeamWinConditionPicker(true); }}
+                                            disabled={!canEditAll}
+                                            className={`bg-[#131B2E] px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
+                                        >
+                                            <Text className="text-white text-sm" numberOfLines={1}>
+                                                {teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select'}
+                                            </Text>
+                                            <Ionicons name="chevron-down" size={16} color="#94A3B8" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
 
                             {selectedFormat === '5' && (
                                 <View className="flex-row gap-4 mb-6">
@@ -643,6 +779,68 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 </Text>
                             </View>
 
+                            <View className="mb-6">
+                                <View className="flex-row items-center mb-3">
+                                    <Ionicons name="sparkles-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                    <Text className="text-sm font-bold text-white">Exclusive Members Only</Text>
+                                </View>
+                                <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                    <Pressable
+                                        onPress={() => { if (canEditAll) setIsExclusive(false); }}
+                                        disabled={!canEditAll}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isExclusive ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${!isExclusive ? 'text-white' : 'text-zinc-500'}`}>
+                                            NO
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => { if (canEditAll) setIsExclusive(true); }}
+                                        disabled={!canEditAll}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isExclusive ? 'bg-[#4F46E5]' : ''}`}
+                                    >
+                                        <Text className={`text-xs font-bold tracking-wide ${isExclusive ? 'text-white' : 'text-zinc-500'}`}>
+                                            YES
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                                <Text className="text-[11px] text-zinc-500 mt-2">
+                                    When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
+                                </Text>
+                            </View>
+
+                            {(selectedFormat === '0' || selectedFormat === '5') && (
+                                <View className="mb-6">
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Double Round Robin</Text>
+                                    </View>
+                                    <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                        <Pressable
+                                            onPress={() => { if (canEditAll) setDoubleRoundRobin(false); }}
+                                            disabled={!canEditAll}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!doubleRoundRobin ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${!doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
+                                                NO
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => { if (canEditAll) setDoubleRoundRobin(true); }}
+                                            disabled={!canEditAll}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${doubleRoundRobin ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
+                                                YES
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Every pair plays twice — one home leg and one away leg. Doubles the match count.
+                                    </Text>
+                                </View>
+                            )}
+
                             {canShowThirdPlace && (
                                 <View className="mb-6">
                                     <View className="flex-row items-center mb-3">
@@ -759,6 +957,14 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     prizeCurrencies,
                     prizeCurrency,
                     setPrizeCurrency
+                )}
+
+                {renderOptionsModal(
+                    showTeamWinConditionPicker,
+                    () => setShowTeamWinConditionPicker(false),
+                    teamWinConditions,
+                    teamWinCondition,
+                    setTeamWinCondition
                 )}
 
                 <DateTimePickerModal
