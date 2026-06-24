@@ -1060,13 +1060,17 @@ export default function TournamentDetailsScreen() {
         const allStageMatches = stageRounds.flatMap((r: any) => r.matches || []);
         const thirdPlaceMatch = allStageMatches.find((m: any) => m.stage === MatchStage.ThirdPlace);
         const grandFinalMatch = allStageMatches.find((m: any) => m.stage === MatchStage.GrandFinal);
+        // Reset Grand Final exists only when the LB champion won the first GF (true double-elim).
+        const grandFinalResetMatch = allStageMatches.find((m: any) => m.stage === MatchStage.GrandFinalReset);
 
-        const bracketRounds = (thirdPlaceMatch || grandFinalMatch)
+        const bracketRounds = (thirdPlaceMatch || grandFinalMatch || grandFinalResetMatch)
             ? stageRounds
                 .map((r: any) => ({
                     ...r,
                     matches: (r.matches || []).filter(
-                        (m: any) => m.stage !== MatchStage.ThirdPlace && m.stage !== MatchStage.GrandFinal
+                        (m: any) => m.stage !== MatchStage.ThirdPlace
+                            && m.stage !== MatchStage.GrandFinal
+                            && m.stage !== MatchStage.GrandFinalReset
                     ),
                 }))
                 .filter((r: any) => r.matches.length > 0)
@@ -1147,6 +1151,27 @@ export default function TournamentDetailsScreen() {
                                         startTime={grandFinalMatch.startTime}
                                         status={grandFinalMatch.status}
                                         onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(grandFinalMatch)}
+                                        currentUserId={user?.id}
+                                        currentUsername={user?.username}
+                                        isAdmin={canManage}
+                                        isTeamTournament={tournament?.isTeamTournament}
+                                    />
+                                </View>
+                            </View>
+                        )}
+                        {grandFinalResetMatch && (
+                            <View className="px-4 mt-6">
+                                <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
+                                    <Ionicons name="trophy" size={16} color="#FBBF24" />
+                                    <Text className="text-sm font-bold text-white">Grand Final (Reset)</Text>
+                                </View>
+                                <View style={{ maxWidth: 320 }}>
+                                    <BracketMatch
+                                        home={grandFinalResetMatch.home}
+                                        away={grandFinalResetMatch.away}
+                                        startTime={grandFinalResetMatch.startTime}
+                                        status={grandFinalResetMatch.status}
+                                        onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(grandFinalResetMatch)}
                                         currentUserId={user?.id}
                                         currentUsername={user?.username}
                                         isAdmin={canManage}

@@ -141,6 +141,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [swissKnockout, setSwissKnockout] = useState(String(tournament?.swissKnockoutQualifiers || '0'));
     const [swissDirect, setSwissDirect] = useState(
         tournament?.swissDirectQualifiers != null ? String(tournament.swissDirectQualifiers) : '');
+    // Knockout bracket style for Groups+Bracket / Swiss: '1' = Single, '2' = Double elimination.
+    const [knockoutType, setKnockoutType] = useState(String(tournament?.knockoutEliminationType || '1'));
     const [showSwissKnockoutPicker, setShowSwissKnockoutPicker] = useState(false);
 
     const initialDurationMinutes = tournament?.roundDurationMinutes;
@@ -191,6 +193,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         ? 2 * (swissKnockoutSize - swissDirectCount)
         : 0;
 
+    // Single/Double knockout choice for the Groups+Bracket / Swiss bracket phase. Needs >= 4 bracket
+    // slots for a real losers bracket. (Swiss is solo-only; Groups+Bracket supports team double-elim.)
+    const groupsTotalQualifiers = (parseInt(groupsCount) || 0) * (parseInt(qualifiersPerGroup) || 0);
+    const showKnockoutTypeToggle =
+        (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers >= 4) ||
+        (isSwiss && swissKnockoutSize >= 4);
+
     useEffect(() => {
         if (!isTeamTournament) {
             return;
@@ -236,6 +245,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setSwissRounds(tournament?.swissRoundsCount ? String(tournament.swissRoundsCount) : '');
         setSwissKnockout(String(tournament?.swissKnockoutQualifiers || '0'));
         setSwissDirect(tournament?.swissDirectQualifiers != null ? String(tournament.swissDirectQualifiers) : '');
+        setKnockoutType(String(tournament?.knockoutEliminationType || '1'));
 
         const durMinutes = tournament?.roundDurationMinutes;
         if (durMinutes != null) {
@@ -280,7 +290,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             const selectedFormatValue = Number(selectedFormat);
             const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
             if (!isAllowedTeamFormat) {
-                setError('Team tournaments only support Single Bracket');
+                setError('Team tournaments only support Single Bracket, Double Bracket, League, or Groups + Bracket');
                 return;
             }
             // Team size and Max Players must still produce ≥ 2 teams once the bracket is built.
@@ -367,6 +377,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 SwissDirectQualifiers: isSwiss && swissKnockoutSize > 0 && swissDirectCount < swissKnockoutSize
                     ? swissDirectCount
                     : null,
+                // Single (1) / Double (2) elimination for the Groups+Bracket / Swiss knockout phase.
+                KnockoutEliminationType: showKnockoutTypeToggle ? parseInt(knockoutType) : null,
                 RegistrationDeadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
                 Prize: parseInt(prize) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
@@ -837,6 +849,38 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     </View>
                                     <Text className="text-[11px] text-zinc-500 mt-2">
                                         Every pair plays twice — one home leg and one away leg. Doubles the match count.
+                                    </Text>
+                                </View>
+                            )}
+
+                            {showKnockoutTypeToggle && (
+                                <View className="mb-6">
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
+                                    </View>
+                                    <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                        <Pressable
+                                            onPress={() => { if (canEditAll) setKnockoutType('1'); }}
+                                            disabled={!canEditAll}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '1' ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '1' ? 'text-white' : 'text-zinc-500'}`}>
+                                                SINGLE
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => { if (canEditAll) setKnockoutType('2'); }}
+                                            disabled={!canEditAll}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '2' ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '2' ? 'text-white' : 'text-zinc-500'}`}>
+                                                DOUBLE
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
                                     </Text>
                                 </View>
                             )}

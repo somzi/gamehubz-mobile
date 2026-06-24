@@ -10,6 +10,7 @@ export enum TournamentFormat {
 
 export const TEAM_TOURNAMENT_FORMATS = [
     TournamentFormat.SingleElimination,
+    TournamentFormat.DoubleElimination,
     TournamentFormat.League,
     TournamentFormat.GroupStageWithKnockout,
 ] as const;
@@ -67,6 +68,8 @@ export enum MatchStage {
     WinnersBracket = 9,
     LosersBracket = 10,
     GrandFinal = 11,
+    // DE reset final (LB champion beat the WB champion in the Grand Final). Rendered after the GF.
+    GrandFinalReset = 17,
     RoundOf128 = 12,
     RoundOf256 = 13,
     RoundOf512 = 14,

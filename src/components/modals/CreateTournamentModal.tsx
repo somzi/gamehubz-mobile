@@ -98,6 +98,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [swissRounds, setSwissRounds] = useState('');
     const [swissKnockout, setSwissKnockout] = useState('0');
     const [swissDirect, setSwissDirect] = useState('');
+    // Knockout bracket style for Groups+Bracket / Swiss: '1' = Single, '2' = Double elimination.
+    const [knockoutType, setKnockoutType] = useState('1');
 
     // Round Duration
     const [roundDurationValue, setRoundDurationValue] = useState('');
@@ -231,6 +233,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         ? 2 * (swissKnockoutSize - swissDirectCount)
         : 0;
 
+    // Single/Double knockout choice applies to the bracket phase of Groups+Bracket and Swiss.
+    // The knockout needs >= 4 bracket slots for a real losers bracket, so the toggle only appears
+    // then. (Swiss is solo-only; Groups+Bracket supports both solo and team double-elimination.)
+    const groupsTotalQualifiers = (parseInt(groupsCount) || 0) * (parseInt(qualifiersPerGroup) || 0);
+    const showKnockoutTypeToggle =
+        (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers >= 4) ||
+        (isSwiss && swissKnockoutSize >= 4);
+
     useEffect(() => {
         if (!isTeamTournament) {
             return;
@@ -275,7 +285,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             const selectedFormatValue = Number(selectedFormat);
             const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
             if (!isAllowedTeamFormat) {
-                setError('Team tournaments only support Single Bracket, League, or Groups + Bracket');
+                setError('Team tournaments only support Single Bracket, Double Bracket, League, or Groups + Bracket');
                 return;
             }
         }
@@ -366,6 +376,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 SwissDirectQualifiers: isSwiss && swissKnockoutSize > 0 && swissDirectCount < swissKnockoutSize
                     ? swissDirectCount
                     : null,
+                // Single (1) / Double (2) elimination for the Groups+Bracket / Swiss knockout phase.
+                // Null when not applicable; backend treats null as single.
+                KnockoutEliminationType: showKnockoutTypeToggle ? parseInt(knockoutType) : null,
                 RoundDurationMinutes: roundDurationMinutes,
                 IsTeamTournament: isTeamTournament,
                 TeamSize: isTeamTournament ? parseInt(teamSize) : null,
@@ -886,6 +899,36 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             </Text>
                                         </View>
                                     )}
+                                </View>
+                            )}
+
+                            {showKnockoutTypeToggle && (
+                                <View>
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
+                                    </View>
+                                    <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                        <Pressable
+                                            onPress={() => setKnockoutType('1')}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '1' ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '1' ? 'text-white' : 'text-zinc-500'}`}>
+                                                SINGLE
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => setKnockoutType('2')}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '2' ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '2' ? 'text-white' : 'text-zinc-500'}`}>
+                                                DOUBLE
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
+                                    </Text>
                                 </View>
                             )}
 
