@@ -89,6 +89,9 @@ export const ENDPOINTS = {
     REMOVE_TEAM_FROM_TOURNAMENT: (tournamentId: string, teamId: string) => `${API_BASE_URL}/api/tournamentParticipant/tournament/${tournamentId}/team/${teamId}`,
     DELETE_ACCOUNT: `${API_BASE_URL}/api/Auth`,
     FORGOT_PASSWORD: `${API_BASE_URL}/api/Auth/forgotPassword`,
+    // v2: backend never returns the OTP in the body (it's emailed) and always reports success,
+    // so we always continue to the OTP entry screen regardless of whether the email is registered.
+    FORGOT_PASSWORD_V2: `${API_BASE_URL}/api/Auth/v2/forgotPassword`,
     RESET_PASSWORD: `${API_BASE_URL}/api/Auth/resetPassword`,
     GET_ALL_HUB_ACTIVITY: (pageNumber: number) => `${API_BASE_URL}/api/hubActivity/all?pageNumber=${pageNumber}`,
     EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
