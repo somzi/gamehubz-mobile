@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
-
-import { PlayerAvatar } from '../ui/PlayerAvatar';
 
 interface TournamentCardProps {
     name: string;
@@ -103,19 +101,35 @@ export function TournamentCard({
                     <View className="flex-row items-center gap-3">
                         <View
                             className="w-12 h-12 rounded-2xl items-center justify-center overflow-hidden"
-                            style={{
-                                backgroundColor: avatarStyle.bg,
-                                borderWidth: 1,
-                                borderColor: avatarStyle.border,
-                            }}
+                            style={
+                                hubAvatarUrl
+                                    ? {
+                                          // Real logo: stay neutral so the image isn't fighting a
+                                          // mismatched colored frame — let it read as a clean cropped tile.
+                                          backgroundColor: 'rgba(255,255,255,0.04)',
+                                      }
+                                    : {
+                                          backgroundColor: avatarStyle.bg,
+                                          borderWidth: 1,
+                                          borderColor: avatarStyle.border,
+                                      }
+                            }
                         >
                             {hubAvatarUrl ? (
-                                <PlayerAvatar
-                                    name={hubName || name}
-                                    src={hubAvatarUrl}
-                                    size="lg"
-                                    className="w-full h-full rounded-none border-0"
-                                />
+                                <>
+                                    <Image
+                                        source={{ uri: hubAvatarUrl }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                    />
+                                    {/* Crisp hairline ring on top of the image so the tile has a clean
+                                        cut-out edge against the card instead of a hard square. */}
+                                    <View
+                                        pointerEvents="none"
+                                        className="absolute inset-0 rounded-2xl"
+                                        style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
+                                    />
+                                </>
                             ) : (
                                 <Ionicons name="trophy" size={22} color={avatarStyle.icon} />
                             )}
