@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { BracketMatch } from './BracketMatch';
 import { parseUtcDate } from '../../lib/utils';
@@ -7,13 +7,19 @@ import { Ionicons } from '@expo/vector-icons';
 // LB layout is a flat column-per-round grid: match counts don't halve cleanly between rounds
 // (a "minor" consolidation round is followed by a "major" round with the same count once a
 // fresh batch of WB losers drops in), so the binary-tree connector geometry used by
-// TournamentBracket doesn't apply. Cards are stacked top-to-bottom inside each round column.
+// TournamentBracket doesn't apply. Cards are stacked top-to-bottom inside each round column,
+// and connectors are instead drawn data-driven from each match's nextMatchId (see `connectors`):
+// this works for the irregular LB topology and still forms a clean Y-merge for paired feeders,
+// matching the winners-bracket look.
 
 const MATCH_H = 130;
 const MATCH_GAP = 16;
 const MATCH_W = 220;
-const COL_GAP = 24;
+const COL_GAP = 40;            // gap between round columns — also the lane the connectors live in
 const HEADER_H = 64;
+const STROKE = 1.5;
+const LINE_DEFAULT = 'rgba(255,255,255,0.06)';
+const LINE_MY_PATH = 'rgba(99,102,241,0.25)';
 
 interface Participant {
     participantId: string;
@@ -98,22 +104,152 @@ export function LosersBracket({
     const zoomIn = () => setScale(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
     const zoomOut = () => setScale(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
 
-    const maxMatches = Math.max(...rounds.map(r => r.matches.length || 1));
     const maxRoundNumber = Math.max(...rounds.map(r => r.roundNumber));
-    const totalH = maxMatches * MATCH_H + (maxMatches - 1) * MATCH_GAP;
-
     const contentWidth = rounds.length * MATCH_W + (rounds.length - 1) * COL_GAP;
+
+    // Match lookup, used by the path tracer.
+    const matchById = useMemo(() => {
+        const map: Record<string, Match> = {};
+        rounds.forEach(r => r.matches.forEach(m => { map[m.id] = m; }));
+        return map;
+    }, [rounds]);
+
+    // Feeder-centered layout. Each match is positioned on the vertical center of the matches that
+    // feed it (its nextMatch predecessors) — exactly how the winners bracket centers a match
+    // between its two feeders — so connectors run straight/clean instead of tangling, which is what
+    // happens when every round is centered independently. The first round (and any match whose
+    // feeders were collapsed out in a small/bye bracket) falls back to even stacking, and a
+    // per-column guard guarantees cards never overlap.
+    const layout = useMemo(() => {
+        const P = MATCH_W + COL_GAP;
+        const UNIT = MATCH_H + MATCH_GAP;
+
+        // targetMatchId -> ids of the matches whose winner advances into it
+        const feedersOf: Record<string, string[]> = {};
+        rounds.forEach(r => r.matches.forEach(m => {
+            if (m.nextMatchId) (feedersOf[m.nextMatchId] ??= []).push(m.id);
+        }));
+
+        const pos: Record<string, { roundIdx: number; top: number; centerY: number; rightX: number; leftX: number }> = {};
+        let areaH = 0;
+
+        rounds.forEach((round, roundIdx) => {
+            let cursor = -Infinity; // top of the previously placed card in this column + UNIT
+            round.matches.forEach((m, matchIdx) => {
+                // Only feeders already placed (always in an earlier column, since they point forward).
+                const feeders = (feedersOf[m.id] ?? []).filter(fid => pos[fid]);
+                let desired: number;
+                if (roundIdx === 0 || feeders.length === 0) {
+                    desired = matchIdx === 0 ? 0 : cursor;
+                } else {
+                    desired = feeders.reduce((sum, fid) => sum + pos[fid].top, 0) / feeders.length;
+                }
+                const top = matchIdx === 0 ? desired : Math.max(desired, cursor);
+                pos[m.id] = {
+                    roundIdx,
+                    top,
+                    centerY: HEADER_H + top + MATCH_H / 2,
+                    rightX: roundIdx * P + MATCH_W,
+                    leftX: roundIdx * P,
+                };
+                cursor = top + UNIT;
+                if (top + MATCH_H > areaH) areaH = top + MATCH_H;
+            });
+        });
+
+        return { pos, areaH };
+    }, [rounds]);
+
+    const totalH = layout.areaH;
     const contentHeight = HEADER_H + totalH;
 
+    // "My path" highlight — same tracer the winners bracket uses: follow each match the current
+    // user wins forward via nextMatchId.
+    const myPathIds = useMemo(() => {
+        const highlighted = new Set<string>();
+        if (!currentUserId && !currentUsername) return highlighted;
+        const norm = (s?: string | null) => (s ?? '').toLowerCase().trim();
+        const cId = norm(currentUserId);
+        const cName = norm(currentUsername);
+        const isMe = (uid?: string | null, uname?: string | null) =>
+            (!!cId && norm(uid) === cId) || (!!cName && norm(uname) === cName);
+        const trace = (matchId: string) => {
+            if (highlighted.has(matchId)) return;
+            const m = matchById[matchId];
+            if (!m) return;
+            highlighted.add(matchId);
+            if (m.nextMatchId) {
+                if (m.home?.isWinner && isMe(m.home.userId, m.home.username)) trace(m.nextMatchId);
+                if (m.away?.isWinner && isMe(m.away.userId, m.away.username)) trace(m.nextMatchId);
+            }
+        };
+        rounds.forEach(r => r.matches.forEach(m => {
+            if (isMe(m.home?.userId, m.home?.username) || isMe(m.away?.userId, m.away?.username)) {
+                trace(m.id);
+            }
+        }));
+        return highlighted;
+    }, [rounds, currentUserId, currentUsername, matchById]);
+
+    // One connector per match → its nextMatch (forward, same-stage only). Paired feeders that
+    // share a target naturally combine into the winners-bracket-style Y-merge. The LB final has
+    // no in-stage nextMatch (the grand final is a separate stage), so it simply draws none.
+    const connectors = useMemo(() => {
+        const segs: { id: string; sx: number; sy: number; tx: number; ty: number; color: string }[] = [];
+        rounds.forEach(round => {
+            round.matches.forEach(m => {
+                if (!m.nextMatchId) return;
+                const src = layout.pos[m.id];
+                const tgt = layout.pos[m.nextMatchId];
+                if (!src || !tgt || tgt.roundIdx <= src.roundIdx) return;
+                const onMyPath = myPathIds.has(m.id) && myPathIds.has(m.nextMatchId);
+                segs.push({
+                    id: m.id,
+                    sx: src.rightX,
+                    sy: src.centerY,
+                    tx: tgt.leftX,
+                    ty: tgt.centerY,
+                    color: onMyPath ? LINE_MY_PATH : LINE_DEFAULT,
+                });
+            });
+        });
+        return segs;
+    }, [rounds, layout, myPathIds]);
+
     const innerContent = (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ width: contentWidth, height: contentHeight, position: 'relative' }}>
+            {/* Connector lane — behind the cards, living in the gaps between columns. Each match
+                links to its nextMatch (winner advances); paired feeders form a clean Y-merge that
+                mirrors the winners-bracket connector styling. */}
+            <View
+                pointerEvents="none"
+                style={{ position: 'absolute', top: 0, left: 0, width: contentWidth, height: contentHeight }}
+            >
+                {connectors.map((c) => {
+                    const midX = (c.sx + c.tx) / 2;
+                    const vTop = Math.min(c.sy, c.ty);
+                    const vH = Math.abs(c.ty - c.sy);
+                    return (
+                        <React.Fragment key={c.id}>
+                            {/* stub out of the source card */}
+                            <View style={{ position: 'absolute', left: c.sx, top: c.sy - STROKE / 2, width: midX - c.sx, height: STROKE, backgroundColor: c.color }} />
+                            {/* vertical run across the gap */}
+                            {vH > 0 && (
+                                <View style={{ position: 'absolute', left: midX - STROKE / 2, top: vTop, width: STROKE, height: vH, backgroundColor: c.color }} />
+                            )}
+                            {/* stub into the target card */}
+                            <View style={{ position: 'absolute', left: midX, top: c.ty - STROKE / 2, width: c.tx - midX, height: STROKE, backgroundColor: c.color }} />
+                        </React.Fragment>
+                    );
+                })}
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
             {rounds.map((round, roundIdx) => {
                 const roundStatus = getRoundStatus(round);
                 const canEditRound =
                     isAdmin && tournamentStatus !== 4 && roundStatus !== 'completed';
                 const label = getLbRoundLabel(round.roundNumber, maxRoundNumber);
-                const colHeight = round.matches.length * MATCH_H + (round.matches.length - 1) * MATCH_GAP;
-                const verticalOffset = (totalH - colHeight) / 2;
 
                 return (
                     <React.Fragment key={round.roundNumber}>
@@ -215,8 +351,8 @@ export function LosersBracket({
                             </View>
 
                             <View style={{ width: MATCH_W, height: totalH, position: 'relative' }}>
-                                {round.matches.map((match, matchIdx) => {
-                                    const top = verticalOffset + matchIdx * (MATCH_H + MATCH_GAP);
+                                {round.matches.map((match) => {
+                                    const top = layout.pos[match.id]?.top ?? 0;
                                     return (
                                         <View
                                             key={match.id}
@@ -237,6 +373,7 @@ export function LosersBracket({
                                                     (match as any).ProposedByUserId ??
                                                     null
                                                 }
+                                                className={myPathIds.has(match.id) ? 'border-indigo-500/30' : undefined}
                                             />
                                         </View>
                                     );
@@ -248,6 +385,7 @@ export function LosersBracket({
                     </React.Fragment>
                 );
             })}
+            </View>
         </View>
     );
 
