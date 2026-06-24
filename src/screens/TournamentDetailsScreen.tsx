@@ -1734,7 +1734,7 @@ export default function TournamentDetailsScreen() {
                                 <PremiumTabs
                                     tabs={[
                                         { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
-                                        ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: 'Registred', icon: 'open-outline' as const }] : []),
+                                        ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: 'Open', icon: 'open-outline' as const }] : []),
                                         ...(canManage ? [{ value: 'registrations', label: 'Requests', icon: 'hourglass-outline' as const }] : []),
                                     ]}
                                     activeTab={teamsTab}
@@ -2060,7 +2060,7 @@ export default function TournamentDetailsScreen() {
                                 )
                             )}
 
-                            {/* Registrations (Moved into Teams logic) */}
+                            {/* Requests — pending team registrations (same card design as the other tabs) */}
                             {teamsTab === 'registrations' && canManage && (
                                 <View className="mt-2">
                                     <View className="flex-row justify-between items-center mb-4">
@@ -2079,16 +2079,7 @@ export default function TournamentDetailsScreen() {
                                                 return acc;
                                             }, []);
 
-                                            const hasApprovable = displayedRegistrations.some((reg: any) => {
-                                                const isTeam = reg.isTeamRegistration || reg.IsTeamRegistration;
-                                                if (isTeam && tournament?.teamSize) {
-                                                    const currentMembers = reg.memberCount || reg.MemberCount || 1;
-                                                    return currentMembers >= tournament?.teamSize;
-                                                }
-                                                return true;
-                                            });
-
-                                            return hasApprovable && displayedRegistrations.length > 0 && (
+                                            return displayedRegistrations.length > 0 && (
                                                 <Button
                                                     size="sm"
                                                     onPress={handleApproveAll}
@@ -2106,7 +2097,7 @@ export default function TournamentDetailsScreen() {
                                     ) : pendingRegistrations.length === 0 ? (
                                         <View className="bg-[#131B2E]/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#F59E0B" />
-                                            <Text className="text-slate-400 mt-4 text-center">No pending registrations.</Text>
+                                            <Text className="text-slate-400 mt-4 text-center">No pending requests.</Text>
                                         </View>
                                     ) : (
                                         pendingRegistrations.reduce((acc: any[], current: any) => {
@@ -2118,82 +2109,151 @@ export default function TournamentDetailsScreen() {
                                                 acc.push(current);
                                             }
                                             return acc;
-                                        }, []).map((reg) => {
+                                        }, []).map((reg, index) => {
                                             const isTeam = reg.isTeamRegistration || reg.IsTeamRegistration;
+                                            if (!isTeam) return null;
+
                                             const regId = reg.id || reg.registrationId || reg.Id;
+                                            const teamId = reg.teamId || reg.TeamId;
+                                            const teamName = reg.teamName || reg.TeamName;
+                                            const teamSize = reg.teamSize || reg.TeamSize || tournament?.teamSize || 0;
+                                            const captainUserId = reg.captainUserId || reg.CaptainUserId;
+                                            const membersList = reg.members || reg.Members || [];
+                                            const memberCount = reg.memberCount || reg.MemberCount || membersList.length || 0;
+                                            const captain = membersList.find((m: any) =>
+                                                m.userId?.toLowerCase() === captainUserId?.toLowerCase() ||
+                                                m.UserId?.toLowerCase() === captainUserId?.toLowerCase()
+                                            );
 
-                                            if (isTeam) {
-                                                const currentMembers = reg.memberCount || reg.MemberCount || 1;
-                                                const requiredMembers = tournament?.teamSize || 2;
-                                                const canApprove = currentMembers >= requiredMembers;
+                                            const isExpanded = expandedTeamId === teamId;
 
-                                                return (
-                                                    <View key={regId || Math.random().toString()} className="bg-[#131B2E] p-4 mb-3 rounded-3xl border border-[#F59E0B]/20">
-                                                        <View className="flex-row items-center gap-3.5">
-                                                            <View className="w-12 h-12 rounded-2xl bg-[#F59E0B]/10 items-center justify-center border border-[#F59E0B]/20">
-                                                                <Ionicons name="people" size={22} color="#F59E0B" />
+                                            return (
+                                                <View key={teamId || regId || index.toString()} className="mb-3">
+                                                    <Pressable
+                                                        onPress={() => setExpandedTeamId(isExpanded ? null : (teamId || null))}
+                                                        className={`bg-[#131B2E] p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-[#F59E0B]/30' : 'border-white/[0.06]'}`}
+                                                    >
+                                                        <LinearGradient
+                                                            colors={['rgba(255,255,255,0.05)', 'transparent']}
+                                                            start={{ x: 0, y: 0 }}
+                                                            end={{ x: 0.9, y: 0.7 }}
+                                                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                                        />
+                                                        <View className="flex-row items-center gap-4">
+                                                            <View className="w-12 h-12 rounded-2xl bg-[#F59E0B]/10 items-center justify-center border border-[#F59E0B]/20 shadow-sm shadow-[#F59E0B]/20">
+                                                                <Ionicons name="shield-half-outline" size={24} color="#F59E0B" />
                                                             </View>
-                                                            <View className="flex-1 justify-center">
-                                                                <Text className="font-black text-base text-white" numberOfLines={1}>
-                                                                    {reg.teamName || reg.TeamName}
+                                                            <View className="flex-1">
+                                                                <Text className="font-black text-lg text-white" numberOfLines={1}>
+                                                                    {teamName || 'Unknown Team'}
                                                                 </Text>
-                                                                <View className="flex-row items-center gap-1.5 mt-1">
-                                                                    <Ionicons name="people-outline" size={11} color="#64748B" />
-                                                                    <Text className="text-xs font-bold text-slate-400">
-                                                                        {currentMembers} / {requiredMembers}
-                                                                    </Text>
-                                                                    {canApprove ? (
-                                                                        <View className="bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20 ml-1">
-                                                                            <Text className="text-[8px] font-black text-[#10B981] uppercase tracking-wider">Ready</Text>
+                                                                <View className="flex-row items-center gap-2 mt-1">
+                                                                    {(memberCount >= teamSize && teamSize > 0) ? (
+                                                                        <View className="bg-[#F59E0B]/10 px-2 py-0.5 rounded-full border border-[#F59E0B]/20 flex-shrink-0">
+                                                                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase">
+                                                                                {TEAM_LABELS.TEAM_FULL}
+                                                                            </Text>
                                                                         </View>
                                                                     ) : (
-                                                                        <View className="bg-[#F59E0B]/10 px-2 py-0.5 rounded-full border border-[#F59E0B]/20 ml-1">
-                                                                            <Text className="text-[8px] font-black text-[#F59E0B] uppercase tracking-wider">Incomplete</Text>
+                                                                        <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
+                                                                            {memberCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                        </Text>
+                                                                    )}
+                                                                    {captain && (
+                                                                        <View className="flex-row items-center gap-1 bg-[#F59E0B]/10 px-2 rounded-full py-0.5 border border-[#F59E0B]/20 flex-shrink">
+                                                                            <Ionicons name="shield" size={10} color="#F59E0B" />
+                                                                            <Text className="text-[9px] text-[#F59E0B] font-black uppercase flex-shrink" numberOfLines={1}>
+                                                                                {captain?.username || captain?.Username}
+                                                                            </Text>
                                                                         </View>
                                                                     )}
                                                                 </View>
                                                             </View>
-                                                            <View className="flex-row gap-2">
-                                                                <Pressable
-                                                                    onPress={() => handleReject(regId)}
-                                                                    disabled={processingId !== null}
-                                                                    className="w-11 h-11 rounded-2xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
-                                                                >
-                                                                    {processingId === regId ? (
-                                                                        <ActivityIndicator size="small" color="#EF4444" />
-                                                                    ) : (
-                                                                        <Ionicons name="close" size={20} color="#EF4444" />
-                                                                    )}
-                                                                </Pressable>
-                                                                {canApprove && (
-                                                                    <Pressable
-                                                                        onPress={() => handleApprove(regId)}
-                                                                        disabled={processingId !== null}
-                                                                        className="w-11 h-11 rounded-2xl bg-[#10B981]/15 items-center justify-center border border-[#10B981]/30 active:opacity-60"
-                                                                    >
-                                                                        {processingId === regId ? (
-                                                                            <ActivityIndicator size="small" color="#10B981" />
-                                                                        ) : (
-                                                                            <Ionicons name="checkmark" size={20} color="#10B981" />
-                                                                        )}
-                                                                    </Pressable>
-                                                                )}
+                                                            <View className="w-8 h-8 rounded-full bg-white/5 items-center justify-center border border-white/5">
+                                                                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={16} color="#94A3B8" />
                                                             </View>
                                                         </View>
-                                                        <View className="flex-row gap-1.5 mt-3.5">
-                                                            {Array.from({ length: requiredMembers }).map((_, pi) => (
-                                                                <View
-                                                                    key={pi}
-                                                                    className="flex-1 h-1.5 rounded-full"
-                                                                    style={{ backgroundColor: pi < currentMembers ? (canApprove ? '#10B981' : '#F59E0B') : 'rgba(255,255,255,0.07)' }}
-                                                                />
-                                                            ))}
-                                                        </View>
-                                                    </View>
-                                                );
-                                            }
 
-                                            return null;
+                                                        {/* Expanded Members List */}
+                                                        {isExpanded && (
+                                                            <View className="mt-4 pt-4 border-t border-white/5 gap-3">
+                                                                {membersList.length > 0 ? (
+                                                                    membersList.map((m: any, mIdx: number) => {
+                                                                        const isMemberCaptain = (m.userId || m.UserId)?.toLowerCase() === captainUserId?.toLowerCase();
+                                                                        return (
+                                                                            <Pressable
+                                                                                key={(m.userId || m.UserId) || mIdx.toString()}
+                                                                                onPress={() => navigation.navigate('PlayerProfile', { id: m.userId || m.UserId })}
+                                                                                className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-[#F59E0B]/[0.08] border-[#F59E0B]/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
+                                                                            >
+                                                                                <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-[#F59E0B]/50' : 'border border-white/10'}`}>
+                                                                                    <PlayerAvatar name={m.username || m.Username} src={m.avatarUrl || m.AvatarUrl} size="sm" />
+                                                                                </View>
+                                                                                <View className="flex-1">
+                                                                                    <Text className="text-white font-bold text-sm" numberOfLines={1}>{m.username || m.Username}</Text>
+                                                                                    {isMemberCaptain ? (
+                                                                                        <View className="flex-row items-center gap-1 mt-0.5">
+                                                                                            <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
+                                                                                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-wider">Captain</Text>
+                                                                                        </View>
+                                                                                    ) : (
+                                                                                        <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
+                                                                                    )}
+                                                                                </View>
+                                                                                <Ionicons name="chevron-forward" size={14} color="#475569" />
+                                                                            </Pressable>
+                                                                        );
+                                                                    })
+                                                                ) : (
+                                                                    <Text className="text-slate-500 text-center text-xs py-2 italic">No members found</Text>
+                                                                )}
+
+                                                                {teamSize > 0 && Array.from({ length: Math.max(0, teamSize - membersList.length) }).map((_, si) => (
+                                                                    <View
+                                                                        key={`empty-${si}`}
+                                                                        className="flex-row items-center gap-3 p-3 rounded-2xl border border-white/10 bg-white/[0.02]"
+                                                                        style={{ borderStyle: 'dashed' }}
+                                                                    >
+                                                                        <View
+                                                                            className="w-8 h-8 rounded-full border border-white/15 items-center justify-center"
+                                                                            style={{ borderStyle: 'dashed' }}
+                                                                        >
+                                                                            <Ionicons name="person-add-outline" size={14} color="#475569" />
+                                                                        </View>
+                                                                        <Text className="text-slate-600 text-xs font-semibold">Open slot</Text>
+                                                                    </View>
+                                                                ))}
+                                                            </View>
+                                                        )}
+
+                                                        {/* Approve / Reject — footer action bar inside the card */}
+                                                        <View className="flex-row items-center gap-2.5 mt-4 pt-4 border-t border-white/5">
+                                                            <Pressable
+                                                                onPress={() => handleApprove(regId)}
+                                                                disabled={processingId !== null}
+                                                                className="flex-1 flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-[#10B981]/15 border border-[#10B981]/30 active:opacity-60"
+                                                            >
+                                                                {processingId === regId ? (
+                                                                    <ActivityIndicator size="small" color="#10B981" />
+                                                                ) : (
+                                                                    <>
+                                                                        <Ionicons name="checkmark" size={18} color="#10B981" />
+                                                                        <Text className="text-[#10B981] font-bold text-sm">Approve</Text>
+                                                                    </>
+                                                                )}
+                                                            </Pressable>
+                                                            <Pressable
+                                                                onPress={() => handleReject(regId)}
+                                                                disabled={processingId !== null}
+                                                                className="flex-row items-center justify-center gap-2 h-11 px-5 rounded-2xl bg-red-500/10 border border-red-500/20 active:opacity-60"
+                                                            >
+                                                                <Ionicons name="close" size={18} color="#EF4444" />
+                                                                <Text className="text-red-400 font-bold text-sm">Decline</Text>
+                                                            </Pressable>
+                                                        </View>
+                                                    </Pressable>
+                                                </View>
+                                            );
                                         })
                                     )}
                                 </View>
