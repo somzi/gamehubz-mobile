@@ -106,6 +106,17 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
         });
 
+        // Group membership is per-connection and is lost when
+        // withAutomaticReconnect() re-establishes a dropped socket (common on
+        // mobile). Re-join on reconnect — otherwise the panel stays "connected"
+        // but silently stops receiving messages. Also pull a fresh snapshot to
+        // backfill anything sent during the disconnect gap (dedup handles overlap).
+        connection.onreconnected(() => {
+            if (!isActive) return;
+            connection.invoke('JoinMatchGroup', matchId).catch(() => { });
+            fetchComments(true);
+        });
+
         const startPromise = connection.start()
             .then(() => {
                 if (!isActive) return;

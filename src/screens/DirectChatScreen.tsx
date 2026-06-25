@@ -152,6 +152,28 @@ export default function DirectChatScreen() {
             setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
         });
 
+        // SignalR group membership is per-connection and is NOT restored when
+        // withAutomaticReconnect() re-establishes a dropped socket (common on
+        // mobile: network switch, brief backgrounding, idle timeout). Without
+        // re-joining, the screen stays "connected" but silently stops receiving
+        // messages until the user leaves and re-enters. Re-join on every reconnect.
+        connection.onreconnected(() => {
+            if (!isActive) return;
+            connection.invoke('JoinChatGroup', currentChatId).catch(() => { });
+            // Backfill anything sent during the disconnect gap (dedup by id below).
+            authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(currentChatId, 100))
+                .then((r) => (r.ok ? r.json() : null))
+                .then((msgs: DirectMessage[] | null) => {
+                    if (!isActive || !msgs) return;
+                    setMessages((prev) => {
+                        const known = new Set(prev.map((p) => p.id));
+                        const added = msgs.filter((m) => !known.has(m.id));
+                        return added.length ? [...prev, ...added] : prev;
+                    });
+                })
+                .catch(() => { });
+        });
+
         const startPromise = connection
             .start()
             .then(() => {
