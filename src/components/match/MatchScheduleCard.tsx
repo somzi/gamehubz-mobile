@@ -914,7 +914,14 @@ export function MatchScheduleCard({
         const KeyboardWrapper: React.ComponentType<any> = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
         const keyboardWrapperProps: any = Platform.OS === 'ios'
             ? { behavior: 'padding', keyboardVerticalOffset: 0, className: 'flex-1' }
-            : { className: 'flex-1', style: { paddingBottom: keyboardHeight > 0 ? Math.max(0, keyboardHeight - insets.bottom) : 0 } };
+            // Android edge-to-edge: keyboardDidShow reports the IME height WITHOUT the
+            // navigation-bar inset (the keyboard visually covers the nav bar below it),
+            // so the real gap from the keyboard top to the screen bottom is
+            // keyboardHeight + insets.bottom. The modal root already pads insets.bottom,
+            // so padding the wrapper by the full keyboardHeight lands the composer right
+            // above the keyboard. (Subtracting insets.bottom here left it one nav-bar
+            // height too low, hiding the composer behind the keyboard.)
+            : { className: 'flex-1', style: { paddingBottom: keyboardHeight > 0 ? keyboardHeight : 0 } };
 
         const scrollToBottom = () => {
             setTimeout(() => {
