@@ -20,12 +20,18 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
     const translateX = useRef(new Animated.Value(0)).current;
     const { badges } = useBadges();
 
-    // Notification badge count per tab. Matches surface on Home (dashboard + My Matches);
-    // friend requests / unread DMs surface under Social.
+    // Notification badge count per tab. Matches (incl. results to confirm) surface on Home;
+    // friend requests / unread DMs surface under Social; organizer items the user has to act on
+    // (team / hub join requests, pending registrations, admin-help) surface under Hubs.
     const badgeForTab = (name: string): number => {
         switch (name) {
             case 'Home': return badges.matchesTotal;
             case 'Social': return badges.socialTotal;
+            // Hub-manager approvals (registrations / hub joins / admin-help) cascade down the Hubs
+            // tab to the specific hub card. Team join requests are a captain concern reachable via
+            // Tournaments, so they surface there instead.
+            case 'Hubs': return badges.hubManageTotal;
+            case 'Tournaments': return badges.teamJoinRequests;
             default: return 0;
         }
     };

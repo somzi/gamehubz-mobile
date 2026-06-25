@@ -69,6 +69,7 @@ function routeFromNotification(
   const tournamentId = data.tournamentId ? String(data.tournamentId) : undefined;
   const matchId = data.matchId ? String(data.matchId) : undefined;
   const userId = data.userId ? String(data.userId) : undefined;
+  const hubId = data.hubId ? String(data.hubId) : undefined;
 
   // Explicit type wins
   switch (type) {
@@ -90,6 +91,35 @@ function routeFromNotification(
         return;
       }
       break;
+    // A result was reported and is waiting for this user to confirm/dispute it.
+    case 'resultproposed':
+      nav.navigate('MyMatches' as any);
+      return;
+    // Tournament finished — open it so the winner / final standings are visible.
+    case 'tournamentwon':
+      if (tournamentId) {
+        nav.navigate('TournamentDetails', { id: tournamentId });
+        return;
+      }
+      break;
+    // Team join lifecycle — open the tournament where teams are managed.
+    case 'teamjoinrequest':
+    case 'teamjoinapproved':
+    case 'teamjoinrejected':
+      if (tournamentId) {
+        nav.navigate('TournamentDetails', { id: tournamentId });
+        return;
+      }
+      break;
+    // Hub join lifecycle — open the hub (managers review requests there).
+    case 'hubjoinrequest':
+    case 'hubjoinapproved':
+    case 'hubjoinrejected':
+      if (hubId) {
+        nav.navigate('HubProfile', { id: hubId });
+        return;
+      }
+      break;
   }
 
   // Fallback by id field (backend tournament/match pushes omit `type`)
@@ -103,6 +133,10 @@ function routeFromNotification(
   }
   if (tournamentId) {
     nav.navigate('TournamentDetails', { id: tournamentId });
+    return;
+  }
+  if (hubId) {
+    nav.navigate('HubProfile', { id: hubId });
     return;
   }
 }

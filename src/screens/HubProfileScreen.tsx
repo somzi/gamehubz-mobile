@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { useBadges } from '../context/BadgesContext';
 import { SocialLinks } from '../components/profile/SocialLinks';
 import { SocialType } from '../types/auth';
 import { getSocialUrl } from '../lib/social';
@@ -29,6 +30,20 @@ export default function HubProfileScreen() {
     const { id } = route.params;
 
     const { user } = useAuth();
+    const { tournamentApprovals, hubApprovalDetail, tournamentsForHub } = useBadges();
+    // Split this hub's pending-approvals total so the Tournaments and Members tabs each show their
+    // own share (join requests live on Members; registrations / admin-help live under Tournaments).
+    const hubDetail = hubApprovalDetail(id);
+    const hubJoinCount = hubDetail?.joinRequests ?? 0;
+    const hubTournamentsCount = Math.max(0, (hubDetail?.count ?? 0) - hubJoinCount);
+    // Bucket the hub's tournaments-with-pending by status so each Live/Upcoming/Past filter tab
+    // shows where the items are (status 3 = Live, 4 = Past, everything else = Upcoming).
+    const hubTournamentApprovals = tournamentsForHub(id);
+    const sumApprovals = (pred: (status: number) => boolean) =>
+        hubTournamentApprovals.filter((t) => pred(t.status)).reduce((acc, t) => acc + t.total, 0);
+    const liveApprovals = sumApprovals((s) => s === 3);
+    const pastApprovals = sumApprovals((s) => s === 4);
+    const upcomingApprovals = sumApprovals((s) => s !== 3 && s !== 4);
     const [isFollowing, setIsFollowing] = useState(false);
     const [isOwner, setIsOwner] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -308,14 +323,31 @@ export default function HubProfileScreen() {
 
     const hubTabs: PremiumTabItem[] = [
         { label: 'Overview', value: 'overview', icon: 'grid-outline' },
-        { label: 'Tournaments', value: 'tournaments', icon: 'trophy-outline' },
-        { label: 'Members', value: 'members', icon: 'people-outline' },
+        {
+            label: 'Tournaments', value: 'tournaments', icon: 'trophy-outline',
+            badge: hubTournamentsCount > 0 ? hubTournamentsCount : undefined,
+            badgeTone: 'alert',
+        },
+        {
+            label: 'Members', value: 'members', icon: 'people-outline',
+            badge: hubJoinCount > 0 ? hubJoinCount : undefined,
+            badgeTone: 'alert',
+        },
     ];
 
     const tournamentFilterTabs: PremiumTabItem[] = [
-        { label: 'Live', value: 'live', icon: 'radio' },
-        { label: 'Upcoming', value: 'upcoming', icon: 'time-outline' },
-        { label: 'Past', value: 'past', icon: 'checkmark-circle-outline' },
+        {
+            label: 'Live', value: 'live', icon: 'radio',
+            badge: liveApprovals > 0 ? liveApprovals : undefined, badgeTone: 'alert',
+        },
+        {
+            label: 'Upcoming', value: 'upcoming', icon: 'time-outline',
+            badge: upcomingApprovals > 0 ? upcomingApprovals : undefined, badgeTone: 'alert',
+        },
+        {
+            label: 'Past', value: 'past', icon: 'checkmark-circle-outline',
+            badge: pastApprovals > 0 ? pastApprovals : undefined, badgeTone: 'alert',
+        },
     ];
 
     const renderTournamentList = () => {
@@ -342,6 +374,7 @@ export default function HubProfileScreen() {
                             players={new Array(tournament.numberOfParticipants || 0).fill({})}
                             onClick={() => navigation.navigate('TournamentDetails', { id: tournament.id })}
                             index={index}
+                            badgeCount={tournamentApprovals(tournament.id)?.total ?? 0}
                             hubName={hubData.name}
                             hubAvatarUrl={hubData.avatarUrl || hubData.logoUrl}
                         />

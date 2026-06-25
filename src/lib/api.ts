@@ -140,6 +140,7 @@ export const ENDPOINTS = {
 
     // ─── Notification badges ────────────────────────────────────────────
     GET_BADGES: `${API_BASE_URL}/api/v2/badges`,
+    GET_BADGE_APPROVALS: `${API_BASE_URL}/api/v2/badges/approvals`,
 
     // ─── SignalR hub URLs ───────────────────────────────────────────────
     SIGNALR_DM_HUB: `${API_BASE_URL}/hubs/dm`,

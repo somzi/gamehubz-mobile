@@ -19,6 +19,8 @@ interface TournamentCardProps {
     index?: number;
     hubName?: string;
     hubAvatarUrl?: string;
+    /** Pending items the organizer has to approve in this tournament — red corner badge. */
+    badgeCount?: number;
 }
 
 const STATUS_THEME: Record<string, { main: string; tint: string; text: string; ring: string }> = {
@@ -59,6 +61,7 @@ export function TournamentCard({
     index = 0,
     hubName,
     hubAvatarUrl,
+    badgeCount = 0,
 }: TournamentCardProps) {
     const theme = STATUS_THEME[status] || STATUS_THEME.upcoming;
     const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
@@ -243,6 +246,29 @@ export function TournamentCard({
                     </View>
                 </View>
             </View>
+
+            {/* Pending-approvals badge — lives on the Pressable, OUTSIDE the card's
+                overflow-hidden wrapper, so it can poke out of the corner without being clipped. */}
+            {badgeCount > 0 && (
+                <View
+                    pointerEvents="none"
+                    className="absolute z-10 rounded-full items-center justify-center"
+                    style={{
+                        top: -6,
+                        right: -6,
+                        minWidth: 22,
+                        height: 22,
+                        paddingHorizontal: 6,
+                        backgroundColor: '#EF4444',
+                        borderWidth: 2,
+                        borderColor: '#0B1120',
+                    }}
+                >
+                    <Text className="text-white text-[11px] font-black">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                    </Text>
+                </View>
+            )}
         </Pressable>
     );
 }

@@ -83,6 +83,50 @@ export interface BadgeCounts {
     unreadMatchMessages: number;
     matchesWithUnreadChat: number;
     matchesToSchedule: number;
+    /** Results an opponent proposed that this user must confirm/dispute (approval mode). */
+    resultsToConfirm: number;
+    /** Pending team join requests on teams where the user is captain. */
+    teamJoinRequests: number;
+    /** Pending hub join requests in hubs the user owns or admins. */
+    hubJoinRequests: number;
+    /** Open match "admin help" requests in tournaments the user manages. */
+    adminHelpRequests: number;
+    /** Pending tournament registrations awaiting approval in the user's hubs. */
+    pendingRegistrations: number;
     socialTotal: number;
+    /** unreadMatchMessages + matchesToSchedule + resultsToConfirm */
     matchesTotal: number;
+    /** teamJoinRequests + hubJoinRequests + adminHelpRequests + pendingRegistrations */
+    organizerTotal: number;
+    /** hubJoinRequests + adminHelpRequests + pendingRegistrations (drives the Hubs-tab dot;
+     *  equals the sum of the per-hub counts in ApprovalsBreakdown). */
+    hubManageTotal: number;
+}
+
+/** Per-hub total pending approvals (hub joins + its tournaments' items). */
+export interface HubApprovalCount {
+    hubId: string;
+    count: number;
+    /** Hub-level join requests only (the Members-tab portion); Tournaments tab = count - joinRequests. */
+    joinRequests: number;
+}
+
+/** Per-tournament pending approvals, split so the Requests/Registrations tab can show just registrations. */
+export interface TournamentApprovalCount {
+    tournamentId: string;
+    hubId: string;
+    /** Raw TournamentStatus int — 3 = Live, 4 = Past/Completed, else Upcoming. */
+    status: number;
+    registrations: number;
+    adminHelp: number;
+    total: number;
+}
+
+/**
+ * Drives the cascade badges: which hub card / tournament / Requests tab has items waiting.
+ * Mirrors backend ApprovalsBreakdownDto. Fetched from GET /api/v2/badges/approvals.
+ */
+export interface ApprovalsBreakdown {
+    hubs: HubApprovalCount[];
+    tournaments: TournamentApprovalCount[];
 }

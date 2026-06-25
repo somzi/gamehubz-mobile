@@ -16,6 +16,8 @@ interface HubCardProps {
     isVerified?: boolean;
     className?: string;
     index?: number;
+    /** Pending items the user has to approve in this hub — shown as a red corner badge. */
+    badgeCount?: number;
 }
 
 const AVATAR_STYLES = [
@@ -34,6 +36,7 @@ export function HubCard({
     isVerified,
     className,
     index = 0,
+    badgeCount = 0,
 }: HubCardProps) {
     const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
 
@@ -195,6 +198,29 @@ export function HubCard({
                     </View>
                 </View>
             </View>
+
+            {/* Pending-approvals badge — lives on the Pressable, OUTSIDE the card's
+                overflow-hidden wrapper, so it can poke out of the corner without being clipped. */}
+            {badgeCount > 0 && (
+                <View
+                    pointerEvents="none"
+                    className="absolute z-10 rounded-full items-center justify-center"
+                    style={{
+                        top: -6,
+                        right: -6,
+                        minWidth: 22,
+                        height: 22,
+                        paddingHorizontal: 6,
+                        backgroundColor: '#EF4444',
+                        borderWidth: 2,
+                        borderColor: '#0B1120',
+                    }}
+                >
+                    <Text className="text-white text-[11px] font-black">
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                    </Text>
+                </View>
+            )}
         </Pressable>
     );
 }

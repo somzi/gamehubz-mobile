@@ -10,6 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
+import { useBadges } from '../context/BadgesContext';
 import { HubCard } from '../components/cards/HubCard';
 import { StatusModal } from '../components/modals/StatusModal';
 import { Toggle } from '../components/ui/Toggle';
@@ -36,6 +37,7 @@ interface Hub {
 export default function HubsScreen() {
     const navigation = useNavigation<HubsScreenNavigationProp>();
     const { user } = useAuth();
+    const { hubApprovals } = useBadges();
     const [searchQuery, setSearchQuery] = useState("");
     const [activeTab, setActiveTab] = useState('joined');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -355,6 +357,9 @@ export default function HubsScreen() {
                                             index={idx}
                                             isJoined={activeTab === 'joined'}
                                             isVerified={(hub as any).isVerified || (hub as any).IsVerified}
+                                            // Only the hubs you manage carry approvals; the lookup
+                                            // returns 0 for everything else, so this is safe on both tabs.
+                                            badgeCount={hubApprovals(hub.id)}
                                             onClick={() => navigation.navigate('HubProfile', { id: hub.id })}
                                         />
                                     </View>

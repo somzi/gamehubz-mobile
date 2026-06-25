@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { cn, getCurrencyLabel } from '../lib/utils';
 import { shareTournament } from '../lib/share';
 import { useAuth } from '../context/AuthContext';
+import { useBadges } from '../context/BadgesContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -48,6 +49,12 @@ export default function TournamentDetailsScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const route = useRoute<TournamentDetailsRouteProp>();
     const { id } = route.params;
+    const { tournamentApprovals } = useBadges();
+    // Pending team/solo registrations awaiting the organizer's approval — cascaded from the
+    // Hubs-tab badge so the Teams/Players tab + Requests sub-tab show a dot before you open them.
+    const pendingRegCount = tournamentApprovals(id)?.registrations ?? 0;
+    // Open admin-help requests live in the bracket → badge the Bracket tab with them.
+    const adminHelpCount = tournamentApprovals(id)?.adminHelp ?? 0;
     const [activeTab, setActiveTab] = useState('overview');
     const [teamsTab, setTeamsTab] = useState('confirmed');
     const [playersTab, setPlayersTab] = useState<'confirmed' | 'registrations'>('confirmed');
@@ -1032,12 +1039,21 @@ export default function TournamentDetailsScreen() {
             label: 'Bracket',
             value: 'bracket',
             icon: 'git-merge-outline',
-            badge: canManage && requiresApproval && pendingApprovals.length > 0 ? pendingApprovals.length : undefined,
+            // Result approvals (when required) + open admin-help requests both live in the bracket.
+            badge: ((canManage && requiresApproval ? pendingApprovals.length : 0) + adminHelpCount) || undefined,
             badgeTone: 'alert',
         },
         ...(tournament?.isTeamTournament
-            ? [{ label: 'Teams', value: 'teams', icon: 'people-outline' as const }]
-            : [{ label: 'Players', value: 'players', icon: 'people-outline' as const }]),
+            ? [{
+                label: 'Teams', value: 'teams', icon: 'people-outline' as const,
+                badge: canManage && pendingRegCount > 0 ? pendingRegCount : undefined,
+                badgeTone: 'alert' as const,
+            }]
+            : [{
+                label: 'Players', value: 'players', icon: 'people-outline' as const,
+                badge: canManage && pendingRegCount > 0 ? pendingRegCount : undefined,
+                badgeTone: 'alert' as const,
+            }]),
     ];
 
     const getStatusText = (status: number) => {
@@ -1879,7 +1895,11 @@ export default function TournamentDetailsScreen() {
                                     tabs={[
                                         { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
                                         ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: 'Open', icon: 'open-outline' as const }] : []),
-                                        ...(canManage ? [{ value: 'registrations', label: 'Requests', icon: 'hourglass-outline' as const }] : []),
+                                        ...(canManage ? [{
+                                            value: 'registrations', label: 'Requests', icon: 'hourglass-outline' as const,
+                                            badge: pendingRegCount > 0 ? pendingRegCount : undefined,
+                                            badgeTone: 'alert' as const,
+                                        }] : []),
                                     ]}
                                     activeTab={teamsTab}
                                     onTabChange={setTeamsTab}
