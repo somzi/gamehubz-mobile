@@ -264,20 +264,54 @@ export function MatchScheduleCard({
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
             if (response.ok) {
                 const data = await response.json();
-                const id = data.homeUserId || data.HomeUserId || null;
-                setDbHomeUserId(id);
-                setDbAwayUserId(data.awayUserId || data.AwayUserId || null);
-                setDbHomeUsername(data.homeUser || data.HomeUser || null);
-                setDbAwayUsername(data.awayUser || data.AwayUser || null);
+
+                // For a team sub-match, GET_MATCH_DETAILS returns the whole team-match DTO,
+                // which has no top-level homeUserId/awayUserId — the home/away roles (and the
+                // proposal) live on the individual sub-match. Without resolving them here,
+                // dbHomeUserId stays null, isUserDbHome is always false in handleSubmitResult,
+                // and the score mapping silently swaps home/away whenever the reporter is the
+                // DB home player. Fall back to the matching sub-match so team scores aren't flipped.
+                let homeUserId = data.homeUserId || data.HomeUserId || null;
+                let awayUserId = data.awayUserId || data.AwayUserId || null;
+                let homeUsername = data.homeUser || data.HomeUser || null;
+                let awayUsername = data.awayUser || data.AwayUser || null;
+                let proposedHome = data.proposedHomeScore ?? data.ProposedHomeScore ?? null;
+                let proposedAway = data.proposedAwayScore ?? data.ProposedAwayScore ?? null;
+                let proposedBy = data.proposedByUserId ?? data.ProposedByUserId ?? null;
+                let evidences = data.evidences || data.Evidences || [];
+
+                if (!homeUserId) {
+                    const subs = data.subMatches || data.SubMatches || [];
+                    const sub = subs.find(
+                        (s: any) => (s.matchId || s.MatchId || '').toLowerCase() === matchId.toLowerCase()
+                    );
+                    if (sub) {
+                        const hp = sub.homePlayer || sub.HomePlayer;
+                        const ap = sub.awayPlayer || sub.AwayPlayer;
+                        homeUserId = hp?.userId || hp?.UserId || null;
+                        awayUserId = ap?.userId || ap?.UserId || null;
+                        homeUsername = hp?.username || hp?.Username || homeUsername;
+                        awayUsername = ap?.username || ap?.Username || awayUsername;
+                        proposedHome = sub.proposedHomeScore ?? sub.ProposedHomeScore ?? proposedHome;
+                        proposedAway = sub.proposedAwayScore ?? sub.ProposedAwayScore ?? proposedAway;
+                        proposedBy = sub.proposedByUserId ?? sub.ProposedByUserId ?? proposedBy;
+                        evidences = sub.evidences || sub.Evidences || evidences;
+                    }
+                }
+
+                setDbHomeUserId(homeUserId);
+                setDbAwayUserId(awayUserId);
+                setDbHomeUsername(homeUsername);
+                setDbAwayUsername(awayUsername);
                 setRequireResultApproval(Boolean(data.requireResultApproval ?? data.RequireResultApproval ?? false));
-                setProposedHomeScore(data.proposedHomeScore ?? data.ProposedHomeScore ?? null);
-                setProposedAwayScore(data.proposedAwayScore ?? data.ProposedAwayScore ?? null);
-                setProposedByUserId(data.proposedByUserId ?? data.ProposedByUserId ?? null);
+                setProposedHomeScore(proposedHome);
+                setProposedAwayScore(proposedAway);
+                setProposedByUserId(proposedBy);
                 setHubOwnerUserId(data.hubOwnerUserId ?? data.HubOwnerUserId ?? null);
-                setExistingEvidences(data.evidences || data.Evidences || []);
+                setExistingEvidences(evidences);
                 setAdminHelpRequested(Boolean(data.adminHelpRequested ?? data.AdminHelpRequested ?? false));
                 setAdminHelpRequestedByUserId(data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null);
-                return id;
+                return homeUserId;
             }
         } catch (error) {
             console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
