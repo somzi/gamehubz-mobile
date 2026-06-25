@@ -100,7 +100,7 @@ export default function TournamentDetailsScreen() {
     );
 
     const [showDeadlineModal, setShowDeadlineModal] = useState(false);
-    const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null } | null>(null);
+    const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null, stageId?: string | null } | null>(null);
 
     // Admin-help requests (problematic matches) — admins only
     const [adminHelpRequests, setAdminHelpRequests] = useState<AdminHelpRequestItem[]>([]);
@@ -630,7 +630,20 @@ export default function TournamentDetailsScreen() {
             const response = await authenticatedFetch(url);
             if (!response.ok) throw new Error('Failed to fetch participants');
             const data = await response.json();
-            setParticipants(data.result || data || []);
+            const list = data.result || data || [];
+            // Guard against duplicate participant rows for the same user (legacy data). The list
+            // is keyed by user id, so duplicates would crash rendering with duplicate React keys.
+            const seen = new Set<string>();
+            const deduped = Array.isArray(list)
+                ? list.filter((p: any) => {
+                    const uid = (p.userId || p.UserId || p.id || '').toString().toLowerCase();
+                    if (!uid) return true;
+                    if (seen.has(uid)) return false;
+                    seen.add(uid);
+                    return true;
+                })
+                : list;
+            setParticipants(deduped);
         } catch (err) {
             console.error('Participants fetch error:', err);
         } finally {
@@ -810,7 +823,12 @@ export default function TournamentDetailsScreen() {
             }
         }
 
-        setSelectedRoundForDeadline({ roundNumber, currentDeadline, roundOpenAt });
+        // Scope the schedule to the stage being viewed. In double-elimination the Winners and
+        // Losers brackets are separate stages that share round numbers, so without the stageId
+        // the backend would apply the deadline to both brackets' round N.
+        const stageId = stages[selectedStageIndex]?.stageId ?? null;
+
+        setSelectedRoundForDeadline({ roundNumber, currentDeadline, roundOpenAt, stageId });
         setShowDeadlineModal(true);
     };
 
@@ -824,7 +842,8 @@ export default function TournamentDetailsScreen() {
             const payload = {
                 RoundNumber: selectedRoundForDeadline.roundNumber,
                 Deadline: deadlineStr ? new Date(deadlineStr.replace(' ', 'T')).toISOString() : null,
-                RoundStart: openAtStr ? new Date(openAtStr.replace(' ', 'T')).toISOString() : null
+                RoundStart: openAtStr ? new Date(openAtStr.replace(' ', 'T')).toISOString() : null,
+                StageId: selectedRoundForDeadline.stageId ?? null
             };
 
             const response = await authenticatedFetch(ENDPOINTS.SET_ROUND_SCHEDULE(id), {
@@ -2438,7 +2457,7 @@ export default function TournamentDetailsScreen() {
                                         const isCurrentUser = user?.id?.toLowerCase() === pUserId?.toLowerCase();
 
                                         return (
-                                            <View key={p.participantId || p.id || pUserId || i} className="flex-row items-center gap-2.5">
+                                            <View key={`${p.participantId || p.id || pUserId || 'p'}-${i}`} className="flex-row items-center gap-2.5">
                                                 <Pressable
                                                     onPress={() => { if (pUserId) navigation.navigate('PlayerProfile', { id: pUserId }); }}
                                                     className="flex-1 active:opacity-80"

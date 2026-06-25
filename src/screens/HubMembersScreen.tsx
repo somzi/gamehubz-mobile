@@ -430,6 +430,21 @@ export default function HubMembersScreen() {
 
     const adminCount = members.filter(m => m.hubRole === HubRole.HubAdmin).length;
 
+    // The viewer's own role within this hub (drives what actions they may take).
+    const currentUserRole = members.find(m => m.userId === currentUser?.id)?.hubRole;
+    const viewerIsOwner = isOwner || currentUserRole === HubRole.HubOwner;
+    const viewerIsAdmin = currentUserRole === HubRole.HubAdmin;
+
+    // The owner can manage every other member. An admin can only manage regular and
+    // exclusive members — never the owner or another admin.
+    const canManageMember = (member: MemberRow): boolean => {
+        if (member.userId === currentUser?.id) return false;     // never self
+        if (member.hubRole === HubRole.HubOwner) return false;   // owner is untouchable
+        if (viewerIsOwner) return true;
+        if (viewerIsAdmin) return member.hubRole !== HubRole.HubAdmin;
+        return false;
+    };
+
     const tabs: PremiumTabItem[] = [
         { value: 'members', label: 'Members', icon: 'people-outline', badge: members.length > 0 ? members.length : undefined },
         { value: 'requests', label: 'Requests', icon: 'mail-outline', badge: requests.length > 0 ? requests.length : undefined },
@@ -516,7 +531,7 @@ export default function HubMembersScreen() {
                                         </View>
                                     </View>
 
-                                    {!isSelf && member.hubRole !== HubRole.HubOwner && (
+                                    {canManageMember(member) && (
                                         isProcessing ? (
                                             <View className="w-10 h-10 items-center justify-center">
                                                 <ActivityIndicator size="small" color="#818CF8" />
