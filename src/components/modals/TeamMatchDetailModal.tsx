@@ -1058,8 +1058,13 @@ export function TeamMatchDetailModal({
                                             const isPlayerOfSub = !!me && (me === homeId || me === awayId);
                                             const approvalRequired = !!(data?.requireResultApproval ?? data?.RequireResultApproval);
                                             const hasResult = sm.status !== 'Pending';
+                                            // Delete only makes sense once an actual result is recorded — scores present
+                                            // (mirrors the score-vs-"VS" display above) or a winner set for a forfeit.
+                                            // Status alone is unreliable here: the backend can serialize it as a number,
+                                            // so `status !== 'Pending'` is true even for an unplayed match.
+                                            const hasRecordedResult = (sm.homeScore !== null && sm.awayScore !== null) || !!sm.winnerUserId;
                                             const canEdit = hasResult && isHubOwner;
-                                            const canDelete = hasResult && (isHubOwner || (isPlayerOfSub && !approvalRequired));
+                                            const canDelete = hasRecordedResult && (isHubOwner || (isPlayerOfSub && !approvalRequired));
                                             if (!canEdit && !canDelete) return null;
                                             return (
                                                 <View className="flex-row justify-end gap-2 mt-2 pt-2 border-t border-border/10">
