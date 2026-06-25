@@ -111,6 +111,7 @@ export const ENDPOINTS = {
     REQUEST_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp`,
     RESOLVE_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp/resolve`,
     GET_ADMIN_HELP_REQUESTS: (tournamentId: string) => `${API_BASE_URL}/api/match/adminHelp/tournament/${tournamentId}`,
+    GET_PENDING_APPROVALS: (tournamentId: string) => `${API_BASE_URL}/api/match/pendingApproval/tournament/${tournamentId}`,
 
     // ─── Friends / Social ───────────────────────────────────────────────
     GET_FRIENDS: (search: string = "") => `${API_BASE_URL}/api/Friend${search ? `?search=${encodeURIComponent(search)}` : ""}`,

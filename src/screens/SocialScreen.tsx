@@ -24,7 +24,7 @@ export default function SocialScreen() {
     const tabs: PremiumTabItem[] = [
         { value: 'friends', label: 'Friends', icon: 'people' },
         { value: 'requests', label: 'Requests', icon: 'person-add', badge: badges.friendRequests > 0 ? badges.friendRequests : undefined },
-        { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses', badge: badges.unreadDirectMessages > 0 ? badges.unreadDirectMessages : undefined },
+        { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses', badge: badges.unreadDirectMessages > 0 ? badges.unreadDirectMessages : undefined, badgeTone: 'alert' },
     ];
 
     useFocusEffect(
@@ -365,7 +365,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
             if (res.ok) {
                 const data = await res.json();
                 if (seq !== reqSeqRef.current) return;
-                setChats(Array.isArray(data) ? data : []);
+                setChats(Array.isArray(data) ? sortChats(data) : []);
             }
         } finally {
             if (seq === reqSeqRef.current) {
@@ -445,14 +445,16 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                                 </Text>
                             )}
                         </View>
-                        <Text
-                            className={`text-[12px] mt-0.5 ${
-                                item.unreadCount > 0 ? 'text-slate-200 font-bold' : 'text-slate-500 font-medium'
-                            }`}
-                            numberOfLines={1}
-                        >
-                            {item.lastMessage ?? 'Say hi 👋'}
-                        </Text>
+                        {item.lastMessage ? (
+                            <Text
+                                className={`text-[12px] mt-0.5 ${
+                                    item.unreadCount > 0 ? 'text-slate-200 font-bold' : 'text-slate-500 font-medium'
+                                }`}
+                                numberOfLines={1}
+                            >
+                                {item.lastMessage}
+                            </Text>
+                        ) : null}
                     </View>
                 </Pressable>
             )}
@@ -524,6 +526,23 @@ function Loading() {
             <ActivityIndicator size="large" color="#10B981" />
         </View>
     );
+}
+
+/**
+ * Drop empty chats (no message exchanged yet) so they don't clutter the list,
+ * then float unread chats to the top; within each group the most recent message wins.
+ */
+function sortChats(chats: DirectChat[]): DirectChat[] {
+    return chats
+        .filter((c) => !!c.lastMessageAt || !!c.lastMessage)
+        .sort((a, b) => {
+        const aUnread = a.unreadCount > 0 ? 1 : 0;
+        const bUnread = b.unreadCount > 0 ? 1 : 0;
+        if (aUnread !== bUnread) return bUnread - aUnread;
+        const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+        const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+        return bTime - aTime;
+    });
 }
 
 function formatRelative(iso: string): string {

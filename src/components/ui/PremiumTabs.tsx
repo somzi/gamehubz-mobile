@@ -9,6 +9,12 @@ export interface PremiumTabItem {
     label: string;
     icon?: keyof typeof Ionicons.glyphMap;
     badge?: string | number;
+    /**
+     * 'default' — subtle chip that follows the tab's accent (used for counts like
+     * pending registrations). 'alert' — prominent red notification badge (FB-style)
+     * that stays visible regardless of whether the tab is active.
+     */
+    badgeTone?: 'default' | 'alert';
 }
 
 interface PremiumTabsProps {
@@ -131,16 +137,20 @@ function PremiumTabButton({
                 <View
                     className="min-w-[18px] h-[18px] items-center justify-center rounded-full px-1"
                     style={{
-                        backgroundColor: active
-                            ? withAlpha(accentColor, 0.3)
-                            : 'rgba(255, 255, 255, 0.06)',
+                        backgroundColor: tab.badgeTone === 'alert'
+                            ? '#EF4444'
+                            : active
+                                ? withAlpha(accentColor, 0.3)
+                                : 'rgba(255, 255, 255, 0.06)',
                     }}
                 >
                     <Text
                         className="font-black"
                         style={{
                             fontSize: 9,
-                            color: active ? accentColorActive : '#64748B',
+                            color: tab.badgeTone === 'alert'
+                                ? '#FFFFFF'
+                                : active ? accentColorActive : '#64748B',
                         }}
                     >
                         {tab.badge}

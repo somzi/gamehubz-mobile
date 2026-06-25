@@ -25,6 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
+import { PendingApprovalsModal, PendingApprovalItem } from '../components/modals/PendingApprovalsModal';
 import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
 import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
@@ -89,6 +90,15 @@ export default function TournamentDetailsScreen() {
     // Resolved by the v2 overview/structure endpoints (tournament.canManage / bracketCanManage).
     const canManage: boolean = !!((tournament as any)?.canManage || bracketCanManage);
 
+    // Whether this tournament was created with "results require approval" on. When it's
+    // off there is nothing to approve, so the Approvals pill and the Bracket-tab badge are
+    // hidden entirely. Known from the overview payload, so it resolves before the bracket loads.
+    const requiresApproval: boolean = !!(
+        bracketRequireResultApproval ||
+        (tournament as any)?.requireResultApproval ||
+        (tournament as any)?.RequireResultApproval
+    );
+
     const [showDeadlineModal, setShowDeadlineModal] = useState(false);
     const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null } | null>(null);
 
@@ -96,6 +106,11 @@ export default function TournamentDetailsScreen() {
     const [adminHelpRequests, setAdminHelpRequests] = useState<AdminHelpRequestItem[]>([]);
     const [showAdminHelpModal, setShowAdminHelpModal] = useState(false);
     const [isLoadingAdminHelp, setIsLoadingAdminHelp] = useState(false);
+
+    // Matches with a reported result awaiting approval — admins only
+    const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([]);
+    const [showApprovalsModal, setShowApprovalsModal] = useState(false);
+    const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
     // Which tab MatchDetailsModal should open on. Bumped to 'chat' when an admin
     // enters via the help-requests inbox; reset to 'match' for every other entry.
     const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<'match' | 'chat'>('match');
@@ -376,12 +391,50 @@ export default function TournamentDetailsScreen() {
         }
     };
 
+    const fetchPendingApprovals = async () => {
+        if (!id || !canManage || !requiresApproval) return;
+        setIsLoadingApprovals(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_PENDING_APPROVALS(id));
+            if (!response.ok) return;
+            const data = await response.json();
+            const normalized: PendingApprovalItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
+                matchId: it.matchId || it.MatchId,
+                roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
+                status: it.status ?? it.Status ?? 0,
+                scheduledStartTime: it.scheduledStartTime ?? it.ScheduledStartTime ?? null,
+                proposedHomeScore: it.proposedHomeScore ?? it.ProposedHomeScore ?? null,
+                proposedAwayScore: it.proposedAwayScore ?? it.ProposedAwayScore ?? null,
+                proposedByUserId: it.proposedByUserId ?? it.ProposedByUserId ?? null,
+                proposedByUsername: it.proposedByUsername ?? it.ProposedByUsername ?? null,
+                homeUserId: it.homeUserId ?? it.HomeUserId ?? null,
+                homeUsername: it.homeUsername ?? it.HomeUsername ?? null,
+                homeAvatarUrl: it.homeAvatarUrl ?? it.HomeAvatarUrl ?? null,
+                awayUserId: it.awayUserId ?? it.AwayUserId ?? null,
+                awayUsername: it.awayUsername ?? it.AwayUsername ?? null,
+                awayAvatarUrl: it.awayAvatarUrl ?? it.AwayAvatarUrl ?? null,
+            }));
+            setPendingApprovals(normalized);
+        } catch (err) {
+            console.error('Pending approvals fetch error:', err);
+        } finally {
+            setIsLoadingApprovals(false);
+        }
+    };
+
     // Admins see the help-request inbox on the bracket tab; refresh whenever it opens.
     useEffect(() => {
         if (activeTab === 'bracket' && canManage) {
             fetchAdminHelpRequests();
         }
     }, [id, activeTab, canManage]);
+
+    // The pending-approval count drives both the inline pill and the red "Bracket"
+    // tab badge, so fetch it as soon as an admin opens a tournament that uses approval
+    // (not only on the bracket tab) and refresh it whenever they switch tabs.
+    useEffect(() => {
+        if (canManage && requiresApproval) fetchPendingApprovals();
+    }, [id, activeTab, canManage, requiresApproval]);
 
     // The admin picked a problematic match — open it like a regular bracket match so
     // the chat tab and the resolve action are available. Land on the chat tab since
@@ -403,6 +456,28 @@ export default function TournamentDetailsScreen() {
             isRoundLocked: false,
         });
         setMatchModalDefaultTab('chat');
+        setShowReportModal(true);
+    };
+
+    // The admin tapped a match awaiting result approval — open it on the match tab,
+    // where the proposed score and the approve / reject actions live.
+    const handleApprovalSelect = (item: PendingApprovalItem) => {
+        setShowApprovalsModal(false);
+        setSelectedMatch({
+            id: item.matchId,
+            status: item.status,
+            roundName: item.roundNumber ? `Round ${item.roundNumber}` : 'Match',
+            startTime: item.scheduledStartTime,
+            home: item.homeUserId
+                ? { userId: item.homeUserId, username: item.homeUsername || 'Player', score: null }
+                : null,
+            away: item.awayUserId
+                ? { userId: item.awayUserId, username: item.awayUsername || 'Player', score: null }
+                : null,
+            canRevert: false,
+            isRoundLocked: false,
+        });
+        setMatchModalDefaultTab('match');
         setShowReportModal(true);
     };
 
@@ -934,7 +1009,13 @@ export default function TournamentDetailsScreen() {
 
     const tabs: PremiumTabItem[] = [
         { label: 'Overview', value: 'overview', icon: 'grid-outline' },
-        { label: 'Bracket', value: 'bracket', icon: 'git-merge-outline' },
+        {
+            label: 'Bracket',
+            value: 'bracket',
+            icon: 'git-merge-outline',
+            badge: canManage && requiresApproval && pendingApprovals.length > 0 ? pendingApprovals.length : undefined,
+            badgeTone: 'alert',
+        },
         ...(tournament?.isTeamTournament
             ? [{ label: 'Teams', value: 'teams', icon: 'people-outline' as const }]
             : [{ label: 'Players', value: 'players', icon: 'people-outline' as const }]),
@@ -960,7 +1041,7 @@ export default function TournamentDetailsScreen() {
                 fetchAdminHelpRequests();
             }}
             className={cn(
-                "flex-row items-center gap-2 px-3.5 py-2 rounded-full border active:opacity-70 self-start",
+                "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
                 adminHelpRequests.length > 0
                     ? "bg-[#F59E0B]/10 border-[#F59E0B]/30"
                     : "bg-white/[0.04] border-white/[0.08]"
@@ -968,21 +1049,65 @@ export default function TournamentDetailsScreen() {
         >
             <Ionicons
                 name={adminHelpRequests.length > 0 ? "hand-left" : "hand-left-outline"}
-                size={14}
+                size={12}
                 color={adminHelpRequests.length > 0 ? "#F59E0B" : "#64748B"}
             />
             <Text className={cn(
-                "text-[11px] font-black uppercase tracking-wider",
+                "text-[10px] font-black uppercase tracking-wide",
                 adminHelpRequests.length > 0 ? "text-[#F59E0B]" : "text-slate-500"
             )}>
                 Help Requests
             </Text>
             {adminHelpRequests.length > 0 && (
-                <View className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#F59E0B] items-center justify-center">
-                    <Text className="text-[10px] font-black text-[#0F172A]">{adminHelpRequests.length}</Text>
+                <View className="min-w-[16px] h-4 px-1 rounded-full bg-[#F59E0B] items-center justify-center">
+                    <Text className="text-[9px] font-black text-[#0F172A]">{adminHelpRequests.length}</Text>
                 </View>
             )}
         </Pressable>
+    ) : null;
+
+    // Admin inbox for results awaiting approval — sits next to the help-requests pill.
+    // Only shown when the tournament was created with result approval enabled.
+    const approvalsPill = canManage && requiresApproval ? (
+        <Pressable
+            onPress={() => {
+                setShowApprovalsModal(true);
+                fetchPendingApprovals();
+            }}
+            className={cn(
+                "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
+                pendingApprovals.length > 0
+                    ? "bg-[#10B981]/10 border-[#10B981]/30"
+                    : "bg-white/[0.04] border-white/[0.08]"
+            )}
+        >
+            <Ionicons
+                name={pendingApprovals.length > 0 ? "checkmark-done" : "checkmark-done-outline"}
+                size={12}
+                color={pendingApprovals.length > 0 ? "#10B981" : "#64748B"}
+            />
+            <Text className={cn(
+                "text-[10px] font-black uppercase tracking-wide",
+                pendingApprovals.length > 0 ? "text-[#10B981]" : "text-slate-500"
+            )}>
+                Approvals
+            </Text>
+            {pendingApprovals.length > 0 && (
+                <View className="min-w-[16px] h-4 px-1 rounded-full bg-[#10B981] items-center justify-center">
+                    <Text className="text-[9px] font-black text-[#0F172A]">{pendingApprovals.length}</Text>
+                </View>
+            )}
+        </Pressable>
+    ) : null;
+
+    // Both admin pills share the bracket header row (and the league / groups header).
+    // Compact so they sit side by side next to the zoom controls; flex-wrap is only a
+    // last-resort fallback on very narrow screens.
+    const adminPills = canManage ? (
+        <View className="flex-row items-center gap-1.5 flex-wrap">
+            {helpRequestsPill}
+            {approvalsPill}
+        </View>
     ) : null;
 
     const renderStages = () => {
@@ -1123,7 +1248,7 @@ export default function TournamentDetailsScreen() {
                                 onEditDeadline={handleEditDeadline}
                                 tournamentStatus={tournament?.status}
                                 isTeamTournament={tournament?.isTeamTournament}
-                                headerLeft={helpRequestsPill}
+                                headerLeft={adminPills}
                             />
                         ) : (
                             <TournamentBracket
@@ -1135,7 +1260,7 @@ export default function TournamentDetailsScreen() {
                                 onEditDeadline={handleEditDeadline}
                                 tournamentStatus={tournament?.status}
                                 isTeamTournament={tournament?.isTeamTournament}
-                                headerLeft={helpRequestsPill}
+                                headerLeft={adminPills}
                             />
                         )}
                         {grandFinalMatch && (
@@ -1216,9 +1341,9 @@ export default function TournamentDetailsScreen() {
                     </>
                 ) : currentStage.groups && currentStage.groups.length > 0 ? (
                     <View>
-                        {/* Group stages have no zoom-controls row — show the admin pill on its own */}
-                        {helpRequestsPill && (
-                            <View className="px-4 mb-4 flex-row">{helpRequestsPill}</View>
+                        {/* Group stages have no zoom-controls row — show the admin pills on their own */}
+                        {adminPills && (
+                            <View className="px-4 mb-4 flex-row">{adminPills}</View>
                         )}
                         {/* Sort groups alphabetically by name (Group A, Group B, …) */}
                         {(() => {
@@ -2549,7 +2674,10 @@ export default function TournamentDetailsScreen() {
                 defaultTab={matchModalDefaultTab}
                 onMatchUpdate={() => {
                     fetchBracket(); // Refresh the bracket/league data
-                    if (canManage) fetchAdminHelpRequests(); // Keep the help-request inbox in sync
+                    if (canManage) {
+                        fetchAdminHelpRequests(); // Keep the help-request inbox in sync
+                        fetchPendingApprovals(); // …and the pending-approval count / list
+                    }
                 }}
             />
 
@@ -2559,6 +2687,14 @@ export default function TournamentDetailsScreen() {
                 requests={adminHelpRequests}
                 isLoading={isLoadingAdminHelp}
                 onSelect={handleHelpRequestSelect}
+            />
+
+            <PendingApprovalsModal
+                visible={showApprovalsModal}
+                onClose={() => setShowApprovalsModal(false)}
+                items={pendingApprovals}
+                isLoading={isLoadingApprovals}
+                onSelect={handleApprovalSelect}
             />
 
             {showStatusModal && (

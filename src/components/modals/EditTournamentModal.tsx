@@ -766,10 +766,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <Ionicons name="shield-checkmark-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                     <Text className="text-sm font-bold text-white">Require Result Approval</Text>
                                 </View>
-                                <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                {/* Approval can be toggled any time — even mid-tournament — since it only
+                                    affects how future results are confirmed, not the bracket structure. */}
+                                <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
                                     <Pressable
-                                        onPress={() => { if (canEditAll) setRequireResultApproval(false); }}
-                                        disabled={!canEditAll}
+                                        onPress={() => setRequireResultApproval(false)}
                                         className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
                                     >
                                         <Text className={`text-xs font-bold tracking-wide ${!requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
@@ -777,8 +778,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         </Text>
                                     </Pressable>
                                     <Pressable
-                                        onPress={() => { if (canEditAll) setRequireResultApproval(true); }}
-                                        disabled={!canEditAll}
+                                        onPress={() => setRequireResultApproval(true)}
                                         className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
                                     >
                                         <Text className={`text-xs font-bold tracking-wide ${requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
