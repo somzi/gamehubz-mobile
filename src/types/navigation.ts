@@ -4,7 +4,15 @@ export type RootStackParamList = {
     ForgotPassword: undefined;
     ResetPassword: { email: string };
     MainTabs: undefined;
-    TournamentDetails: { id: string };
+    TournamentDetails: {
+        id: string;
+        /** Push deep-link: pop the admin help-requests inbox on open. */
+        openAdminHelp?: boolean;
+        /** Push deep-link: open this match's details modal on open. */
+        focusMatchId?: string;
+        /** Which tab the deep-linked match modal lands on. Defaults to 'chat'. */
+        focusMatchTab?: 'match' | 'chat';
+    };
     HubProfile: { id: string };
     PlayerProfile: { id: string };
     NotFound: undefined;

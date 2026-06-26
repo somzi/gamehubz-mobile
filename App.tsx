@@ -91,6 +91,27 @@ function routeFromNotification(
         return;
       }
       break;
+    // A player requested admin help in their match — drop the admin into the
+    // tournament and pop the help-requests inbox so every pending request is one
+    // tap away (and the requesting match's chat from there).
+    case 'adminhelp':
+      if (tournamentId) {
+        nav.navigate('TournamentDetails', { id: tournamentId, openAdminHelp: true });
+        return;
+      }
+      break;
+    // A new match-chat message — open the tournament and jump straight into that
+    // match's chat tab.
+    case 'matchmessage':
+      if (tournamentId && matchId) {
+        nav.navigate('TournamentDetails', {
+          id: tournamentId,
+          focusMatchId: matchId,
+          focusMatchTab: 'chat',
+        });
+        return;
+      }
+      break;
     // A result was reported and is waiting for this user to confirm/dispute it.
     case 'resultproposed':
       nav.navigate('MyMatches' as any);

@@ -488,6 +488,26 @@ export default function TournamentDetailsScreen() {
         setShowReportModal(true);
     };
 
+    // Push-notification deep links. Tapping an "admin help" push lands here with
+    // openAdminHelp; a match-chat push lands here with focusMatchId. We act once,
+    // then clear the params so the action doesn't replay on the next render/focus.
+    const { openAdminHelp, focusMatchId, focusMatchTab } = route.params;
+    useEffect(() => {
+        if (focusMatchId) {
+            setSelectedMatch({ id: focusMatchId, canRevert: false, isRoundLocked: false });
+            setMatchModalDefaultTab(focusMatchTab === 'match' ? 'match' : 'chat');
+            setShowReportModal(true);
+            navigation.setParams({ focusMatchId: undefined, focusMatchTab: undefined });
+            return;
+        }
+        if (openAdminHelp) {
+            setShowAdminHelpModal(true);
+            fetchAdminHelpRequests();
+            navigation.setParams({ openAdminHelp: undefined });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openAdminHelp, focusMatchId, focusMatchTab]);
+
     const handleCreateBracket = async () => {
         if (!id) return;
 
