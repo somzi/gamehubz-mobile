@@ -2491,7 +2491,12 @@ export default function TournamentDetailsScreen() {
                                             value: 'registrations',
                                             label: 'Registrations',
                                             icon: 'hourglass-outline' as const,
-                                            badge: pendingRegistrations.length > 0 ? pendingRegistrations.length : undefined,
+                                            // Use the live list length once it's been fetched, but fall back to the
+                                            // cascaded approval count so the badge shows immediately — before the
+                                            // sub-tab is opened (matching the Teams "Requests" sub-tab).
+                                            badge: (pendingRegistrations.length || pendingRegCount) > 0
+                                                ? (pendingRegistrations.length || pendingRegCount)
+                                                : undefined,
                                         }] : []),
                                     ]}
                                     activeTab={playersTab}
