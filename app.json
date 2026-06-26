@@ -57,6 +57,11 @@
               "scheme": "https",
               "host": "share.codespheresolutions.dev",
               "pathPrefix": "/user"
+            },
+            {
+              "scheme": "https",
+              "host": "share.codespheresolutions.dev",
+              "pathPrefix": "/team"
             }
           ],
           "category": [

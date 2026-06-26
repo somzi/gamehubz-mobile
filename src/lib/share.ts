@@ -3,7 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 
 export const SHARE_BASE_URL = 'https://share.codespheresolutions.dev';
 
-type ShareTarget = 'tournament' | 'player' | 'hub';
+type ShareTarget = 'tournament' | 'player' | 'hub' | 'team';
 
 // The share site exposes player profiles as /user/..., while the in-app
 // route (and the gamehubz:// deep link) is player/...
@@ -11,6 +11,7 @@ const WEB_PATHS: Record<ShareTarget, string> = {
     tournament: 'tournament',
     hub: 'hub',
     player: 'user',
+    team: 'team',
 };
 
 export function buildShareUrl(target: ShareTarget, id: string) {
@@ -80,5 +81,13 @@ export function shareUser(id: string, name?: string) {
         title: name || 'Player Profile',
         description: name ? `View ${name} on GameHubz.` : 'View this player on GameHubz.',
         url: buildShareUrl('player', id),
+    });
+}
+
+export function shareTeam(id: string, name?: string) {
+    return shareLink({
+        title: name || 'Team',
+        description: name ? `Join ${name} on GameHubz.` : 'Join this team on GameHubz.',
+        url: buildShareUrl('team', id),
     });
 }

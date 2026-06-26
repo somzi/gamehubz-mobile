@@ -49,6 +49,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       HubProfile: 'hub/:id',
       PlayerProfile: 'player/:id',
       DirectChat: 'chat/:chatId',
+      Team: 'team/:teamId',
       Login: 'login',
     },
   },

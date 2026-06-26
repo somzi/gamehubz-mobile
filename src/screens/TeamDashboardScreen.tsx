@@ -31,6 +31,7 @@ import {
     rejectJoinRequest,
 } from '../lib/teamApi';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage, API_BASE_URL } from '../lib/api';
+import { shareTeam } from '../lib/share';
 import type { TeamDto, TeamJoinRequestDto } from '../types/team';
 
 type TeamDashboardRouteProp = RouteProp<RootStackParamList, 'TeamDashboard'>;
@@ -323,7 +324,19 @@ export default function TeamDashboardScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-[#0F172A]">
-            <PageHeader title={TEAM_LABELS.TEAM_DASHBOARD_TITLE} showBack />
+            <PageHeader
+                title={TEAM_LABELS.TEAM_DASHBOARD_TITLE}
+                showBack
+                rightElement={
+                    <Pressable
+                        onPress={() => shareTeam(team.teamId, team.teamName)}
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
+                        accessibilityLabel="Share team"
+                    >
+                        <Ionicons name="share-outline" size={20} color="#FAFAFA" />
+                    </Pressable>
+                }
+            />
 
             <ScrollView
                 className="flex-1"

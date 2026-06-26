@@ -30,6 +30,7 @@ import { PendingApprovalsModal, PendingApprovalItem } from '../components/modals
 import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
 import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
+import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
 import { TeamMatchDetailModal } from '../components/modals/TeamMatchDetailModal';
@@ -92,6 +93,8 @@ export default function TournamentDetailsScreen() {
     const [bracketRequireResultApproval, setBracketRequireResultApproval] = useState(false);
     const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
     const [joiningTeamId, setJoiningTeamId] = useState<string | null>(null);
+    // Share deep-link: confirm prompt before joining/requesting the shared team.
+    const [joinPrompt, setJoinPrompt] = useState<{ teamId: string; teamName: string; requiresApproval: boolean } | null>(null);
 
     // Owner-level permission for this tournament: hub owner, hub admin or platform admin.
     // Resolved by the v2 overview/structure endpoints (tournament.canManage / bracketCanManage).
@@ -488,10 +491,10 @@ export default function TournamentDetailsScreen() {
         setShowReportModal(true);
     };
 
-    // Push-notification deep links. Tapping an "admin help" push lands here with
-    // openAdminHelp; a match-chat push lands here with focusMatchId. We act once,
-    // then clear the params so the action doesn't replay on the next render/focus.
-    const { openAdminHelp, focusMatchId, focusMatchTab } = route.params;
+    // Deep links. Push notifications land here with openAdminHelp / focusMatchId;
+    // a shared /team/{id} link lands here with focusTeamId. We act once, then clear
+    // the params so the action doesn't replay on the next render/focus.
+    const { openAdminHelp, focusMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval } = route.params;
     useEffect(() => {
         if (focusMatchId) {
             setSelectedMatch({ id: focusMatchId, canRevert: false, isRoundLocked: false });
@@ -500,13 +503,34 @@ export default function TournamentDetailsScreen() {
             navigation.setParams({ focusMatchId: undefined, focusMatchTab: undefined });
             return;
         }
+        if (focusTeamId) {
+            // Land on the Teams → open tab so the team is in context behind the prompt.
+            setActiveTab('teams');
+            setTeamsTab('open');
+            fetchOpenTeams();
+            setJoinPrompt({
+                teamId: focusTeamId,
+                teamName: focusTeamName || 'this team',
+                requiresApproval: !!focusTeamRequiresApproval,
+            });
+            navigation.setParams({ focusTeamId: undefined, focusTeamName: undefined, focusTeamRequiresApproval: undefined });
+            return;
+        }
         if (openAdminHelp) {
             setShowAdminHelpModal(true);
             fetchAdminHelpRequests();
             navigation.setParams({ openAdminHelp: undefined });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [openAdminHelp, focusMatchId, focusMatchTab]);
+    }, [openAdminHelp, focusMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval]);
+
+    // Confirm → reuse the existing join/request flow, then close the prompt.
+    const handleJoinPromptConfirm = async () => {
+        if (!joinPrompt) return;
+        const { teamId, requiresApproval } = joinPrompt;
+        await handleJoinTeam(teamId, requiresApproval);
+        setJoinPrompt(null);
+    };
 
     const handleCreateBracket = async () => {
         if (!id) return;
@@ -2757,6 +2781,22 @@ export default function TournamentDetailsScreen() {
                 items={pendingApprovals}
                 isLoading={isLoadingApprovals}
                 onSelect={handleApprovalSelect}
+            />
+
+            {/* Shared team link → confirm before joining / requesting. */}
+            <ConfirmationModal
+                visible={!!joinPrompt}
+                onClose={() => setJoinPrompt(null)}
+                onConfirm={handleJoinPromptConfirm}
+                isDestructive={false}
+                title={joinPrompt?.requiresApproval ? 'Request to Join' : 'Join Team'}
+                message={
+                    joinPrompt?.requiresApproval
+                        ? `Send a request to join ${joinPrompt?.teamName}? The captain will need to approve it.`
+                        : `Join ${joinPrompt?.teamName}?`
+                }
+                confirmText={joinPrompt?.requiresApproval ? 'Request to Join' : 'Join This Team'}
+                isLoading={joiningTeamId !== null && joiningTeamId === joinPrompt?.teamId}
             />
 
             {showStatusModal && (

@@ -16,6 +16,29 @@ export async function createTeam(tournamentId: string, teamName: string, require
     return response.data;
 }
 
+export interface TeamShareSummary {
+    teamId: string;
+    tournamentId: string;
+    teamName: string;
+    requiresApproval: boolean;
+    memberCount: number;
+    teamSize: number | null;
+}
+
+/** Resolves a shared /team/{id} link to the team's tournament + basic info. */
+export async function getTeamShareSummary(teamId: string): Promise<TeamShareSummary> {
+    const response = await apiClient.get(`/api/teams/${teamId}`);
+    const d: any = response.data;
+    return {
+        teamId: d.teamId ?? d.TeamId,
+        tournamentId: d.tournamentId ?? d.TournamentId,
+        teamName: d.teamName ?? d.TeamName ?? '',
+        requiresApproval: d.requiresApproval ?? d.RequiresApproval ?? false,
+        memberCount: d.memberCount ?? d.MemberCount ?? 0,
+        teamSize: d.teamSize ?? d.TeamSize ?? null,
+    };
+}
+
 export async function joinTeam(teamId: string): Promise<TeamDto> {
     const response = await apiClient.post<TeamDto>(`/api/teams/${teamId}/join`);
     return response.data;

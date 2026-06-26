@@ -12,6 +12,10 @@ export type RootStackParamList = {
         focusMatchId?: string;
         /** Which tab the deep-linked match modal lands on. Defaults to 'chat'. */
         focusMatchTab?: 'match' | 'chat';
+        /** Share deep-link: land on the Teams tab and prompt to join this team. */
+        focusTeamId?: string;
+        focusTeamName?: string;
+        focusTeamRequiresApproval?: boolean;
     };
     HubProfile: { id: string };
     PlayerProfile: { id: string };
@@ -30,6 +34,8 @@ export type RootStackParamList = {
     MyMatches: undefined;
     TeamDashboard: { teamId: string; tournamentId: string; teamSize?: number; tournamentStatus?: number };
     DirectChat: { chatId?: string; otherUserId?: string };
+    /** Share-link landing: resolves the team's tournament, then redirects into it. */
+    Team: { teamId: string };
 };
 
 export type MainTabParamList = {
