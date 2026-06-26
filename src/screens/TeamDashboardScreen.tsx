@@ -247,6 +247,10 @@ export default function TeamDashboardScreen() {
                 const errData = await response.json().catch(() => ({}));
                 throw new Error(errData.message || TEAM_LABELS.ERROR_REGISTER_TEAM);
             }
+            // Refresh so isAlreadyRegistered flips to true and the "Registered – Pending"
+            // banner replaces the Register button immediately (in case the user stays on /
+            // returns to this screen instead of navigating away via the modal).
+            await fetchTeam();
             setStatusModalConfig({
                 type: 'success',
                 title: 'Team Registered!',
