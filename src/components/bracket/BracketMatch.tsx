@@ -152,6 +152,11 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     const hasScore = (p: any) => p?.score !== null && p?.score !== undefined;
     const isAlreadyReported = hasScore(home) || hasScore(away);
     const isCompleted = status === 3 || status === 4;
+    // Double walkover: a completed elimination match with both players present, no winner and no
+    // scores. Both no-showed, so neither advanced (their opponent went through unopposed). The
+    // no-score guard separates it from a legitimate scored draw.
+    const isDoubleWalkover = isCompleted && !!home && !!away && !home.isWinner && !away.isWinner
+        && !hasScore(home) && !hasScore(away);
     const isLive = status === 2;
     // A pending proposal trumps any other in-progress state — surface it clearly so participants
     // know they're waiting on an approval and not on the actual match.
@@ -236,11 +241,19 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             </Text>
                         </View>
                     )}
-                    {!canReport && !isAwaitingApproval && isCompleted && (
+                    {!canReport && !isAwaitingApproval && isCompleted && !isDoubleWalkover && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="checkmark-circle" size={11} color="#34D399" />
                             <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-[1.5px]">
                                 Completed
+                            </Text>
+                        </View>
+                    )}
+                    {!canReport && !isAwaitingApproval && isDoubleWalkover && (
+                        <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="play-skip-forward-outline" size={11} color="#F59E0B" />
+                            <Text className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-[1.5px]">
+                                Double Walkover
                             </Text>
                         </View>
                     )}

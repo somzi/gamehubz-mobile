@@ -17,6 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cn, parseUtcDate } from '../../lib/utils';
+import { MatchStage } from '../../types/tournament';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -64,6 +65,11 @@ interface MatchDetailsModalProps {
     isRoundLocked?: boolean;
     canRevert?: boolean;
     requireResultApproval?: boolean;
+    /** MatchStage of this match (mirrors backend enum). Drives the elimination-only Double Walkover action. */
+    stage?: number;
+    /** Downstream links — a Double Walkover needs somewhere to advance the surviving opponent into. */
+    nextMatchId?: string | null;
+    nextMatchLoserBracketId?: string | null;
     /** Backend tournament status (4 = Completed). When completed, the chat tab is hidden for everyone. */
     tournamentStatus?: number;
     /**
@@ -96,6 +102,9 @@ export function MatchDetailsModal({
     isRoundLocked = false,
     canRevert = false,
     requireResultApproval = false,
+    stage,
+    nextMatchId,
+    nextMatchLoserBracketId,
     tournamentStatus,
     defaultTab = 'match',
 }: MatchDetailsModalProps) {
@@ -138,6 +147,9 @@ export function MatchDetailsModal({
 
     // Delete-result (revert) state — reopens a completed match as Scheduled.
     const [isDeletingResult, setIsDeletingResult] = useState(false);
+
+    // Double-walkover state — admin closes an unplayed match with no winner so the opponent advances.
+    const [isApplyingWalkover, setIsApplyingWalkover] = useState(false);
 
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
@@ -519,6 +531,45 @@ export function MatchDetailsModal({
         );
     };
 
+    const submitDoubleWalkover = async () => {
+        if (!matchId) return;
+        setIsApplyingWalkover(true);
+        setError(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.DOUBLE_WALKOVER, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: matchId }),
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || 'Failed to apply double walkover');
+            }
+            if (onMatchUpdate) onMatchUpdate();
+            onClose();
+        } catch (err: any) {
+            console.error('Double walkover error:', err);
+            setError(err.message || 'An error occurred while applying the double walkover');
+        } finally {
+            setIsApplyingWalkover(false);
+        }
+    };
+
+    // Destructive and bracket-changing (both players are eliminated and their opponent advances
+    // unopposed), so confirm first. Backend re-checks the manage permission and that the match is
+    // an unplayed elimination match.
+    const handleDoubleWalkover = () => {
+        const homeName = home?.username || matchDetails?.homeUser || 'Player 1';
+        const awayName = away?.username || matchDetails?.awayUser || 'Player 2';
+        Alert.alert(
+            'Double walkover?',
+            `Neither ${homeName} nor ${awayName} played, so both are eliminated and their opponent advances by walkover. This usually can't be undone once the opponent moves on. Continue?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Double walkover', style: 'destructive', onPress: submitDoubleWalkover },
+            ],
+        );
+    };
+
     const handleCancelEdit = () => {
         setIsEditMode(false);
         setHomeScore('');
@@ -549,14 +600,24 @@ export function MatchDetailsModal({
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
+    // Double walkover: admin/owner only, on an unplayed elimination match with both players set and
+    // somewhere to advance the opponent into. Group/league/Swiss matches (GroupStage) are excluded —
+    // there is no "next match" for an opponent to advance through. Backend re-validates all of this.
+    const isEliminationMatch = stage !== undefined && stage !== null && Number(stage) !== MatchStage.GroupStage;
+    const hasDownstream = !!nextMatchId || !!nextMatchLoserBracketId;
+    const bothPlayersSet = !!(home?.username || matchDetails?.homeUserId) && !!(away?.username || matchDetails?.awayUserId);
+    const canDoubleWalkover = isPrivileged && status !== 'completed' && status !== 'pending_availability'
+        && isEliminationMatch && hasDownstream && bothPlayersSet;
+
     const adminHelpRequested = !!matchDetails?.adminHelpRequested;
     // Chat & admin-help visibility:
     //  - tournament completed → nobody sees the chat tab (not even admins)
     //  - participants see it for their own matches
-    //  - privileged users (hub owner/admin) only see it while a help request is open
+    //  - privileged users (hub owner/admin) can read the chat at any time while the tournament runs
+    //    (not only when a help request is open) — they moderate / step in whenever needed
     //  - spectators tapping a bracket match keep the read-only match view
     const isTournamentCompleted = Number(tournamentStatus) === 4;
-    const showChatTab = !isTournamentCompleted && (isParticipant || (isPrivileged && adminHelpRequested));
+    const showChatTab = !isTournamentCompleted && (isParticipant || isPrivileged);
     // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
     const showStreamTab = status !== 'pending_availability';
@@ -1164,6 +1225,32 @@ export function MatchDetailsModal({
                     </Pressable>
                 </View>
                 </>
+                )}
+
+                {/* Double Walkover — admin/owner only. Both players no-showed, so the match is closed
+                    with no winner and their opponent advances unopposed. The subtitle doubles as the
+                    in-place tooltip (no hover on mobile). */}
+                {canDoubleWalkover && (
+                    <View className="mb-5">
+                        <View className="h-px bg-white/[0.08] mb-4" />
+                        <Pressable
+                            onPress={handleDoubleWalkover}
+                            disabled={isApplyingWalkover}
+                            className="bg-[#F59E0B]/10 border border-[#F59E0B]/25 rounded-2xl py-3.5 items-center flex-row justify-center gap-2 active:opacity-70"
+                        >
+                            {isApplyingWalkover ? (
+                                <ActivityIndicator size="small" color="#F59E0B" />
+                            ) : (
+                                <>
+                                    <Ionicons name="play-skip-forward-outline" size={16} color="#F59E0B" />
+                                    <Text className="text-sm font-black text-[#F59E0B] uppercase tracking-wider">Double Walkover</Text>
+                                </>
+                            )}
+                        </Pressable>
+                        <Text className="text-[11px] text-slate-500 mt-2 text-center px-2 leading-4">
+                            Both players failed to play — closes this match with no winner and advances their opponent automatically.
+                        </Text>
+                    </View>
                 )}
 
                 {/* Previously Uploaded Evidence — always visible so both sides can verify the proposal */}

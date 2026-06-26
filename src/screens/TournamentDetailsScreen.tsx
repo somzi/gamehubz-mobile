@@ -2708,6 +2708,9 @@ export default function TournamentDetailsScreen() {
                 canManage={canManage}
                 isRoundLocked={selectedMatch?.isRoundLocked}
                 canRevert={selectedMatch?.canRevert}
+                stage={selectedMatch?.stage ?? selectedMatch?.Stage}
+                nextMatchId={selectedMatch?.nextMatchId ?? selectedMatch?.NextMatchId}
+                nextMatchLoserBracketId={selectedMatch?.nextMatchLoserBracketId ?? selectedMatch?.NextMatchLoserBracketId}
                 requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
                 tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
                 defaultTab={matchModalDefaultTab}
