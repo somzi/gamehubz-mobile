@@ -176,6 +176,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         return TOURNAMENT_FORMAT_OPTIONS.find(f => f.value === selectedFormat)?.label || 'Select Format';
     };
 
+    // Team tournaments only support a subset of formats (no Swiss / Groups-then-X), so the
+    // picker is restricted to those. Solo tournaments get the full list. The format stays
+    // editable until the tournament starts (canEditAll), since no bracket exists yet.
+    const formatOptions = isTeamTournament
+        ? TOURNAMENT_FORMAT_OPTIONS.filter(o => TEAM_TOURNAMENT_FORMATS.some(f => f === Number(o.value)))
+        : TOURNAMENT_FORMAT_OPTIONS;
+
     // Number of bracket entrants: players for solo, teams for team tournaments.
     // Use the editable teamSize so the format/third-place gates reflect the user's pending edit.
     const teamSizeNum = parseInt(teamSize) || 0;
@@ -615,7 +622,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     />
                                 </View>
                                 <View className="flex-1">
-                                    {!isTeamTournament && renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
+                                    {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
                                         setShowFormatPicker(true)
                                         , !canEditAll)}
                                 </View>
@@ -966,7 +973,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 {renderOptionsModal(
                     showFormatPicker,
                     () => setShowFormatPicker(false),
-                    TOURNAMENT_FORMAT_OPTIONS,
+                    formatOptions,
                     selectedFormat,
                     setSelectedFormat
                 )}
