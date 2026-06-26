@@ -124,6 +124,25 @@ function routeFromNotification(
         return;
       }
       break;
+    // Registration closing soon — open the tournament so the user can still register.
+    case 'registrationdeadline':
+      if (tournamentId) {
+        nav.navigate('TournamentDetails', { id: tournamentId });
+        return;
+      }
+      break;
+    // A match's deadline is approaching — open the tournament and land straight on the
+    // match modal's 'match' tab, where the result is reported.
+    case 'rounddeadline':
+      if (tournamentId && matchId) {
+        nav.navigate('TournamentDetails', {
+          id: tournamentId,
+          focusMatchId: matchId,
+          focusMatchTab: 'match',
+        });
+        return;
+      }
+      break;
     // Team join lifecycle — open the tournament where teams are managed.
     case 'teamjoinrequest':
     case 'teamjoinapproved':

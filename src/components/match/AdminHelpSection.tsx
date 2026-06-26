@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
+import { ConfirmationModal } from '../modals/ConfirmationModal';
 
 // getErrorMessage swallows everything into "An unexpected error occurred" when there
 // is no usable text — for this surface we prefer a domain-specific fallback in that case.
@@ -48,6 +49,7 @@ export function AdminHelpSection({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isResolving, setIsResolving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     useEffect(() => {
         setLocalRequested(requested);
@@ -68,25 +70,21 @@ export function AdminHelpSection({
             }
             setLocalRequested(true);
             setLocalByMe(true);
+            setShowConfirm(false);
             if (onChanged) onChanged();
         } catch (err: any) {
             console.error('[AdminHelpSection] Request error:', err);
             // Prefer the server's message so users see "Only match participants…" etc.
             setError(extractErrorMessage(err, 'Could not notify the admins. Please try again.'));
+            setShowConfirm(false);
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleRequestPress = () => {
-        Alert.alert(
-            'Request Admin Help',
-            'Tournament admins and the hub owner will be notified and can join your match chat to sort things out.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Notify Admins', onPress: submitRequest },
-            ]
-        );
+        setError(null);
+        setShowConfirm(true);
     };
 
     const handleResolve = async () => {
@@ -140,6 +138,16 @@ export function AdminHelpSection({
                 {error && (
                     <Text className="text-red-400 text-[11px] font-medium text-center mt-2">{error}</Text>
                 )}
+                <ConfirmationModal
+                    visible={showConfirm}
+                    onClose={() => setShowConfirm(false)}
+                    onConfirm={submitRequest}
+                    title="Request Admin Help"
+                    message="Tournament admins and the hub owner will be notified and can join your match chat to sort things out."
+                    confirmText="Notify Admins"
+                    isDestructive={false}
+                    isLoading={isSubmitting}
+                />
             </View>
         );
     }
