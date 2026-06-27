@@ -295,6 +295,21 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             return;
         }
 
+        if (selectedFormat === String(TournamentFormat.GroupStageWithKnockout)) {
+            if (groupsTotalQualifiers < 2) {
+                setError('Groups + Bracket needs at least 2 total qualifiers (Groups × Qualifiers/Group).');
+                return;
+            }
+            // Single-elimination pads the bracket up to the next power of two with byes, so any
+            // qualifier count is fine (e.g. 6 → bracket of 8, top 2 seeds on a bye). Double-elimination
+            // has no bye handling, so it still needs an exact power of two.
+            const isPow2 = (groupsTotalQualifiers & (groupsTotalQualifiers - 1)) === 0;
+            if (showKnockoutTypeToggle && knockoutType === '2' && !isPow2) {
+                setError(`Double-elimination knockout needs the total qualifiers (${groupsTotalQualifiers}) to be a power of 2 (4, 8, 16, …). Switch to a single bracket, or adjust groups/qualifiers.`);
+                return;
+            }
+        }
+
         if (isSwiss && swissKnockoutSize > 0) {
             if (swissKnockoutSize > participantCount) {
                 setError(`Knockout qualifiers (${swissKnockoutSize}) cannot exceed Max Players (${participantCount})`);
