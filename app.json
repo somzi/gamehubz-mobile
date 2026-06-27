@@ -3,7 +3,7 @@
     "name": "GameHubz",
     "scheme": "gamehubz",
     "slug": "gamehubz-mobile",
-    "version": "2.5.0",
+    "version": "2.6.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

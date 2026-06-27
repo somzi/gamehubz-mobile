@@ -14,6 +14,9 @@ export const ENDPOINTS = {
     GET_HUB: (id: string) => `${API_BASE_URL}/api/Hub/${id}`,
     GET_TOURNAMENT_STRUCTURE: (id: string) => `${API_BASE_URL}/api/tournament/${id}/structure`,
     GET_TOURNAMENT_STRUCTURE_V2: (id: string) => `${API_BASE_URL}/api/tournament/${id}/structure/v2`,
+    // v3: group-stage matches in team tournaments come back as one Team-vs-Team card per team match
+    // (v1/v2 return the per-player sub-matches). Carries the same CanManage/approval fields as v2.
+    GET_TOURNAMENT_STRUCTURE_V3: (id: string) => `${API_BASE_URL}/api/tournament/${id}/structure/v3`,
     UPDATE_PROFILE: `${API_BASE_URL}/api/user/update`,
     GET_PLAYER_STATS: (id: string) => `${API_BASE_URL}/api/UserProfile/v2/${id}/stats`,
     USER_SOCIAL: `${API_BASE_URL}/api/UserSocial`,

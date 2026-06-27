@@ -343,7 +343,7 @@ export default function TournamentDetailsScreen() {
         setLoadingBracket(true);
         setBracketError(null);
         try {
-            const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE_V2(id);
+            const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE_V3(id);
             console.log('Fetching bracket from:', url);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
@@ -1463,7 +1463,7 @@ export default function TournamentDetailsScreen() {
                                     {sortedGroups[selectedGroupIndex] && (
                                         <TournamentGroups
                                             groups={[sortedGroups[selectedGroupIndex]]}
-                                            onMatchPress={handleMatchPress}
+                                            onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
                                             currentUserId={user?.id}
                                             currentUsername={user?.username}
                                             isAdmin={canManage}
@@ -1471,6 +1471,7 @@ export default function TournamentDetailsScreen() {
                                             tournamentStatus={tournament?.status}
                                             qualificationZones={swissZones}
                                             totalRounds={swissTotalRounds}
+                                            isTeamTournament={tournament?.isTeamTournament}
                                         />
                                     )}
                                 </>

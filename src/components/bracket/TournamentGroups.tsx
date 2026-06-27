@@ -11,6 +11,10 @@ interface Standing {
     position: number;
     participantId: string;
     userId: string;
+    // Authoritative display name from the backend (LeagueStandingDto.Name):
+    // team name for team groups, username for solo groups. Prefer this over the
+    // userId→match lookup, which can't resolve team rows (their userId is empty).
+    name?: string;
     username?: string;
     points: number;
     matchesPlayed: number;
@@ -69,9 +73,12 @@ interface TournamentGroupsProps {
     // Swiss: total rounds scheduled — drives the "Round X of Y" header on the matches list.
     // When omitted, only "Round X" is shown (legacy group/league behaviour).
     totalRounds?: number;
+    // Team tournaments: each group card is a Team-vs-Team match — render the team icon
+    // instead of a player avatar, mirroring the knockout bracket.
+    isTeamTournament?: boolean;
 }
 
-export function TournamentGroups({ groups, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, qualificationZones, totalRounds }: TournamentGroupsProps) {
+export function TournamentGroups({ groups, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, qualificationZones, totalRounds, isTeamTournament }: TournamentGroupsProps) {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [selectedRounds, setSelectedRounds] = useState<Record<string, number>>({});
 
@@ -156,10 +163,14 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 && !isDirect
                                                 && standing.position <= qualificationZones.playInEnd;
                                             const zoneColor = isDirect ? '#10B981' : isPlayIn ? '#F59E0B' : null;
+                                            // Team rows carry no real user (UserId = empty GUID) — disable the tap so we
+                                            // don't navigate to a non-existent player profile (the backend 500s on it).
+                                            const canOpenProfile = !!standing.userId && standing.userId !== '00000000-0000-0000-0000-000000000000';
                                             return (
                                                 <Pressable
                                                     key={standing.participantId}
-                                                    onPress={() => handlePlayerPress(standing)}
+                                                    onPress={canOpenProfile ? () => handlePlayerPress(standing) : undefined}
+                                                    disabled={!canOpenProfile}
                                                     className={cn(
                                                         "flex-row py-3 px-4 border-b border-white/[0.03] items-center",
                                                         index === group.standings.length - 1 && "border-b-0"
@@ -190,7 +201,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                     </View>
                                                     <View className="w-32 ml-2 flex-row items-center gap-1.5">
                                                         <Text className={cn("text-xs font-bold flex-1", isMe ? "text-emerald-300" : "text-slate-200")} numberOfLines={1}>
-                                                            {standing.username || getUsername(standing.userId, group.matches)}
+                                                            {standing.name || standing.username || getUsername(standing.userId, group.matches)}
                                                         </Text>
                                                         {isMe && (
                                                             <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
@@ -304,6 +315,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 currentUserId={currentUserId}
                                                 currentUsername={currentUsername}
                                                 isAdmin={isAdmin}
+                                                isTeamTournament={isTeamTournament}
                                                 proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                             />
                                         ))}
