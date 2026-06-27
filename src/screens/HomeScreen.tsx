@@ -12,7 +12,7 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
-import { parseUtcDate } from '../lib/utils';
+import { parseUtcDate, formatLocalDateTime } from '../lib/utils';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -299,7 +299,7 @@ export default function HomeScreen() {
                                         hubAvatar={item.hubAvatarUrl || item.hubAvatar}
                                         message={item.message}
                                         tournamentName={item.tournamentName}
-                                        timestamp={item.timeAgo}
+                                        timestamp={formatLocalDateTime(item.createdOn)}
                                         onClick={
                                             item.tournamentId
                                                 ? () => navigation.navigate('TournamentDetails', { id: item.tournamentId! })

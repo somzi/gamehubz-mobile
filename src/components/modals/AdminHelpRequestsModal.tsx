@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { formatLocalDateTime } from '../../lib/utils';
 
 export interface AdminHelpRequestItem {
     matchId: string;
@@ -28,18 +29,7 @@ interface AdminHelpRequestsModalProps {
 }
 
 function formatTimeAgo(dateString?: string | null) {
-    if (!dateString) return '';
-    const normalized = dateString.endsWith('Z') ? dateString : dateString + 'Z';
-    const date = new Date(normalized);
-    const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    return formatLocalDateTime(dateString);
 }
 
 /**

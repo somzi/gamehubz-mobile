@@ -6,6 +6,7 @@ import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navig
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
+import { formatLocalDateTime } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
@@ -546,16 +547,5 @@ function sortChats(chats: DirectChat[]): DirectChat[] {
 }
 
 function formatRelative(iso: string): string {
-    try {
-        const date = new Date(iso);
-        const now = new Date();
-        const diff = (now.getTime() - date.getTime()) / 1000;
-        if (diff < 60) return 'now';
-        if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-        if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
-        return date.toLocaleDateString();
-    } catch {
-        return '';
-    }
+    return formatLocalDateTime(iso);
 }

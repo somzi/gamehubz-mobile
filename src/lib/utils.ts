@@ -11,6 +11,18 @@ export function parseUtcDate(dateStr: string): Date {
     return new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
 }
 
+// Exact local (device-timezone) time for a backend UTC timestamp — never "x ago".
+// Shows just the clock time for today's items and prefixes the date for older ones,
+// so the same instant reads e.g. 15:00 in RS and 18:30 in IN.
+export function formatLocalDateTime(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    const d = parseUtcDate(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isToday = d.toDateString() === new Date().toDateString();
+    return isToday ? time : `${d.toLocaleDateString()} ${time}`;
+}
+
 // Safely format a backend date string for display. Returns the fallback if the
 // input is missing or unparseable — avoids "Invalid Date" leaking into UI.
 export function formatDateSafe(dateStr: string | null | undefined, fallback: string = 'TBD'): string {

@@ -8,7 +8,7 @@ import { useBadges } from '../../context/BadgesContext';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
-import { cn } from '../../lib/utils';
+import { cn, parseUtcDate } from '../../lib/utils';
 
 interface MatchChatPanelProps {
     matchId: string;
@@ -158,18 +158,13 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         }
     };
 
+    // Exact local time (device timezone) instead of "x ago". Date is prefixed only for
+    // messages not sent today, so same-day chat stays compact.
     const formatCommentTime = (dateString: string) => {
-        const normalized = dateString.endsWith('Z') ? dateString : dateString + 'Z';
-        const date = new Date(normalized);
-        const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString();
+        const date = parseUtcDate(dateString);
+        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const isToday = date.toDateString() === new Date().toDateString();
+        return isToday ? time : `${date.toLocaleDateString()} ${time}`;
     };
 
     return (

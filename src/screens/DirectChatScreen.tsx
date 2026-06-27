@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../lib/api';
+import { parseUtcDate } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { DirectChat, DirectMessage } from '../types/social';
@@ -490,7 +491,9 @@ function DateBreak({ date }: { date: string }) {
 
 function formatTime(iso: string): string {
     try {
-        const d = new Date(iso);
+        // parseUtcDate treats a tz-less backend timestamp as UTC, so toLocaleTimeString
+        // renders it in the device timezone (e.g. 15:00 in RS shows as 18:30 in IN).
+        const d = parseUtcDate(iso);
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
         return '';
@@ -499,7 +502,7 @@ function formatTime(iso: string): string {
 
 function formatDay(iso: string): string {
     try {
-        const d = new Date(iso);
+        const d = parseUtcDate(iso);
         const now = new Date();
         const diffDays = Math.floor(
             (new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) /
@@ -515,7 +518,7 @@ function formatDay(iso: string): string {
 
 function sameDay(a: string, b: string): boolean {
     try {
-        return new Date(a).toDateString() === new Date(b).toDateString();
+        return parseUtcDate(a).toDateString() === parseUtcDate(b).toDateString();
     } catch {
         return false;
     }

@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { cn } from '../../lib/utils';
+import { cn, formatLocalDateTime } from '../../lib/utils';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
@@ -242,21 +242,7 @@ export function MatchScheduleCard({
         }
     };
 
-    const formatCommentTime = (dateString: string) => {
-        const normalized = dateString.endsWith('Z') ? dateString : dateString + 'Z';
-        const date = new Date(normalized);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMins / 60);
-        const diffDays = Math.floor(diffHours / 24);
-
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString();
-    };
+    const formatCommentTime = (dateString: string) => formatLocalDateTime(dateString);
 
     const fetchDbHomeUserId = async (): Promise<string | null> => {
         if (!matchId) return null;

@@ -6,6 +6,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { FeedCard } from '../cards/FeedCard';
 import { DashboardActivityDto } from '../../types/dashboard';
 import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
+import { formatLocalDateTime } from '../../lib/utils';
 import { Button } from '../ui/Button';
 import { RootStackParamList } from '../../types/navigation';
 
@@ -130,7 +131,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                                     hubAvatar={item.hubAvatarUrl || item.hubAvatar}
                                     message={item.message}
                                     tournamentName={item.tournamentName}
-                                    timestamp={item.timeAgo}
+                                    timestamp={formatLocalDateTime(item.createdOn)}
                                     onClick={item.tournamentId ? () => handleActivityPress(item.tournamentId) : undefined}
                                 />
                             </View>
