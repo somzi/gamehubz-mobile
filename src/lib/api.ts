@@ -41,6 +41,7 @@ export const ENDPOINTS = {
     APPROVE_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/approve`,
     REJECT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/reject`,
     REVERT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/revert`,
+    CASCADE_REVERT_PREVIEW: `${API_BASE_URL}/api/tournament/matchResult/cascadePreview`,
     DOUBLE_WALKOVER: `${API_BASE_URL}/api/tournament/matchResult/doubleWalkover`,
     GET_HUB_TOURNAMENTS: (hubId: string, status: number, page: number, pageSize: number = 10) =>
         `${API_BASE_URL}/api/Hub/${hubId}/tournaments?Status=${status}&Page=${page}&PageSize=${pageSize}`,

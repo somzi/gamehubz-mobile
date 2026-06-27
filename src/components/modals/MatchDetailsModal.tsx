@@ -381,7 +381,7 @@ export function MatchDetailsModal({
         }
     };
 
-    const handleSubmitResult = async () => {
+    const handleSubmitResult = async (cascade: boolean = false) => {
         if (!matchId || !tournamentId) return;
         if (homeScore === '' || awayScore === '') {
             setError('Please enter scores for both players');
@@ -396,7 +396,8 @@ export function MatchDetailsModal({
                 MatchId: matchId,
                 HomeScore: parseInt(homeScore, 10),
                 AwayScore: parseInt(awayScore, 10),
-                TournamentId: tournamentId
+                TournamentId: tournamentId,
+                Cascade: cascade
             };
 
             const response = await authenticatedFetch(ENDPOINTS.REPORT_MATCH_RESULT, {
@@ -495,14 +496,14 @@ export function MatchDetailsModal({
         setIsEditMode(true);
     };
 
-    const submitDeleteResult = async () => {
+    const submitDeleteResult = async (cascade: boolean = false) => {
         if (!matchId) return;
         setIsDeletingResult(true);
         setError(null);
         try {
             const response = await authenticatedFetch(ENDPOINTS.REVERT_MATCH_RESULT, {
                 method: 'POST',
-                body: JSON.stringify({ MatchId: matchId }),
+                body: JSON.stringify({ MatchId: matchId, Cascade: cascade }),
             });
             if (!response.ok) {
                 const text = await response.text();
@@ -518,17 +519,121 @@ export function MatchDetailsModal({
         }
     };
 
-    // Deleting a result is destructive (clears the score/winner and reopens the match),
-    // so confirm first. Backend re-checks permissions and the downstream lock.
-    const handleDeleteResult = () => {
+    // Builds a short human label for a downstream match the cascade would reopen.
+    const describeAffected = (a: any): string => {
+        const round = a.round ?? a.Round ?? 0;
+        const isUpper = a.isUpperBracket ?? a.IsUpperBracket ?? true;
+        const hs = a.homeScore ?? a.HomeScore ?? 0;
+        const as = a.awayScore ?? a.AwayScore ?? 0;
+        const side = isUpper ? `Round ${round}` : `Losers R${round}`;
+        return `${side}  ·  ${hs}–${as}`;
+    };
+
+    // Fetches the list of already-played downstream matches this action would reopen, then routes to
+    // the right confirmation: a plain confirm when nothing downstream is affected, or a cascade confirm
+    // listing the collateral when there is. `onConfirm(cascade)` runs the actual mutation.
+    const confirmWithCascade = async (
+        mode: 'delete' | 'edit',
+        onConfirm: (cascade: boolean) => void,
+    ) => {
+        if (!matchId) return;
+        let affected: any[] = [];
+        try {
+            const res = await authenticatedFetch(ENDPOINTS.CASCADE_REVERT_PREVIEW, {
+                method: 'POST',
+                body: JSON.stringify({ MatchId: matchId }),
+            });
+            if (res.ok) {
+                affected = await res.json();
+            }
+            // A non-OK preview (e.g. not privileged) just falls through to the plain confirm; the
+            // backend stays the source of truth and will reject if the action really isn't allowed.
+        } catch {
+            // A network hiccup on the preview shouldn't block the action — fall back to plain confirm.
+        }
+
+        const count = Array.isArray(affected) ? affected.length : 0;
+
+        if (count === 0) {
+            if (mode === 'delete') {
+                Alert.alert(
+                    'Delete result?',
+                    'This clears the score and winner and reopens the match. You can report the result again afterwards.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => onConfirm(false) },
+                    ],
+                );
+            } else {
+                Alert.alert(
+                    'Save changes?',
+                    'This changes the winner and re-advances the bracket.',
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Save', onPress: () => onConfirm(false) },
+                    ],
+                );
+            }
+            return;
+        }
+
+        const list = affected.map((a) => `•  ${describeAffected(a)}`).join('\n');
+        const verb = mode === 'delete' ? 'Deleting' : 'Changing';
         Alert.alert(
-            'Delete result?',
-            'This clears the score and winner and reopens the match as Scheduled. You can report the result again afterwards.',
+            `${count} linked result${count > 1 ? 's' : ''} will also be reopened`,
+            `${verb} this result first reopens ${count} already-played match${count > 1 ? 'es' : ''} below it — their scores will be cleared and they'll have to be played again:\n\n${list}\n\nThis cannot be undone. Continue?`,
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: submitDeleteResult },
+                {
+                    text: mode === 'delete' ? 'Delete all' : 'Change & reopen',
+                    style: 'destructive',
+                    onPress: () => onConfirm(true),
+                },
             ],
         );
+    };
+
+    // Deleting a result is destructive (clears the score/winner and reopens the match), so confirm
+    // first — and, in a double-elimination bracket, surface any already-played downstream matches the
+    // delete would also reopen. Backend re-checks permissions and the downstream lock.
+    const handleDeleteResult = () => {
+        confirmWithCascade('delete', (cascade) => submitDeleteResult(cascade));
+    };
+
+    // Editing an existing (completed) result. Always confirms. When only the score changes but the
+    // winner stays the same the bracket is untouched (backend applies it in place); when the winner
+    // flips we may need to reopen downstream matches, so route through the cascade confirmation.
+    const handleSubmitEdit = () => {
+        if (homeScore === '' || awayScore === '') {
+            setError('Please enter scores for both players');
+            return;
+        }
+        const newHome = parseInt(homeScore, 10);
+        const newAway = parseInt(awayScore, 10);
+        const oldHome = matchDetails?.homeUserScore ?? 0;
+        const oldAway = matchDetails?.awayUserScore ?? 0;
+
+        // Same scores (e.g. only adding evidence) or a score change that keeps the same winner: the
+        // bracket below is untouched, so just confirm and save — the backend applies it in place.
+        const scoresUnchanged = newHome === oldHome && newAway === oldAway;
+        const winnerUnchanged =
+            scoresUnchanged ||
+            (oldHome > oldAway && newHome > newAway) ||
+            (oldAway > oldHome && newAway > newHome);
+
+        if (winnerUnchanged) {
+            Alert.alert(
+                'Save changes?',
+                'This updates the result. The winner stays the same, so the rest of the bracket is unaffected.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Save', onPress: () => handleSubmitResult(false) },
+                ],
+            );
+            return;
+        }
+
+        confirmWithCascade('edit', (cascade) => handleSubmitResult(cascade));
     };
 
     const submitDoubleWalkover = async () => {
@@ -586,7 +691,11 @@ export function MatchDetailsModal({
     const isAway = (away?.userId || matchDetails?.awayUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isParticipant = !!(isHome || isAway);
 
-    const canEditResult = status === 'completed' && !isEditMode && canRevert;
+    // Participants only get Edit/Delete when the result is cleanly revertable (canRevert). Owners/admins
+    // also get them when the bracket has progressed downstream — they can cascade-reopen the collateral
+    // (handled with a listing confirmation). Byes (a missing side) carry no result to edit.
+    const canEditResult = status === 'completed' && !isEditMode
+        && (canRevert || ((isHubOwner || canManage) && !!home && !!away));
 
     const canSubmit = isParticipant || isHubOwner || canManage;
 
@@ -962,7 +1071,7 @@ export function MatchDetailsModal({
                         <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Cancel</Text>
                     </Pressable>
                     <Pressable
-                        onPress={handleSubmitResult}
+                        onPress={handleSubmitEdit}
                         className="flex-1 bg-[#10B981] rounded-2xl py-4 items-center active:opacity-80"
                     >
                         {isSubmitting ? (
