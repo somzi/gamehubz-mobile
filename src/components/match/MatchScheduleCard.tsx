@@ -11,6 +11,7 @@ import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
+import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import { MatchComment } from '../../types/auth';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize, getOptimizedCloudinaryUrl } from '../../lib/image';
@@ -388,7 +389,11 @@ export function MatchScheduleCard({
         let isActive = true;
 
         const connection = new HubConnectionBuilder()
-            .withUrl(`${API_BASE_URL}/hubs/chat`)
+            // MatchChatHub now requires authentication — pass the JWT as the access_token query param.
+            .withUrl(`${API_BASE_URL}/hubs/chat`, {
+                accessTokenFactory: async () =>
+                    (await SecureStore.getItemAsync('access_token').catch(() => null)) ?? '',
+            })
             .withAutomaticReconnect()
             .configureLogging(LogLevel.Information)
             .build();

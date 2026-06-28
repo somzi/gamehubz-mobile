@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
+import * as SecureStore from 'expo-secure-store';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
@@ -80,7 +81,12 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         let isActive = true;
 
         const connection = new HubConnectionBuilder()
-            .withUrl(`${API_BASE_URL}/hubs/chat`)
+            // MatchChatHub now requires authentication — pass the JWT as the access_token query param
+            // (WebSockets can't set Authorization headers).
+            .withUrl(`${API_BASE_URL}/hubs/chat`, {
+                accessTokenFactory: async () =>
+                    (await SecureStore.getItemAsync('access_token').catch(() => null)) ?? '',
+            })
             .withAutomaticReconnect()
             .configureLogging(LogLevel.Information)
             .build();
