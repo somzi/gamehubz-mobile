@@ -18,6 +18,7 @@ const EMPTY_BADGES: BadgeCounts = {
     hubJoinRequests: 0,
     adminHelpRequests: 0,
     pendingRegistrations: 0,
+    pendingResultApprovals: 0,
     socialTotal: 0,
     matchesTotal: 0,
     organizerTotal: 0,

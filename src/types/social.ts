@@ -93,13 +93,15 @@ export interface BadgeCounts {
     adminHelpRequests: number;
     /** Pending tournament registrations awaiting approval in the user's hubs. */
     pendingRegistrations: number;
+    /** Matches with a proposed result awaiting the organizer's approval in the user's hubs. */
+    pendingResultApprovals: number;
     socialTotal: number;
     /** unreadMatchMessages + matchesToSchedule + resultsToConfirm */
     matchesTotal: number;
-    /** teamJoinRequests + hubJoinRequests + adminHelpRequests + pendingRegistrations */
+    /** teamJoinRequests + hubJoinRequests + adminHelpRequests + pendingRegistrations + pendingResultApprovals */
     organizerTotal: number;
-    /** hubJoinRequests + adminHelpRequests + pendingRegistrations (drives the Hubs-tab dot;
-     *  equals the sum of the per-hub counts in ApprovalsBreakdown). */
+    /** hubJoinRequests + adminHelpRequests + pendingRegistrations + pendingResultApprovals (drives the
+     *  Hubs-tab dot; equals the sum of the per-hub counts in ApprovalsBreakdown). */
     hubManageTotal: number;
 }
 
@@ -119,6 +121,9 @@ export interface TournamentApprovalCount {
     status: number;
     registrations: number;
     adminHelp: number;
+    /** Matches with a proposed result awaiting the organizer's approval (approval-mode tournaments). */
+    resultApprovals: number;
+    /** registrations + adminHelp + resultApprovals — the tournament's full pending-approval count. */
     total: number;
 }
 
