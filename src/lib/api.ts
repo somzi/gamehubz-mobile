@@ -44,6 +44,8 @@ export const ENDPOINTS = {
     // then re-draw it from the standings on demand.
     RESET_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/reset`,
     DRAW_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/draw`,
+    // Admin-only: manually swap two first-round teams' bracket positions (re-seed).
+    SWAP_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/swap`,
     REPORT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult`,
     APPROVE_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/approve`,
     REJECT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/reject`,

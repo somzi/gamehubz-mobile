@@ -34,6 +34,7 @@ import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
 import { TeamMatchDetailModal } from '../components/modals/TeamMatchDetailModal';
+import { SwapBracketModal, SwapTeam } from '../components/modals/SwapBracketModal';
 import {
     getPendingTournamentTeams,
     getTournamentTeams,
@@ -80,6 +81,8 @@ export default function TournamentDetailsScreen() {
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [isCreatingBracket, setIsCreatingBracket] = useState(false);
     const [isResettingBracket, setIsResettingBracket] = useState(false);
+    const [showSwapModal, setShowSwapModal] = useState(false);
+    const [isSwapping, setIsSwapping] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     const [isUserRegistered, setIsUserRegistered] = useState(false);
@@ -652,6 +655,62 @@ export default function TournamentDetailsScreen() {
                 { text: 'Reset bracket', style: 'destructive', onPress: performResetBracket },
             ]
         );
+    };
+
+    // First-round knockout teams a manual swap can touch: both teams of an unplayed real match, plus
+    // teams sitting on a bye (the backend re-seeds those via a regenerate). Played real matches are
+    // excluded — the swap only works before play.
+    const getSwappableBracketTeams = (): SwapTeam[] => {
+        const norm = (s: any) => s.type ?? s.Type;
+        const out: SwapTeam[] = [];
+        const seen = new Set<string>();
+        const add = (p: any) => {
+            const pid = p?.participantId ?? p?.ParticipantId;
+            if (!pid || seen.has(pid)) return;
+            seen.add(pid);
+            out.push({ id: pid, name: p.teamName ?? p.username ?? p.Username ?? p.name ?? 'Team', seed: p.seed ?? p.Seed });
+        };
+        stages
+            .filter((s: any) => norm(s) === 3 || norm(s) === 4) // single-elim / DE winners bracket
+            .forEach((s: any) => (s.rounds ?? s.Rounds ?? []).forEach((r: any) => (r.matches ?? r.Matches ?? []).forEach((m: any) => {
+                const round = m.round ?? m.Round ?? 1;
+                if (round !== 1) return;
+                const status = m.status ?? m.Status;
+                const home = m.home ?? m.Home;
+                const away = m.away ?? m.Away;
+                if (home && away) {
+                    if (status === 3 || status === 4) return; // real match already played
+                    add(home);
+                    add(away);
+                } else {
+                    add(home ?? away); // bye — include the lone team
+                }
+            })));
+        return out;
+    };
+
+    const handleSwapBracket = async (aId: string, bId: string) => {
+        if (!id) return;
+        setIsSwapping(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.SWAP_BRACKET(id), {
+                method: 'POST',
+                body: JSON.stringify({ ParticipantAId: aId, ParticipantBId: bId }),
+            });
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'No response body');
+                throw new Error(text);
+            }
+            setShowSwapModal(false);
+            setStatusModalConfig({ type: 'success', title: 'Positions Swapped', message: 'The two teams have switched places in the bracket.' });
+            setShowStatusModal(true);
+            fetchBracket();
+        } catch (err: any) {
+            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setShowStatusModal(true);
+        } finally {
+            setIsSwapping(false);
+        }
     };
 
     const handleCloseRegistration = async () => {
@@ -1278,6 +1337,7 @@ export default function TournamentDetailsScreen() {
 
         const showReset = knockoutDrawn;
         const showDraw = !knockoutDrawn && groupComplete;
+        const canSwap = knockoutDrawn && getSwappableBracketTeams().length >= 2;
         if (!showReset && !showDraw) return null;
 
         return (
@@ -1286,6 +1346,15 @@ export default function TournamentDetailsScreen() {
                     <Button className="w-full" onPress={handleDrawBracket} loading={isResettingBracket}>
                         Draw Bracket
                     </Button>
+                )}
+                {canSwap && (
+                    <Pressable
+                        onPress={() => setShowSwapModal(true)}
+                        className="w-full flex-row items-center justify-center gap-2 py-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 active:opacity-70"
+                    >
+                        <Ionicons name="swap-horizontal" size={16} color="#818CF8" />
+                        <Text className="text-sm font-bold text-indigo-300">Swap Seeds</Text>
+                    </Pressable>
                 )}
                 {showReset && (
                     <>
@@ -2979,6 +3048,14 @@ export default function TournamentDetailsScreen() {
                     }}
                 />
             )}
+
+            <SwapBracketModal
+                visible={showSwapModal}
+                onClose={() => setShowSwapModal(false)}
+                teams={showSwapModal ? getSwappableBracketTeams() : []}
+                onConfirm={handleSwapBracket}
+                busy={isSwapping}
+            />
         </SafeAreaView>
     );
 }
