@@ -226,6 +226,35 @@ export function MatchDetailsModal({
         }
     }, [visible, status, matchId, evidences, home, away]);
 
+    // Picks our sub-match out of a parent team-match DTO and reshapes it into the
+    // MatchResultDetailDto the solo modal renders (players, score, evidence, proposal &
+    // admin-help flag). Mirrors the backend TeamSubMatchDto field names (camel/Pascal).
+    const mapSubMatchDetails = (data: any, subMatches: any[]): MatchResultDetailDto => {
+        const sub = subMatches.find(
+            (s: any) => (s.matchId || s.MatchId || '').toLowerCase() === (matchId || '').toLowerCase()
+        );
+        const hp = sub?.homePlayer || sub?.HomePlayer;
+        const ap = sub?.awayPlayer || sub?.AwayPlayer;
+        return {
+            homeUser: hp?.username || hp?.Username || '',
+            homeUserId: hp?.userId || hp?.UserId || '',
+            awayUser: ap?.username || ap?.Username || '',
+            awayUserId: ap?.userId || ap?.UserId || '',
+            homeUserScore: sub?.homeScore ?? sub?.HomeScore ?? 0,
+            awayUserScore: sub?.awayScore ?? sub?.AwayScore ?? 0,
+            evidences: sub?.evidences || sub?.Evidences || [],
+            scheduledTime: data.scheduledTime || data.ScheduledTime,
+            homeUserAvatarUrl: formatAvatarUrl(hp?.avatarUrl || hp?.AvatarUrl),
+            awayUserAvatarUrl: formatAvatarUrl(ap?.avatarUrl || ap?.AvatarUrl),
+            requireResultApproval: data.requireResultApproval ?? data.RequireResultApproval ?? false,
+            proposedHomeScore: sub?.proposedHomeScore ?? sub?.ProposedHomeScore ?? null,
+            proposedAwayScore: sub?.proposedAwayScore ?? sub?.ProposedAwayScore ?? null,
+            proposedByUserId: sub?.proposedByUserId ?? sub?.ProposedByUserId ?? null,
+            adminHelpRequested: sub?.adminHelpRequested ?? sub?.AdminHelpRequested ?? false,
+            adminHelpRequestedByUserId: sub?.adminHelpRequestedByUserId ?? sub?.AdminHelpRequestedByUserId ?? null,
+        };
+    };
+
     const fetchMatchDetails = async () => {
         if (!matchId) return;
         setIsLoadingDetails(true);
@@ -234,25 +263,32 @@ export function MatchDetailsModal({
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
             if (response.ok) {
                 const data = await response.json();
-                const normalizedData: MatchResultDetailDto = {
-                    ...data,
-                    homeUser: data.homeUser || data.HomeUser || '',
-                    homeUserId: data.homeUserId || data.HomeUserId || '',
-                    awayUser: data.awayUser || data.AwayUser || '',
-                    awayUserId: data.awayUserId || data.AwayUserId || '',
-                    homeUserScore: data.homeUserScore ?? data.HomeUserScore ?? 0,
-                    awayUserScore: data.awayUserScore ?? data.AwayUserScore ?? 0,
-                    evidences: data.evidences || data.Evidences || [],
-                    scheduledTime: data.scheduledTime || data.ScheduledTime,
-                    homeUserAvatarUrl: formatAvatarUrl(data.homeUserAvatarUrl || data.HomeUserAvatarUrl),
-                    awayUserAvatarUrl: formatAvatarUrl(data.awayUserAvatarUrl || data.AwayUserAvatarUrl),
-                    requireResultApproval: data.requireResultApproval ?? data.RequireResultApproval ?? false,
-                    proposedHomeScore: data.proposedHomeScore ?? data.ProposedHomeScore ?? null,
-                    proposedAwayScore: data.proposedAwayScore ?? data.ProposedAwayScore ?? null,
-                    proposedByUserId: data.proposedByUserId ?? data.ProposedByUserId ?? null,
-                    adminHelpRequested: data.adminHelpRequested ?? data.AdminHelpRequested ?? false,
-                    adminHelpRequestedByUserId: data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null,
-                };
+                // For a team-tournament sub-match, GET_MATCH_DETAILS returns the parent
+                // team-match DTO (no top-level home/away — the individual players, scores and
+                // help-request flag live on the matching sub-match). Resolve our sub-match so
+                // the solo modal renders the real pairing & result instead of an empty 0:0.
+                const subMatches = data.subMatches || data.SubMatches;
+                const normalizedData: MatchResultDetailDto = Array.isArray(subMatches)
+                    ? mapSubMatchDetails(data, subMatches)
+                    : {
+                        ...data,
+                        homeUser: data.homeUser || data.HomeUser || '',
+                        homeUserId: data.homeUserId || data.HomeUserId || '',
+                        awayUser: data.awayUser || data.AwayUser || '',
+                        awayUserId: data.awayUserId || data.AwayUserId || '',
+                        homeUserScore: data.homeUserScore ?? data.HomeUserScore ?? 0,
+                        awayUserScore: data.awayUserScore ?? data.AwayUserScore ?? 0,
+                        evidences: data.evidences || data.Evidences || [],
+                        scheduledTime: data.scheduledTime || data.ScheduledTime,
+                        homeUserAvatarUrl: formatAvatarUrl(data.homeUserAvatarUrl || data.HomeUserAvatarUrl),
+                        awayUserAvatarUrl: formatAvatarUrl(data.awayUserAvatarUrl || data.AwayUserAvatarUrl),
+                        requireResultApproval: data.requireResultApproval ?? data.RequireResultApproval ?? false,
+                        proposedHomeScore: data.proposedHomeScore ?? data.ProposedHomeScore ?? null,
+                        proposedAwayScore: data.proposedAwayScore ?? data.ProposedAwayScore ?? null,
+                        proposedByUserId: data.proposedByUserId ?? data.ProposedByUserId ?? null,
+                        adminHelpRequested: data.adminHelpRequested ?? data.AdminHelpRequested ?? false,
+                        adminHelpRequestedByUserId: data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null,
+                    };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
                     const date = parseUtcDate(normalizedData.scheduledTime);

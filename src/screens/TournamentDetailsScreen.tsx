@@ -454,16 +454,12 @@ export default function TournamentDetailsScreen() {
     // The admin picked a problematic match — open it like a regular bracket match so
     // the chat tab and the resolve action are available. Land on the chat tab since
     // that's where the conversation that triggered the help request lives.
-    // Team-tournament sub-matches carry a teamMatchId — route those to the team-match
-    // modal (player list + per-sub scores). The solo modal would render empty 0:0 there
-    // because /api/match/{id}/details returns the parent team-match shape for sub-matches.
+    // Team-tournament sub-matches use the same solo modal: item.matchId is the sub-match
+    // id, and the modal resolves the pairing/score out of the parent team-match DTO that
+    // /api/match/{id}/details returns. The team modal has no chat/stream/resolve, so the
+    // solo modal is the right surface for handling a help request.
     const handleHelpRequestSelect = (item: AdminHelpRequestItem) => {
         setShowAdminHelpModal(false);
-        if (item.teamMatchId) {
-            setSelectedTeamMatchId(item.teamMatchId);
-            setShowTeamMatchDetail(true);
-            return;
-        }
         setSelectedMatch({
             id: item.matchId,
             status: item.status,
@@ -509,20 +505,22 @@ export default function TournamentDetailsScreen() {
     // the params so the action doesn't replay on the next render/focus.
     const { openAdminHelp, focusMatchId, focusTeamMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval } = route.params;
     useEffect(() => {
-        // Team-tournament sub-match deep links: open the team-match modal (player list +
-        // per-sub scores). The solo modal would render empty 0:0 because /api/match/{id}/details
-        // returns the parent team-match shape for a sub-match id.
-        if (focusTeamMatchId) {
-            setSelectedTeamMatchId(focusTeamMatchId);
-            setShowTeamMatchDetail(true);
-            navigation.setParams({ focusMatchId: undefined, focusTeamMatchId: undefined, focusMatchTab: undefined });
-            return;
-        }
+        // Match deep links (incl. team-tournament sub-matches): open the solo match modal on
+        // the requested tab. The push carries the sub-match id in focusMatchId; the modal
+        // resolves the pairing & score out of the parent team-match DTO, so chat/stream/result
+        // all work here — unlike the team modal, which has neither chat nor a help-resolve action.
         if (focusMatchId) {
             setSelectedMatch({ id: focusMatchId, canRevert: false, isRoundLocked: false });
             setMatchModalDefaultTab(focusMatchTab === 'match' ? 'match' : 'chat');
             setShowReportModal(true);
-            navigation.setParams({ focusMatchId: undefined, focusMatchTab: undefined });
+            navigation.setParams({ focusMatchId: undefined, focusTeamMatchId: undefined, focusMatchTab: undefined });
+            return;
+        }
+        // Fallback: a team-match id with no specific sub-match — open the team overview modal.
+        if (focusTeamMatchId) {
+            setSelectedTeamMatchId(focusTeamMatchId);
+            setShowTeamMatchDetail(true);
+            navigation.setParams({ focusTeamMatchId: undefined, focusMatchTab: undefined });
             return;
         }
         if (focusTeamId) {
