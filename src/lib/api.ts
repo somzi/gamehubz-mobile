@@ -40,6 +40,10 @@ export const ENDPOINTS = {
     GET_TOURNAMENT_PARTICIPANTS: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}`,
     REMOVE_PARTICIPANT: (tournamentId: string, userId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/user/${userId}`,
     CREATE_BRACKET: `${API_BASE_URL}/api/tournament/createBracket`,
+    // Admin-only: tear the knockout bracket back down (group results kept) so a mistake can be fixed,
+    // then re-draw it from the standings on demand.
+    RESET_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/reset`,
+    DRAW_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/draw`,
     REPORT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult`,
     APPROVE_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/approve`,
     REJECT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/reject`,

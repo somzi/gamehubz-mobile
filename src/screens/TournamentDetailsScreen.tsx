@@ -79,6 +79,7 @@ export default function TournamentDetailsScreen() {
     const [isLoadingPending, setIsLoadingPending] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [isCreatingBracket, setIsCreatingBracket] = useState(false);
+    const [isResettingBracket, setIsResettingBracket] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     const [isUserRegistered, setIsUserRegistered] = useState(false);
@@ -587,6 +588,70 @@ export default function TournamentDetailsScreen() {
         } finally {
             setIsCreatingBracket(false);
         }
+    };
+
+    // Admin: draw (or re-draw) the knockout bracket from the finished group standings on demand.
+    // Shown after a reset, or whenever the groups are complete but the bracket hasn't been drawn.
+    const handleDrawBracket = async () => {
+        if (!id) return;
+        setIsResettingBracket(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.DRAW_BRACKET(id), { method: 'POST' });
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'No response body');
+                throw new Error(text);
+            }
+            setStatusModalConfig({
+                type: 'success',
+                title: 'Bracket Drawn',
+                message: 'The knockout bracket has been drawn from the group standings.'
+            });
+            setShowStatusModal(true);
+            fetchBracket();
+            fetchTournamentDetails();
+        } catch (err: any) {
+            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setShowStatusModal(true);
+        } finally {
+            setIsResettingBracket(false);
+        }
+    };
+
+    const performResetBracket = async () => {
+        if (!id) return;
+        setIsResettingBracket(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.RESET_BRACKET(id), { method: 'POST' });
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'No response body');
+                throw new Error(text);
+            }
+            setStatusModalConfig({
+                type: 'success',
+                title: 'Bracket Reset',
+                message: 'The knockout bracket was cleared. Fix any group result if needed, then draw the bracket again.'
+            });
+            setShowStatusModal(true);
+            fetchBracket();
+            fetchTournamentDetails();
+        } catch (err: any) {
+            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setShowStatusModal(true);
+        } finally {
+            setIsResettingBracket(false);
+        }
+    };
+
+    // Destructive — confirm first, surfacing how many fixtures will be deleted.
+    const handleResetBracket = (knockoutMatchCount: number) => {
+        Alert.alert(
+            'Reset bracket?',
+            `This deletes the current knockout bracket${knockoutMatchCount > 0 ? ` (${knockoutMatchCount} matches)` : ''} and any results in it. Group standings are kept — you can then correct a group result and re-draw the bracket.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Reset bracket', style: 'destructive', onPress: performResetBracket },
+            ]
+        );
     };
 
     const handleCloseRegistration = async () => {
@@ -1188,6 +1253,60 @@ export default function TournamentDetailsScreen() {
             {approvalsPill}
         </View>
     ) : null;
+
+    // Admin-only bracket controls for the Groups + Bracket format:
+    //  • Reset Bracket  — visible once the knockout is drawn; tears it down so a group result can be fixed.
+    //  • Draw Bracket   — visible when the groups are complete but the knockout is empty (e.g. after a reset).
+    const renderBracketAdminActions = () => {
+        if (!canManage || stages.length === 0) return null;
+
+        const norm = (s: any) => s.type ?? s.Type;
+        const hasGroupStage = stages.some((s: any) => norm(s) === 1); // StageType.GroupStage
+        if (!hasGroupStage) return null;
+
+        // Knockout stages: SingleEliminationBracket (3) or DE Winners Bracket (4).
+        const knockoutMatches = stages
+            .filter((s: any) => norm(s) === 3 || norm(s) === 4)
+            .flatMap((s: any) => (s.rounds ?? s.Rounds ?? []).flatMap((r: any) => r.matches ?? r.Matches ?? []));
+        const knockoutDrawn = knockoutMatches.length > 0;
+
+        const groupStage = stages.find((s: any) => norm(s) === 1);
+        const groupMatches = (groupStage?.groups ?? groupStage?.Groups ?? [])
+            .flatMap((g: any) => g.matches ?? g.Matches ?? []);
+        const groupComplete = groupMatches.length > 0
+            && groupMatches.every((m: any) => { const st = m.status ?? m.Status; return st === 3 || st === 4; });
+
+        const showReset = knockoutDrawn;
+        const showDraw = !knockoutDrawn && groupComplete;
+        if (!showReset && !showDraw) return null;
+
+        return (
+            <View className="px-4 mb-4 gap-2">
+                {showDraw && (
+                    <Button className="w-full" onPress={handleDrawBracket} loading={isResettingBracket}>
+                        Draw Bracket
+                    </Button>
+                )}
+                {showReset && (
+                    <>
+                        <Pressable
+                            onPress={() => handleResetBracket(knockoutMatches.length)}
+                            disabled={isResettingBracket}
+                            className="w-full flex-row items-center justify-center gap-2 py-3 rounded-2xl border border-red-500/30 bg-red-500/10 active:opacity-70"
+                        >
+                            {isResettingBracket
+                                ? <ActivityIndicator size="small" color="#F87171" />
+                                : <Ionicons name="refresh" size={16} color="#F87171" />}
+                            <Text className="text-sm font-bold text-red-400">Reset Bracket</Text>
+                        </Pressable>
+                        <Text className="text-[11px] text-slate-500 text-center">
+                            Clears the knockout so you can correct a group result. Group standings are kept.
+                        </Text>
+                    </>
+                )}
+            </View>
+        );
+    };
 
     const renderStages = () => {
         if (stages.length === 0) {
@@ -1922,6 +2041,7 @@ export default function TournamentDetailsScreen() {
 
                     {activeTab === 'bracket' && (
                         <View className="py-4 pb-12">
+                            {renderBracketAdminActions()}
                             {renderStages()}
                         </View>
                     )}
