@@ -10,6 +10,9 @@ export type RootStackParamList = {
         openAdminHelp?: boolean;
         /** Push deep-link: open this match's details modal on open. */
         focusMatchId?: string;
+        /** Push deep-link: set when the focused match is a team-tournament sub-match — opens
+         *  the team-match modal instead of the solo modal (which renders empty for sub-matches). */
+        focusTeamMatchId?: string;
         /** Which tab the deep-linked match modal lands on. Defaults to 'chat'. */
         focusMatchTab?: 'match' | 'chat';
         /** Share deep-link: land on the Teams tab and prompt to join this team. */

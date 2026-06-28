@@ -6,6 +6,9 @@ import { formatLocalDateTime } from '../../lib/utils';
 
 export interface AdminHelpRequestItem {
     matchId: string;
+    // Set when the requested match is a team-tournament sub-match — admin opens the parent
+    // team-match modal instead of the solo modal.
+    teamMatchId?: string | null;
     roundNumber?: number | null;
     status: number;
     scheduledStartTime?: string | null;

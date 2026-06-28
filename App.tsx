@@ -69,6 +69,9 @@ function routeFromNotification(
   const chatId = data.chatId ? String(data.chatId) : undefined;
   const tournamentId = data.tournamentId ? String(data.tournamentId) : undefined;
   const matchId = data.matchId ? String(data.matchId) : undefined;
+  // Set for team-tournament sub-matches — routes to the team-match modal so the
+  // payload isn't lost in the solo modal that can't render a sub-match id.
+  const teamMatchId = data.teamMatchId ? String(data.teamMatchId) : undefined;
   const userId = data.userId ? String(data.userId) : undefined;
   const hubId = data.hubId ? String(data.hubId) : undefined;
 
@@ -108,6 +111,7 @@ function routeFromNotification(
         nav.navigate('TournamentDetails', {
           id: tournamentId,
           focusMatchId: matchId,
+          focusTeamMatchId: teamMatchId,
           focusMatchTab: 'chat',
         });
         return;
@@ -138,6 +142,7 @@ function routeFromNotification(
         nav.navigate('TournamentDetails', {
           id: tournamentId,
           focusMatchId: matchId,
+          focusTeamMatchId: teamMatchId,
           focusMatchTab: 'match',
         });
         return;

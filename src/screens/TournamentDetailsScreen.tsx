@@ -384,6 +384,7 @@ export default function TournamentDetailsScreen() {
             const data = await response.json();
             const normalized: AdminHelpRequestItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
                 matchId: it.matchId || it.MatchId,
+                teamMatchId: it.teamMatchId ?? it.TeamMatchId ?? null,
                 roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
                 status: it.status ?? it.Status ?? 0,
                 scheduledStartTime: it.scheduledStartTime ?? it.ScheduledStartTime ?? null,
@@ -453,8 +454,16 @@ export default function TournamentDetailsScreen() {
     // The admin picked a problematic match — open it like a regular bracket match so
     // the chat tab and the resolve action are available. Land on the chat tab since
     // that's where the conversation that triggered the help request lives.
+    // Team-tournament sub-matches carry a teamMatchId — route those to the team-match
+    // modal (player list + per-sub scores). The solo modal would render empty 0:0 there
+    // because /api/match/{id}/details returns the parent team-match shape for sub-matches.
     const handleHelpRequestSelect = (item: AdminHelpRequestItem) => {
         setShowAdminHelpModal(false);
+        if (item.teamMatchId) {
+            setSelectedTeamMatchId(item.teamMatchId);
+            setShowTeamMatchDetail(true);
+            return;
+        }
         setSelectedMatch({
             id: item.matchId,
             status: item.status,
@@ -498,8 +507,17 @@ export default function TournamentDetailsScreen() {
     // Deep links. Push notifications land here with openAdminHelp / focusMatchId;
     // a shared /team/{id} link lands here with focusTeamId. We act once, then clear
     // the params so the action doesn't replay on the next render/focus.
-    const { openAdminHelp, focusMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval } = route.params;
+    const { openAdminHelp, focusMatchId, focusTeamMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval } = route.params;
     useEffect(() => {
+        // Team-tournament sub-match deep links: open the team-match modal (player list +
+        // per-sub scores). The solo modal would render empty 0:0 because /api/match/{id}/details
+        // returns the parent team-match shape for a sub-match id.
+        if (focusTeamMatchId) {
+            setSelectedTeamMatchId(focusTeamMatchId);
+            setShowTeamMatchDetail(true);
+            navigation.setParams({ focusMatchId: undefined, focusTeamMatchId: undefined, focusMatchTab: undefined });
+            return;
+        }
         if (focusMatchId) {
             setSelectedMatch({ id: focusMatchId, canRevert: false, isRoundLocked: false });
             setMatchModalDefaultTab(focusMatchTab === 'match' ? 'match' : 'chat');
@@ -526,7 +544,7 @@ export default function TournamentDetailsScreen() {
             navigation.setParams({ openAdminHelp: undefined });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [openAdminHelp, focusMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval]);
+    }, [openAdminHelp, focusMatchId, focusTeamMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval]);
 
     // Confirm → reuse the existing join/request flow, then close the prompt.
     const handleJoinPromptConfirm = async () => {
