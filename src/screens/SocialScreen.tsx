@@ -5,12 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
+import { LinearGradient } from 'expo-linear-gradient';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
-import { formatLocalDateTime } from '../lib/utils';
+import { parseUtcDate, cn } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { useBadges } from '../context/BadgesContext';
+import { useAuth } from '../context/AuthContext';
 
 type TabKey = 'friends' | 'requests' | 'chats';
 type NavProp = StackNavigationProp<RootStackParamList>;
@@ -143,30 +145,33 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
             }
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             renderItem={({ item }) => (
-                <Pressable
-                    onPress={() => navigation.navigate('PlayerProfile', { id: item.userId })}
-                    className="bg-[#131B2E] rounded-2xl p-3 flex-row items-center border border-white/[0.04]"
-                    style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                >
-                    <PlayerAvatar src={item.avatarUrl ?? undefined} name={item.username} size="md" />
-                    <View className="flex-1 ml-3">
-                        <Text className="text-white font-black text-sm" numberOfLines={1}>
-                            {item.username}
-                        </Text>
-                        {item.nickname ? (
-                            <Text className="text-slate-500 text-[11px] font-medium mt-0.5" numberOfLines={1}>
-                                {item.nickname}
+                <CardSurface onPress={() => navigation.navigate('PlayerProfile', { id: item.userId })}>
+                    <View className="flex-row items-center p-3.5">
+                        <RingAvatar src={item.avatarUrl ?? undefined} name={item.username} />
+                        <View className="flex-1 ml-3.5">
+                            <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
+                                {item.username}
                             </Text>
-                        ) : null}
+                            <Text className="text-slate-500 text-[11px] font-semibold mt-0.5" numberOfLines={1}>
+                                {item.nickname ? `@${item.nickname}` : `Friends since ${monthYear(item.friendsSince)}`}
+                            </Text>
+                        </View>
+                        <Pressable
+                            onPress={() => openChat(item)}
+                            hitSlop={8}
+                            className="w-10 h-10 rounded-2xl items-center justify-center mr-1.5"
+                            style={({ pressed }) => ({
+                                backgroundColor: 'rgba(16,185,129,0.10)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(16,185,129,0.22)',
+                                opacity: pressed ? 0.7 : 1,
+                            })}
+                        >
+                            <Ionicons name="chatbubble-ellipses" size={17} color="#10B981" />
+                        </Pressable>
+                        <Ionicons name="chevron-forward" size={16} color="#334155" />
                     </View>
-                    <Pressable
-                        onPress={() => openChat(item)}
-                        className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 items-center justify-center"
-                        hitSlop={8}
-                    >
-                        <Ionicons name="chatbubble-ellipses" size={16} color="#10B981" />
-                    </Pressable>
-                </Pressable>
+                </CardSurface>
             )}
         />
     );
@@ -295,51 +300,77 @@ function RequestsTab() {
                     const username = isIncoming ? item.fromUsername : item.toUsername;
                     const avatarUrl = isIncoming ? item.fromAvatarUrl : item.toAvatarUrl;
                     return (
-                        <View className="bg-[#131B2E] rounded-2xl p-3 border border-white/[0.04]">
-                            <View className="flex-row items-center">
-                                <PlayerAvatar
-                                    src={avatarUrl ?? undefined}
-                                    name={username}
-                                    size="md"
-                                />
-                                <View className="flex-1 ml-3">
-                                    <Text className="text-white font-black text-sm" numberOfLines={1}>
-                                        {username}
-                                    </Text>
-                                    <Text className="text-slate-500 text-[11px] mt-0.5">
-                                        {isIncoming ? 'Wants to be your friend' : 'Request sent'}
+                        <CardSurface>
+                            <View className="p-3.5">
+                                <View className="flex-row items-center">
+                                    <RingAvatar
+                                        src={avatarUrl ?? undefined}
+                                        name={username}
+                                        ringColor={isIncoming ? 'rgba(16,185,129,0.30)' : 'rgba(255,255,255,0.10)'}
+                                    />
+                                    <View className="flex-1 ml-3.5">
+                                        <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
+                                            {username}
+                                        </Text>
+                                        <View className="flex-row items-center mt-0.5" style={{ gap: 5 }}>
+                                            <Ionicons
+                                                name={isIncoming ? 'arrow-down' : 'arrow-up'}
+                                                size={11}
+                                                color={isIncoming ? '#10B981' : '#64748B'}
+                                            />
+                                            <Text className="text-slate-500 text-[11px] font-semibold">
+                                                {isIncoming ? 'Wants to connect' : 'Request sent'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Text className="text-slate-600 text-[10px] font-bold ml-2">
+                                        {formatChatTime(item.createdOn)}
                                     </Text>
                                 </View>
-                            </View>
-                            <View className="flex-row mt-3" style={{ gap: 8 }}>
-                                {isIncoming ? (
-                                    <>
+                                <View className="flex-row mt-3.5" style={{ gap: 8 }}>
+                                    {isIncoming ? (
+                                        <>
+                                            <Pressable
+                                                onPress={() => accept(item)}
+                                                style={({ pressed }) => ({ flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                                            >
+                                                <View
+                                                    className="flex-row items-center justify-center"
+                                                    style={{ backgroundColor: '#10B981', borderRadius: 14, paddingVertical: 11, gap: 6 }}
+                                                >
+                                                    <Ionicons name="checkmark" size={15} color="#0F172A" />
+                                                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 12, letterSpacing: 0.3 }}>Accept</Text>
+                                                </View>
+                                            </Pressable>
+                                            <Pressable
+                                                onPress={() => reject(item)}
+                                                style={({ pressed }) => ({ flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                                            >
+                                                <View
+                                                    className="items-center"
+                                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 14, paddingVertical: 11 }}
+                                                >
+                                                    <Text style={{ color: '#CBD5E1', fontWeight: '900', fontSize: 12 }}>Decline</Text>
+                                                </View>
+                                            </Pressable>
+                                        </>
+                                    ) : (
                                         <Pressable
-                                            onPress={() => accept(item)}
-                                            className="flex-1 bg-emerald-500 py-2.5 rounded-xl items-center"
-                                            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                                            onPress={() => cancel(item)}
+                                            style={({ pressed }) => ({ flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
                                         >
-                                            <Text className="text-white font-black text-xs">Accept</Text>
+                                            <View
+                                                className="flex-row items-center justify-center"
+                                                style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 14, paddingVertical: 11, gap: 6 }}
+                                            >
+                                                <Ionicons name="close" size={15} color="#94A3B8" />
+                                                <Text style={{ color: '#CBD5E1', fontWeight: '900', fontSize: 12 }}>Cancel request</Text>
+                                            </View>
                                         </Pressable>
-                                        <Pressable
-                                            onPress={() => reject(item)}
-                                            className="flex-1 bg-white/5 border border-white/10 py-2.5 rounded-xl items-center"
-                                            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                                        >
-                                            <Text className="text-slate-300 font-black text-xs">Decline</Text>
-                                        </Pressable>
-                                    </>
-                                ) : (
-                                    <Pressable
-                                        onPress={() => cancel(item)}
-                                        className="flex-1 bg-white/5 border border-white/10 py-2.5 rounded-xl items-center"
-                                        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                                    >
-                                        <Text className="text-slate-300 font-black text-xs">Cancel request</Text>
-                                    </Pressable>
-                                )}
+                                    )}
+                                </View>
                             </View>
-                        </View>
+                        </CardSurface>
                     );
                 }}
             />
@@ -352,6 +383,7 @@ function RequestsTab() {
 // ═════════════════════════════════════════════════════════════════════
 
 function ChatsTab({ navigation }: { navigation: NavProp }) {
+    const { user } = useAuth();
     const [chats, setChats] = useState<DirectChat[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
@@ -411,54 +443,64 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                     subtitle="Open a friend's profile and tap message to get started"
                 />
             }
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-            renderItem={({ item }) => (
-                <Pressable
-                    onPress={() => navigation.navigate('DirectChat', { chatId: item.id })}
-                    className="bg-[#131B2E] rounded-2xl p-3 flex-row items-center border border-white/[0.04]"
-                    style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
-                >
-                    <View>
-                        <PlayerAvatar
-                            src={item.otherAvatarUrl ?? undefined}
-                            name={item.otherUsername}
-                            size="md"
-                        />
-                        {item.unreadCount > 0 && (
-                            <View
-                                className="absolute -top-1 -right-1 bg-emerald-500 px-1.5 rounded-full min-w-[18px] items-center border-2 border-[#0F172A]"
-                                style={{ paddingVertical: 1 }}
-                            >
-                                <Text className="text-white font-black text-[9px]">
-                                    {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                                </Text>
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            renderItem={({ item }) => {
+                const unread = item.unreadCount > 0;
+                const fromMe = !!user?.id && item.lastMessageSenderId === user.id;
+                return (
+                    <CardSurface
+                        highlight={unread}
+                        onPress={() => navigation.navigate('DirectChat', { chatId: item.id })}
+                    >
+                        <View className="flex-row items-center p-3.5">
+                            <View>
+                                <RingAvatar
+                                    src={item.otherAvatarUrl ?? undefined}
+                                    name={item.otherUsername}
+                                    ringColor={unread ? 'rgba(16,185,129,0.55)' : 'rgba(255,255,255,0.10)'}
+                                />
+                                {unread && (
+                                    <View
+                                        style={{
+                                            position: 'absolute', top: -3, right: -3,
+                                            backgroundColor: '#10B981',
+                                            minWidth: 18, height: 18, borderRadius: 999,
+                                            paddingHorizontal: 4,
+                                            alignItems: 'center', justifyContent: 'center',
+                                            borderWidth: 2, borderColor: '#0F172A',
+                                        }}
+                                    >
+                                        <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 9 }}>
+                                            {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
-                        )}
-                    </View>
-                    <View className="flex-1 ml-3 mr-2">
-                        <View className="flex-row items-center justify-between">
-                            <Text className="text-white font-black text-sm flex-1" numberOfLines={1}>
-                                {item.otherUsername}
-                            </Text>
-                            {item.lastMessageAt && (
-                                <Text className="text-slate-600 text-[10px] font-bold ml-2">
-                                    {formatRelative(item.lastMessageAt)}
-                                </Text>
-                            )}
+                            <View className="flex-1 ml-3.5">
+                                <View className="flex-row items-center justify-between">
+                                    <Text className="text-white font-black text-[15px] tracking-tight flex-1" numberOfLines={1}>
+                                        {item.otherUsername}
+                                    </Text>
+                                    {item.lastMessageAt && (
+                                        <Text className={cn('text-[10px] font-bold ml-2', unread ? 'text-emerald-400' : 'text-slate-600')}>
+                                            {formatChatTime(item.lastMessageAt)}
+                                        </Text>
+                                    )}
+                                </View>
+                                {item.lastMessage ? (
+                                    <Text
+                                        className={cn('text-[12.5px] mt-1', unread ? 'text-slate-100 font-semibold' : 'text-slate-500 font-medium')}
+                                        numberOfLines={1}
+                                    >
+                                        {fromMe ? <Text className="text-slate-500 font-medium">You: </Text> : null}
+                                        {item.lastMessage}
+                                    </Text>
+                                ) : null}
+                            </View>
                         </View>
-                        {item.lastMessage ? (
-                            <Text
-                                className={`text-[12px] mt-0.5 ${
-                                    item.unreadCount > 0 ? 'text-slate-200 font-bold' : 'text-slate-500 font-medium'
-                                }`}
-                                numberOfLines={1}
-                            >
-                                {item.lastMessage}
-                            </Text>
-                        ) : null}
-                    </View>
-                </Pressable>
-            )}
+                    </CardSurface>
+                );
+            }}
         />
     );
 }
@@ -476,24 +518,31 @@ function SearchBar({
     onChange: (v: string) => void;
     placeholder: string;
 }) {
+    const active = value.length > 0;
     return (
         <View className="mb-3 mt-1">
             <View
-                className="flex-row items-center bg-[#131B2E] rounded-xl border border-white/[0.06] px-3"
-                style={{ height: 44 }}
+                className="flex-row items-center px-3.5"
+                style={{
+                    height: 48,
+                    borderRadius: 16,
+                    backgroundColor: '#131B2E',
+                    borderWidth: 1,
+                    borderColor: active ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)',
+                }}
             >
-                <Ionicons name="search" size={16} color="#475569" />
+                <Ionicons name="search" size={17} color={active ? '#10B981' : '#475569'} />
                 <TextInput
                     value={value}
                     onChangeText={onChange}
                     placeholder={placeholder}
                     placeholderTextColor="#475569"
-                    className="flex-1 ml-2 text-white text-sm"
-                    style={{ height: 44 }}
+                    className="flex-1 ml-2.5 text-white text-sm font-medium"
+                    style={{ height: 48 }}
                 />
-                {value.length > 0 && (
+                {active && (
                     <Pressable onPress={() => onChange('')} hitSlop={8}>
-                        <Ionicons name="close-circle" size={16} color="#475569" />
+                        <Ionicons name="close-circle" size={17} color="#64748B" />
                     </Pressable>
                 )}
             </View>
@@ -511,12 +560,19 @@ function EmptyState({
     subtitle: string;
 }) {
     return (
-        <View className="items-center mt-20 px-6">
-            <View className="w-16 h-16 rounded-2xl bg-white/[0.03] items-center justify-center mb-4">
-                <Ionicons name={icon} size={28} color="#1E293B" />
+        <View className="items-center mt-24 px-6">
+            <View
+                style={{
+                    width: 72, height: 72, borderRadius: 24,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: 'rgba(16,185,129,0.06)',
+                    borderWidth: 1, borderColor: 'rgba(16,185,129,0.14)',
+                }}
+            >
+                <Ionicons name={icon} size={30} color="#10B981" />
             </View>
-            <Text className="text-white font-black text-base mb-1">{title}</Text>
-            <Text className="text-slate-500 text-xs text-center font-medium">{subtitle}</Text>
+            <Text className="text-white font-black text-base mt-4 mb-1">{title}</Text>
+            <Text className="text-slate-500 text-xs text-center font-medium leading-5">{subtitle}</Text>
         </View>
     );
 }
@@ -546,6 +602,91 @@ function sortChats(chats: DirectChat[]): DirectChat[] {
     });
 }
 
-function formatRelative(iso: string): string {
-    return formatLocalDateTime(iso);
+// Compact, chat-app style timestamp: today → time, yesterday → "Yesterday",
+// within a week → weekday, older → "27 Jun".
+function formatChatTime(iso: string): string {
+    const d = parseUtcDate(iso);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dayMs = 86400000;
+    const t = d.getTime();
+    if (t >= startOfToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (t >= startOfToday - dayMs) return 'Yesterday';
+    if (t >= startOfToday - 6 * dayMs) return d.toLocaleDateString([], { weekday: 'short' });
+    return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+function monthYear(iso?: string): string {
+    if (!iso) return '';
+    return parseUtcDate(iso).toLocaleDateString([], { month: 'short', year: 'numeric' });
+}
+
+// Premium card chrome shared across all Social rows: soft gradient, hairline
+// border, lift shadow. `highlight` gives unread chats an emerald accent + edge strip.
+function CardSurface({
+    onPress,
+    children,
+    highlight = false,
+}: {
+    onPress?: () => void;
+    children: React.ReactNode;
+    highlight?: boolean;
+}) {
+    const surface = (
+        <View
+            style={{
+                borderRadius: 20,
+                overflow: 'hidden',
+                backgroundColor: '#131B2E',
+                borderWidth: 1,
+                borderColor: highlight ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.06)',
+                shadowColor: highlight ? '#10B981' : '#000',
+                shadowOpacity: highlight ? 0.15 : 0.18,
+                shadowRadius: highlight ? 10 : 7,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 3,
+            }}
+        >
+            <LinearGradient
+                colors={highlight ? ['rgba(16,185,129,0.10)', 'transparent'] : ['rgba(255,255,255,0.04)', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.8, y: 0.7 }}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            />
+            {highlight && (
+                <View
+                    style={{
+                        position: 'absolute', left: 0, top: 12, bottom: 12, width: 3,
+                        backgroundColor: '#10B981',
+                        borderTopRightRadius: 3, borderBottomRightRadius: 3,
+                    }}
+                />
+            )}
+            {children}
+        </View>
+    );
+    if (!onPress) return surface;
+    return (
+        <Pressable onPress={onPress} style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.985 : 1 }] })}>
+            {surface}
+        </Pressable>
+    );
+}
+
+// Avatar wrapped in a subtle ring (emerald when emphasised). PlayerAvatar's own
+// border is dropped so the ring reads as a single clean band.
+function RingAvatar({
+    src,
+    name,
+    ringColor = 'rgba(255,255,255,0.10)',
+}: {
+    src?: string;
+    name: string;
+    ringColor?: string;
+}) {
+    return (
+        <View style={{ borderRadius: 999, padding: 2, borderWidth: 1.5, borderColor: ringColor }}>
+            <PlayerAvatar src={src} name={name} size="md" className="border-0" />
+        </View>
+    );
 }
