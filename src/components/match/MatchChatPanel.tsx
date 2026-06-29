@@ -97,6 +97,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 id: newMessage.id || newMessage.Id,
                 userId: newMessage.userId || newMessage.UserId,
                 userNickname: newMessage.userNickname || newMessage.UserNickname || 'Unknown',
+                userAvatarUrl: newMessage.userAvatarUrl || newMessage.UserAvatarUrl,
                 content: newMessage.content || newMessage.Content,
                 sentAt: newMessage.sentAt || newMessage.SentAt,
             };
@@ -195,7 +196,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                         const isMyComment = senderId === user?.id?.toLowerCase();
                         const isAdminMessage =
                             normalizedParticipantIds.length > 0 && !normalizedParticipantIds.includes(senderId);
-                        const avatarSrc = isMyComment ? user?.avatarUrl : avatarsByUserId[senderId];
+                        const avatarSrc = isMyComment ? user?.avatarUrl : (comment.userAvatarUrl || avatarsByUserId[senderId]);
 
                         return (
                             <View

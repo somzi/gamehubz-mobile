@@ -367,11 +367,10 @@ export function MatchScheduleCard({
             fetchComments();
         }
 
-        // Fetch DB home/away roles so we can correctly map scores on submit.
-        // pending_availability also needs the details for the admin-help flag state.
-        if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'pending_availability') {
-            fetchDbHomeUserId();
-        }
+        // Fetch DB home/away roles so we can correctly map scores on submit AND so the chat
+        // can tell participants from admins (admin messages get a badge + their own avatar,
+        // never the opponent's). Needed in every state the chat is viewable, including completed.
+        fetchDbHomeUserId();
 
         // Stream availability — relevant once a match is scheduled, in ready phase, or completed (replay).
         if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'completed') {
@@ -404,6 +403,7 @@ export function MatchScheduleCard({
                 id: newMessage.id || newMessage.Id,
                 userId: newMessage.userId || newMessage.UserId,
                 userNickname: newMessage.userNickname || newMessage.UserNickname || 'Unknown',
+                userAvatarUrl: newMessage.userAvatarUrl || newMessage.UserAvatarUrl,
                 content: newMessage.content || newMessage.Content,
                 sentAt: newMessage.sentAt || newMessage.SentAt,
             };
@@ -1154,7 +1154,7 @@ export function MatchScheduleCard({
                                                                 isPremium ? "text-slate-400" : "text-muted-foreground"
                                                             )}>
                                                                 {isProposer
-                                                                    ? 'Waiting for your opponent (or hub owner) to confirm.'
+                                                                    ? 'Waiting for your opponent or admin to confirm.'
                                                                     : `${proposerName} reported the result. Confirm if it's correct.`}
                                                             </Text>
                                                         </View>
@@ -1599,7 +1599,20 @@ export function MatchScheduleCard({
                                                     onContentSizeChange={() => commentsScrollRef.current?.scrollToEnd({ animated: false })}
                                                 >
                                                     {comments.map((comment) => {
-                                                        const isMyComment = comment.userId === user?.id;
+                                                        const senderId = (comment.userId || '').toLowerCase();
+                                                        const isMyComment = !!user?.id && senderId === user.id.toLowerCase();
+                                                        // Match participants (home/away) come from the loaded match details.
+                                                        // Any sender outside that set is an admin / hub owner chiming in.
+                                                        const matchParticipantIds = [dbHomeUserId, dbAwayUserId]
+                                                            .filter(Boolean)
+                                                            .map(id => (id as string).toLowerCase());
+                                                        const isAdminMessage = !isMyComment && matchParticipantIds.length > 0 && !matchParticipantIds.includes(senderId);
+                                                        const isOpponentMessage = !isMyComment && !isAdminMessage;
+                                                        // Use the sender's own avatar; only fall back to the opponent avatar for the
+                                                        // actual opponent — never borrow it for an admin (that was the bug).
+                                                        const avatarSrc = isMyComment
+                                                            ? user?.avatarUrl
+                                                            : (comment.userAvatarUrl || (isOpponentMessage ? opponentAvatarUrl : undefined));
                                                         return (
                                                             <View key={comment.id} className={cn(
                                                                 "mb-4 flex-row items-end gap-2 max-w-[85%]",
@@ -1607,8 +1620,8 @@ export function MatchScheduleCard({
                                                             )}>
                                                                 {!isMyComment && (
                                                                     <PlayerAvatar
-                                                                        src={opponentAvatarUrl}
-                                                                        name={opponentName}
+                                                                        src={avatarSrc}
+                                                                        name={comment.userNickname}
                                                                         size="sm"
                                                                         className="w-7 h-7 shrink-0"
                                                                     />
@@ -1620,6 +1633,11 @@ export function MatchScheduleCard({
                                                                             <Text className={cn("font-black text-[10px] uppercase tracking-tighter", isPremium ? "text-primary" : "text-primary/70")}>
                                                                                 {comment.userNickname}
                                                                             </Text>
+                                                                        )}
+                                                                        {isAdminMessage && (
+                                                                            <View className="bg-[#F59E0B]/15 px-1.5 py-0.5 rounded-full border border-[#F59E0B]/25">
+                                                                                <Text className="text-[8px] font-black text-[#F59E0B] uppercase tracking-widest">Admin</Text>
+                                                                            </View>
                                                                         )}
                                                                         <Text className="text-[9px] font-bold text-slate-500">
                                                                             {formatCommentTime(comment.sentAt)}

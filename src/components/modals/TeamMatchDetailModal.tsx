@@ -11,6 +11,7 @@ import {
     Image,
     Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { getOptimizedCloudinaryUrl, MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../../lib/image';
 import { useNavigation } from '@react-navigation/native';
@@ -46,6 +47,202 @@ interface TeamMatchDetailModalProps {
     onMatchUpdate?: () => void;
 }
 
+// One source of truth for the redesigned palette — emerald primary, amber pending/tie-break,
+// neutral surfaces tuned for the dark theme. Kept inline so the modal stays self-contained.
+const C = {
+    emerald: '#10B981',
+    emeraldSoft: 'rgba(16,185,129,0.10)',
+    emeraldRing: 'rgba(16,185,129,0.30)',
+    amber: '#F59E0B',
+    amberSoft: 'rgba(245,158,11,0.10)',
+    amberRing: 'rgba(245,158,11,0.30)',
+    red: '#EF4444',
+    redSoft: 'rgba(239,68,68,0.10)',
+    redRing: 'rgba(239,68,68,0.25)',
+    indigo: '#818CF8',
+    bg: '#0B1120',
+    surface: '#0F172A',
+    surfaceRaised: '#111827',
+    surfaceCard: '#131B2E',
+    border: 'rgba(255,255,255,0.06)',
+    borderStrong: 'rgba(255,255,255,0.10)',
+    text: '#F8FAFC',
+    textDim: '#94A3B8',
+    textFaint: '#475569',
+    textGhost: '#334155',
+};
+
+type TeamState = 'pending' | 'live' | 'completed' | 'tieBreak';
+type SubState = 'pending' | 'completed' | 'awaitingApproval' | 'tieBreak';
+
+function deriveTeamState(data: TeamMatchDetailsDto | null, tieBreak: TieBreakStatusDto | null): TeamState {
+    if (tieBreak?.isRequired && !data?.winnerTeamParticipantId) return 'tieBreak';
+    if (data?.winnerTeamParticipantId || data?.status === 'Completed' || data?.status === 3) return 'completed';
+    if (data?.status === 'InProgress' || data?.status === 2) return 'live';
+    return 'pending';
+}
+
+function deriveSubState(sm: SubMatchDto, approvalRequired: boolean): SubState {
+    if (sm.isTieBreakMatch && !sm.winnerUserId && (sm.homeScore === null || sm.awayScore === null)) return 'tieBreak';
+    const hasResult = sm.homeScore !== null && sm.awayScore !== null;
+    if (hasResult && (sm.status === 'Completed' || sm.status === 2 || sm.status === 3 || !!sm.winnerUserId)) return 'completed';
+    const proposed = (sm as any).proposedByUserId ?? (sm as any).ProposedByUserId;
+    const subPending = sm.status === 'Pending' || sm.status === 0 || sm.status === 1;
+    if (approvalRequired && !!proposed && subPending) return 'awaitingApproval';
+    return 'pending';
+}
+
+function paletteFor(state: TeamState | SubState) {
+    switch (state) {
+        case 'completed':
+            return { accent: C.emerald, soft: C.emeraldSoft, ring: C.emeraldRing, label: 'Completed' };
+        case 'live':
+            return { accent: C.emerald, soft: C.emeraldSoft, ring: C.emeraldRing, label: 'Live' };
+        case 'tieBreak':
+            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Tie-Break' };
+        case 'awaitingApproval':
+            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Awaiting Approval' };
+        default:
+            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Pending' };
+    }
+}
+
+// Pill with state dot — tightened typography and a slightly larger dot for legibility at glance.
+function StatusPill({ state, size = 'md' }: { state: TeamState | SubState; size?: 'sm' | 'md' }) {
+    const p = paletteFor(state);
+    const isSm = size === 'sm';
+    return (
+        <View
+            style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'flex-start',
+                backgroundColor: p.soft,
+                borderWidth: 1,
+                borderColor: p.ring,
+                paddingHorizontal: isSm ? 8 : 10,
+                paddingVertical: isSm ? 3 : 5,
+                borderRadius: 999,
+                gap: 6,
+            }}
+        >
+            <View style={{ width: isSm ? 5 : 6, height: isSm ? 5 : 6, borderRadius: 999, backgroundColor: p.accent }} />
+            <Text style={{ color: p.accent, fontSize: isSm ? 8 : 9, fontWeight: '900', letterSpacing: 1.6, textTransform: 'uppercase' }}>
+                {p.label}
+            </Text>
+        </View>
+    );
+}
+
+// Square avatar that FULLY fills its frame. The old build nested a fixed-size PlayerAvatar
+// (40px) inside a larger ring (52px) with no centering, so the initials sat pinned in the
+// top-left corner and visually "spilled" out of the frame. Sizing the image/initials to the
+// frame itself removes that whole class of bug.
+function Avatar({
+    url,
+    name,
+    size,
+    ring = false,
+    ringColor = C.emeraldRing,
+}: {
+    url?: string;
+    name: string;
+    size: number;
+    ring?: boolean;
+    ringColor?: string;
+}) {
+    const initials = (name || '')
+        .split(' ')
+        .map((n) => n?.[0] || '')
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+    return (
+        <View
+            style={{
+                width: size,
+                height: size,
+                borderRadius: Math.round(size * 0.32),
+                borderWidth: ring ? 2 : 1,
+                borderColor: ring ? ringColor : 'rgba(255,255,255,0.08)',
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+            }}
+        >
+            {url ? (
+                <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            ) : (
+                <Text style={{ color: C.text, fontWeight: '800', fontSize: Math.round(size * 0.38) }}>
+                    {initials || '?'}
+                </Text>
+            )}
+        </View>
+    );
+}
+
+// Team crest for the hero card — emerald glow for the winning side, neutral for the rest.
+function TeamCrest({
+    avatarUrl,
+    teamName,
+    isWinner,
+}: {
+    avatarUrl?: string;
+    teamName?: string;
+    isWinner: boolean;
+}) {
+    const SIZE = 58;
+    return (
+        <View style={{ alignItems: 'center', flex: 1 }}>
+            <View
+                style={{
+                    borderRadius: Math.round(SIZE * 0.32),
+                    shadowColor: isWinner ? C.emerald : '#000',
+                    shadowOpacity: isWinner ? 0.35 : 0.22,
+                    shadowRadius: isWinner ? 14 : 7,
+                    shadowOffset: { width: 0, height: 4 },
+                    elevation: isWinner ? 6 : 3,
+                }}
+            >
+                {avatarUrl ? (
+                    <Avatar url={avatarUrl} name={teamName || ''} size={SIZE} ring={isWinner} />
+                ) : (
+                    <View
+                        style={{
+                            width: SIZE,
+                            height: SIZE,
+                            borderRadius: Math.round(SIZE * 0.32),
+                            borderWidth: 2,
+                            borderColor: isWinner ? C.emeraldRing : 'rgba(255,255,255,0.08)',
+                            backgroundColor: 'rgba(255,255,255,0.03)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Ionicons name="people" size={24} color={isWinner ? C.emerald : C.textDim} />
+                    </View>
+                )}
+            </View>
+            <Text
+                numberOfLines={2}
+                style={{
+                    marginTop: 8,
+                    fontSize: 12,
+                    lineHeight: 14,
+                    fontWeight: '900',
+                    textAlign: 'center',
+                    color: isWinner ? C.emerald : C.text,
+                    letterSpacing: 0.2,
+                    paddingHorizontal: 4,
+                }}
+            >
+                {teamName || 'Unknown'}
+            </Text>
+        </View>
+    );
+}
+
 export function TeamMatchDetailModal({
     visible,
     onClose,
@@ -71,10 +268,12 @@ export function TeamMatchDetailModal({
 
     // Edit & Evidence state
     const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+    // Which individual game row is expanded. Collapsed by default so a 10-v-10 match
+    // reads as a short, scannable list instead of a wall of full-size cards.
+    const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
     const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
-    const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
 
     // Tie-break
     const [tieBreakStatus, setTieBreakStatus] = useState<TieBreakStatusDto | null>(null);
@@ -141,12 +340,12 @@ export function TeamMatchDetailModal({
                 subMatches: (raw.subMatches || raw.SubMatches || []).map((sm: any) => {
                     const hp = sm.homePlayer || sm.HomePlayer;
                     const ap = sm.awayPlayer || sm.AwayPlayer;
-                    
+
                     // Fall back to team member avatars if sub-match player avatar is null
-                    const homeTeamMember = (home?.members || home?.Members || []).find((m: any) => 
+                    const homeTeamMember = (home?.members || home?.Members || []).find((m: any) =>
                         (m.userId || m.UserId) === (hp?.userId || hp?.UserId)
                     );
-                    const awayTeamMember = (away?.members || away?.Members || []).find((m: any) => 
+                    const awayTeamMember = (away?.members || away?.Members || []).find((m: any) =>
                         (m.userId || m.UserId) === (ap?.userId || ap?.UserId)
                     );
 
@@ -170,7 +369,11 @@ export function TeamMatchDetailModal({
                         winnerUserId: sm.winnerUserId || sm.WinnerUserId || null,
                         isTieBreakMatch: sm.isTieBreakMatch || sm.IsTieBreakMatch || false,
                         evidences: sm.evidences || sm.Evidences || [],
-                    };
+                        // Preserve proposal fields (not in the static type) for the approval flow.
+                        proposedByUserId: sm.proposedByUserId ?? sm.ProposedByUserId ?? null,
+                        proposedHomeScore: sm.proposedHomeScore ?? sm.ProposedHomeScore ?? null,
+                        proposedAwayScore: sm.proposedAwayScore ?? sm.ProposedAwayScore ?? null,
+                    } as SubMatchDto;
                 }),
                 aggregateScore: agg ? {
                     homeTeamWins: agg.homeTeamWins ?? agg.HomeTeamWins ?? 0,
@@ -204,8 +407,12 @@ export function TeamMatchDetailModal({
                         } : null;
                     })(),
                 } : null,
-                evidences: raw.evidences || raw.Evidences || []
-            };
+                evidences: raw.evidences || raw.Evidences || [],
+                // Approval flag passes through untyped (TeamMatchDetailsDto doesn't list it).
+                ...(raw.requireResultApproval !== undefined || raw.RequireResultApproval !== undefined
+                    ? { requireResultApproval: raw.requireResultApproval ?? raw.RequireResultApproval ?? false }
+                    : {}),
+            } as TeamMatchDetailsDto;
 
             setData(normalized);
             if (normalized.tieBreak?.isRequired) {
@@ -230,7 +437,6 @@ export function TeamMatchDetailModal({
         setPreviewImage(null);
         setEditingMatchId(null);
         setTieBreakStatus(null);
-        setIsEvidenceOpen(false);
     }, [matchId]);
 
     useEffect(() => {
@@ -299,10 +505,10 @@ export function TeamMatchDetailModal({
 
                 if (oversized.length > 0) {
                     const oversizedNames = oversized.map(a => a.fileName || 'Image').join(', ');
-                    setStatusConfig({ 
-                        type: 'error', 
-                        title: 'Files too large', 
-                        message: `Some images are too large: ${oversizedNames}. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.` 
+                    setStatusConfig({
+                        type: 'error',
+                        title: 'Files too large',
+                        message: `Some images are too large: ${oversizedNames}. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`
                     });
                     setShowStatusModal(true);
 
@@ -371,6 +577,14 @@ export function TeamMatchDetailModal({
         setSelectedImages([]);
     };
 
+    // Expand/collapse a game row. Switching rows drops any open edit form + staged images
+    // so a half-finished report on one game never bleeds into another.
+    const toggleGame = (id: string) => {
+        setExpandedGameId((prev) => (prev === id ? null : id));
+        setEditingMatchId(null);
+        setSelectedImages([]);
+    };
+
     const handleScoreChange = (subMatchId: string, side: 'home' | 'away', value: string) => {
         setScoreInputs((prev) => ({
             ...prev,
@@ -406,7 +620,9 @@ export function TeamMatchDetailModal({
                 throw new Error(text);
             }
 
-            if (selectedImages.length > 0 && subMatch.matchId === editingMatchId) {
+            // Only one row's form is ever open at a time and staged images are cleared on
+            // toggle, so any selected images belong to this sub-match — upload them on save.
+            if (selectedImages.length > 0) {
                 await handleUploadOnly(subMatch.matchId);
             }
 
@@ -535,9 +751,9 @@ export function TeamMatchDetailModal({
         data.awayTeam.members?.some(m => String(m.userId).toLowerCase() === String(currentUserId).toLowerCase() && m.isCaptain)
     );
     const isCaptainOfEitherTeam = !!(isCaptainOfHome || isCaptainOfAway);
- 
+
     const isTieBreakMatchCreated = data?.subMatches?.some(sm => sm.isTieBreakMatch);
- 
+
     // Check if current user already submitted rep
     const hasSubmittedRep = (() => {
         if (!tieBreakStatus) return false;
@@ -549,110 +765,34 @@ export function TeamMatchDetailModal({
     // Get the team members for the rep picker
     const myTeamMembers: TeamMemberDto[] = (() => {
         if (!data) return [];
-        // Prioritize the team the user is actually on
         const userAsHome = data.homeTeam?.members?.some(m => m.userId.toLowerCase() === currentUserId?.toLowerCase());
         const userAsAway = data.awayTeam?.members?.some(m => m.userId.toLowerCase() === currentUserId?.toLowerCase());
 
         if (userAsHome && data.homeTeam) return data.homeTeam.members || [];
         if (userAsAway && data.awayTeam) return data.awayTeam.members || [];
-        
-        // If hub owner but not in a team, and not a captain, show both if we want admin choice
-        // But user said "only show members from my team" - so if they are admin they might need both
-        // Let's assume as admin they pick for the team they "choose" or we show all
+
         if (isHubOwner) {
             return (data.homeTeam?.members || []).concat(data.awayTeam?.members || []);
         }
         return [];
     })();
 
-    const getStatusBadge = (status: string | number, isCompleted?: boolean) => {
-        // If tied and no winner, always show tie-break state
-        if (tieBreakStatus?.isRequired && !data?.winnerTeamParticipantId) {
-             return (
-                <View className="bg-[#F59E0B]/10 px-3 py-1 rounded-full border border-[#F59E0B]/30 flex-row items-center gap-1.5 shadow-sm">
-                    <View className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
-                    <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-tighter">
-                        Tie-Break
-                    </Text>
-                </View>
-            );
-        }
+    // Derived team-level state for the hero pill / outcome footer.
+    const teamState: TeamState = deriveTeamState(data, tieBreakStatus);
+    const approvalRequired = !!((data as any)?.requireResultApproval ?? (data as any)?.RequireResultApproval);
 
-        if (isCompleted) {
-            return (
-                <View className="bg-[#064E3B] px-2 py-1 rounded-full">
-                    <Text className="text-[9px] font-black text-[#10B981] uppercase">
-                        Completed
-                    </Text>
-                </View>
-            );
-        }
+    // Progress over individual matches — drives the "X of N completed" progress strip.
+    const totalSubs = data?.subMatches?.length ?? 0;
+    const completedSubs = data?.subMatches?.filter(sm => {
+        const hasResult = sm.homeScore !== null && sm.awayScore !== null;
+        return hasResult && (sm.status === 'Completed' || sm.status === 2 || sm.status === 3 || !!sm.winnerUserId);
+    }).length ?? 0;
 
-        const statusStr = typeof status === 'number'
-            ? (status === 0 ? 'Pending' : status === 1 ? 'ReadyPhase' : status === 2 ? 'InProgress' : status === 3 ? 'Completed' : status === 4 ? 'TieBreakRequired' : 'Pending')
-            : status;
-
-        switch (statusStr) {
-            case 'Completed':
-            case '2':
-            case '3':
-                return (
-                    <View className="bg-[#064E3B] px-2 py-1 rounded-full">
-                        <Text className="text-[9px] font-black text-[#10B981] uppercase">
-                            Completed
-                        </Text>
-                    </View>
-                );
-            case 'Pending':
-            case '0':
-            case 'Scheduled':
-            case '1':
-            case 'ReadyPhase':
-            case 'InProgress':
-                return (
-                    <View className="bg-yellow-500/10 px-2 py-1 rounded-full">
-                        <Text className="text-[9px] font-black text-yellow-400 uppercase">
-                            Pending
-                        </Text>
-                    </View>
-                );
-            case 'TieBreakRequired':
-            case '4':
-            case '5':
-                return (
-                    <View className="bg-[#F59E0B]/10 px-3 py-1 rounded-full border border-[#F59E0B]/30 flex-row items-center gap-1.5 shadow-sm">
-                        <View className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]" />
-                        <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-tighter">
-                            Tie-Break
-                        </Text>
-                    </View>
-                );
-            default:
-                return (
-                    <View className="bg-[#10B981]/10 px-3 py-1 rounded-full border border-[#10B981]/30 flex-row items-center gap-1.5 shadow-sm">
-                        <View className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                        <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-tighter">
-                            Completed
-                        </Text>
-                    </View>
-                );
-        }
-    };
-
-    const getMatchPill = (status: string | number, isCompleted?: boolean) => {
-        if (isCompleted || status === 'Completed' || status === 3) {
-            return (
-                <View className="bg-[#10B981]/10 px-2 py-0.5 rounded-full border border-[#10B981]/20 mt-1">
-                    <Text className="text-[8px] font-black text-[#10B981] uppercase tracking-widest text-center">
-                        Done
-                    </Text>
-                </View>
-            );
-        }
-        return null;
-    };
-
-    const allEvidences = [...(data?.evidences || []), ...(data?.subMatches?.flatMap(sm => sm.evidences || []) || [])];
+    // Hero score colour rules: winner glows emerald, the rest sit muted. Falls back to neutral when tied.
+    const homeWins = data?.aggregateScore?.homeTeamWins ?? 0;
+    const awayWins = data?.aggregateScore?.awayTeamWins ?? 0;
+    const homeIsHeroWinner = homeWins > awayWins;
+    const awayIsHeroWinner = awayWins > homeWins;
 
     if (!visible) return null;
 
@@ -663,600 +803,1028 @@ export function TeamMatchDetailModal({
             onRequestClose={onClose}
         >
             <View
-                className="flex-1 bg-[#0B1120]"
                 style={{
+                    flex: 1,
+                    backgroundColor: C.bg,
                     paddingTop: Math.max(insets.top, 50),
                     paddingBottom: Math.max(insets.bottom, 20),
                 }}
             >
+                {/* Top accent — subtle emerald halo that fades into the surface. */}
+                <LinearGradient
+                    colors={['rgba(16,185,129,0.10)', 'transparent']}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 220 }}
+                    pointerEvents="none"
+                />
+
                 {/* Header Bar */}
-                <View className="flex-row items-center justify-between px-6 pb-4 mb-2 border-b border-white/5">
-                    <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-white/5 items-center justify-center active:bg-white/10">
-                        <Ionicons name="close" size={20} color="#94A3B8" />
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 20,
+                        paddingBottom: 14,
+                        marginBottom: 4,
+                    }}
+                >
+                    <Pressable
+                        onPress={onClose}
+                        style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 999,
+                            backgroundColor: 'rgba(255,255,255,0.05)',
+                            borderWidth: 1,
+                            borderColor: C.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Ionicons name="close" size={18} color={C.textDim} />
                     </Pressable>
-                    <Text className="text-sm font-black text-white uppercase tracking-[4px]">
-                        MATCH DETAILS
-                    </Text>
-                    <View className="w-10" />
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '900', color: C.textFaint, letterSpacing: 3, textTransform: 'uppercase' }}>
+                            Team Match
+                        </Text>
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: C.text, letterSpacing: 0.4, marginTop: 2 }}>
+                            Match Details
+                        </Text>
+                    </View>
+                    <View style={{ width: 40 }} />
                 </View>
 
                 {isLoading ? (
-                    <View className="flex-1 items-center justify-center">
-                        <ActivityIndicator size="large" color="#10B981" />
-                        <Text className="text-muted-foreground mt-4 font-bold uppercase tracking-widest text-[10px]">Loading match data...</Text>
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        <ActivityIndicator size="large" color={C.emerald} />
+                        <Text style={{ marginTop: 16, color: C.textDim, fontWeight: '800', letterSpacing: 2, fontSize: 10, textTransform: 'uppercase' }}>
+                            Loading match data
+                        </Text>
                     </View>
                 ) : error || !data ? (
-                    <View className="flex-1 items-center justify-center px-6">
-                        <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                        <Text className="text-destructive mt-4 text-center font-medium">
+                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+                        <Ionicons name="alert-circle-outline" size={48} color={C.red} />
+                        <Text style={{ marginTop: 16, color: C.red, textAlign: 'center', fontWeight: '600' }}>
                             {error || 'Match data unavailable'}
                         </Text>
                         <Button onPress={fetchData} className="mt-6">Retry</Button>
                     </View>
                 ) : (
                     <ScrollView
-                        className="flex-1"
-                        contentContainerStyle={{ paddingBottom: 40 }}
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ paddingBottom: 48 }}
                         showsVerticalScrollIndicator={false}
                     >
-                        {/* Match Header */}
-                        <View className="px-6 py-8 items-center">
-                            <View className="flex-row items-center justify-center py-6 w-full bg-muted/10 rounded-3xl border border-border/10 shadow-sm">
-                                {/* Home Team */}
-                                <View className="items-center flex-1">
-                                    <View className="mb-2">
-                                        {data?.homeTeam?.avatarUrl ? (
-                                            <PlayerAvatar
-                                                src={data?.homeTeam?.avatarUrl}
-                                                name={data?.homeTeam?.teamName || ''}
-                                                size="lg"
-                                                className="rounded-2xl border-0"
-                                            />
-                                        ) : (
-                                            <View className="w-14 h-14 rounded-2xl bg-[#10B981]/10 items-center justify-center">
-                                                <Ionicons name="people" size={24} color="#10B981" />
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text
-                                        className="text-sm font-black text-foreground text-center"
-                                        numberOfLines={2}
+                        {/* ─── HERO CARD ────────────────────────────────────────────── */}
+                        <View style={{ paddingHorizontal: 16, marginBottom: 18 }}>
+                            <View
+                                style={{
+                                    borderRadius: 28,
+                                    overflow: 'hidden',
+                                    backgroundColor: C.surfaceRaised,
+                                    borderWidth: 1,
+                                    borderColor: C.border,
+                                    shadowColor: '#000',
+                                    shadowOpacity: 0.35,
+                                    shadowRadius: 16,
+                                    shadowOffset: { width: 0, height: 8 },
+                                    elevation: 8,
+                                }}
+                            >
+                                <LinearGradient
+                                    colors={['rgba(255,255,255,0.04)', 'transparent']}
+                                    style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '100%' }}
+                                />
+
+                                {/* Header row inside hero — small label + state pill */}
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingHorizontal: 18,
+                                        paddingTop: 16,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            backgroundColor: 'rgba(255,255,255,0.04)',
+                                            borderWidth: 1,
+                                            borderColor: C.border,
+                                            paddingHorizontal: 9,
+                                            paddingVertical: 4,
+                                            borderRadius: 999,
+                                        }}
                                     >
-                                        {data?.homeTeam?.teamName || 'Unknown'}
-                                    </Text>
+                                        <Text style={{ fontSize: 8, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                            Best of {totalSubs || '—'}
+                                        </Text>
+                                    </View>
+                                    <StatusPill state={teamState} />
                                 </View>
 
-                                {/* Score */}
-                                <View className="items-center px-4">
-                                    <View className="flex-row items-center mb-1">
-                                        <Text className={`text-6xl font-black ${(data?.aggregateScore?.homeTeamWins ?? 0) > (data?.aggregateScore?.awayTeamWins ?? 0) ? 'text-[#10B981]' : 'text-white/20'}`}>
-                                            {data?.aggregateScore?.homeTeamWins ?? 0}
-                                        </Text>
-                                        <Text className="text-3xl font-black text-white/10 mx-3">:</Text>
-                                        <Text className={`text-6xl font-black ${(data?.aggregateScore?.awayTeamWins ?? 0) > (data?.aggregateScore?.homeTeamWins ?? 0) ? 'text-[#10B981]' : 'text-foreground'}`}>
-                                            {data?.aggregateScore?.awayTeamWins ?? 0}
-                                        </Text>
+                                {/* Teams + Score */}
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'flex-start',
+                                        paddingHorizontal: 16,
+                                        paddingTop: 14,
+                                        paddingBottom: 16,
+                                    }}
+                                >
+                                    <TeamCrest
+                                        avatarUrl={data?.homeTeam?.avatarUrl}
+                                        teamName={data?.homeTeam?.teamName}
+                                        isWinner={teamState === 'completed' && homeIsHeroWinner}
+                                    />
+
+                                    {/* Score block */}
+                                    <View style={{ paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', minWidth: 96, paddingTop: 6 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                                            <Text
+                                                style={{
+                                                    fontSize: 46,
+                                                    lineHeight: 50,
+                                                    fontWeight: '900',
+                                                    letterSpacing: -1.5,
+                                                    color: homeIsHeroWinner ? C.emerald : (homeWins === awayWins ? C.text : 'rgba(255,255,255,0.18)'),
+                                                }}
+                                            >
+                                                {homeWins}
+                                            </Text>
+                                            <Text style={{ fontSize: 22, fontWeight: '900', color: 'rgba(255,255,255,0.10)', marginHorizontal: 8 }}>
+                                                :
+                                            </Text>
+                                            <Text
+                                                style={{
+                                                    fontSize: 46,
+                                                    lineHeight: 50,
+                                                    fontWeight: '900',
+                                                    letterSpacing: -1.5,
+                                                    color: awayIsHeroWinner ? C.emerald : (homeWins === awayWins ? C.text : 'rgba(255,255,255,0.18)'),
+                                                }}
+                                            >
+                                                {awayWins}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <View className="mt-2">
-                                        {getStatusBadge(data?.status || 'Pending', !!data?.winnerTeamParticipantId)}
-                                    </View>
+
+                                    <TeamCrest
+                                        avatarUrl={data?.awayTeam?.avatarUrl}
+                                        teamName={data?.awayTeam?.teamName}
+                                        isWinner={teamState === 'completed' && awayIsHeroWinner}
+                                    />
                                 </View>
 
-                                {/* Away Team */}
-                                <View className="items-center flex-1">
-                                    <View className="mb-2">
-                                        {data?.awayTeam?.avatarUrl ? (
-                                            <PlayerAvatar
-                                                src={data?.awayTeam?.avatarUrl}
-                                                name={data?.awayTeam?.teamName || ''}
-                                                size="lg"
-                                                className="rounded-2xl border-0"
-                                            />
-                                        ) : (
-                                            <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center">
-                                                <Ionicons name="people" size={24} color="#6366f1" />
-                                            </View>
-                                        )}
+                                {/* Bottom stat strip — aggregate sub-totals + progress */}
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingHorizontal: 18,
+                                        paddingVertical: 12,
+                                        borderTopWidth: 1,
+                                        borderTopColor: 'rgba(255,255,255,0.04)',
+                                        backgroundColor: 'rgba(0,0,0,0.25)',
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                        <Ionicons name="stats-chart" size={11} color={C.textFaint} />
+                                        <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                            Aggregate
+                                        </Text>
+                                        <Text style={{ fontSize: 11, fontWeight: '900', color: C.textDim, marginLeft: 2 }}>
+                                            {data?.aggregateScore?.homeTeamTotalScore ?? 0}
+                                            <Text style={{ color: C.textGhost }}>  –  </Text>
+                                            {data?.aggregateScore?.awayTeamTotalScore ?? 0}
+                                        </Text>
                                     </View>
-                                    <Text
-                                        className="text-sm font-black text-foreground text-center"
-                                        numberOfLines={2}
-                                    >
-                                        {data?.awayTeam?.teamName || 'Unknown'}
+                                    <Text style={{ fontSize: 10, fontWeight: '900', color: C.textFaint, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                                        {completedSubs} / {totalSubs} Done
                                     </Text>
                                 </View>
                             </View>
                         </View>
 
-                        {/* Tie-Break Banner */}
+                        {/* ─── TIE-BREAK ACTION BANNER ──────────────────────────────── */}
                         {tieBreakStatus?.isRequired && !data?.winnerTeamParticipantId && (
-                            <View className="mx-6 mb-4">
-                                <View className="bg-[#F59E0B]/10 p-4 rounded-2xl border border-[#F59E0B]/20">
-                                    <View className="flex-row items-center gap-2 mb-2">
-                                        <Ionicons name="warning" size={18} color="#F59E0B" />
-                                        <Text className="text-sm font-black text-[#F59E0B]">
-                                            {tieBreakStatus.homeRepresentative && tieBreakStatus.awayRepresentative
-                                                ? TEAM_LABELS.TIE_BREAK_IN_PROGRESS
-                                                : TEAM_LABELS.TIE_BREAK_BANNER}
-                                        </Text>
-                                    </View>
+                            <View style={{ paddingHorizontal: 16, marginBottom: 18 }}>
+                                <View
+                                    style={{
+                                        borderRadius: 24,
+                                        overflow: 'hidden',
+                                        backgroundColor: C.surfaceRaised,
+                                        borderWidth: 1,
+                                        borderColor: C.amberRing,
+                                    }}
+                                >
+                                    {/* Amber edge accent */}
+                                    <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: C.amber }} />
+                                    <LinearGradient
+                                        colors={['rgba(245,158,11,0.10)', 'transparent']}
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                    />
 
-                                    {/* Representative status */}
-                                    <View className="gap-2 mt-2">
-                                        <View className="flex-row items-center justify-between">
-                                            <Text className="text-xs text-muted-foreground font-bold">
-                                                {TEAM_LABELS.HOME_REPRESENTATIVE}:
-                                            </Text>
-                                            <Text className="text-xs font-bold text-foreground">
-                                                {tieBreakStatus.homeRepresentative?.username || TEAM_LABELS.WAITING_LABEL}
-                                            </Text>
+                                    <View style={{ padding: 18, paddingLeft: 22 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                            <View
+                                                style={{
+                                                    width: 32, height: 32, borderRadius: 12,
+                                                    backgroundColor: C.amberSoft,
+                                                    borderWidth: 1, borderColor: C.amberRing,
+                                                    alignItems: 'center', justifyContent: 'center',
+                                                }}
+                                            >
+                                                <Ionicons name="flash" size={16} color={C.amber} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>
+                                                    Tie-Break Required
+                                                </Text>
+                                                <Text style={{ fontSize: 12, fontWeight: '800', color: C.text }}>
+                                                    {tieBreakStatus.homeRepresentative && tieBreakStatus.awayRepresentative
+                                                        ? TEAM_LABELS.TIE_BREAK_IN_PROGRESS
+                                                        : TEAM_LABELS.TIE_BREAK_BANNER}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View className="flex-row items-center justify-between">
-                                            <Text className="text-xs text-muted-foreground font-bold">
-                                                {TEAM_LABELS.AWAY_REPRESENTATIVE}:
-                                            </Text>
-                                            <Text className="text-xs font-bold text-foreground">
-                                                {tieBreakStatus.awayRepresentative?.username || TEAM_LABELS.WAITING_LABEL}
-                                            </Text>
-                                        </View>
-                                    </View>
 
-                                    {/* Select Representative Button */}
-                                    {(isCaptainOfEitherTeam || isHubOwner) && !isTieBreakMatchCreated && (
-                                        <Button
-                                            className="mt-3 bg-[#F59E0B]"
-                                            size="sm"
-                                            onPress={() => setShowRepPicker(true)}
-                                            loading={isSubmittingRep}
+                                        {/* Reps */}
+                                        <View
+                                            style={{
+                                                backgroundColor: 'rgba(0,0,0,0.30)',
+                                                borderRadius: 14,
+                                                paddingHorizontal: 12,
+                                                paddingVertical: 10,
+                                                marginBottom: 12,
+                                                borderWidth: 1,
+                                                borderColor: 'rgba(255,255,255,0.04)',
+                                            }}
                                         >
-                                            <Text className="text-white font-black uppercase text-[10px]">
-                                                {isHubOwner && !isCaptainOfEitherTeam ? "Admin: " : ""}
-                                                {hasSubmittedRep ? "Change Representative" : String(TEAM_LABELS.SELECT_REPRESENTATIVE)}
-                                            </Text>
-                                        </Button>
-                                    )}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                                <Text style={{ fontSize: 10, fontWeight: '800', color: C.textDim, letterSpacing: 0.5 }}>
+                                                    {TEAM_LABELS.HOME_REPRESENTATIVE}
+                                                </Text>
+                                                <Text style={{ fontSize: 11, fontWeight: '900', color: tieBreakStatus.homeRepresentative ? C.text : C.textFaint }}>
+                                                    {tieBreakStatus.homeRepresentative?.username || TEAM_LABELS.WAITING_LABEL}
+                                                </Text>
+                                            </View>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Text style={{ fontSize: 10, fontWeight: '800', color: C.textDim, letterSpacing: 0.5 }}>
+                                                    {TEAM_LABELS.AWAY_REPRESENTATIVE}
+                                                </Text>
+                                                <Text style={{ fontSize: 11, fontWeight: '900', color: tieBreakStatus.awayRepresentative ? C.text : C.textFaint }}>
+                                                    {tieBreakStatus.awayRepresentative?.username || TEAM_LABELS.WAITING_LABEL}
+                                                </Text>
+                                            </View>
+                                        </View>
 
-                                    {isCaptainOfEitherTeam && hasSubmittedRep && (
-                                        <Text className="text-xs text-[#F59E0B] mt-2 text-center font-bold">
-                                            {TEAM_LABELS.WAITING_FOR_OPPONENT}
-                                        </Text>
-                                    )}
+                                        {(isCaptainOfEitherTeam || isHubOwner) && !isTieBreakMatchCreated && (
+                                            <Pressable
+                                                onPress={() => setShowRepPicker(true)}
+                                                disabled={isSubmittingRep}
+                                                style={{
+                                                    backgroundColor: C.amber,
+                                                    borderRadius: 14,
+                                                    paddingVertical: 11,
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                }}
+                                            >
+                                                {isSubmittingRep ? (
+                                                    <ActivityIndicator size="small" color="#0F172A" />
+                                                ) : (
+                                                    <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.6, textTransform: 'uppercase' }}>
+                                                        {isHubOwner && !isCaptainOfEitherTeam ? 'Admin: ' : ''}
+                                                        {hasSubmittedRep ? 'Change Representative' : String(TEAM_LABELS.SELECT_REPRESENTATIVE)}
+                                                    </Text>
+                                                )}
+                                            </Pressable>
+                                        )}
+
+                                        {isCaptainOfEitherTeam && hasSubmittedRep && (
+                                            <Text style={{ fontSize: 10, fontWeight: '800', color: C.amber, textAlign: 'center', marginTop: 8, letterSpacing: 0.5 }}>
+                                                {TEAM_LABELS.WAITING_FOR_OPPONENT}
+                                            </Text>
+                                        )}
+                                    </View>
                                 </View>
                             </View>
                         )}
 
-                        {/* Sub-Matches */}
-                        <View className="px-6">
-                            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[2px] mb-4 ml-1">
-                                INDIVIDUAL MATCHES
-                            </Text>
-
-                            {data.subMatches.map((sm) => (
+                        {/* ─── SUB-MATCHES ───────────────────────────────────────────── */}
+                        <View style={{ paddingHorizontal: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '900', color: C.textFaint, letterSpacing: 2.5, textTransform: 'uppercase' }}>
+                                    Individual Games
+                                </Text>
                                 <View
-                                    key={sm.matchId}
-                                    className="bg-[#111827]/40 rounded-[28px] border border-white/5 p-4 mb-3 shadow-sm"
+                                    style={{
+                                        marginLeft: 10,
+                                        backgroundColor: 'rgba(255,255,255,0.04)',
+                                        borderWidth: 1, borderColor: C.border,
+                                        borderRadius: 999,
+                                        paddingHorizontal: 8, paddingVertical: 2,
+                                    }}
                                 >
-                                    {sm.isTieBreakMatch && (
-                                        <View className="bg-[#F59E0B]/10 px-2 py-0.5 rounded-full self-start mb-3 border border-[#F59E0B]/20">
-                                            <Text className="text-[7px] font-black text-[#F59E0B] uppercase tracking-widest">
-                                                {TEAM_LABELS.TIE_BREAK_LABEL}
-                                            </Text>
-                                        </View>
-                                    )}
- 
-                                    <View className="flex-row items-center justify-between py-1">
-                                        {/* Home player */}
-                                        <Pressable 
-                                            onPress={() => {
-                                                if (sm.homePlayer?.userId) {
-                                                    onClose();
-                                                    navigation.navigate('PlayerProfile', { id: sm.homePlayer.userId });
-                                                }
+                                    <Text style={{ fontSize: 9, fontWeight: '900', color: C.textDim }}>{totalSubs}</Text>
+                                </View>
+                            </View>
+
+                            {data.subMatches.map((sm, idx) => {
+                                const subState: SubState = deriveSubState(sm, approvalRequired);
+                                const palette = paletteFor(subState);
+                                const hasScore = sm.homeScore !== null && sm.awayScore !== null;
+                                const homeWinner = !!sm.winnerUserId && sm.winnerUserId === sm.homePlayer?.userId;
+                                const awayWinner = !!sm.winnerUserId && sm.winnerUserId === sm.awayPlayer?.userId;
+
+                                // Action eligibility — same rules as the previous build, kept verbatim so behaviour doesn't drift.
+                                const homeId = (sm.homePlayer?.userId || (sm as any).HomePlayer?.userId || '').toLowerCase();
+                                const awayId = (sm.awayPlayer?.userId || (sm as any).AwayPlayer?.userId || '').toLowerCase();
+                                const me = (currentUserId || '').toLowerCase();
+                                const isPlayerOfSub = !!me && (me === homeId || me === awayId);
+                                const hasRecordedResult = (sm.homeScore !== null && sm.awayScore !== null) || !!sm.winnerUserId;
+                                const canEdit = sm.status !== 'Pending' && isHubOwner;
+                                const canDelete = hasRecordedResult && (isHubOwner || (isPlayerOfSub && !approvalRequired));
+
+                                // Pending proposal — surfaced only while approval is required and the sub-match has not yet completed.
+                                const proposed = (sm as any).proposedByUserId ?? (sm as any).ProposedByUserId;
+                                const subPending = sm.status === 'Pending' || sm.status === 0 || sm.status === 1;
+                                const hasProposal = approvalRequired && !!proposed && subPending;
+                                const phs = (sm as any).proposedHomeScore ?? (sm as any).ProposedHomeScore ?? 0;
+                                const pas = (sm as any).proposedAwayScore ?? (sm as any).ProposedAwayScore ?? 0;
+                                const isProposer = hasProposal && !!currentUserId && String(proposed).toLowerCase() === currentUserId.toLowerCase();
+                                const isOpponent = hasProposal && !isProposer && (me === homeId || me === awayId);
+                                const canDecide = hasProposal && (isOpponent || isHubOwner);
+
+                                const expanded = expandedGameId === sm.matchId;
+                                // Owner reports straight from the expanded panel whenever the game has no recorded
+                                // result yet (any not-scored status, not just code 0/1) — explicit Edit opens scored ones.
+                                const showForm = expanded && (
+                                    editingMatchId === sm.matchId ||
+                                    (isHubOwner && !hasRecordedResult && !hasProposal && editingMatchId === null)
+                                );
+                                const hasEvidence = (sm.evidences?.length || 0) > 0;
+                                // A row only expands when there's something behind the tap (evidence, a pending
+                                // proposal, or owner actions); otherwise it just shows a state dot.
+                                const hasExpandableDetail = hasEvidence || hasProposal || canEdit || canDelete || (isHubOwner && !hasRecordedResult);
+
+                                return (
+                                    <View
+                                        key={sm.matchId}
+                                        style={{
+                                            marginBottom: 10,
+                                            borderRadius: 18,
+                                            overflow: 'hidden',
+                                            backgroundColor: C.surfaceRaised,
+                                            borderWidth: 1,
+                                            borderColor: subState === 'completed' ? 'rgba(16,185,129,0.16)' : C.border,
+                                            shadowColor: subState === 'completed' ? C.emerald : '#000',
+                                            shadowOpacity: subState === 'completed' ? 0.14 : 0.18,
+                                            shadowRadius: subState === 'completed' ? 10 : 6,
+                                            shadowOffset: { width: 0, height: 3 },
+                                            elevation: 3,
+                                        }}
+                                    >
+                                        {/* Left accent strip */}
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+                                                left: 0, top: 10, bottom: 10,
+                                                width: 3,
+                                                borderTopRightRadius: 3,
+                                                borderBottomRightRadius: 3,
+                                                backgroundColor: palette.accent,
+                                                opacity: subState === 'pending' ? 0.5 : 1,
                                             }}
-                                            className="flex-1 items-center gap-1.5"
+                                        />
+
+                                        {/* Collapsed row — one compact line: players · score · expand. */}
+                                        <Pressable
+                                            onPress={() => toggleGame(sm.matchId)}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                paddingVertical: 11,
+                                                paddingLeft: 12,
+                                                paddingRight: 10,
+                                            }}
                                         >
-                                            <PlayerAvatar
-                                                src={sm.homePlayer?.avatarUrl}
-                                                name={sm.homePlayer?.username || 'Unknown'}
-                                                size="md"
-                                                className="rounded-xl"
-                                            />
-                                            <Text className="text-[11px] text-slate-200 font-bold text-center w-full px-1" numberOfLines={1}>
-                                                {sm.homePlayer?.username || 'Unknown'}
-                                            </Text>
-                                        </Pressable>
- 
-                                        {/* Score Center */}
-                                        <View className="items-center justify-center px-1 min-w-[80px]">
-                                            {sm.homeScore !== null && sm.awayScore !== null ? (
-                                                <View className="items-center">
-                                                    <View className="flex-row items-center">
-                                                        <Text className={`text-2xl font-black ${(sm.homeScore ?? 0) > (sm.awayScore ?? 0) ? 'text-[#10B981]' : 'text-slate-300'}`}>
+                                            {/* Home player */}
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                <Pressable
+                                                    onPress={() => {
+                                                        if (sm.homePlayer?.userId) {
+                                                            onClose();
+                                                            navigation.navigate('PlayerProfile', { id: sm.homePlayer.userId });
+                                                        }
+                                                    }}
+                                                >
+                                                    <Avatar url={sm.homePlayer?.avatarUrl} name={sm.homePlayer?.username || '?'} size={24} ring={homeWinner} />
+                                                </Pressable>
+                                                <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, fontWeight: '800', color: homeWinner ? C.emerald : C.text }}>
+                                                    {sm.homePlayer?.username || 'Unknown'}
+                                                </Text>
+                                            </View>
+
+                                            {/* Center — game label + score / state */}
+                                            <View style={{ width: 60, alignItems: 'center', paddingHorizontal: 2 }}>
+                                                <Text style={{ fontSize: 7.5, fontWeight: '900', color: sm.isTieBreakMatch ? C.amber : C.textFaint, letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 2 }}>
+                                                    {sm.isTieBreakMatch ? TEAM_LABELS.TIE_BREAK_LABEL : `Game ${idx + 1}`}
+                                                </Text>
+                                                {hasScore ? (
+                                                    <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                                                        <Text style={{ fontSize: 16, fontWeight: '900', color: (sm.homeScore ?? 0) > (sm.awayScore ?? 0) ? C.emerald : 'rgba(255,255,255,0.30)' }}>
                                                             {sm.homeScore}
                                                         </Text>
-                                                        <Text className="text-base text-slate-600 font-black mx-2">:</Text>
-                                                        <Text className={`text-2xl font-black ${(sm.awayScore ?? 0) > (sm.homeScore ?? 0) ? 'text-[#10B981]' : 'text-slate-300'}`}>
+                                                        <Text style={{ fontSize: 11, fontWeight: '900', color: C.textGhost, marginHorizontal: 3 }}>:</Text>
+                                                        <Text style={{ fontSize: 16, fontWeight: '900', color: (sm.awayScore ?? 0) > (sm.homeScore ?? 0) ? C.emerald : 'rgba(255,255,255,0.30)' }}>
                                                             {sm.awayScore}
                                                         </Text>
                                                     </View>
-                                                    <View className="mt-0.5">
-                                                        {getMatchPill(sm.status, !!sm.winnerUserId)}
-                                                    </View>
-                                                </View>
-                                            ) : (
-                                                <View className="bg-white/5 py-0.5 px-2.5 rounded-lg border border-white/10">
-                                                    <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest text-center">VS</Text>
-                                                </View>
-                                            )}
-                                        </View>
- 
-                                        {/* Away player */}
-                                        <Pressable 
-                                            onPress={() => {
-                                                if (sm.awayPlayer?.userId) {
-                                                    onClose();
-                                                    navigation.navigate('PlayerProfile', { id: sm.awayPlayer.userId });
-                                                }
-                                            }}
-                                            className="flex-1 items-center gap-1.5"
-                                        >
-                                            <PlayerAvatar
-                                                src={sm.awayPlayer?.avatarUrl}
-                                                name={sm.awayPlayer?.username || 'Unknown'}
-                                                size="md"
-                                                className="rounded-xl"
-                                            />
-                                            <Text className="text-[11px] text-slate-200 font-bold text-center w-full px-1" numberOfLines={1}>
-                                                {sm.awayPlayer?.username || 'Unknown'}
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-
-                                    {(() => {
-                                        // Pending proposal — surfaced only while approval is required and the sub-match has not yet completed.
-                                        const approvalRequired = !!(data?.requireResultApproval ?? data?.RequireResultApproval);
-                                        const proposedBy = (sm.proposedByUserId ?? sm.ProposedByUserId) || null;
-                                        const subPending = sm.status === 'Pending' || sm.status === 0 || sm.status === 1;
-                                        const hasProposal = approvalRequired && !!proposedBy && subPending;
-                                        if (!hasProposal) return null;
-
-                                        const phs = sm.proposedHomeScore ?? sm.ProposedHomeScore ?? 0;
-                                        const pas = sm.proposedAwayScore ?? sm.ProposedAwayScore ?? 0;
-                                        const isProposer = !!currentUserId && proposedBy!.toLowerCase() === currentUserId.toLowerCase();
-                                        const homeId = (sm.homePlayer?.userId || sm.HomePlayer?.userId || '').toLowerCase();
-                                        const awayId = (sm.awayPlayer?.userId || sm.AwayPlayer?.userId || '').toLowerCase();
-                                        const me = (currentUserId || '').toLowerCase();
-                                        const isOpponent = !isProposer && (me === homeId || me === awayId);
-                                        const canDecide = isOpponent || isHubOwner;
-
-                                        return (
-                                            <View className="mt-3 pt-3 border-t border-[#F59E0B]/20">
-                                                <View className="bg-[#F59E0B]/[0.06] rounded-xl border border-[#F59E0B]/15 p-3">
-                                                    <View className="flex-row items-center justify-between mb-2">
-                                                        <View className="bg-[#F59E0B]/15 px-2 py-0.5 rounded-md border border-[#F59E0B]/25">
-                                                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-widest">
-                                                                {isProposer ? 'Awaiting Approval' : 'Result Reported'}
-                                                            </Text>
-                                                        </View>
-                                                        <Text className="text-[14px] font-black text-[#F59E0B]">{phs} : {pas}</Text>
-                                                    </View>
-                                                    {canDecide && (
-                                                        <View className="flex-row gap-2 mt-1">
-                                                            <Pressable
-                                                                onPress={() => handleRejectSubMatch(sm)}
-                                                                disabled={submittingScoreId === sm.matchId}
-                                                                className="flex-1 bg-red-500/10 rounded-lg py-2 items-center border border-red-500/20 active:opacity-70"
-                                                            >
-                                                                {submittingScoreId === sm.matchId ? (
-                                                                    <ActivityIndicator size="small" color="#F87171" />
-                                                                ) : (
-                                                                    <Text className="text-[10px] font-black text-red-400 uppercase tracking-wider">Reject</Text>
-                                                                )}
-                                                            </Pressable>
-                                                            <Pressable
-                                                                onPress={() => handleApproveSubMatch(sm)}
-                                                                disabled={submittingScoreId === sm.matchId}
-                                                                className="flex-1 bg-[#10B981] rounded-lg py-2 items-center active:opacity-80"
-                                                            >
-                                                                {submittingScoreId === sm.matchId ? (
-                                                                    <ActivityIndicator size="small" color="#0F172A" />
-                                                                ) : (
-                                                                    <Text className="text-[10px] font-black text-[#0F172A] uppercase tracking-wider">Approve</Text>
-                                                                )}
-                                                            </Pressable>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                            </View>
-                                        );
-                                    })()}
-
-                                    {/* Evidence & Edit Mode */}
-                                    {editingMatchId === sm.matchId || (isHubOwner && sm.status === 'Pending') ? (
-                                        <View className="mt-3 pt-3 border-t border-border/10">
-                                            {/* Score Input */}
-                                            <View className="flex-row items-center gap-2 mb-3">
-                                                <TextInput
-                                                    className="flex-1 bg-muted/30 px-3 h-10 rounded-xl text-foreground text-center border border-border/10 font-black"
-                                                    placeholder="0"
-                                                    placeholderTextColor="#71717A"
-                                                    keyboardType="numeric"
-                                                    value={scoreInputs[sm.matchId]?.home || ''}
-                                                    onChangeText={(v) => handleScoreChange(sm.matchId, 'home', v)}
-                                                />
-                                                <Text className="text-muted-foreground font-bold text-xs">—</Text>
-                                                <TextInput
-                                                    className="flex-1 bg-muted/30 px-3 h-10 rounded-xl text-foreground text-center border border-border/10 font-black"
-                                                    placeholder="0"
-                                                    placeholderTextColor="#71717A"
-                                                    keyboardType="numeric"
-                                                    value={scoreInputs[sm.matchId]?.away || ''}
-                                                    onChangeText={(v) => handleScoreChange(sm.matchId, 'away', v)}
-                                                />
-                                            </View>
-                                            
-                                            {/* Evidence Section */}
-                                            <View className="mb-4">
-                                                <View className="flex-row items-center justify-between mb-2">
-                                                    <View className="flex-row items-center gap-1.5">
-                                                        <View className="w-5 h-5 rounded-md bg-[#10B981]/10 items-center justify-center">
-                                                            <Ionicons name="images-outline" size={12} color="#10B981" />
-                                                        </View>
-                                                        <Text className="text-[10px] font-black text-white uppercase tracking-widest">Evidence</Text>
-                                                    </View>
-                                                    <Pressable onPress={pickImages} className="bg-[#10B981]/10 px-2 py-1 rounded-md border border-[#10B981]/20">
-                                                        <Text className="text-[9px] font-black text-[#10B981] uppercase tracking-wider">Add</Text>
-                                                    </Pressable>
-                                                </View>
-                                                {selectedImages.length > 0 ? (
-                                                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                                        {selectedImages.map((img, index) => (
-                                                            <View key={img.uri + index} className="mr-2 mb-1">
-                                                                <View className="rounded-xl overflow-hidden border border-white/5">
-                                                                    <Image source={{ uri: img.uri }} className="w-16 h-16" />
-                                                                </View>
-                                                                <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1 -right-1 bg-red-500 w-4 h-4 rounded-full items-center justify-center border border-[#0B1120] shadow-sm">
-                                                                    <Ionicons name="close" size={8} color="white" />
-                                                                </Pressable>
-                                                            </View>
-                                                        ))}
-                                                    </ScrollView>
+                                                ) : hasProposal ? (
+                                                    <Text style={{ fontSize: 14, fontWeight: '900', color: C.amber }}>
+                                                        {phs} : {pas}
+                                                    </Text>
                                                 ) : (
-                                                    <Pressable onPress={pickImages} className="h-14 border border-dashed border-white/10 rounded-xl items-center justify-center bg-white/[0.02]">
-                                                        <Text className="text-[10px] text-slate-600 font-bold">No photos selected</Text>
-                                                    </Pressable>
+                                                    <Text style={{ fontSize: 10, fontWeight: '900', color: C.textGhost, letterSpacing: 2 }}>VS</Text>
                                                 )}
                                             </View>
 
-                                            <View className="flex-row gap-2">
-                                                {sm.status !== 'Pending' && (
-                                                    <Pressable onPress={handleCancelEdit} className="flex-1 bg-white/5 rounded-xl py-2 items-center border border-white/10 active:opacity-70">
-                                                        <Text className="text-xs font-black text-slate-400 uppercase tracking-wider">Cancel</Text>
-                                                    </Pressable>
-                                                )}
-                                                <Pressable 
-                                                    onPress={() => handleSubmitScore(sm)} 
-                                                    className="flex-1 bg-primary/90 rounded-xl py-2 items-center active:opacity-80"
+                                            {/* Away player */}
+                                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                                                <Text numberOfLines={1} style={{ flex: 1, textAlign: 'right', fontSize: 12, fontWeight: '800', color: awayWinner ? C.emerald : C.text }}>
+                                                    {sm.awayPlayer?.username || 'Unknown'}
+                                                </Text>
+                                                <Pressable
+                                                    onPress={() => {
+                                                        if (sm.awayPlayer?.userId) {
+                                                            onClose();
+                                                            navigation.navigate('PlayerProfile', { id: sm.awayPlayer.userId });
+                                                        }
+                                                    }}
                                                 >
-                                                    {submittingScoreId === sm.matchId ? (
-                                                        <ActivityIndicator size="small" color="#0F172A" />
-                                                    ) : (
-                                                        <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">Save</Text>
-                                                    )}
+                                                    <Avatar url={sm.awayPlayer?.avatarUrl} name={sm.awayPlayer?.username || '?'} size={24} ring={awayWinner} />
                                                 </Pressable>
                                             </View>
-                                        </View>
-                                    ) : (
-                                        (() => {
-                                            // Owner/admin can edit & delete any completed sub-match. A player of THIS
-                                            // game can also delete their own result (mirrors solo), except in approval
-                                            // mode where a confirmed result stays locked to managers. Reporting/editing
-                                            // remains owner-driven in this modal.
-                                            const homeId = (sm.homePlayer?.userId || sm.HomePlayer?.userId || '').toLowerCase();
-                                            const awayId = (sm.awayPlayer?.userId || sm.AwayPlayer?.userId || '').toLowerCase();
-                                            const me = (currentUserId || '').toLowerCase();
-                                            const isPlayerOfSub = !!me && (me === homeId || me === awayId);
-                                            const approvalRequired = !!(data?.requireResultApproval ?? data?.RequireResultApproval);
-                                            const hasResult = sm.status !== 'Pending';
-                                            // Delete only makes sense once an actual result is recorded — scores present
-                                            // (mirrors the score-vs-"VS" display above) or a winner set for a forfeit.
-                                            // Status alone is unreliable here: the backend can serialize it as a number,
-                                            // so `status !== 'Pending'` is true even for an unplayed match.
-                                            const hasRecordedResult = (sm.homeScore !== null && sm.awayScore !== null) || !!sm.winnerUserId;
-                                            const canEdit = hasResult && isHubOwner;
-                                            const canDelete = hasRecordedResult && (isHubOwner || (isPlayerOfSub && !approvalRequired));
-                                            if (!canEdit && !canDelete) return null;
-                                            return (
-                                                <View className="flex-row justify-end gap-2 mt-2 pt-2 border-t border-border/10">
+
+                                            {/* Expand affordance — chevron when there's detail, otherwise a state dot */}
+                                            <View style={{ width: 16, alignItems: 'center', marginLeft: 2 }}>
+                                                {hasExpandableDetail ? (
+                                                    <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.textFaint} />
+                                                ) : (
+                                                    <View style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: palette.accent, opacity: subState === 'pending' ? 0.6 : 1 }} />
+                                                )}
+                                            </View>
+                                        </Pressable>
+
+                                        {/* Expanded detail panel */}
+                                        {expanded && hasExpandableDetail && (
+                                        <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 12 }}>
+                                            {!showForm && (
+                                                <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
+                                                    <StatusPill state={subState} size="sm" />
+                                                </View>
+                                            )}
+
+                                        {/* Inline evidence thumbnails — folds the old global Evidence section into context. */}
+                                        {(sm.evidences?.length || 0) > 0 && (
+                                            <View
+                                                style={{
+                                                    paddingHorizontal: 14,
+                                                    paddingBottom: 12,
+                                                    paddingTop: 4,
+                                                }}
+                                            >
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                                    <Ionicons name="images-outline" size={11} color={C.indigo} />
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                                        Evidence
+                                                    </Text>
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: C.textGhost }}>
+                                                        ({(sm.evidences?.length ?? 0)})
+                                                    </Text>
+                                                </View>
+                                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                                    {(sm.evidences ?? []).slice(0, 6).map((url, eIdx) => (
+                                                        <Pressable
+                                                            key={eIdx}
+                                                            onPress={() => setPreviewImage(url)}
+                                                            style={{ marginRight: 8 }}
+                                                        >
+                                                            <View
+                                                                style={{
+                                                                    borderRadius: 12,
+                                                                    overflow: 'hidden',
+                                                                    borderWidth: 1, borderColor: C.border,
+                                                                    width: 72, height: 72,
+                                                                }}
+                                                            >
+                                                                <Image
+                                                                    source={{ uri: getOptimizedCloudinaryUrl(url, 200) }}
+                                                                    style={{ width: 72, height: 72 }}
+                                                                    resizeMode="cover"
+                                                                />
+                                                            </View>
+                                                        </Pressable>
+                                                    ))}
+                                                    {(sm.evidences?.length ?? 0) > 6 && (
+                                                        <View
+                                                            style={{
+                                                                width: 72, height: 72, borderRadius: 12,
+                                                                backgroundColor: 'rgba(255,255,255,0.04)',
+                                                                borderWidth: 1, borderColor: C.border,
+                                                                alignItems: 'center', justifyContent: 'center',
+                                                            }}
+                                                        >
+                                                            <Text style={{ color: C.textDim, fontWeight: '900', fontSize: 11 }}>
+                                                                +{(sm.evidences?.length ?? 0) - 6}
+                                                            </Text>
+                                                        </View>
+                                                    )}
+                                                </ScrollView>
+                                            </View>
+                                        )}
+
+                                        {/* Awaiting-approval row */}
+                                        {hasProposal && (
+                                            <View
+                                                style={{
+                                                    marginHorizontal: 14,
+                                                    marginBottom: 14,
+                                                    padding: 12,
+                                                    backgroundColor: C.amberSoft,
+                                                    borderRadius: 14,
+                                                    borderWidth: 1,
+                                                    borderColor: C.amberRing,
+                                                }}
+                                            >
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: canDecide ? 10 : 0 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        <Ionicons name="hourglass-outline" size={11} color={C.amber} />
+                                                        <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 1.8, textTransform: 'uppercase' }}>
+                                                            {isProposer ? 'Awaiting Approval' : 'Result Reported'}
+                                                        </Text>
+                                                    </View>
+                                                    <Text style={{ fontSize: 14, fontWeight: '900', color: C.amber }}>
+                                                        {phs} : {pas}
+                                                    </Text>
+                                                </View>
+                                                {canDecide && (
+                                                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                                                        <Pressable
+                                                            onPress={() => handleRejectSubMatch(sm)}
+                                                            disabled={submittingScoreId === sm.matchId}
+                                                            style={{
+                                                                flex: 1,
+                                                                backgroundColor: C.redSoft,
+                                                                borderWidth: 1, borderColor: C.redRing,
+                                                                borderRadius: 12,
+                                                                paddingVertical: 9,
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            {submittingScoreId === sm.matchId ? (
+                                                                <ActivityIndicator size="small" color="#F87171" />
+                                                            ) : (
+                                                                <Text style={{ fontSize: 10, fontWeight: '900', color: '#F87171', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                                                                    Reject
+                                                                </Text>
+                                                            )}
+                                                        </Pressable>
+                                                        <Pressable
+                                                            onPress={() => handleApproveSubMatch(sm)}
+                                                            disabled={submittingScoreId === sm.matchId}
+                                                            style={{
+                                                                flex: 1,
+                                                                backgroundColor: C.emerald,
+                                                                borderRadius: 12,
+                                                                paddingVertical: 9,
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            {submittingScoreId === sm.matchId ? (
+                                                                <ActivityIndicator size="small" color="#0F172A" />
+                                                            ) : (
+                                                                <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                                                                    Approve
+                                                                </Text>
+                                                            )}
+                                                        </Pressable>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        )}
+
+                                        {/* Edit mode (score inputs + evidence picker) */}
+                                        {showForm ? (
+                                            <View
+                                                style={{
+                                                    marginHorizontal: 14,
+                                                    marginBottom: 14,
+                                                    padding: 14,
+                                                    backgroundColor: 'rgba(0,0,0,0.20)',
+                                                    borderRadius: 16,
+                                                    borderWidth: 1,
+                                                    borderColor: C.border,
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>
+                                                    {sm.status === 'Pending' ? 'Report Result' : 'Edit Result'}
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                                                    <TextInput
+                                                        style={{
+                                                            flex: 1,
+                                                            height: 44,
+                                                            backgroundColor: 'rgba(255,255,255,0.04)',
+                                                            borderRadius: 12,
+                                                            borderWidth: 1, borderColor: C.border,
+                                                            color: C.text,
+                                                            textAlign: 'center',
+                                                            fontWeight: '900',
+                                                            fontSize: 18,
+                                                        }}
+                                                        placeholder="0"
+                                                        placeholderTextColor={C.textGhost}
+                                                        keyboardType="numeric"
+                                                        value={scoreInputs[sm.matchId]?.home || ''}
+                                                        onChangeText={(v) => handleScoreChange(sm.matchId, 'home', v)}
+                                                    />
+                                                    <Text style={{ color: C.textFaint, fontWeight: '900', fontSize: 14 }}>:</Text>
+                                                    <TextInput
+                                                        style={{
+                                                            flex: 1,
+                                                            height: 44,
+                                                            backgroundColor: 'rgba(255,255,255,0.04)',
+                                                            borderRadius: 12,
+                                                            borderWidth: 1, borderColor: C.border,
+                                                            color: C.text,
+                                                            textAlign: 'center',
+                                                            fontWeight: '900',
+                                                            fontSize: 18,
+                                                        }}
+                                                        placeholder="0"
+                                                        placeholderTextColor={C.textGhost}
+                                                        keyboardType="numeric"
+                                                        value={scoreInputs[sm.matchId]?.away || ''}
+                                                        onChangeText={(v) => handleScoreChange(sm.matchId, 'away', v)}
+                                                    />
+                                                </View>
+
+                                                {/* Evidence section inside edit */}
+                                                <View style={{ marginBottom: 14 }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                            <Ionicons name="images-outline" size={11} color={C.emerald} />
+                                                            <Text style={{ fontSize: 9, fontWeight: '900', color: C.text, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                                                Evidence
+                                                            </Text>
+                                                        </View>
+                                                        <Pressable
+                                                            onPress={pickImages}
+                                                            style={{
+                                                                backgroundColor: C.emeraldSoft,
+                                                                borderWidth: 1, borderColor: C.emeraldRing,
+                                                                paddingHorizontal: 10, paddingVertical: 4,
+                                                                borderRadius: 8,
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                                                                + Add
+                                                            </Text>
+                                                        </Pressable>
+                                                    </View>
+                                                    {selectedImages.length > 0 ? (
+                                                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                                            {selectedImages.map((img, ix) => (
+                                                                <View key={img.uri + ix} style={{ marginRight: 8 }}>
+                                                                    <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
+                                                                        <Image source={{ uri: img.uri }} style={{ width: 64, height: 64 }} />
+                                                                    </View>
+                                                                    <Pressable
+                                                                        onPress={() => removeImage(img.uri)}
+                                                                        style={{
+                                                                            position: 'absolute', top: -4, right: -4,
+                                                                            width: 18, height: 18, borderRadius: 999,
+                                                                            backgroundColor: C.red,
+                                                                            alignItems: 'center', justifyContent: 'center',
+                                                                            borderWidth: 2, borderColor: C.surfaceRaised,
+                                                                        }}
+                                                                    >
+                                                                        <Ionicons name="close" size={10} color="white" />
+                                                                    </Pressable>
+                                                                </View>
+                                                            ))}
+                                                        </ScrollView>
+                                                    ) : (
+                                                        <Pressable
+                                                            onPress={pickImages}
+                                                            style={{
+                                                                height: 56,
+                                                                borderRadius: 12,
+                                                                borderWidth: 1,
+                                                                borderColor: 'rgba(255,255,255,0.08)',
+                                                                borderStyle: 'dashed',
+                                                                alignItems: 'center', justifyContent: 'center',
+                                                                backgroundColor: 'rgba(255,255,255,0.02)',
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontSize: 10, color: C.textFaint, fontWeight: '700' }}>
+                                                                Tap to attach screenshots
+                                                            </Text>
+                                                        </Pressable>
+                                                    )}
+                                                </View>
+
+                                                <View style={{ flexDirection: 'row', gap: 8 }}>
+                                                    {editingMatchId === sm.matchId && (
+                                                        <Pressable
+                                                            onPress={handleCancelEdit}
+                                                            style={{
+                                                                flex: 1,
+                                                                backgroundColor: 'rgba(255,255,255,0.04)',
+                                                                borderWidth: 1, borderColor: C.border,
+                                                                borderRadius: 12,
+                                                                paddingVertical: 11,
+                                                                alignItems: 'center',
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontSize: 10, fontWeight: '900', color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                                                                Cancel
+                                                            </Text>
+                                                        </Pressable>
+                                                    )}
+                                                    <Pressable
+                                                        onPress={() => handleSubmitScore(sm)}
+                                                        disabled={submittingScoreId === sm.matchId || isUploadingEvidence}
+                                                        style={{
+                                                            flex: 1,
+                                                            backgroundColor: C.emerald,
+                                                            borderRadius: 12,
+                                                            paddingVertical: 11,
+                                                            alignItems: 'center',
+                                                        }}
+                                                    >
+                                                        {submittingScoreId === sm.matchId || isUploadingEvidence ? (
+                                                            <ActivityIndicator size="small" color="#0F172A" />
+                                                        ) : (
+                                                            <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                                                                Save Result
+                                                            </Text>
+                                                        )}
+                                                    </Pressable>
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            // Actions row — only shows when there's something to do
+                                            (canEdit || canDelete) && (
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        justifyContent: 'flex-end',
+                                                        gap: 8,
+                                                        paddingHorizontal: 14,
+                                                        paddingBottom: 12,
+                                                        paddingTop: 4,
+                                                    }}
+                                                >
                                                     {canEdit && (
                                                         <Pressable
                                                             onPress={() => handleEditSubMatch(sm)}
-                                                            className="bg-[#10B981]/10 px-3 py-1 rounded-md border border-[#10B981]/20 active:opacity-70"
+                                                            style={{
+                                                                flexDirection: 'row', alignItems: 'center', gap: 5,
+                                                                backgroundColor: C.emeraldSoft,
+                                                                borderWidth: 1, borderColor: C.emeraldRing,
+                                                                borderRadius: 10,
+                                                                paddingHorizontal: 10, paddingVertical: 6,
+                                                            }}
                                                         >
-                                                            <Text className="text-[9px] font-black text-[#10B981] uppercase tracking-wider">Edit Result</Text>
+                                                            <Ionicons name="create-outline" size={11} color={C.emerald} />
+                                                            <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
+                                                                Edit
+                                                            </Text>
                                                         </Pressable>
                                                     )}
                                                     {canDelete && (
                                                         <Pressable
                                                             onPress={() => handleDeleteSubMatch(sm)}
                                                             disabled={submittingScoreId === sm.matchId}
-                                                            className="bg-red-500/10 px-3 py-1 rounded-md border border-red-500/20 active:opacity-70 flex-row items-center"
+                                                            style={{
+                                                                flexDirection: 'row', alignItems: 'center', gap: 5,
+                                                                backgroundColor: C.redSoft,
+                                                                borderWidth: 1, borderColor: C.redRing,
+                                                                borderRadius: 10,
+                                                                paddingHorizontal: 10, paddingVertical: 6,
+                                                            }}
                                                         >
                                                             {submittingScoreId === sm.matchId ? (
                                                                 <ActivityIndicator size="small" color="#F87171" />
                                                             ) : (
-                                                                <Text className="text-[9px] font-black text-red-400 uppercase tracking-wider">Delete</Text>
+                                                                <>
+                                                                    <Ionicons name="trash-outline" size={11} color="#F87171" />
+                                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: '#F87171', letterSpacing: 1.4, textTransform: 'uppercase' }}>
+                                                                        Delete
+                                                                    </Text>
+                                                                </>
                                                             )}
                                                         </Pressable>
                                                     )}
                                                 </View>
-                                            );
-                                        })()
-                                    )}
-                                </View>
-                            ))}
+                                            )
+                                        )}
+                                        </View>
+                                        )}
+                                    </View>
+                                );
+                            })}
                         </View>
 
-                        {/* Evidence Gallery — collapsible */}
-                        <View className="mx-6 mb-6">
-                            <Pressable
-                                onPress={() => setIsEvidenceOpen(prev => !prev)}
-                                className="flex-row items-center justify-between py-1 active:opacity-70"
-                            >
-                                <View className="flex-row items-center gap-2.5">
-                                    <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
-                                        <Ionicons name="images-outline" size={14} color="#818CF8" />
-                                    </View>
-                                    <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Evidence</Text>
-                                    {allEvidences.length > 0 && (
-                                        <View className="bg-white/5 px-2 py-0.5 rounded-full">
-                                            <Text className="text-[9px] font-bold text-slate-500">{allEvidences.length}</Text>
-                                        </View>
-                                    )}
-                                </View>
-                                <View className="w-7 h-7 rounded-full bg-white/5 items-center justify-center">
-                                    <Ionicons
-                                        name={isEvidenceOpen ? 'chevron-up' : 'chevron-down'}
-                                        size={14}
-                                        color="#475569"
-                                    />
-                                </View>
-                            </Pressable>
+                        {/* ─── OUTCOME FOOTER ───────────────────────────────────────── */}
+                        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+                            {teamState === 'completed' && ((homeWins !== awayWins) || data?.winnerTeamParticipantId) ? (
+                                (() => {
+                                    let winnerIsHome = false;
+                                    let isTie = false;
+                                    let winnerCalculated = false;
 
-                            {isEvidenceOpen && (
-                                <View className="mt-3">
-                                    {/* Display existing evidences */}
-                                    {allEvidences.length > 0 ? (
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                            {allEvidences.map((url, idx) => (
-                                                <Pressable
-                                                    key={idx}
-                                                    className="mr-3"
-                                                    onPress={() => setPreviewImage(url)}
+                                    const matchWinsHome = homeWins;
+                                    const matchWinsAway = awayWins;
+                                    const totalScoreHome = data?.aggregateScore?.homeTeamTotalScore ?? 0;
+                                    const totalScoreAway = data?.aggregateScore?.awayTeamTotalScore ?? 0;
+
+                                    if (data?.winnerTeamParticipantId) {
+                                        if (data?.homeTeam?.teamId === data?.winnerTeamParticipantId) {
+                                            winnerIsHome = true;
+                                            winnerCalculated = true;
+                                        } else if (data?.awayTeam?.teamId === data?.winnerTeamParticipantId) {
+                                            winnerIsHome = false;
+                                            winnerCalculated = true;
+                                        }
+                                    }
+
+                                    if (!winnerCalculated) {
+                                        if (matchWinsHome !== matchWinsAway) {
+                                            winnerIsHome = matchWinsHome > matchWinsAway;
+                                        } else if (totalScoreHome !== totalScoreAway) {
+                                            winnerIsHome = totalScoreHome > totalScoreAway;
+                                        } else {
+                                            isTie = true;
+                                        }
+                                    }
+
+                                    const winningTeamName = isTie ? 'Match Draw' : (winnerIsHome ? data?.homeTeam?.teamName : data?.awayTeam?.teamName);
+                                    const winningWins = winnerIsHome ? matchWinsHome : matchWinsAway;
+                                    const losingWins = winnerIsHome ? matchWinsAway : matchWinsHome;
+                                    const winningTotal = winnerIsHome ? totalScoreHome : totalScoreAway;
+                                    const losingTotal = winnerIsHome ? totalScoreAway : totalScoreHome;
+                                    const isMatchWinsTie = matchWinsHome === matchWinsAway;
+                                    const isBigWin = Math.abs(winningWins - losingWins) >= 2;
+
+                                    return (
+                                        <View
+                                            style={{
+                                                borderRadius: 28,
+                                                overflow: 'hidden',
+                                                borderWidth: 1,
+                                                borderColor: C.emeraldRing,
+                                                backgroundColor: C.surfaceRaised,
+                                                shadowColor: C.emerald,
+                                                shadowOpacity: 0.25,
+                                                shadowRadius: 18,
+                                                shadowOffset: { width: 0, height: 8 },
+                                                elevation: 6,
+                                            }}
+                                        >
+                                            <LinearGradient
+                                                colors={['rgba(16,185,129,0.18)', 'rgba(16,185,129,0.04)']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 1 }}
+                                                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                            />
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, gap: 16 }}>
+                                                <View
+                                                    style={{
+                                                        width: 64, height: 64, borderRadius: 22,
+                                                        backgroundColor: 'rgba(16,185,129,0.18)',
+                                                        borderWidth: 1, borderColor: C.emeraldRing,
+                                                        alignItems: 'center', justifyContent: 'center',
+                                                        shadowColor: C.emerald, shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+                                                    }}
                                                 >
-                                                    <View className="rounded-2xl overflow-hidden border border-white/5">
-                                                        <Image
-                                                            source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                                            className="w-36 h-48 bg-muted"
-                                                            resizeMode="cover"
+                                                    <Ionicons name={isTie ? 'shield' : 'trophy'} size={30} color={C.emerald} />
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: 'rgba(16,185,129,0.7)', letterSpacing: 2.2, textTransform: 'uppercase', marginBottom: 4 }}>
+                                                        {isTie ? 'Result' : 'Match Winner'}
+                                                    </Text>
+                                                    <Text
+                                                        numberOfLines={1}
+                                                        style={{ fontSize: 20, fontWeight: '900', color: C.emerald, letterSpacing: -0.3, marginBottom: 8 }}
+                                                    >
+                                                        {winningTeamName}
+                                                    </Text>
+                                                    <View
+                                                        style={{
+                                                            flexDirection: 'row', alignItems: 'center', gap: 6,
+                                                            alignSelf: 'flex-start',
+                                                            backgroundColor: 'rgba(16,185,129,0.15)',
+                                                            borderWidth: 1, borderColor: C.emeraldRing,
+                                                            borderRadius: 10,
+                                                            paddingHorizontal: 9, paddingVertical: 4,
+                                                        }}
+                                                    >
+                                                        <Ionicons
+                                                            name={isTie ? 'calculator' : (isMatchWinsTie ? 'calculator' : (isBigWin ? 'flame' : 'flag'))}
+                                                            size={11}
+                                                            color={C.emerald}
                                                         />
+                                                        <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
+                                                            {isTie
+                                                                ? `Draw · ${winningWins} – ${losingWins}`
+                                                                : isMatchWinsTie
+                                                                    ? `Aggregate Win · ${winningTotal} – ${losingTotal}`
+                                                                    : `${isBigWin ? 'Dominant Win' : 'Match Wins'} · ${winningWins} – ${losingWins}`}
+                                                        </Text>
                                                     </View>
-                                                </Pressable>
-                                            ))}
-                                        </ScrollView>
-                                    ) : (
-                                        <View className="bg-white/5 rounded-2xl py-6 items-center justify-center border border-white/10 border-dashed">
-                                            <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
-                                                <Ionicons name="images-outline" size={18} color="#818CF8" />
+                                                </View>
                                             </View>
-                                            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest">No Evidence Attached</Text>
                                         </View>
-                                    )}
-                                </View>
-                            )}
-                        </View>
-
-                        {/* Footer */}
-                        <View className="px-6 pt-2 mb-8">
-                            { (tieBreakStatus?.isRequired || (data && (data.status === 'TieBreakRequired' || data.status === 4))) && !data?.winnerTeamParticipantId ? (
-                                <View className="bg-[#F59E0B]/10 rounded-3xl border border-[#F59E0B]/30 p-5 items-center">
-                                    <View className="flex-row items-center gap-3">
-                                        <Ionicons name="warning" size={20} color="#F59E0B" />
-                                        <Text className="text-sm font-black text-[#F59E0B] uppercase tracking-widest">
-                                            {TEAM_LABELS.TIE_BREAK_BANNER}
-                                        </Text>
+                                    );
+                                })()
+                            ) : teamState === 'tieBreak' ? (
+                                <View
+                                    style={{
+                                        borderRadius: 22,
+                                        backgroundColor: C.surfaceRaised,
+                                        borderWidth: 1, borderColor: C.amberRing,
+                                        paddingHorizontal: 20, paddingVertical: 18,
+                                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            width: 36, height: 36, borderRadius: 14,
+                                            backgroundColor: C.amberSoft,
+                                            borderWidth: 1, borderColor: C.amberRing,
+                                            alignItems: 'center', justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="flash" size={16} color={C.amber} />
                                     </View>
-                                </View>
-                            ) : (data?.status === 'Completed' || data?.status === 3 || data?.winnerTeamParticipantId) && ((data?.aggregateScore?.homeTeamWins ?? 0) !== (data?.aggregateScore?.awayTeamWins ?? 0) || data?.winnerTeamParticipantId) ? (
-                                <View className="bg-[#10B981]/10 rounded-[32px] border border-[#10B981]/30 p-6 shadow-lg relative overflow-hidden">
-                                     <View className="flex-row items-center gap-4">
-                                         <View className="bg-[#10B981]/20 p-4 rounded-3xl shadow-sm border border-[#10B981]/30">
-                                             <Ionicons name="trophy" size={32} color="#10B981" />
-                                         </View>
-                                         <View className="flex-1">
-                                             {(() => {
-                                                 let winnerIsHome = false;
-                                                 let isTie = false;
-                                                 let winnerCalculated = false;
-
-                                                 const matchWinsHome = data?.aggregateScore?.homeTeamWins ?? 0;
-                                                 const matchWinsAway = data?.aggregateScore?.awayTeamWins ?? 0;
-                                                 const totalScoreHome = data?.aggregateScore?.homeTeamTotalScore ?? 0;
-                                                 const totalScoreAway = data?.aggregateScore?.awayTeamTotalScore ?? 0;
-
-                                                 if (data?.winnerTeamParticipantId) {
-                                                     if (data?.homeTeam?.teamId === data?.winnerTeamParticipantId) {
-                                                         winnerIsHome = true;
-                                                         winnerCalculated = true;
-                                                     } else if (data?.awayTeam?.teamId === data?.winnerTeamParticipantId) {
-                                                         winnerIsHome = false;
-                                                         winnerCalculated = true;
-                                                     }
-                                                 }
-
-                                                 if (!winnerCalculated) {
-                                                     if (matchWinsHome !== matchWinsAway) {
-                                                         winnerIsHome = matchWinsHome > matchWinsAway;
-                                                     } else if (totalScoreHome !== totalScoreAway) {
-                                                         winnerIsHome = totalScoreHome > totalScoreAway;
-                                                     } else {
-                                                         isTie = true;
-                                                     }
-                                                 }
-
-                                                 const winningTeamName = isTie ? 'MATCH DRAW' : (winnerIsHome ? data?.homeTeam?.teamName : data?.awayTeam?.teamName);
-                                                 const winningWins = winnerIsHome ? matchWinsHome : matchWinsAway;
-                                                 const losingWins = winnerIsHome ? matchWinsAway : matchWinsHome;
-                                                 const winningTotal = winnerIsHome ? totalScoreHome : totalScoreAway;
-                                                 const losingTotal = winnerIsHome ? totalScoreAway : totalScoreHome;
-                                                 
-                                                 const isMatchWinsTie = matchWinsHome === matchWinsAway;
-                                                 const isBigWin = Math.abs(winningWins - losingWins) >= 2;
-
-                                                 return (
-                                                     <>
-                                                         <Text className="text-[10px] font-black text-[#10B981]/60 uppercase tracking-[2px] mb-1">
-                                                             TEAM MATCH WINNER
-                                                         </Text>
-                                                         <Text className="text-xl font-black text-[#10B981] uppercase leading-tight mb-2" numberOfLines={1}>
-                                                             {winningTeamName}
-                                                         </Text>
-                                                         
-                                                         {isTie ? (
-                                                             <View className="flex-row items-center bg-[#10B981]/15 self-start px-2.5 py-1 rounded-lg border border-[#10B981]/20 gap-1.5">
-                                                                 <Ionicons name="calculator" size={12} color="#10B981" />
-                                                                 <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-wider mt-0.5">
-                                                                     DRAW · {winningWins} - {losingWins}
-                                                                 </Text>
-                                                             </View>
-                                                         ) : isMatchWinsTie ? (
-                                                             <View className="flex-row items-center bg-[#10B981]/15 self-start px-2.5 py-1 rounded-lg border border-[#10B981]/20 gap-1.5">
-                                                                 <Ionicons name="calculator" size={12} color="#10B981" />
-                                                                 <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-wider mt-0.5">
-                                                                     AGGREGATE WIN · {winningTotal} - {losingTotal}
-                                                                 </Text>
-                                                             </View>
-                                                         ) : (
-                                                             <View className="flex-row items-center bg-[#10B981]/15 self-start px-2.5 py-1 rounded-lg border border-[#10B981]/20 gap-1.5">
-                                                                 <Ionicons name="flag" size={12} color="#10B981" />
-                                                                 <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-wider mt-0.5">
-                                                                     {isBigWin ? 'DOMINANT WIN' : 'MATCH WINS'} · {winningWins} - {losingWins}
-                                                                 </Text>
-                                                             </View>
-                                                         )}
-                                                     </>
-                                                 );
-                                             })()}
-                                         </View>
-                                     </View>
+                                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '900', color: C.amber, letterSpacing: 1.6, textTransform: 'uppercase' }}>
+                                        {TEAM_LABELS.TIE_BREAK_BANNER}
+                                    </Text>
                                 </View>
                             ) : (
-                                <View className="bg-white/5 rounded-3xl border border-white/10 p-5 items-center">
-                                    <View className="flex-row items-center gap-3">
-                                        <ActivityIndicator size="small" color="#64748B" />
-                                        <Text className="text-sm font-black text-slate-500 uppercase tracking-widest">
-                                            {TEAM_LABELS.AWAITING_RESULTS}
+                                // Pending — show progress strip instead of a generic spinner
+                                <View
+                                    style={{
+                                        borderRadius: 22,
+                                        backgroundColor: C.surfaceRaised,
+                                        borderWidth: 1, borderColor: C.border,
+                                        padding: 18,
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View
+                                                style={{
+                                                    width: 28, height: 28, borderRadius: 10,
+                                                    backgroundColor: C.amberSoft,
+                                                    borderWidth: 1, borderColor: C.amberRing,
+                                                    alignItems: 'center', justifyContent: 'center',
+                                                }}
+                                            >
+                                                <Ionicons name="time-outline" size={14} color={C.amber} />
+                                            </View>
+                                            <Text style={{ fontSize: 11, fontWeight: '900', color: C.text, letterSpacing: 0.4 }}>
+                                                {TEAM_LABELS.AWAITING_RESULTS}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ fontSize: 11, fontWeight: '900', color: C.amber, letterSpacing: 1.2 }}>
+                                            {completedSubs} / {totalSubs}
                                         </Text>
+                                    </View>
+                                    {/* Progress bar */}
+                                    <View
+                                        style={{
+                                            height: 6,
+                                            backgroundColor: 'rgba(255,255,255,0.04)',
+                                            borderRadius: 999,
+                                            overflow: 'hidden',
+                                        }}
+                                    >
+                                        <View
+                                            style={{
+                                                height: '100%',
+                                                width: totalSubs > 0 ? `${(completedSubs / totalSubs) * 100}%` : '0%',
+                                                backgroundColor: C.amber,
+                                                borderRadius: 999,
+                                            }}
+                                        />
                                     </View>
                                 </View>
                             )}
@@ -1273,45 +1841,52 @@ export function TeamMatchDetailModal({
                     animationType="fade"
                     onRequestClose={() => setShowRepPicker(false)}
                 >
-                    <View className="flex-1 bg-black/60 items-center justify-center p-6">
-                        <Pressable
-                            className="absolute inset-0"
-                            onPress={() => setShowRepPicker(false)}
-                        />
-                        <View className="bg-card w-full max-w-sm rounded-[32px] overflow-hidden border border-border/10 shadow-2xl">
-                            <View className="p-6 border-b border-white/5">
-                                <Text className="text-lg font-bold text-white text-center">
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                        <Pressable style={{ position: 'absolute', inset: 0 }} onPress={() => setShowRepPicker(false)} />
+                        <View
+                            style={{
+                                width: '100%', maxWidth: 360,
+                                borderRadius: 28, overflow: 'hidden',
+                                backgroundColor: C.surfaceRaised,
+                                borderWidth: 1, borderColor: C.borderStrong,
+                            }}
+                        >
+                            <View style={{ padding: 22, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                                <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 4 }}>
+                                    Tie-Break
+                                </Text>
+                                <Text style={{ fontSize: 16, fontWeight: '900', color: C.text, textAlign: 'center' }}>
                                     {TEAM_LABELS.SELECT_REPRESENTATIVE}
                                 </Text>
                             </View>
-                            <ScrollView className="max-h-80">
+                            <ScrollView style={{ maxHeight: 320 }}>
                                 {myTeamMembers.map((member) => (
                                     <Pressable
                                         key={member.userId}
                                         onPress={() => handleSelectRepresentative(member)}
                                         disabled={isSubmittingRep}
-                                        className="flex-row items-center gap-3 p-4 border-b border-white/5 active:bg-white/5"
+                                        style={{
+                                            flexDirection: 'row', alignItems: 'center', gap: 12,
+                                            paddingHorizontal: 18, paddingVertical: 14,
+                                            borderBottomWidth: 1, borderBottomColor: C.border,
+                                        }}
                                     >
-                                        <PlayerAvatar
-                                            src={member.avatarUrl}
-                                            name={member.username}
-                                            size="md"
-                                        />
-                                        <Text className="flex-1 text-white font-bold text-base">
+                                        <PlayerAvatar src={member.avatarUrl} name={member.username} size="md" />
+                                        <Text style={{ flex: 1, color: C.text, fontWeight: '800', fontSize: 14 }}>
                                             {member.username}
                                         </Text>
                                         {member.isCaptain && (
-                                            <Ionicons name="shield" size={14} color="#F59E0B" />
+                                            <Ionicons name="shield" size={14} color={C.amber} />
                                         )}
                                         {isSubmittingRep ? (
-                                            <ActivityIndicator size="small" color="#00E5A0" />
+                                            <ActivityIndicator size="small" color={C.emerald} />
                                         ) : (
-                                            <Ionicons name="chevron-forward" size={18} color="#475569" />
+                                            <Ionicons name="chevron-forward" size={18} color={C.textGhost} />
                                         )}
                                     </Pressable>
                                 ))}
                             </ScrollView>
-                            <View className="p-4">
+                            <View style={{ padding: 16 }}>
                                 <Button
                                     variant="outline"
                                     onPress={() => setShowRepPicker(false)}
@@ -1338,13 +1913,21 @@ export function TeamMatchDetailModal({
             {/* Evidence Image Preview Modal */}
             {previewImage && (
                 <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
-                    <View className="flex-1 bg-black/95 items-center justify-center p-4">
-                        <Pressable onPress={() => setPreviewImage(null)} className="absolute top-12 right-6 z-10 w-10 h-10 bg-white/10 rounded-full items-center justify-center">
-                            <Ionicons name="close" size={24} color="white" />
+                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                        <Pressable
+                            onPress={() => setPreviewImage(null)}
+                            style={{
+                                position: 'absolute', top: 48, right: 24, zIndex: 10,
+                                width: 40, height: 40, borderRadius: 999,
+                                backgroundColor: 'rgba(255,255,255,0.10)',
+                                alignItems: 'center', justifyContent: 'center',
+                            }}
+                        >
+                            <Ionicons name="close" size={22} color="white" />
                         </Pressable>
                         <Image
                             source={{ uri: getOptimizedCloudinaryUrl(previewImage, 800) }}
-                            className="w-full h-full"
+                            style={{ width: '100%', height: '100%' }}
                             resizeMode="contain"
                         />
                     </View>

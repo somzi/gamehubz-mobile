@@ -72,8 +72,8 @@ export interface TieBreakStatusDto {
 export interface TeamMatchDetailsDto {
     teamMatchId: string;
     TeamMatchId?: string;
-    status: 'Pending' | 'Completed' | 'TieBreakRequired' | number;
-    Status?: 'Pending' | 'Completed' | 'TieBreakRequired' | number;
+    status: 'Pending' | 'InProgress' | 'Completed' | 'TieBreakRequired' | number;
+    Status?: 'Pending' | 'InProgress' | 'Completed' | 'TieBreakRequired' | number;
     winnerTeamParticipantId: string | null;
     WinnerTeamParticipantId?: string | null;
     homeTeam: TeamMatchTeamInfoDto | null;
