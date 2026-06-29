@@ -150,27 +150,20 @@ export function FeedCard({
                         </View>
 
                         <View className="flex-1 min-w-0">
-                            <View className="flex-row items-baseline gap-2 mb-1">
-                                <Text
-                                    className="font-black text-white text-[14px] tracking-tight flex-1"
-                                    numberOfLines={1}
-                                >
-                                    {hubName}
+                            {/* Hub name gets the full row — no longer fights the
+                                timestamp for width, so it stops truncating. */}
+                            <Text
+                                className="font-black text-white text-[14px] tracking-tight"
+                                numberOfLines={1}
+                            >
+                                {hubName}
+                            </Text>
+                            {/* Timestamp lives on its own line as a quiet subtitle. */}
+                            <View className="flex-row items-center gap-1 mt-0.5 mb-1.5">
+                                <Ionicons name="time-outline" size={10} color="#64748B" />
+                                <Text className="text-[9.5px] font-bold text-slate-500 uppercase tracking-[1px]">
+                                    {timestamp}
                                 </Text>
-                                <View className="flex-row items-center gap-1">
-                                    <View
-                                        style={{
-                                            width: 3,
-                                            height: 3,
-                                            borderRadius: 1.5,
-                                            backgroundColor: ACCENT,
-                                            opacity: 0.6,
-                                        }}
-                                    />
-                                    <Text className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[1.5px]">
-                                        {timestamp}
-                                    </Text>
-                                </View>
                             </View>
                             <Text
                                 className="text-[13px] text-slate-300 leading-[18px]"

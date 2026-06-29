@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -34,6 +34,13 @@ interface MatchOverviewDto {
 
 const SECTION_GAP = 28;
 
+// LayoutAnimation needs an explicit opt-in on Android to animate the collapse.
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type SectionKey = 'attention' | 'active' | 'highlights';
+
 export default function HomeScreen() {
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const { user } = useAuth();
@@ -42,6 +49,16 @@ export default function HomeScreen() {
     const [hubActivities, setHubActivities] = useState<DashboardActivityDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [showHighlightsModal, setShowHighlightsModal] = useState(false);
+    const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({
+        attention: false,
+        active: false,
+        highlights: false,
+    });
+
+    const toggleSection = (key: SectionKey) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const fetchMatches = async () => {
         if (!user?.id) return;
@@ -205,7 +222,10 @@ export default function HomeScreen() {
                                 title="Needs Attention"
                                 subtitle="Requires your action"
                                 onSeeAll={() => navigation.navigate('MyMatches')}
+                                collapsed={collapsed.attention}
+                                onToggle={() => toggleSection('attention')}
                             />
+                            {!collapsed.attention && (
                             <View className="gap-3">
                                 {actionRequiredMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
@@ -224,6 +244,7 @@ export default function HomeScreen() {
                                     />
                                 ))}
                             </View>
+                            )}
                         </View>
                     )}
 
@@ -237,9 +258,12 @@ export default function HomeScreen() {
                             title="Active Matches"
                             subtitle="In progress & scheduled"
                             onSeeAll={() => navigation.navigate('MyMatches')}
+                            collapsed={collapsed.active}
+                            onToggle={() => toggleSection('active')}
                         />
 
-                        {sortedActiveMatches.length > 0 ? (
+                        {!collapsed.active && (
+                        sortedActiveMatches.length > 0 ? (
                             <View className="gap-3">
                                 {sortedActiveMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
@@ -275,6 +299,7 @@ export default function HomeScreen() {
                                 title="No active matches"
                                 description="Your competitive matches will appear here once they start"
                             />
+                        )
                         )}
                     </View>
 
@@ -288,9 +313,12 @@ export default function HomeScreen() {
                             title="Highlights"
                             subtitle="Latest from your hubs"
                             onSeeAll={() => setShowHighlightsModal(true)}
+                            collapsed={collapsed.highlights}
+                            onToggle={() => toggleSection('highlights')}
                         />
 
-                        {hubActivities.length > 0 ? (
+                        {!collapsed.highlights && (
+                        hubActivities.length > 0 ? (
                             <View className="gap-2.5">
                                 {hubActivities.slice(0, 3).map((item, index) => (
                                     <FeedCard
@@ -315,6 +343,7 @@ export default function HomeScreen() {
                                 title="No highlights yet"
                                 description="Activity from your hubs will appear here"
                             />
+                        )
                         )}
                     </View>
                 </View>
@@ -336,6 +365,8 @@ interface SectionHeaderProps {
     title: string;
     subtitle: string;
     onSeeAll?: () => void;
+    collapsed?: boolean;
+    onToggle?: () => void;
 }
 
 function SectionHeader({
@@ -346,10 +377,18 @@ function SectionHeader({
     title,
     subtitle,
     onSeeAll,
+    collapsed,
+    onToggle,
 }: SectionHeaderProps) {
     return (
         <View className="flex-row items-center justify-between mb-4">
-            <View className="flex-row items-center gap-3 flex-1">
+            {/* Tapping the title cluster collapses/expands the section. */}
+            <Pressable
+                onPress={onToggle}
+                disabled={!onToggle}
+                className="flex-row items-center gap-3 flex-1 active:opacity-70"
+                hitSlop={8}
+            >
                 <View
                     className="w-10 h-10 rounded-2xl items-center justify-center"
                     style={{
@@ -368,7 +407,16 @@ function SectionHeader({
                         {subtitle}
                     </Text>
                 </View>
-            </View>
+                {onToggle && (
+                    <View className="w-7 h-7 rounded-full bg-white/[0.04] items-center justify-center border border-white/[0.06] mr-1.5">
+                        <Ionicons
+                            name={collapsed ? 'chevron-down' : 'chevron-up'}
+                            size={14}
+                            color="#94A3B8"
+                        />
+                    </View>
+                )}
+            </Pressable>
             {onSeeAll && (
                 <Pressable
                     onPress={onSeeAll}
