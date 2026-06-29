@@ -288,9 +288,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                         disabled={!newComment.trim() || isSending}
                         className="w-12 h-12 rounded-full items-center justify-center"
                         style={({ pressed }) => [{
-                            backgroundColor: !newComment.trim() || isSending
-                                ? '#1E293B'
-                                : pressed ? '#059669' : '#10B981',
+                            // Always emerald — dimmed (not dark) while empty/sending so the send
+                            // button looks identical no matter how the chat was opened.
+                            backgroundColor: pressed ? '#059669' : '#10B981',
+                            opacity: (!newComment.trim() || isSending) ? 0.45 : 1,
                             transform: [{ scale: pressed ? 0.95 : 1 }],
                         }]}
                     >

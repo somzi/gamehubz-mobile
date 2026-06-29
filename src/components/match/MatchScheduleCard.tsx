@@ -1702,15 +1702,11 @@ export function MatchScheduleCard({
                                         <Pressable
                                             onPress={handleSendComment}
                                             disabled={!newComment.trim() || isSendingComment}
-                                            className={cn(
-                                                "w-12 h-12 rounded-full items-center justify-center",
-                                                newComment.trim() ? "bg-primary" : "bg-primary/20",
-                                                (!newComment.trim() || isSendingComment) && "opacity-50"
-                                            )}
+                                            className="w-12 h-12 rounded-full items-center justify-center"
                                             style={({ pressed }) => [{
-                                                backgroundColor: !newComment.trim() || isSendingComment
-                                                    ? '#1E293B'
-                                                    : pressed ? '#059669' : '#10B981',
+                                                // Always emerald — dimmed (not dark) while empty/sending.
+                                                backgroundColor: pressed ? '#059669' : '#10B981',
+                                                opacity: (!newComment.trim() || isSendingComment) ? 0.45 : 1,
                                                 transform: [{ scale: pressed ? 0.95 : 1 }]
                                             }]}
                                         >
