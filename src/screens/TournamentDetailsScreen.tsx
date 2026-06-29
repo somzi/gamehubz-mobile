@@ -104,6 +104,10 @@ export default function TournamentDetailsScreen() {
     // Resolved by the v2 overview/structure endpoints (tournament.canManage / bracketCanManage).
     const canManage: boolean = !!((tournament as any)?.canManage || bracketCanManage);
 
+    // Before the tournament starts (status 0/1/2). Once it's LIVE (3) or Completed (4)
+    // the roster is locked into the bracket — no new join requests and no team removal.
+    const isPreStart: boolean = (tournament?.status ?? 99) < 3;
+
     // Whether this tournament was created with "results require approval" on. When it's
     // off there is nothing to approve, so the Approvals pill and the Bracket-tab badge are
     // hidden entirely. Known from the overview payload, so it resolves before the bracket loads.
@@ -2145,7 +2149,7 @@ export default function TournamentDetailsScreen() {
                                     tabs={[
                                         { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
                                         ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: 'Open', icon: 'open-outline' as const }] : []),
-                                        ...(canManage ? [{
+                                        ...(canManage && isPreStart ? [{
                                             value: 'registrations', label: 'Requests', icon: 'hourglass-outline' as const,
                                             badge: pendingRegCount > 0 ? pendingRegCount : undefined,
                                             badgeTone: 'alert' as const,
@@ -2297,8 +2301,10 @@ export default function TournamentDetailsScreen() {
                                                     )}
                                                 </Pressable>
 
-                                                {/* Remove Team Button — Creator Only (Outside Card) */}
-                                                {canManage && (
+                                                {/* Remove Team Button — Creator Only (Outside Card).
+                                                    Hidden once the tournament is LIVE/Completed: the roster is
+                                                    locked into the bracket and removing a team would orphan fixtures. */}
+                                                {canManage && isPreStart && (
                                                     <View className="self-start mt-5">
                                                         <Pressable
                                                             onPress={() => handleRemoveTeam(teamId as string, teamName as string)}
@@ -2475,7 +2481,7 @@ export default function TournamentDetailsScreen() {
                             )}
 
                             {/* Requests — pending team registrations (same card design as the other tabs) */}
-                            {teamsTab === 'registrations' && canManage && (
+                            {teamsTab === 'registrations' && canManage && isPreStart && (
                                 <View className="mt-2">
                                     <View className="flex-row justify-between items-center mb-4">
                                         <Text className="text-sm font-bold text-slate-400 uppercase tracking-widest">
