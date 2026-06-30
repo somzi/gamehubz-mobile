@@ -3,17 +3,13 @@ import {
     View,
     Text,
     ScrollView,
-    TextInput,
     ActivityIndicator,
     Pressable,
     Modal,
     AppState,
     Image,
-    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
-import { getOptimizedCloudinaryUrl, MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../../lib/image';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
@@ -28,7 +24,7 @@ import {
     getTieBreakStatus,
     submitTieBreakRepresentative,
 } from '../../lib/teamApi';
-import { authenticatedFetch, ENDPOINTS, getErrorMessage, API_BASE_URL } from '../../lib/api';
+import { getErrorMessage, API_BASE_URL } from '../../lib/api';
 import type {
     TeamMatchDetailsDto,
     SubMatchDto,
@@ -45,6 +41,12 @@ interface TeamMatchDetailModalProps {
     canManage?: boolean;
     currentUserId?: string;
     onMatchUpdate?: () => void;
+    /**
+     * Drill from a single game into its full match page (chat / stream / result) — the same
+     * solo MatchDetailsModal a 1v1 tournament uses. The team modal has no chat of its own, so
+     * the parent reshapes the sub-match and opens the solo surface; `tab` picks the entry tab.
+     */
+    onOpenSubMatch?: (sub: SubMatchDto, tab: 'match' | 'chat') => void;
 }
 
 // One source of truth for the redesigned palette — emerald primary, amber pending/tie-break,
@@ -252,6 +254,7 @@ export function TeamMatchDetailModal({
     canManage = false,
     currentUserId,
     onMatchUpdate,
+    onOpenSubMatch,
 }: TeamMatchDetailModalProps) {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const insets = useSafeAreaInsets();
@@ -259,21 +262,6 @@ export function TeamMatchDetailModal({
     const [data, setData] = useState<TeamMatchDetailsDto | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Score input per sub-match
-    const [scoreInputs, setScoreInputs] = useState<
-        Record<string, { home: string; away: string }>
-    >({});
-    const [submittingScoreId, setSubmittingScoreId] = useState<string | null>(null);
-
-    // Edit & Evidence state
-    const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
-    // Which individual game row is expanded. Collapsed by default so a 10-v-10 match
-    // reads as a short, scannable list instead of a wall of full-size cards.
-    const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
-    const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
-    const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
 
     // Tie-break
     const [tieBreakStatus, setTieBreakStatus] = useState<TieBreakStatusDto | null>(null);
@@ -432,10 +420,6 @@ export function TeamMatchDetailModal({
     useEffect(() => {
         setData(null);
         setError(null);
-        setScoreInputs({});
-        setSelectedImages([]);
-        setPreviewImage(null);
-        setEditingMatchId(null);
         setTieBreakStatus(null);
     }, [matchId]);
 
@@ -484,240 +468,6 @@ export function TeamMatchDetailModal({
         });
         return () => subscription.remove();
     }, [visible, matchId, fetchData]);
-
-    const pickImages = async () => {
-        try {
-            const { status: pStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (pStatus !== 'granted') {
-                setStatusConfig({ type: 'error', title: 'Permission Required', message: 'Camera roll permissions are needed.' });
-                setShowStatusModal(true);
-                return;
-            }
-
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsMultipleSelection: true,
-                quality: 0.8,
-            });
-
-            if (!result.canceled) {
-                const oversized = result.assets.filter(asset => !isFileSizeValid(asset));
-
-                if (oversized.length > 0) {
-                    const oversizedNames = oversized.map(a => a.fileName || 'Image').join(', ');
-                    setStatusConfig({
-                        type: 'error',
-                        title: 'Files too large',
-                        message: `Some images are too large: ${oversizedNames}. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`
-                    });
-                    setShowStatusModal(true);
-
-                    const validAssets = result.assets.filter(asset => isFileSizeValid(asset));
-                    if (validAssets.length > 0) {
-                        setSelectedImages(prev => [...prev, ...validAssets]);
-                    }
-                    return;
-                }
-
-                setSelectedImages(prev => [...prev, ...result.assets]);
-            }
-        } catch (err) {
-            console.error('Error picking images:', err);
-        }
-    };
-
-    const removeImage = (uri: string) => {
-        setSelectedImages(prev => prev.filter(img => img.uri !== uri));
-    };
-
-    const handleUploadOnly = async (subMatchId: string) => {
-        if (!subMatchId || selectedImages.length === 0) return;
-        setIsUploadingEvidence(true);
-        try {
-            const formData = new FormData();
-            selectedImages.forEach((img, index) => {
-                const filename = img.uri.split('/').pop() || `evidence-${index}.jpg`;
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : `image/jpeg`;
-                // @ts-ignore
-                formData.append('files', { uri: img.uri, name: filename, type });
-            });
-
-            const response = await authenticatedFetch(ENDPOINTS.UPLOAD_MATCH_EVIDENCE(subMatchId), {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(text || 'Failed to upload images');
-            }
-            setSelectedImages([]);
-            fetchData();
-        } catch (err: any) {
-            console.error('Upload evidence error:', err);
-            setStatusConfig({ type: 'error', title: 'Upload Failed', message: err.message || 'Failed to upload evidence' });
-            setShowStatusModal(true);
-        } finally {
-            setIsUploadingEvidence(false);
-        }
-    };
-
-    const handleEditSubMatch = (sm: SubMatchDto) => {
-        setEditingMatchId(sm.matchId);
-        setScoreInputs((prev) => ({
-            ...prev,
-            [sm.matchId]: { home: String(sm.homeScore ?? ''), away: String(sm.awayScore ?? '') }
-        }));
-        setSelectedImages([]);
-    };
-
-    const handleCancelEdit = () => {
-        setEditingMatchId(null);
-        setSelectedImages([]);
-    };
-
-    // Expand/collapse a game row. Switching rows drops any open edit form + staged images
-    // so a half-finished report on one game never bleeds into another.
-    const toggleGame = (id: string) => {
-        setExpandedGameId((prev) => (prev === id ? null : id));
-        setEditingMatchId(null);
-        setSelectedImages([]);
-    };
-
-    const handleScoreChange = (subMatchId: string, side: 'home' | 'away', value: string) => {
-        setScoreInputs((prev) => ({
-            ...prev,
-            [subMatchId]: {
-                ...prev[subMatchId],
-                [side]: value,
-            },
-        }));
-    };
-
-    const handleSubmitScore = async (subMatch: SubMatchDto) => {
-        const inputs = scoreInputs[subMatch.matchId];
-        if (!inputs?.home || !inputs?.away) return;
-
-        const homeScore = parseInt(inputs.home);
-        const awayScore = parseInt(inputs.away);
-        if (isNaN(homeScore) || isNaN(awayScore)) return;
-
-        setSubmittingScoreId(subMatch.matchId);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.REPORT_MATCH_RESULT, {
-                method: 'POST',
-                body: JSON.stringify({
-                    MatchId: subMatch.matchId,
-                    HomeScore: homeScore,
-                    AwayScore: awayScore,
-                    TournamentId: tournamentId
-                }),
-            });
-
-            if (!response.ok) {
-                const text = await response.text().catch(() => 'Failed');
-                throw new Error(text);
-            }
-
-            // Only one row's form is ever open at a time and staged images are cleared on
-            // toggle, so any selected images belong to this sub-match — upload them on save.
-            if (selectedImages.length > 0) {
-                await handleUploadOnly(subMatch.matchId);
-            }
-
-            // Refresh data after submission
-            setEditingMatchId(null);
-            fetchData();
-            onMatchUpdate?.();
-        } catch (err: unknown) {
-            const message = getErrorMessage(err);
-            setStatusConfig({ type: 'error', title: 'Error', message });
-            setShowStatusModal(true);
-        } finally {
-            setSubmittingScoreId(null);
-        }
-    };
-
-    const handleApproveSubMatch = async (subMatch: SubMatchDto) => {
-        setSubmittingScoreId(subMatch.matchId);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.APPROVE_MATCH_RESULT, {
-                method: 'POST',
-                body: JSON.stringify({ MatchId: subMatch.matchId }),
-            });
-            if (!response.ok) {
-                const text = await response.text().catch(() => 'Failed');
-                throw new Error(text);
-            }
-            fetchData();
-            onMatchUpdate?.();
-        } catch (err: unknown) {
-            const message = getErrorMessage(err);
-            setStatusConfig({ type: 'error', title: 'Error', message });
-            setShowStatusModal(true);
-        } finally {
-            setSubmittingScoreId(null);
-        }
-    };
-
-    const handleRejectSubMatch = async (subMatch: SubMatchDto) => {
-        setSubmittingScoreId(subMatch.matchId);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.REJECT_MATCH_RESULT, {
-                method: 'POST',
-                body: JSON.stringify({ MatchId: subMatch.matchId }),
-            });
-            if (!response.ok) {
-                const text = await response.text().catch(() => 'Failed');
-                throw new Error(text);
-            }
-            fetchData();
-            onMatchUpdate?.();
-        } catch (err: unknown) {
-            const message = getErrorMessage(err);
-            setStatusConfig({ type: 'error', title: 'Error', message });
-            setShowStatusModal(true);
-        } finally {
-            setSubmittingScoreId(null);
-        }
-    };
-
-    const submitDeleteSubMatch = async (subMatch: SubMatchDto) => {
-        setSubmittingScoreId(subMatch.matchId);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.REVERT_MATCH_RESULT, {
-                method: 'POST',
-                body: JSON.stringify({ MatchId: subMatch.matchId }),
-            });
-            if (!response.ok) {
-                const text = await response.text().catch(() => 'Failed');
-                throw new Error(text);
-            }
-            setEditingMatchId(null);
-            fetchData();
-            onMatchUpdate?.();
-        } catch (err: unknown) {
-            const message = getErrorMessage(err);
-            setStatusConfig({ type: 'error', title: 'Error', message });
-            setShowStatusModal(true);
-        } finally {
-            setSubmittingScoreId(null);
-        }
-    };
-
-    // Destructive: clears this game's score and reopens it (and the team match, if it was the
-    // deciding game). Confirm first; the backend re-checks permissions and the downstream lock.
-    const handleDeleteSubMatch = (subMatch: SubMatchDto) => {
-        Alert.alert(
-            'Delete result?',
-            "This clears this game's score and reopens it. If it was the deciding game, the team match reopens too.",
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => submitDeleteSubMatch(subMatch) },
-            ],
-        );
-    };
 
     const handleSelectRepresentative = async (member: TeamMemberDto) => {
         if (!data) return;
@@ -1140,36 +890,13 @@ export function TeamMatchDetailModal({
                                 const homeWinner = !!sm.winnerUserId && sm.winnerUserId === sm.homePlayer?.userId;
                                 const awayWinner = !!sm.winnerUserId && sm.winnerUserId === sm.awayPlayer?.userId;
 
-                                // Action eligibility — same rules as the previous build, kept verbatim so behaviour doesn't drift.
-                                const homeId = (sm.homePlayer?.userId || (sm as any).HomePlayer?.userId || '').toLowerCase();
-                                const awayId = (sm.awayPlayer?.userId || (sm as any).AwayPlayer?.userId || '').toLowerCase();
-                                const me = (currentUserId || '').toLowerCase();
-                                const isPlayerOfSub = !!me && (me === homeId || me === awayId);
-                                const hasRecordedResult = (sm.homeScore !== null && sm.awayScore !== null) || !!sm.winnerUserId;
-                                const canEdit = sm.status !== 'Pending' && isHubOwner;
-                                const canDelete = hasRecordedResult && (isHubOwner || (isPlayerOfSub && !approvalRequired));
-
-                                // Pending proposal — surfaced only while approval is required and the sub-match has not yet completed.
+                                // A result awaiting approval shows its proposed score (amber) in the summary row;
+                                // reporting / approving / editing all happen on the match page (See Details).
                                 const proposed = (sm as any).proposedByUserId ?? (sm as any).ProposedByUserId;
                                 const subPending = sm.status === 'Pending' || sm.status === 0 || sm.status === 1;
                                 const hasProposal = approvalRequired && !!proposed && subPending;
                                 const phs = (sm as any).proposedHomeScore ?? (sm as any).ProposedHomeScore ?? 0;
                                 const pas = (sm as any).proposedAwayScore ?? (sm as any).ProposedAwayScore ?? 0;
-                                const isProposer = hasProposal && !!currentUserId && String(proposed).toLowerCase() === currentUserId.toLowerCase();
-                                const isOpponent = hasProposal && !isProposer && (me === homeId || me === awayId);
-                                const canDecide = hasProposal && (isOpponent || isHubOwner);
-
-                                const expanded = expandedGameId === sm.matchId;
-                                // Owner reports straight from the expanded panel whenever the game has no recorded
-                                // result yet (any not-scored status, not just code 0/1) — explicit Edit opens scored ones.
-                                const showForm = expanded && (
-                                    editingMatchId === sm.matchId ||
-                                    (isHubOwner && !hasRecordedResult && !hasProposal && editingMatchId === null)
-                                );
-                                const hasEvidence = (sm.evidences?.length || 0) > 0;
-                                // A row only expands when there's something behind the tap (evidence, a pending
-                                // proposal, or owner actions); otherwise it just shows a state dot.
-                                const hasExpandableDetail = hasEvidence || hasProposal || canEdit || canDelete || (isHubOwner && !hasRecordedResult);
 
                                 return (
                                     <View
@@ -1201,9 +928,10 @@ export function TeamMatchDetailModal({
                                             }}
                                         />
 
-                                        {/* Collapsed row — one compact line: players · score · expand. */}
+                                        {/* Compact summary row — players · score. The whole card opens the full
+                                            match page (result · chat · stream), the same surface a solo match uses. */}
                                         <Pressable
-                                            onPress={() => toggleGame(sm.matchId)}
+                                            onPress={() => onOpenSubMatch?.(sm, 'match')}
                                             style={{
                                                 flexDirection: 'row',
                                                 alignItems: 'center',
@@ -1269,374 +997,30 @@ export function TeamMatchDetailModal({
                                                     <Avatar url={sm.awayPlayer?.avatarUrl} name={sm.awayPlayer?.username || '?'} size={24} ring={awayWinner} />
                                                 </Pressable>
                                             </View>
-
-                                            {/* Expand affordance — chevron when there's detail, otherwise a state dot */}
-                                            <View style={{ width: 16, alignItems: 'center', marginLeft: 2 }}>
-                                                {hasExpandableDetail ? (
-                                                    <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={C.textFaint} />
-                                                ) : (
-                                                    <View style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: palette.accent, opacity: subState === 'pending' ? 0.6 : 1 }} />
-                                                )}
-                                            </View>
                                         </Pressable>
 
-                                        {/* Expanded detail panel */}
-                                        {expanded && hasExpandableDetail && (
-                                        <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 12 }}>
-                                            {!showForm && (
-                                                <View style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
-                                                    <StatusPill state={subState} size="sm" />
-                                                </View>
-                                            )}
-
-                                        {/* Inline evidence thumbnails — folds the old global Evidence section into context. */}
-                                        {(sm.evidences?.length || 0) > 0 && (
-                                            <View
-                                                style={{
-                                                    paddingHorizontal: 14,
-                                                    paddingBottom: 12,
-                                                    paddingTop: 4,
-                                                }}
-                                            >
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                                                    <Ionicons name="images-outline" size={11} color={C.indigo} />
-                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                                        Evidence
-                                                    </Text>
-                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: C.textGhost }}>
-                                                        ({(sm.evidences?.length ?? 0)})
-                                                    </Text>
-                                                </View>
-                                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                                    {(sm.evidences ?? []).slice(0, 6).map((url, eIdx) => (
-                                                        <Pressable
-                                                            key={eIdx}
-                                                            onPress={() => setPreviewImage(url)}
-                                                            style={{ marginRight: 8 }}
-                                                        >
-                                                            <View
-                                                                style={{
-                                                                    borderRadius: 12,
-                                                                    overflow: 'hidden',
-                                                                    borderWidth: 1, borderColor: C.border,
-                                                                    width: 72, height: 72,
-                                                                }}
-                                                            >
-                                                                <Image
-                                                                    source={{ uri: getOptimizedCloudinaryUrl(url, 200) }}
-                                                                    style={{ width: 72, height: 72 }}
-                                                                    resizeMode="cover"
-                                                                />
-                                                            </View>
-                                                        </Pressable>
-                                                    ))}
-                                                    {(sm.evidences?.length ?? 0) > 6 && (
-                                                        <View
-                                                            style={{
-                                                                width: 72, height: 72, borderRadius: 12,
-                                                                backgroundColor: 'rgba(255,255,255,0.04)',
-                                                                borderWidth: 1, borderColor: C.border,
-                                                                alignItems: 'center', justifyContent: 'center',
-                                                            }}
-                                                        >
-                                                            <Text style={{ color: C.textDim, fontWeight: '900', fontSize: 11 }}>
-                                                                +{(sm.evidences?.length ?? 0) - 6}
-                                                            </Text>
-                                                        </View>
-                                                    )}
-                                                </ScrollView>
-                                            </View>
-                                        )}
-
-                                        {/* Awaiting-approval row */}
-                                        {hasProposal && (
-                                            <View
-                                                style={{
-                                                    marginHorizontal: 14,
-                                                    marginBottom: 14,
-                                                    padding: 12,
-                                                    backgroundColor: C.amberSoft,
-                                                    borderRadius: 14,
-                                                    borderWidth: 1,
-                                                    borderColor: C.amberRing,
-                                                }}
-                                            >
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: canDecide ? 10 : 0 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                        <Ionicons name="hourglass-outline" size={11} color={C.amber} />
-                                                        <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 1.8, textTransform: 'uppercase' }}>
-                                                            {isProposer ? 'Awaiting Approval' : 'Result Reported'}
-                                                        </Text>
-                                                    </View>
-                                                    <Text style={{ fontSize: 14, fontWeight: '900', color: C.amber }}>
-                                                        {phs} : {pas}
-                                                    </Text>
-                                                </View>
-                                                {canDecide && (
-                                                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                                                        <Pressable
-                                                            onPress={() => handleRejectSubMatch(sm)}
-                                                            disabled={submittingScoreId === sm.matchId}
-                                                            style={{
-                                                                flex: 1,
-                                                                backgroundColor: C.redSoft,
-                                                                borderWidth: 1, borderColor: C.redRing,
-                                                                borderRadius: 12,
-                                                                paddingVertical: 9,
-                                                                alignItems: 'center',
-                                                            }}
-                                                        >
-                                                            {submittingScoreId === sm.matchId ? (
-                                                                <ActivityIndicator size="small" color="#F87171" />
-                                                            ) : (
-                                                                <Text style={{ fontSize: 10, fontWeight: '900', color: '#F87171', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                                                                    Reject
-                                                                </Text>
-                                                            )}
-                                                        </Pressable>
-                                                        <Pressable
-                                                            onPress={() => handleApproveSubMatch(sm)}
-                                                            disabled={submittingScoreId === sm.matchId}
-                                                            style={{
-                                                                flex: 1,
-                                                                backgroundColor: C.emerald,
-                                                                borderRadius: 12,
-                                                                paddingVertical: 9,
-                                                                alignItems: 'center',
-                                                            }}
-                                                        >
-                                                            {submittingScoreId === sm.matchId ? (
-                                                                <ActivityIndicator size="small" color="#0F172A" />
-                                                            ) : (
-                                                                <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                                                                    Approve
-                                                                </Text>
-                                                            )}
-                                                        </Pressable>
-                                                    </View>
-                                                )}
-                                            </View>
-                                        )}
-
-                                        {/* Edit mode (score inputs + evidence picker) */}
-                                        {showForm ? (
-                                            <View
-                                                style={{
-                                                    marginHorizontal: 14,
-                                                    marginBottom: 14,
-                                                    padding: 14,
-                                                    backgroundColor: 'rgba(0,0,0,0.20)',
-                                                    borderRadius: 16,
-                                                    borderWidth: 1,
-                                                    borderColor: C.border,
-                                                }}
-                                            >
-                                                <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>
-                                                    {sm.status === 'Pending' ? 'Report Result' : 'Edit Result'}
+                                        {/* See Details — opens the match page where result reporting, edit / delete,
+                                            evidence, chat & stream all live now. */}
+                                        <Pressable
+                                            onPress={() => onOpenSubMatch?.(sm, 'match')}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 11,
+                                                borderTopWidth: 1,
+                                                borderTopColor: 'rgba(255,255,255,0.05)',
+                                            }}
+                                        >
+                                            <StatusPill state={subState} size="sm" />
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                <Text style={{ fontSize: 10, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
+                                                    See Details
                                                 </Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                                                    <TextInput
-                                                        style={{
-                                                            flex: 1,
-                                                            height: 44,
-                                                            backgroundColor: 'rgba(255,255,255,0.04)',
-                                                            borderRadius: 12,
-                                                            borderWidth: 1, borderColor: C.border,
-                                                            color: C.text,
-                                                            textAlign: 'center',
-                                                            fontWeight: '900',
-                                                            fontSize: 18,
-                                                        }}
-                                                        placeholder="0"
-                                                        placeholderTextColor={C.textGhost}
-                                                        keyboardType="numeric"
-                                                        value={scoreInputs[sm.matchId]?.home || ''}
-                                                        onChangeText={(v) => handleScoreChange(sm.matchId, 'home', v)}
-                                                    />
-                                                    <Text style={{ color: C.textFaint, fontWeight: '900', fontSize: 14 }}>:</Text>
-                                                    <TextInput
-                                                        style={{
-                                                            flex: 1,
-                                                            height: 44,
-                                                            backgroundColor: 'rgba(255,255,255,0.04)',
-                                                            borderRadius: 12,
-                                                            borderWidth: 1, borderColor: C.border,
-                                                            color: C.text,
-                                                            textAlign: 'center',
-                                                            fontWeight: '900',
-                                                            fontSize: 18,
-                                                        }}
-                                                        placeholder="0"
-                                                        placeholderTextColor={C.textGhost}
-                                                        keyboardType="numeric"
-                                                        value={scoreInputs[sm.matchId]?.away || ''}
-                                                        onChangeText={(v) => handleScoreChange(sm.matchId, 'away', v)}
-                                                    />
-                                                </View>
-
-                                                {/* Evidence section inside edit */}
-                                                <View style={{ marginBottom: 14 }}>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                                            <Ionicons name="images-outline" size={11} color={C.emerald} />
-                                                            <Text style={{ fontSize: 9, fontWeight: '900', color: C.text, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                                                Evidence
-                                                            </Text>
-                                                        </View>
-                                                        <Pressable
-                                                            onPress={pickImages}
-                                                            style={{
-                                                                backgroundColor: C.emeraldSoft,
-                                                                borderWidth: 1, borderColor: C.emeraldRing,
-                                                                paddingHorizontal: 10, paddingVertical: 4,
-                                                                borderRadius: 8,
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                                                                + Add
-                                                            </Text>
-                                                        </Pressable>
-                                                    </View>
-                                                    {selectedImages.length > 0 ? (
-                                                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                                            {selectedImages.map((img, ix) => (
-                                                                <View key={img.uri + ix} style={{ marginRight: 8 }}>
-                                                                    <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
-                                                                        <Image source={{ uri: img.uri }} style={{ width: 64, height: 64 }} />
-                                                                    </View>
-                                                                    <Pressable
-                                                                        onPress={() => removeImage(img.uri)}
-                                                                        style={{
-                                                                            position: 'absolute', top: -4, right: -4,
-                                                                            width: 18, height: 18, borderRadius: 999,
-                                                                            backgroundColor: C.red,
-                                                                            alignItems: 'center', justifyContent: 'center',
-                                                                            borderWidth: 2, borderColor: C.surfaceRaised,
-                                                                        }}
-                                                                    >
-                                                                        <Ionicons name="close" size={10} color="white" />
-                                                                    </Pressable>
-                                                                </View>
-                                                            ))}
-                                                        </ScrollView>
-                                                    ) : (
-                                                        <Pressable
-                                                            onPress={pickImages}
-                                                            style={{
-                                                                height: 56,
-                                                                borderRadius: 12,
-                                                                borderWidth: 1,
-                                                                borderColor: 'rgba(255,255,255,0.08)',
-                                                                borderStyle: 'dashed',
-                                                                alignItems: 'center', justifyContent: 'center',
-                                                                backgroundColor: 'rgba(255,255,255,0.02)',
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontSize: 10, color: C.textFaint, fontWeight: '700' }}>
-                                                                Tap to attach screenshots
-                                                            </Text>
-                                                        </Pressable>
-                                                    )}
-                                                </View>
-
-                                                <View style={{ flexDirection: 'row', gap: 8 }}>
-                                                    {editingMatchId === sm.matchId && (
-                                                        <Pressable
-                                                            onPress={handleCancelEdit}
-                                                            style={{
-                                                                flex: 1,
-                                                                backgroundColor: 'rgba(255,255,255,0.04)',
-                                                                borderWidth: 1, borderColor: C.border,
-                                                                borderRadius: 12,
-                                                                paddingVertical: 11,
-                                                                alignItems: 'center',
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontSize: 10, fontWeight: '900', color: C.textDim, letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                                                                Cancel
-                                                            </Text>
-                                                        </Pressable>
-                                                    )}
-                                                    <Pressable
-                                                        onPress={() => handleSubmitScore(sm)}
-                                                        disabled={submittingScoreId === sm.matchId || isUploadingEvidence}
-                                                        style={{
-                                                            flex: 1,
-                                                            backgroundColor: C.emerald,
-                                                            borderRadius: 12,
-                                                            paddingVertical: 11,
-                                                            alignItems: 'center',
-                                                        }}
-                                                    >
-                                                        {submittingScoreId === sm.matchId || isUploadingEvidence ? (
-                                                            <ActivityIndicator size="small" color="#0F172A" />
-                                                        ) : (
-                                                            <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                                                                Save Result
-                                                            </Text>
-                                                        )}
-                                                    </Pressable>
-                                                </View>
+                                                <Ionicons name="chevron-forward" size={14} color={C.emerald} />
                                             </View>
-                                        ) : (
-                                            // Actions row — only shows when there's something to do
-                                            (canEdit || canDelete) && (
-                                                <View
-                                                    style={{
-                                                        flexDirection: 'row',
-                                                        justifyContent: 'flex-end',
-                                                        gap: 8,
-                                                        paddingHorizontal: 14,
-                                                        paddingBottom: 12,
-                                                        paddingTop: 4,
-                                                    }}
-                                                >
-                                                    {canEdit && (
-                                                        <Pressable
-                                                            onPress={() => handleEditSubMatch(sm)}
-                                                            style={{
-                                                                flexDirection: 'row', alignItems: 'center', gap: 5,
-                                                                backgroundColor: C.emeraldSoft,
-                                                                borderWidth: 1, borderColor: C.emeraldRing,
-                                                                borderRadius: 10,
-                                                                paddingHorizontal: 10, paddingVertical: 6,
-                                                            }}
-                                                        >
-                                                            <Ionicons name="create-outline" size={11} color={C.emerald} />
-                                                            <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
-                                                                Edit
-                                                            </Text>
-                                                        </Pressable>
-                                                    )}
-                                                    {canDelete && (
-                                                        <Pressable
-                                                            onPress={() => handleDeleteSubMatch(sm)}
-                                                            disabled={submittingScoreId === sm.matchId}
-                                                            style={{
-                                                                flexDirection: 'row', alignItems: 'center', gap: 5,
-                                                                backgroundColor: C.redSoft,
-                                                                borderWidth: 1, borderColor: C.redRing,
-                                                                borderRadius: 10,
-                                                                paddingHorizontal: 10, paddingVertical: 6,
-                                                            }}
-                                                        >
-                                                            {submittingScoreId === sm.matchId ? (
-                                                                <ActivityIndicator size="small" color="#F87171" />
-                                                            ) : (
-                                                                <>
-                                                                    <Ionicons name="trash-outline" size={11} color="#F87171" />
-                                                                    <Text style={{ fontSize: 9, fontWeight: '900', color: '#F87171', letterSpacing: 1.4, textTransform: 'uppercase' }}>
-                                                                        Delete
-                                                                    </Text>
-                                                                </>
-                                                            )}
-                                                        </Pressable>
-                                                    )}
-                                                </View>
-                                            )
-                                        )}
-                                        </View>
-                                        )}
+                                        </Pressable>
                                     </View>
                                 );
                             })}
@@ -1910,29 +1294,6 @@ export function TeamMatchDetailModal({
                 />
             )}
 
-            {/* Evidence Image Preview Modal */}
-            {previewImage && (
-                <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
-                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                        <Pressable
-                            onPress={() => setPreviewImage(null)}
-                            style={{
-                                position: 'absolute', top: 48, right: 24, zIndex: 10,
-                                width: 40, height: 40, borderRadius: 999,
-                                backgroundColor: 'rgba(255,255,255,0.10)',
-                                alignItems: 'center', justifyContent: 'center',
-                            }}
-                        >
-                            <Ionicons name="close" size={22} color="white" />
-                        </Pressable>
-                        <Image
-                            source={{ uri: getOptimizedCloudinaryUrl(previewImage, 800) }}
-                            style={{ width: '100%', height: '100%' }}
-                            resizeMode="contain"
-                        />
-                    </View>
-                </Modal>
-            )}
         </Modal>
     );
 }

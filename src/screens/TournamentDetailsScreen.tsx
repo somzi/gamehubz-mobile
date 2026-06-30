@@ -142,6 +142,9 @@ export default function TournamentDetailsScreen() {
     const [userTeam, setUserTeam] = useState<TeamDto | null>(null);
     const [showTeamMatchDetail, setShowTeamMatchDetail] = useState(false);
     const [selectedTeamMatchId, setSelectedTeamMatchId] = useState<string | null>(null);
+    // When a single game is opened from the team overview, remember the parent team match so
+    // closing the solo match page drops the user back onto the team modal (drill-in / drill-out).
+    const [returnToTeamMatchId, setReturnToTeamMatchId] = useState<string | null>(null);
     const [removingTeamId, setRemovingTeamId] = useState<string | null>(null);
 
     // Collapsible section states
@@ -501,6 +504,53 @@ export default function TournamentDetailsScreen() {
             isRoundLocked: false,
         });
         setMatchModalDefaultTab('match');
+        setShowReportModal(true);
+    };
+
+    // Drill from the team overview into one individual game's full match page. The team modal
+    // has no chat/stream of its own, so we reshape the sub-match into the solo MatchDetailsModal
+    // (which resolves the pairing/score out of the parent team-match DTO and renders chat /
+    // stream / result). We stash the parent team match so closing the game returns to it.
+    const handleOpenSubMatchFromTeam = (sub: any, tab: 'match' | 'chat') => {
+        const isDone =
+            !!sub?.winnerUserId ||
+            sub?.status === 'Completed' || sub?.status === 2 || sub?.status === 3 ||
+            (sub?.homeScore !== null && sub?.homeScore !== undefined &&
+                sub?.awayScore !== null && sub?.awayScore !== undefined);
+
+        // The solo modal derives its 'completed'/'ready_phase' status from a NUMERIC code (3 =
+        // completed → result + edit/delete; 2 = ready → the report/submit form). Passing a string
+        // here falls through to the default and wrongly shows the submit form on a played game.
+        const numericStatus = isDone ? 3 : 2;
+
+        // Players keep edit/delete on their own finished game when no approval gate is in play;
+        // hub owners/admins already get them via the modal's privileged path.
+        const me = user?.id?.toLowerCase();
+        const isPlayerOfSub = !!me && (
+            sub?.homePlayer?.userId?.toLowerCase() === me ||
+            sub?.awayPlayer?.userId?.toLowerCase() === me
+        );
+        const approvalRequired = bracketRequireResultApproval
+            || (tournament as any)?.requireResultApproval
+            || (tournament as any)?.RequireResultApproval
+            || false;
+
+        setReturnToTeamMatchId(selectedTeamMatchId);
+        setShowTeamMatchDetail(false);
+        setSelectedMatch({
+            id: sub.matchId,
+            status: numericStatus,
+            roundName: 'Team Match',
+            home: sub.homePlayer
+                ? { userId: sub.homePlayer.userId, username: sub.homePlayer.username, score: sub.homeScore ?? null }
+                : null,
+            away: sub.awayPlayer
+                ? { userId: sub.awayPlayer.userId, username: sub.awayPlayer.username, score: sub.awayScore ?? null }
+                : null,
+            canRevert: isDone && isPlayerOfSub && !approvalRequired,
+            isRoundLocked: false,
+        });
+        setMatchModalDefaultTab(tab);
         setShowReportModal(true);
     };
 
@@ -2943,7 +2993,23 @@ export default function TournamentDetailsScreen() {
 
             <MatchDetailsModal
                 visible={showReportModal}
-                onClose={() => setShowReportModal(false)}
+                onClose={() => {
+                    setShowReportModal(false);
+                    // If this game was opened from a team match, drop back onto the team overview.
+                    // Defer + guard with isFocused: the solo modal also calls onClose right before
+                    // navigating to a player's profile, and we must not re-raise the team modal on
+                    // top of that pushed screen — only restore it on a genuine dismiss.
+                    if (returnToTeamMatchId) {
+                        const back = returnToTeamMatchId;
+                        setReturnToTeamMatchId(null);
+                        setTimeout(() => {
+                            if (navigation.isFocused()) {
+                                setSelectedTeamMatchId(back);
+                                setShowTeamMatchDetail(true);
+                            }
+                        }, 320);
+                    }
+                }}
                 matchId={selectedMatch?.id}
                 tournamentId={id}
                 tournamentName={tournament?.name}
@@ -3064,6 +3130,7 @@ export default function TournamentDetailsScreen() {
                     hubOwnerId={hubOwnerId}
                     canManage={canManage}
                     currentUserId={user?.id}
+                    onOpenSubMatch={handleOpenSubMatchFromTeam}
                     onMatchUpdate={() => {
                         fetchBracket();
                         if (tournament?.isTeamTournament) fetchTournamentTeams(id);

@@ -286,19 +286,22 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     <Pressable
                         onPress={handleSend}
                         disabled={!newComment.trim() || isSending}
-                        className="w-12 h-12 rounded-full items-center justify-center"
-                        style={({ pressed }) => [{
-                            // Always emerald — dimmed (not dark) while empty/sending so the send
-                            // button looks identical no matter how the chat was opened.
-                            backgroundColor: pressed ? '#059669' : '#10B981',
-                            opacity: (!newComment.trim() || isSending) ? 0.45 : 1,
-                            transform: [{ scale: pressed ? 0.95 : 1 }],
-                        }]}
+                        // Background MUST live in className — a function style on Pressable is not
+                        // applied reliably here, so bg-emerald-500 (bright green) when there's text,
+                        // bg-white/5 (dark) when empty. Mirrors the friends DM send button.
+                        className={`w-12 h-12 rounded-full items-center justify-center ${
+                            newComment.trim() && !isSending ? 'bg-emerald-500' : 'bg-white/5'
+                        }`}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
                     >
                         {isSending ? (
-                            <ActivityIndicator size="small" color="#0F172A" />
+                            <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                            <Ionicons name="send" size={20} color="#0F172A" />
+                            <Ionicons
+                                name="send"
+                                size={20}
+                                color={newComment.trim() ? '#fff' : '#475569'}
+                            />
                         )}
                     </Pressable>
                 </View>

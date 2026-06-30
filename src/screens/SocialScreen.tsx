@@ -26,7 +26,7 @@ export default function SocialScreen() {
 
     const tabs: PremiumTabItem[] = [
         { value: 'friends', label: 'Friends', icon: 'people' },
-        { value: 'requests', label: 'Requests', icon: 'person-add', badge: badges.friendRequests > 0 ? badges.friendRequests : undefined },
+        { value: 'requests', label: 'Requests', icon: 'person-add', badge: badges.friendRequests > 0 ? badges.friendRequests : undefined, badgeTone: 'alert' },
         { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses', badge: badges.unreadDirectMessages > 0 ? badges.unreadDirectMessages : undefined, badgeTone: 'alert' },
     ];
 
@@ -257,7 +257,7 @@ function RequestsTab() {
             <View className="px-5 mb-2">
                 <PremiumTabs
                     tabs={[
-                        { value: 'incoming', label: 'Incoming', icon: 'arrow-down-circle-outline', badge: incoming.length > 0 ? incoming.length : undefined },
+                        { value: 'incoming', label: 'Incoming', icon: 'arrow-down-circle-outline', badge: incoming.length > 0 ? incoming.length : undefined, badgeTone: 'alert' },
                         { value: 'outgoing', label: 'Outgoing', icon: 'arrow-up-circle-outline', badge: outgoing.length > 0 ? outgoing.length : undefined },
                     ]}
                     activeTab={subTab}
@@ -327,44 +327,60 @@ function RequestsTab() {
                                         {formatChatTime(item.createdOn)}
                                     </Text>
                                 </View>
-                                <View className="flex-row mt-3.5" style={{ gap: 8 }}>
+                                {/* Action row — full-width split buttons. flex-1 via className (NativeWind
+                                    applies it reliably; an inline flex inside a function style does NOT here,
+                                    which left them content-width). Green = accept, red = decline. */}
+                                <View className="flex-row" style={{ marginTop: 16, gap: 10 }}>
                                     {isIncoming ? (
                                         <>
                                             <Pressable
                                                 onPress={() => accept(item)}
-                                                style={({ pressed }) => ({ flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                                                className="flex-1"
+                                                style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
                                             >
                                                 <View
-                                                    className="flex-row items-center justify-center"
-                                                    style={{ backgroundColor: '#10B981', borderRadius: 14, paddingVertical: 11, gap: 6 }}
+                                                    style={{
+                                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                                                        backgroundColor: '#10B981', borderRadius: 14, paddingVertical: 14,
+                                                        shadowColor: '#10B981', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3,
+                                                    }}
                                                 >
-                                                    <Ionicons name="checkmark" size={15} color="#0F172A" />
-                                                    <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 12, letterSpacing: 0.3 }}>Accept</Text>
+                                                    <Ionicons name="checkmark-circle" size={18} color="#04130D" />
+                                                    <Text style={{ color: '#04130D', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>Accept</Text>
                                                 </View>
                                             </Pressable>
                                             <Pressable
                                                 onPress={() => reject(item)}
-                                                style={({ pressed }) => ({ flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                                                className="flex-1"
+                                                style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
                                             >
                                                 <View
-                                                    className="items-center"
-                                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 14, paddingVertical: 11 }}
+                                                    style={{
+                                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                                                        backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.40)',
+                                                        borderRadius: 14, paddingVertical: 13,
+                                                    }}
                                                 >
-                                                    <Text style={{ color: '#CBD5E1', fontWeight: '900', fontSize: 12 }}>Decline</Text>
+                                                    <Ionicons name="close-circle" size={17} color="#F87171" />
+                                                    <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>Decline</Text>
                                                 </View>
                                             </Pressable>
                                         </>
                                     ) : (
                                         <Pressable
                                             onPress={() => cancel(item)}
-                                            style={({ pressed }) => ({ flex: 1, transform: [{ scale: pressed ? 0.97 : 1 }] })}
+                                            className="flex-1"
+                                            style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
                                         >
                                             <View
-                                                className="flex-row items-center justify-center"
-                                                style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 14, paddingVertical: 11, gap: 6 }}
+                                                style={{
+                                                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                                                    backgroundColor: 'rgba(239,68,68,0.10)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.30)',
+                                                    borderRadius: 14, paddingVertical: 13,
+                                                }}
                                             >
-                                                <Ionicons name="close" size={15} color="#94A3B8" />
-                                                <Text style={{ color: '#CBD5E1', fontWeight: '900', fontSize: 12 }}>Cancel request</Text>
+                                                <Ionicons name="close-circle" size={17} color="#F87171" />
+                                                <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>Cancel request</Text>
                                             </View>
                                         </Pressable>
                                     )}
