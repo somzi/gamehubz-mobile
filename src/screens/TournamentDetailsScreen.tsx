@@ -512,11 +512,15 @@ export default function TournamentDetailsScreen() {
     // (which resolves the pairing/score out of the parent team-match DTO and renders chat /
     // stream / result). We stash the parent team match so closing the game returns to it.
     const handleOpenSubMatchFromTeam = (sub: any, tab: 'match' | 'chat') => {
+        // Backend MatchStatus enum (mirrored in the team-match payload): 1 Pending, 2 Scheduled,
+        // 3 Live, 4 Completed, 5 NoShow. Only Completed (or an explicit winner — a draw can be
+        // Completed without one) means the game has a result; everything else is still in play.
+        // Don't infer "done" from non-null scores: revert/edit can leave 0:0 ghosts on a Pending
+        // row, which used to flip a never-played game into the Final Score / Edit-Delete view.
         const isDone =
             !!sub?.winnerUserId ||
-            sub?.status === 'Completed' || sub?.status === 2 || sub?.status === 3 ||
-            (sub?.homeScore !== null && sub?.homeScore !== undefined &&
-                sub?.awayScore !== null && sub?.awayScore !== undefined);
+            sub?.status === 'Completed' ||
+            sub?.status === 4;
 
         // The solo modal derives its 'completed'/'ready_phase' status from a NUMERIC code (3 =
         // completed → result + edit/delete; 2 = ready → the report/submit form). Passing a string

@@ -78,18 +78,22 @@ type TeamState = 'pending' | 'live' | 'completed' | 'tieBreak';
 type SubState = 'pending' | 'completed' | 'awaitingApproval' | 'tieBreak';
 
 function deriveTeamState(data: TeamMatchDetailsDto | null, tieBreak: TieBreakStatusDto | null): TeamState {
+    // Backend TeamMatchStatus: Pending=1, Completed=2, TieBreakRequired=3, Processing=4.
+    // (Distinct from MatchStatus on sub-matches, where Completed=4 — do not cross-wire.)
     if (tieBreak?.isRequired && !data?.winnerTeamParticipantId) return 'tieBreak';
-    if (data?.winnerTeamParticipantId || data?.status === 'Completed' || data?.status === 3) return 'completed';
-    if (data?.status === 'InProgress' || data?.status === 2) return 'live';
+    if (data?.status === 'TieBreakRequired' || data?.status === 3) return 'tieBreak';
+    if (data?.winnerTeamParticipantId || data?.status === 'Completed' || data?.status === 2) return 'completed';
+    if (data?.status === 'Processing' || data?.status === 4) return 'live';
     return 'pending';
 }
 
 function deriveSubState(sm: SubMatchDto, approvalRequired: boolean): SubState {
+    // Backend MatchStatus on sub-matches: Pending=1, Scheduled=2, Live=3, Completed=4, NoShow=5.
     if (sm.isTieBreakMatch && !sm.winnerUserId && (sm.homeScore === null || sm.awayScore === null)) return 'tieBreak';
     const hasResult = sm.homeScore !== null && sm.awayScore !== null;
-    if (hasResult && (sm.status === 'Completed' || sm.status === 2 || sm.status === 3 || !!sm.winnerUserId)) return 'completed';
+    if (hasResult && (sm.status === 'Completed' || sm.status === 4 || !!sm.winnerUserId)) return 'completed';
     const proposed = (sm as any).proposedByUserId ?? (sm as any).ProposedByUserId;
-    const subPending = sm.status === 'Pending' || sm.status === 0 || sm.status === 1;
+    const subPending = sm.status === 'Pending' || sm.status === 1;
     if (approvalRequired && !!proposed && subPending) return 'awaitingApproval';
     return 'pending';
 }
@@ -535,7 +539,7 @@ export function TeamMatchDetailModal({
     const totalSubs = data?.subMatches?.length ?? 0;
     const completedSubs = data?.subMatches?.filter(sm => {
         const hasResult = sm.homeScore !== null && sm.awayScore !== null;
-        return hasResult && (sm.status === 'Completed' || sm.status === 2 || sm.status === 3 || !!sm.winnerUserId);
+        return hasResult && (sm.status === 'Completed' || sm.status === 4 || !!sm.winnerUserId);
     }).length ?? 0;
 
     // Hero score colour rules: winner glows emerald, the rest sit muted. Falls back to neutral when tied.
@@ -1028,7 +1032,7 @@ export function TeamMatchDetailModal({
 
                         {/* ─── OUTCOME FOOTER ───────────────────────────────────────── */}
                         <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-                            {teamState === 'completed' && ((homeWins !== awayWins) || data?.winnerTeamParticipantId) ? (
+                            {teamState === 'completed' ? (
                                 (() => {
                                     let winnerIsHome = false;
                                     let isTie = false;
@@ -1162,56 +1166,7 @@ export function TeamMatchDetailModal({
                                         {TEAM_LABELS.TIE_BREAK_BANNER}
                                     </Text>
                                 </View>
-                            ) : (
-                                // Pending — show progress strip instead of a generic spinner
-                                <View
-                                    style={{
-                                        borderRadius: 22,
-                                        backgroundColor: C.surfaceRaised,
-                                        borderWidth: 1, borderColor: C.border,
-                                        padding: 18,
-                                    }}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <View
-                                                style={{
-                                                    width: 28, height: 28, borderRadius: 10,
-                                                    backgroundColor: C.amberSoft,
-                                                    borderWidth: 1, borderColor: C.amberRing,
-                                                    alignItems: 'center', justifyContent: 'center',
-                                                }}
-                                            >
-                                                <Ionicons name="time-outline" size={14} color={C.amber} />
-                                            </View>
-                                            <Text style={{ fontSize: 11, fontWeight: '900', color: C.text, letterSpacing: 0.4 }}>
-                                                {TEAM_LABELS.AWAITING_RESULTS}
-                                            </Text>
-                                        </View>
-                                        <Text style={{ fontSize: 11, fontWeight: '900', color: C.amber, letterSpacing: 1.2 }}>
-                                            {completedSubs} / {totalSubs}
-                                        </Text>
-                                    </View>
-                                    {/* Progress bar */}
-                                    <View
-                                        style={{
-                                            height: 6,
-                                            backgroundColor: 'rgba(255,255,255,0.04)',
-                                            borderRadius: 999,
-                                            overflow: 'hidden',
-                                        }}
-                                    >
-                                        <View
-                                            style={{
-                                                height: '100%',
-                                                width: totalSubs > 0 ? `${(completedSubs / totalSubs) * 100}%` : '0%',
-                                                backgroundColor: C.amber,
-                                                borderRadius: 999,
-                                            }}
-                                        />
-                                    </View>
-                                </View>
-                            )}
+                            ) : null /* Pending — progress is already shown by the "X / N DONE" line + aggregate in the hero card up top, no need to repeat it as a footer strip. */}
                         </View>
                     </ScrollView>
                 )}

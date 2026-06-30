@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { DateTimePickerModal } from './DateTimePickerModal';
-import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
+import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
 
@@ -51,6 +51,16 @@ const teamWinConditions = [
     { value: '0', label: 'Match Wins' },
     { value: '1', label: 'Aggregate Score' },
 ];
+
+// User-facing format groups. Single/Double Elimination collapse into one "Bracket"
+// entry — the Single/Double sub-toggle picks between them. The backend still receives
+// the full TournamentFormat (3 = SingleElim, 4 = DoubleElim).
+const FORMAT_GROUP_OPTIONS = [
+    { value: 'league', label: 'League' },
+    { value: 'bracket', label: 'Bracket' },
+    { value: 'groups-bracket', label: 'Groups + Bracket' },
+    { value: 'swiss', label: 'Swiss' },
+] as const;
 
 const regionMapping: Record<string, number> = {
     'global': TournamentRegion.Global,
@@ -206,8 +216,30 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         return prizeCurrencies.find(c => c.value === prizeCurrency)?.label || 'Currency';
     };
 
+    // Map selectedFormat (TournamentFormat) → user-facing group key.
+    const formatGroup: typeof FORMAT_GROUP_OPTIONS[number]['value'] =
+        selectedFormat === String(TournamentFormat.League) ? 'league' :
+        (selectedFormat === String(TournamentFormat.SingleElimination)
+            || selectedFormat === String(TournamentFormat.DoubleElimination)) ? 'bracket' :
+        selectedFormat === String(TournamentFormat.GroupStageWithKnockout) ? 'groups-bracket' :
+        selectedFormat === String(TournamentFormat.Swiss) ? 'swiss' :
+        'bracket';
+
     const getFormatLabel = () => {
-        return TOURNAMENT_FORMAT_OPTIONS.find(f => f.value === selectedFormat)?.label || 'Select Format';
+        return FORMAT_GROUP_OPTIONS.find(f => f.value === formatGroup)?.label || 'Select Format';
+    };
+
+    // The format dropdown writes a group key, which we expand back to TournamentFormat here.
+    // Switching INTO 'bracket' keeps the current Single/Double choice (3 or 4); otherwise defaults to Single.
+    const handleFormatGroupChange = (group: string) => {
+        if (group === 'league') setSelectedFormat(String(TournamentFormat.League));
+        else if (group === 'bracket') {
+            if (selectedFormat !== String(TournamentFormat.SingleElimination)
+                && selectedFormat !== String(TournamentFormat.DoubleElimination)) {
+                setSelectedFormat(String(TournamentFormat.SingleElimination));
+            }
+        } else if (group === 'groups-bracket') setSelectedFormat(String(TournamentFormat.GroupStageWithKnockout));
+        else if (group === 'swiss') setSelectedFormat(String(TournamentFormat.Swiss));
     };
 
     // Number of bracket entrants: players for solo, teams for team tournaments.
@@ -233,13 +265,29 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         ? 2 * (swissKnockoutSize - swissDirectCount)
         : 0;
 
-    // Single/Double knockout choice applies to the bracket phase of Groups+Bracket and Swiss.
-    // The knockout needs >= 4 bracket slots for a real losers bracket, so the toggle only appears
-    // then. (Swiss is solo-only; Groups+Bracket supports both solo and team double-elimination.)
+    // Single/Double knockout choice applies to: a pure Bracket (where it picks between SingleElim/DoubleElim),
+    // Groups+Bracket (where it picks the knockout phase style), and Swiss (where it picks the post-Swiss bracket).
+    // The knockout needs >= 4 bracket slots for a real losers bracket — Groups+Bracket / Swiss gate the toggle
+    // on that. For a pure Bracket we always show it; backend submit rejects Double-Elim with < 4 players anyway.
     const groupsTotalQualifiers = (parseInt(groupsCount) || 0) * (parseInt(qualifiersPerGroup) || 0);
     const showKnockoutTypeToggle =
+        formatGroup === 'bracket' ||
         (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers >= 4) ||
         (isSwiss && swissKnockoutSize >= 4);
+
+    // For a pure Bracket the choice IS the format (3 vs 4); for Groups+Bracket / Swiss it's stored on knockoutType.
+    const currentElimType: '1' | '2' = formatGroup === 'bracket'
+        ? (selectedFormat === String(TournamentFormat.DoubleElimination) ? '2' : '1')
+        : (knockoutType === '2' ? '2' : '1');
+    const setCurrentElimType = (val: '1' | '2') => {
+        if (formatGroup === 'bracket') {
+            setSelectedFormat(val === '2'
+                ? String(TournamentFormat.DoubleElimination)
+                : String(TournamentFormat.SingleElimination));
+        } else {
+            setKnockoutType(val);
+        }
+    };
 
     useEffect(() => {
         if (!isTeamTournament) {
@@ -384,8 +432,11 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     ? swissDirectCount
                     : null,
                 // Single (1) / Double (2) elimination for the Groups+Bracket / Swiss knockout phase.
-                // Null when not applicable; backend treats null as single.
-                KnockoutEliminationType: showKnockoutTypeToggle ? parseInt(knockoutType) : null,
+                // Null when not applicable (including pure Bracket, where SingleElim/DoubleElim IS the format).
+                // Backend treats null as single.
+                KnockoutEliminationType: showKnockoutTypeToggle && formatGroup !== 'bracket'
+                    ? parseInt(knockoutType)
+                    : null,
                 RoundDurationMinutes: roundDurationMinutes,
                 IsTeamTournament: isTeamTournament,
                 TeamSize: isTeamTournament ? parseInt(teamSize) : null,
@@ -599,6 +650,136 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                 </View>
                             </View>
 
+                            {/* Format-specific configuration — surfaces right under the Format picker so users
+                                don't have to scroll to find the Single/Double choice or Swiss rounds. */}
+
+                            {/* Groups + Bracket: groups count and qualifiers-per-group drive the knockout size. */}
+                            {selectedFormat === '5' && (
+                                <View className="flex-row gap-4">
+                                    <View className="flex-1">
+                                        <Text className="text-sm font-bold text-white mb-3">Groups Count</Text>
+                                        <TextInput
+                                            className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
+                                            placeholder="e.g. 4"
+                                            placeholderTextColor="#6b7280"
+                                            keyboardType="numeric"
+                                            value={groupsCount}
+                                            onChangeText={setGroupsCount}
+                                        />
+                                        <Text className="text-[11px] text-zinc-500 mt-2">
+                                            How many groups players will be split into.
+                                        </Text>
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-sm font-bold text-white mb-3">Qualifiers / Group</Text>
+                                        <TextInput
+                                            className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
+                                            placeholder="e.g. 2"
+                                            placeholderTextColor="#6b7280"
+                                            keyboardType="numeric"
+                                            value={qualifiersPerGroup}
+                                            onChangeText={setQualifiersPerGroup}
+                                        />
+                                        <Text className="text-[11px] text-zinc-500 mt-2">
+                                            How many players from each group advance to the knockout bracket.
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Swiss: rounds count + knockout-stage size + optional direct-qualifiers play-in. */}
+                            {isSwiss && (
+                                <View className="flex flex-col gap-y-6">
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1">
+                                            <View className="flex-row items-center mb-3">
+                                                <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                                <Text className="text-sm font-bold text-white">Swiss Rounds</Text>
+                                            </View>
+                                            <TextInput
+                                                className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
+                                                placeholder="Auto"
+                                                placeholderTextColor="#6b7280"
+                                                keyboardType="numeric"
+                                                value={swissRounds}
+                                                onChangeText={setSwissRounds}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <View className="flex-row items-center mb-3">
+                                                <Ionicons name="git-merge-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                                <Text className="text-sm font-bold text-white">Knockout Stage</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => setShowSwissKnockoutPicker(true)}
+                                                className="bg-[#131B2E] px-4 h-12 rounded-xl border border-white/10 flex-row items-center justify-between"
+                                            >
+                                                <Text className="text-white text-sm" numberOfLines={1}>
+                                                    {SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None'}
+                                                </Text>
+                                                <Ionicons name="chevron-down" size={16} color="#94A3B8" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 -mt-3">
+                                        Everyone plays every round against opponents on a similar score. Leave rounds empty for the standard count.
+                                    </Text>
+
+                                    {swissKnockoutSize > 0 && (
+                                        <View>
+                                            <View className="flex-row items-center mb-3">
+                                                <Ionicons name="flash-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                                <Text className="text-sm font-bold text-white">Direct Qualifiers (optional play-in)</Text>
+                                            </View>
+                                            <TextInput
+                                                className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
+                                                placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
+                                                placeholderTextColor="#6b7280"
+                                                keyboardType="numeric"
+                                                value={swissDirect}
+                                                onChangeText={setSwissDirect}
+                                            />
+                                            <Text className="text-[11px] text-zinc-500 mt-2">
+                                                {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
+                                                    ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round (best vs worst) for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
+                                                    : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            )}
+
+                            {/* Bracket / Groups+Bracket / Swiss: pick Single vs Double elimination for the knockout stage. */}
+                            {showKnockoutTypeToggle && (
+                                <View>
+                                    <View className="flex-row items-center mb-3">
+                                        <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                        <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
+                                    </View>
+                                    <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                        <Pressable
+                                            onPress={() => setCurrentElimType('1')}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${currentElimType === '1' ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${currentElimType === '1' ? 'text-white' : 'text-zinc-500'}`}>
+                                                SINGLE
+                                            </Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => setCurrentElimType('2')}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${currentElimType === '2' ? 'bg-[#4F46E5]' : ''}`}
+                                        >
+                                            <Text className={`text-xs font-bold tracking-wide ${currentElimType === '2' ? 'text-white' : 'text-zinc-500'}`}>
+                                                DOUBLE
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                    <Text className="text-[11px] text-zinc-500 mt-2">
+                                        Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
+                                    </Text>
+                                </View>
+                            )}
+
                             {/* Tournament Scope: region-based or country-based */}
                             <View>
                                 <View className="flex-row items-center mb-3">
@@ -784,39 +965,6 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                 </View>
                             )}
 
-                            {selectedFormat === '5' && (
-                                <View className="flex-row gap-4">
-                                    <View className="flex-1">
-                                        <Text className="text-sm font-bold text-white mb-3">Groups Count</Text>
-                                        <TextInput
-                                            className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
-                                            placeholder="e.g. 4"
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={groupsCount}
-                                            onChangeText={setGroupsCount}
-                                        />
-                                        <Text className="text-[11px] text-zinc-500 mt-2">
-                                            How many groups players will be split into.
-                                        </Text>
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-sm font-bold text-white mb-3">Qualifiers / Group</Text>
-                                        <TextInput
-                                            className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
-                                            placeholder="e.g. 2"
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={qualifiersPerGroup}
-                                            onChangeText={setQualifiersPerGroup}
-                                        />
-                                        <Text className="text-[11px] text-zinc-500 mt-2">
-                                            How many players from each group advance to the knockout bracket.
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
                             {/* Double round robin — every pair plays twice (home + away). Shown for League and Groups+Bracket. */}
                             {(selectedFormat === '0' || selectedFormat === '5') && (
                                 <View>
@@ -844,97 +992,6 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     </View>
                                     <Text className="text-[11px] text-zinc-500 mt-2">
                                         Every pair plays twice — one home leg and one away leg. Doubles the match count.
-                                    </Text>
-                                </View>
-                            )}
-
-                            {isSwiss && (
-                                <View className="flex flex-col gap-y-6">
-                                    <View className="flex-row gap-4">
-                                        <View className="flex-1">
-                                            <View className="flex-row items-center mb-3">
-                                                <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                                <Text className="text-sm font-bold text-white">Swiss Rounds</Text>
-                                            </View>
-                                            <TextInput
-                                                className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
-                                                placeholder="Auto"
-                                                placeholderTextColor="#6b7280"
-                                                keyboardType="numeric"
-                                                value={swissRounds}
-                                                onChangeText={setSwissRounds}
-                                            />
-                                        </View>
-                                        <View className="flex-1">
-                                            <View className="flex-row items-center mb-3">
-                                                <Ionicons name="git-merge-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                                <Text className="text-sm font-bold text-white">Knockout Stage</Text>
-                                            </View>
-                                            <TouchableOpacity
-                                                onPress={() => setShowSwissKnockoutPicker(true)}
-                                                className="bg-[#131B2E] px-4 h-12 rounded-xl border border-white/10 flex-row items-center justify-between"
-                                            >
-                                                <Text className="text-white text-sm" numberOfLines={1}>
-                                                    {SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None'}
-                                                </Text>
-                                                <Ionicons name="chevron-down" size={16} color="#94A3B8" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 -mt-3">
-                                        Everyone plays every round against opponents on a similar score. Leave rounds empty for the standard count.
-                                    </Text>
-
-                                    {swissKnockoutSize > 0 && (
-                                        <View>
-                                            <View className="flex-row items-center mb-3">
-                                                <Ionicons name="flash-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                                <Text className="text-sm font-bold text-white">Direct Qualifiers (optional play-in)</Text>
-                                            </View>
-                                            <TextInput
-                                                className="bg-[#131B2E] px-4 h-12 rounded-xl text-white border border-white/10"
-                                                placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
-                                                placeholderTextColor="#6b7280"
-                                                keyboardType="numeric"
-                                                value={swissDirect}
-                                                onChangeText={setSwissDirect}
-                                            />
-                                            <Text className="text-[11px] text-zinc-500 mt-2">
-                                                {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
-                                                    ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round (best vs worst) for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
-                                                    : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            )}
-
-                            {showKnockoutTypeToggle && (
-                                <View>
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
-                                    </View>
-                                    <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
-                                        <Pressable
-                                            onPress={() => setKnockoutType('1')}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '1' ? 'bg-[#4F46E5]' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '1' ? 'text-white' : 'text-zinc-500'}`}>
-                                                SINGLE
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => setKnockoutType('2')}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '2' ? 'bg-[#4F46E5]' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '2' ? 'text-white' : 'text-zinc-500'}`}>
-                                                DOUBLE
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
                                     </Text>
                                 </View>
                             )}
@@ -1064,9 +1121,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     {renderOptionsModal(
                         showFormatPicker,
                         () => setShowFormatPicker(false),
-                        TOURNAMENT_FORMAT_OPTIONS,
-                        selectedFormat,
-                        setSelectedFormat
+                        FORMAT_GROUP_OPTIONS.map(o => ({ value: o.value, label: o.label })),
+                        formatGroup,
+                        handleFormatGroupChange
                     )}
                     {renderOptionsModal(
                         showDurationUnitPicker,
