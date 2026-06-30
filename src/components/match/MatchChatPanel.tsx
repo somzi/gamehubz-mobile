@@ -11,6 +11,9 @@ import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
 import { cn, parseUtcDate } from '../../lib/utils';
 
+// Initial page size — load a screenful fast; older messages page in on demand.
+const PAGE_SIZE = 30;
+
 interface MatchChatPanelProps {
     matchId: string;
     /** Fetch history + hold the SignalR connection only while the panel is actually visible. */
@@ -35,8 +38,12 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const [newComment, setNewComment] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingEarlier, setLoadingEarlier] = useState(false);
     const scrollRef = useRef<ScrollView>(null);
     const connectionRef = useRef<HubConnection | null>(null);
+    // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
+    const didInitialScrollRef = useRef(false);
 
     const normalizedParticipantIds = participantIds
         .filter(Boolean)
@@ -46,15 +53,48 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         if (!matchId) return;
         if (!silent) setIsLoading(true);
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId));
+            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId, PAGE_SIZE));
             if (response.ok) {
                 const data = await response.json();
-                setComments(Array.isArray(data) ? data : []);
+                const list: MatchComment[] = Array.isArray(data) ? data : [];
+                setComments(list);
+                setHasMore(list.length >= PAGE_SIZE);
+                if (!silent) {
+                    // Let the initial batch lay out, then stop auto-scrolling so
+                    // "Load earlier" prepends don't jump the view to the bottom.
+                    setTimeout(() => { didInitialScrollRef.current = true; }, 400);
+                }
             }
         } catch (error) {
             console.error('[MatchChatPanel] Error fetching comments:', error);
         } finally {
             if (!silent) setIsLoading(false);
+        }
+    };
+
+    // Pull the previous page of older messages (oldest currently shown = the cursor).
+    const loadEarlier = async () => {
+        if (!matchId || loadingEarlier || !hasMore || comments.length === 0) return;
+        setLoadingEarlier(true);
+        try {
+            const oldest = comments[0];
+            const response = await authenticatedFetch(
+                ENDPOINTS.GET_MATCH_COMMENTS(matchId, PAGE_SIZE, oldest.sentAt)
+            );
+            if (response.ok) {
+                const data = await response.json();
+                const older: MatchComment[] = Array.isArray(data) ? data : [];
+                setComments(prev => {
+                    const known = new Set(prev.map(c => c.id));
+                    const fresh = older.filter(c => !known.has(c.id));
+                    return fresh.length ? [...fresh, ...prev] : prev;
+                });
+                setHasMore(older.length >= PAGE_SIZE);
+            }
+        } catch (error) {
+            console.error('[MatchChatPanel] Error loading earlier comments:', error);
+        } finally {
+            setLoadingEarlier(false);
         }
     };
 
@@ -69,7 +109,9 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
 
     useEffect(() => {
         if (!active || !matchId) return;
+        didInitialScrollRef.current = false;
         setComments([]);
+        setHasMore(false);
         fetchComments();
         markRead();
     }, [matchId, active]);
@@ -189,8 +231,27 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="on-drag"
                     contentContainerStyle={{ paddingVertical: 10 }}
-                    onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+                    onContentSizeChange={() => {
+                        if (!didInitialScrollRef.current) {
+                            scrollRef.current?.scrollToEnd({ animated: false });
+                        }
+                    }}
                 >
+                    {hasMore && (
+                        <Pressable
+                            onPress={loadEarlier}
+                            disabled={loadingEarlier}
+                            className="items-center py-2"
+                        >
+                            {loadingEarlier ? (
+                                <ActivityIndicator size="small" color="#10B981" />
+                            ) : (
+                                <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                                    Load earlier messages
+                                </Text>
+                            )}
+                        </Pressable>
+                    )}
                     {comments.map((comment) => {
                         const senderId = (comment.userId || '').toLowerCase();
                         const isMyComment = senderId === user?.id?.toLowerCase();

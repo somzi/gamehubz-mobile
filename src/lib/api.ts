@@ -91,7 +91,13 @@ export const ENDPOINTS = {
     REJECT_HUB_JOIN_REQUEST: (requestId: string) => `${API_BASE_URL}/api/Hub/join-request/${requestId}/reject`,
     UPLOAD_MATCH_EVIDENCE: (id: string) => `${API_BASE_URL}/api/match/${id}/evidence`,
     GET_MATCH_DETAILS: (id: string) => `${API_BASE_URL}/api/match/${id}/details`,
-    GET_MATCH_COMMENTS: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/history`,
+    GET_MATCH_COMMENTS: (matchId: string, take?: number, before?: string) => {
+        const qs = [
+            take != null ? `take=${take}` : '',
+            before ? `before=${encodeURIComponent(before)}` : '',
+        ].filter(Boolean).join('&');
+        return `${API_BASE_URL}/api/MatchChat/${matchId}/history${qs ? `?${qs}` : ''}`;
+    },
     POST_MATCH_COMMENT: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}`,
     MARK_MATCH_CHAT_READ: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/read`,
     UPLOAD_AVATAR: `${API_BASE_URL}/api/userProfile/avatar`,
@@ -140,6 +146,7 @@ export const ENDPOINTS = {
 
     // ─── Direct Chat ────────────────────────────────────────────────────
     GET_DIRECT_CHATS: (search: string = "") => `${API_BASE_URL}/api/DirectChat${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+    GET_DIRECT_CHAT_BY_ID: (chatId: string) => `${API_BASE_URL}/api/DirectChat/${chatId}`,
     GET_OR_CREATE_DIRECT_CHAT: (otherUserId: string) => `${API_BASE_URL}/api/DirectChat/with/${otherUserId}`,
     GET_DIRECT_CHAT_MESSAGES: (chatId: string, take: number = 100, before?: string) =>
         `${API_BASE_URL}/api/DirectChat/${chatId}/messages?take=${take}${before ? `&before=${encodeURIComponent(before)}` : ""}`,

@@ -112,7 +112,15 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
     }, [search, load]);
 
     const openChat = async (friend: Friend) => {
-        navigation.navigate('DirectChat', { otherUserId: friend.userId });
+        navigation.navigate('DirectChat', {
+            otherUserId: friend.userId,
+            header: {
+                otherUserId: friend.userId,
+                otherUsername: friend.username,
+                otherNickname: friend.nickname,
+                otherAvatarUrl: friend.avatarUrl,
+            },
+        });
     };
 
     if (loading) return <Loading />;
@@ -466,7 +474,15 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                 return (
                     <CardSurface
                         highlight={unread}
-                        onPress={() => navigation.navigate('DirectChat', { chatId: item.id })}
+                        onPress={() => navigation.navigate('DirectChat', {
+                            chatId: item.id,
+                            header: {
+                                otherUserId: item.otherUserId,
+                                otherUsername: item.otherUsername,
+                                otherNickname: item.otherNickname,
+                                otherAvatarUrl: item.otherAvatarUrl,
+                            },
+                        })}
                     >
                         <View className="flex-row items-center p-3.5">
                             <View>

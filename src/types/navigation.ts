@@ -36,7 +36,22 @@ export type RootStackParamList = {
     ManageTournament: { id: string };
     MyMatches: undefined;
     TeamDashboard: { teamId: string; tournamentId: string; teamSize?: number; tournamentStatus?: number };
-    DirectChat: { chatId?: string; otherUserId?: string };
+    DirectChat: {
+        chatId?: string;
+        otherUserId?: string;
+        /**
+         * Optional header seed from the originating list/profile so the chat screen
+         * can render the name/avatar instantly — no round-trip just for the header.
+         * Present on chatId entries (chat list). Absent on deep links / push
+         * notifications, where the screen falls back to GET /api/DirectChat/{id}.
+         */
+        header?: {
+            otherUserId?: string;
+            otherUsername: string;
+            otherNickname?: string | null;
+            otherAvatarUrl?: string | null;
+        };
+    };
     /** Share-link landing: resolves the team's tournament, then redirects into it. */
     Team: { teamId: string };
 };

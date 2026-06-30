@@ -92,7 +92,10 @@ export function FriendActionBar({ otherUserId, otherUsername }: Props) {
         await authenticatedFetch(ENDPOINTS.UNBLOCK_USER(otherUserId), { method: 'DELETE' });
     });
 
-    const openChat = () => navigation.navigate('DirectChat', { otherUserId });
+    const openChat = () => navigation.navigate('DirectChat', {
+        otherUserId,
+        header: otherUsername ? { otherUserId, otherUsername } : undefined,
+    });
 
     const confirmRemoveFriend = () => setConfirm({
         title: 'Remove friend?',

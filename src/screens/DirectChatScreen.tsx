@@ -26,13 +26,17 @@ import { DirectChat, DirectMessage } from '../types/social';
 type Route = RouteProp<RootStackParamList, 'DirectChat'>;
 type Nav = StackNavigationProp<RootStackParamList>;
 
+// Initial page size — a single screenful loads fast; older messages page in on demand
+// via the "Load earlier" header (uses the `before` cursor on the messages endpoint).
+const PAGE_SIZE = 30;
+
 export default function DirectChatScreen() {
     const route = useRoute<Route>();
     const navigation = useNavigation<Nav>();
     const { user } = useAuth();
     const myUserId = user?.id;
 
-    const { chatId: initialChatId, otherUserId } = route.params || {};
+    const { chatId: initialChatId, otherUserId, header } = route.params || {};
 
     const [chat, setChat] = useState<DirectChat | null>(null);
     const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -41,64 +45,104 @@ export default function DirectChatScreen() {
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [sendError, setSendError] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const listRef = useRef<FlatList<DirectMessage>>(null);
     const connectionRef = useRef<HubConnection | null>(null);
+    // Guards the one-time scroll-to-bottom on first load so paging in older
+    // messages (which grows the list at the top) doesn't yank the view down.
+    const didInitialScrollRef = useRef(false);
 
-    // ─── Bootstrap: resolve chat (by id or by other user) + load messages ─
+    // ─── Bootstrap: resolve chat + load messages ────────────────────────
+    // Fast path (chat list tap): the header is seeded from navigation params, so
+    // the screen renders instantly and we go straight to GET /messages — no list
+    // fetch, and the SignalR effect (keyed on chat.id) connects in parallel.
+    // Fallback (deep link / push notification): only a chatId is known, so we pull
+    // just that one chat (GET /api/DirectChat/{id}) alongside the messages.
     useEffect(() => {
         let cancelled = false;
+        didInitialScrollRef.current = false;
+
         // Clear per-chat state immediately on switch so the previous chat's
-        // header, messages, and draft don't flash while the new chat loads.
-        setChat(null);
+        // messages and draft don't flash while the new chat loads.
         setMessages([]);
         setInput('');
         setSendError(null);
         setError(null);
+        setHasMore(false);
+
+        if (header && initialChatId) {
+            // Render now from the seed; messages stream in underneath.
+            setChat({
+                id: initialChatId,
+                otherUserId: header.otherUserId ?? '',
+                otherUsername: header.otherUsername,
+                otherNickname: header.otherNickname ?? null,
+                otherAvatarUrl: header.otherAvatarUrl ?? null,
+                lastMessage: null,
+                lastMessageAt: null,
+                lastMessageSenderId: null,
+                unreadCount: 0,
+            });
+            setLoading(false);
+        } else {
+            setChat(null);
+            setLoading(true);
+        }
+
         (async () => {
             try {
-                setLoading(true);
-                let resolved: DirectChat | null = null;
+                let chatId = initialChatId ?? null;
 
-                if (initialChatId) {
-                    // We have a chatId — load chats list and pick the one
-                    // matching, or just fetch messages directly.
-                    const chatsRes = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHATS());
-                    if (chatsRes.ok) {
-                        const all: DirectChat[] = await chatsRes.json();
-                        resolved = all.find((c) => c.id === initialChatId) ?? null;
-                    }
-                } else if (otherUserId) {
+                // Opened from a profile/friend — resolve (or create) the chat to learn its id.
+                if (!chatId && otherUserId) {
                     const res = await authenticatedFetch(
                         ENDPOINTS.GET_OR_CREATE_DIRECT_CHAT(otherUserId),
                         { method: 'POST' }
                     );
-                    if (res.ok) {
-                        resolved = await res.json();
-                    } else {
+                    if (!res.ok) {
                         const txt = await res.text();
                         throw new Error(txt || 'Failed to open chat');
                     }
-                } else {
-                    throw new Error('Missing chat parameters');
+                    const resolved: DirectChat = await res.json();
+                    if (cancelled) return;
+                    chatId = resolved.id;
+                    setChat(resolved);
                 }
 
+                if (!chatId) throw new Error('Missing chat parameters');
+
+                // Deep link / notification with only a chatId and no header seed — fetch just
+                // this one chat for the header, in parallel with the messages below.
+                const needsMeta = !header && !otherUserId;
+                const metaPromise: Promise<DirectChat | null> = needsMeta
+                    ? authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_BY_ID(chatId))
+                        .then((r) => (r.ok ? r.json() : null))
+                        .catch(() => null)
+                    : Promise.resolve(null);
+
+                const [msgsRes, meta] = await Promise.all([
+                    authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(chatId, PAGE_SIZE)),
+                    metaPromise,
+                ]);
                 if (cancelled) return;
-                if (!resolved) throw new Error('Chat not found');
 
-                setChat(resolved);
+                if (meta) setChat(meta);
+                else if (needsMeta) throw new Error('Chat not available');
 
-                // Load messages
-                const msgsRes = await authenticatedFetch(
-                    ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(resolved.id, 100)
-                );
                 if (msgsRes.ok) {
                     const msgs: DirectMessage[] = await msgsRes.json();
-                    if (!cancelled) setMessages(msgs);
+                    if (!cancelled) {
+                        setMessages(msgs);
+                        setHasMore(msgs.length >= PAGE_SIZE);
+                        // Let the initial batch lay out, then stop auto-scrolling so
+                        // "Load earlier" prepends don't jump the view to the bottom.
+                        setTimeout(() => { didInitialScrollRef.current = true; }, 400);
+                    }
                 }
 
-                // Mark as read
-                authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(resolved.id), { method: 'POST' })
+                authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' })
                     .catch(() => { /* ignore */ });
             } catch (e: any) {
                 if (!cancelled) setError(getErrorMessage(e));
@@ -109,6 +153,29 @@ export default function DirectChatScreen() {
 
         return () => { cancelled = true; };
     }, [initialChatId, otherUserId]);
+
+    // ─── Pagination: pull the previous page of older messages ────────────
+    const loadEarlier = useCallback(async () => {
+        const chatId = chat?.id;
+        if (!chatId || loadingMore || !hasMore || messages.length === 0) return;
+        setLoadingMore(true);
+        try {
+            const oldest = messages[0];
+            const res = await authenticatedFetch(
+                ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(chatId, PAGE_SIZE, oldest.sentAt)
+            );
+            if (res.ok) {
+                const older: DirectMessage[] = await res.json();
+                setMessages((prev) => {
+                    const known = new Set(prev.map((p) => p.id));
+                    const fresh = older.filter((m) => !known.has(m.id));
+                    return fresh.length ? [...fresh, ...prev] : prev;
+                });
+                setHasMore(older.length >= PAGE_SIZE);
+            }
+        } catch { /* best-effort */ }
+        finally { setLoadingMore(false); }
+    }, [chat?.id, loadingMore, hasMore, messages]);
 
     // ─── SignalR connection ──────────────────────────────────────────────
     useEffect(() => {
@@ -207,13 +274,6 @@ export default function DirectChatScreen() {
         };
     }, [chat?.id, myUserId]);
 
-    // Auto-scroll to bottom on initial load
-    useEffect(() => {
-        if (!loading && messages.length > 0) {
-            setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
-        }
-    }, [loading]);
-
     const showSendError = useCallback((msg: string) => {
         setSendError(msg);
         Alert.alert('Message not sent', msg);
@@ -295,6 +355,34 @@ export default function DirectChatScreen() {
                     data={messages}
                     keyExtractor={(m) => m.id}
                     contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={15}
+                    windowSize={11}
+                    // Keep the reading position stable when "Load earlier" prepends older
+                    // messages (RN 0.81 supports this on both platforms).
+                    maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                    onContentSizeChange={() => {
+                        if (!didInitialScrollRef.current) {
+                            listRef.current?.scrollToEnd({ animated: false });
+                        }
+                    }}
+                    ListHeaderComponent={
+                        hasMore ? (
+                            <Pressable
+                                onPress={loadEarlier}
+                                disabled={loadingMore}
+                                className="items-center py-2.5"
+                            >
+                                {loadingMore ? (
+                                    <ActivityIndicator size="small" color="#10B981" />
+                                ) : (
+                                    <Text className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
+                                        Load earlier messages
+                                    </Text>
+                                )}
+                            </Pressable>
+                        ) : null
+                    }
                     renderItem={({ item, index }) => {
                         const isMine = item.senderId === myUserId;
                         const prev = messages[index - 1];
@@ -429,7 +517,10 @@ function Header({
     );
 }
 
-function MessageBubble({
+// Memoized so a new incoming message re-renders only itself, not every visible
+// bubble. Props are primitives + a stable message ref (existing messages keep
+// identity when we append), so the default shallow compare is effective.
+const MessageBubble = React.memo(function MessageBubble({
     message,
     isMine,
     showAvatar,
@@ -480,7 +571,7 @@ function MessageBubble({
             </View>
         </View>
     );
-}
+});
 
 function DateBreak({ date }: { date: string }) {
     return (
