@@ -193,12 +193,16 @@ apiClient.interceptors.request.use(async (config) => {
     config.headers['X-App-Version'] = APP_VERSION;
     config.headers['X-Platform'] = APP_PLATFORM;
     try {
-        const token = await SecureStore.getItemAsync('access_token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        } else if (authToken) {
-            config.headers.Authorization = `Bearer ${authToken}`;
+        // Prefer the in-memory token. It's kept current on bootstrap, login and refresh,
+        // so we avoid an encrypted-keystore read (SecureStore) on every single request —
+        // that read is several ms of crypto/disk per call on Android. SecureStore is only
+        // consulted as a cold-start fallback before AuthContext has populated authToken.
+        let token = authToken;
+        if (!token) {
+            token = await SecureStore.getItemAsync('access_token');
+            if (token) authToken = token;
         }
+        if (token) config.headers.Authorization = `Bearer ${token}`;
     } catch (e) {
         if (authToken) config.headers.Authorization = `Bearer ${authToken}`;
     }
@@ -215,6 +219,34 @@ const processQueue = (error: any, token: string | null = null) => {
     });
     failedQueue = [];
 };
+
+/**
+ * Perform a single token refresh against the backend and persist the new pair.
+ * Updates the in-memory authToken so subsequent requests pick it up immediately.
+ * Throws on any failure (caller decides whether to log the user out).
+ * Shared by the axios 401 interceptor and the raw-fetch upload path so uploads
+ * get the same refresh-and-retry behaviour as JSON requests.
+ */
+async function doRefresh(): Promise<string> {
+    const refreshToken = await SecureStore.getItemAsync('refresh_token');
+    const accessToken = await SecureStore.getItemAsync('access_token');
+    if (!refreshToken || !accessToken) throw new Error('Refresh failed');
+
+    const refreshResponse = await axios.post(`${API_BASE_URL}/api/Auth/refreshtoken`, {
+        AccessToken: accessToken,
+        RefreshToken: refreshToken,
+    });
+
+    const data = refreshResponse.data;
+    const newAccess = data?.accessToken?.token || data?.accessToken || data?.AccessToken;
+    const newRefresh = data?.refreshToken || data?.RefreshToken;
+    if (!newAccess || !newRefresh) throw new Error('Refresh failed');
+
+    await SecureStore.setItemAsync('access_token', newAccess);
+    await SecureStore.setItemAsync('refresh_token', newRefresh);
+    authToken = newAccess;
+    return newAccess;
+}
 
 apiClient.interceptors.response.use((response) => response, async (error) => {
     const originalRequest = error.config;
@@ -233,31 +265,10 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
         isRefreshing = true;
 
         try {
-            const refreshToken = await SecureStore.getItemAsync('refresh_token');
-            const accessToken = await SecureStore.getItemAsync('access_token');
-
-            if (refreshToken && accessToken) {
-                const refreshResponse = await axios.post(`${API_BASE_URL}/api/Auth/refreshtoken`, {
-                    AccessToken: accessToken,
-                    RefreshToken: refreshToken
-                });
-
-                if (refreshResponse.data) {
-                    const newAccess = refreshResponse.data.accessToken?.token || refreshResponse.data.accessToken || refreshResponse.data.AccessToken;
-                    const newRefresh = refreshResponse.data.refreshToken || refreshResponse.data.RefreshToken;
-
-                    if (newAccess && newRefresh) {
-                        await SecureStore.setItemAsync('access_token', newAccess);
-                        await SecureStore.setItemAsync('refresh_token', newRefresh);
-                        authToken = newAccess;
-
-                        originalRequest.headers.Authorization = 'Bearer ' + newAccess;
-                        processQueue(null, newAccess);
-                        return apiClient(originalRequest);
-                    }
-                }
-            }
-            throw new Error('Refresh failed');
+            const newAccess = await doRefresh();
+            originalRequest.headers.Authorization = 'Bearer ' + newAccess;
+            processQueue(null, newAccess);
+            return apiClient(originalRequest);
         } catch (refreshError) {
             processQueue(refreshError, null);
             await SecureStore.deleteItemAsync('access_token');
@@ -288,22 +299,42 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
 
         // 2. SPECIJALNA LOGIKA ZA FORM DATA (Slike/Fajlovi) - Fix za Android
         if (isFormData) {
-            const token = await SecureStore.getItemAsync('access_token').catch(() => null) || authToken;
+            const buildFormHeaders = (token: string | null) => {
+                const h = { ...headers };
+                // KLJUČNO: Brišemo Content-Type da bi fetch sam dodao boundary
+                delete h['Content-Type'];
+                h['X-App-Version'] = APP_VERSION;
+                h['X-Platform'] = APP_PLATFORM;
+                if (token) h['Authorization'] = `Bearer ${token}`;
+                return h;
+            };
 
-            const formHeaders = { ...headers };
-            // KLJUČNO: Brišemo Content-Type da bi fetch sam dodao boundary
-            delete formHeaders['Content-Type'];
+            // Prefer the in-memory token (same reasoning as the axios interceptor).
+            let token = authToken || (await SecureStore.getItemAsync('access_token').catch(() => null));
 
-            formHeaders['X-App-Version'] = APP_VERSION;
-            formHeaders['X-Platform'] = APP_PLATFORM;
-
-            if (token) formHeaders['Authorization'] = `Bearer ${token}`;
-
-            const fetchResponse = await fetch(url, {
+            let fetchResponse = await fetch(url, {
                 method: options.method || 'POST',
-                headers: formHeaders,
-                body: options.body
+                headers: buildFormHeaders(token),
+                body: options.body,
             });
+
+            // Uploads use raw fetch and so bypass the axios 401→refresh interceptor.
+            // Handle the same refresh-and-retry here once, so an expired token mid-upload
+            // doesn't silently fail (e.g. avatar / match evidence upload on a stale session).
+            if (fetchResponse.status === 401) {
+                try {
+                    const newAccess = await doRefresh();
+                    fetchResponse = await fetch(url, {
+                        method: options.method || 'POST',
+                        headers: buildFormHeaders(newAccess),
+                        body: options.body,
+                    });
+                } catch {
+                    await SecureStore.deleteItemAsync('access_token').catch(() => { });
+                    await SecureStore.deleteItemAsync('refresh_token').catch(() => { });
+                    triggerLogout();
+                }
+            }
 
             // Ako server vrati grešku (npr. 400, 413, 500)
             if (!fetchResponse.ok) {

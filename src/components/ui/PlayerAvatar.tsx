@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { cn } from '../../lib/utils';
+import { getOptimizedCloudinaryUrl } from '../../lib/image';
 
 interface PlayerAvatarProps {
     src?: string;
@@ -33,6 +34,12 @@ export function PlayerAvatar({ src, name, size = "md", className }: PlayerAvatar
 
     const dimension = sizes[size];
 
+    // Ask Cloudinary for an avatar sized to the actual display box (×2 for retina) in
+    // WebP at auto quality. A profile photo uploaded at 1000px+ otherwise downloads in
+    // full just to be drawn at 32–80px — this cuts ~80–90% of the bytes per avatar.
+    // Non-Cloudinary URLs are returned unchanged, so this is a safe no-op for them.
+    const optimizedSrc = src ? getOptimizedCloudinaryUrl(src, dimension * 2) : '';
+
     return (
         <View
             className={cn(
@@ -41,9 +48,9 @@ export function PlayerAvatar({ src, name, size = "md", className }: PlayerAvatar
             )}
             style={{ width: dimension, height: dimension }}
         >
-            {src ? (
+            {optimizedSrc ? (
                 <Image
-                    source={{ uri: src }}
+                    source={{ uri: optimizedSrc }}
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                 />

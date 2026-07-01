@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { TournamentRegion } from '../types/tournament';
@@ -9,6 +9,7 @@ import { TournamentCard } from '../components/cards/TournamentCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
+import { useFocusRefetch } from '../hooks/useFocusRefetch';
 import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
@@ -95,13 +96,10 @@ export default function TournamentsScreen() {
         }
     };
 
-    // useEffect removed - useFocusEffect below handles initialization and re-focus fetching
-
-    useFocusEffect(
-        useCallback(() => {
-            fetchTournaments(0, false);
-        }, [activeTab, user?.id])
-    );
+    // Loads page 0 on focus / tab change, but skips it when the same tab was loaded within
+    // 30s, so flipping between bottom tabs doesn't re-pull an unchanged list every time.
+    // Switching the status tab changes the key and always reloads; pull-to-refresh bypasses it.
+    useFocusRefetch(() => fetchTournaments(0, false), `${activeTab}:${user?.id ?? ''}`);
 
     const onRefresh = () => {
         setIsRefreshing(true);

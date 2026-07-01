@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { useFocusRefetch } from '../hooks/useFocusRefetch';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -107,11 +108,10 @@ export default function HubsScreen() {
         }
     };
 
-    useFocusEffect(
-        useCallback(() => {
-            fetchHubs();
-        }, [activeTab, user?.id])
-    );
+    // Loads on focus / tab change, but skips the refetch when the same tab was loaded
+    // within 30s so tab-hopping doesn't re-pull the hub list each time. Switching the
+    // joined/discovery tab changes the key and reloads; pull-to-refresh bypasses it.
+    useFocusRefetch(() => fetchHubs(), `${activeTab}:${user?.id ?? ''}`);
 
     const onRefresh = () => {
         setIsRefreshing(true);

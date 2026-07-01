@@ -137,7 +137,24 @@ export default function HubMembersScreen() {
                 const data = await response.json();
                 const raw = data.result || data || [];
                 const normalized = (Array.isArray(raw) ? raw : []).map(normalizeMember).filter(Boolean) as MemberRow[];
-                setMembers(normalized);
+                // Backend can return the same user twice (e.g. the owner also listed as a plain
+                // member), which crashes the FlatList with duplicate keys (keyExtractor = userId).
+                // Dedupe by userId, keeping the most-privileged role on collision.
+                const rolePriority: Record<number, number> = {
+                    [HubRole.HubOwner]: 0,
+                    [HubRole.HubAdmin]: 1,
+                    [HubRole.HubExclusive]: 2,
+                    [HubRole.HubMember]: 3,
+                };
+                const byUser = new Map<string, MemberRow>();
+                for (const m of normalized) {
+                    const key = m.userId.toLowerCase();
+                    const existing = byUser.get(key);
+                    if (!existing || (rolePriority[m.hubRole] ?? 99) < (rolePriority[existing.hubRole] ?? 99)) {
+                        byUser.set(key, m);
+                    }
+                }
+                setMembers(Array.from(byUser.values()));
             }
         } catch (error) {
             console.error('Error fetching hub members:', error);

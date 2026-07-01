@@ -23,7 +23,19 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Treat data as fresh for 30s so re-mounting a screen doesn't immediately refire
+      // the network. Keep cached data around for 5 min after a screen unmounts so going
+      // back to it paints instantly while any refetch happens in the background.
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['gamehubz://', 'https://share.codespheresolutions.dev'],

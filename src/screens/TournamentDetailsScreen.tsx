@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -58,6 +58,10 @@ export default function TournamentDetailsScreen() {
     // Open admin-help requests live in the bracket → badge the Bracket tab with them.
     const adminHelpCount = tournamentApprovals(id)?.adminHelp ?? 0;
     const [activeTab, setActiveTab] = useState('overview');
+    // Mirror activeTab into a ref so the focus effect can read the live tab without taking
+    // it as a dependency (which would refire the overview fetch on every tab switch).
+    const activeTabRef = useRef(activeTab);
+    activeTabRef.current = activeTab;
     const [teamsTab, setTeamsTab] = useState('confirmed');
     const [playersTab, setPlayersTab] = useState<'confirmed' | 'registrations'>('confirmed');
     const [openTeams, setOpenTeams] = useState<TeamDto[]>([]);
@@ -1219,10 +1223,14 @@ export default function TournamentDetailsScreen() {
     // Load initial data and silently refresh when coming back to this screen
     useFocusEffect(
         useCallback(() => {
-            // First time it mounts, isLoading is already true by default, so silent doesn't matter visually, 
+            // First time it mounts, isLoading is already true by default, so silent doesn't matter visually,
             // but for subsequent focuses, silent=true prevents the screen from going blank
             fetchTournamentDetails(true);
-            fetchParticipants();
+            // The participants list only feeds the Overview join button and the Players tab.
+            // Skip the extra round-trip on refocus when we're on bracket/teams/registrations,
+            // which don't use it. The tab-switch effect still fetches it when Players is opened.
+            const tab = activeTabRef.current;
+            if (tab === 'overview' || tab === 'players') fetchParticipants();
         }, [id])
     );
 

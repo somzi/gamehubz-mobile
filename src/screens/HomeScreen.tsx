@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { useFocusRefetch } from '../hooks/useFocusRefetch';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
@@ -119,11 +120,10 @@ export default function HomeScreen() {
         setLoading(false);
     };
 
-    useFocusEffect(
-        React.useCallback(() => {
-            loadData();
-        }, [user?.id])
-    );
+    // Loads on focus, but skips the refetch when we already pulled fresh data within the
+    // last 30s — bouncing between bottom tabs no longer refires both home requests each time.
+    // Pull-to-refresh (onRefresh → loadData) and match-card updates still force a refresh.
+    useFocusRefetch(loadData, user?.id ?? '');
 
     const greeting = useMemo(() => {
         const h = new Date().getHours();
