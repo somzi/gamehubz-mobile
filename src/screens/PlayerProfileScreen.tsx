@@ -71,6 +71,13 @@ export default function PlayerProfileScreen() {
             setHasMoreTournaments(true);
             setMatchesPage(0);
             setHasMoreMatches(true);
+            // Also drop the previous player's rows — the pagination cursors above only
+            // decide WHERE the next fetch starts, they don't wipe the visible list. Without
+            // this, opening Player B after Player A shows B's header (name/stats) with A's
+            // tournament and match rows underneath until the user scrolls to trigger a load,
+            // and even then loadMore APPENDS B's rows onto A's instead of replacing them.
+            setUserTournaments([]);
+            setUserMatches([]);
             try {
                 const [infoRes, statsRes] = await Promise.all([
                     authenticatedFetch(ENDPOINTS.GET_USER_INFO(id)),

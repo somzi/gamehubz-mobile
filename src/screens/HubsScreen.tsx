@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -104,6 +105,10 @@ export default function HubsScreen() {
         enabled: !!user?.id,
         staleTime: 30_000,
         refetchOnMount: true,
+        // Keep showing the previous list while a new key (search change / tab flip)
+        // is fetching, instead of blanking to the full-screen "Loading hubs..." view
+        // between every debounced keystroke. Prevents the flash-flicker regression.
+        placeholderData: keepPreviousData,
     });
 
     const hubs = useMemo(
@@ -111,16 +116,13 @@ export default function HubsScreen() {
         [hubsQuery.data],
     );
 
-    // Bottom tabs keep this screen mounted, so useInfiniteQuery's refetchOnMount
-    // never fires on tab-swap. Trigger a background refetch when the top-level
-    // (first-page) data is >30s stale, mirroring the old useFocusRefetch guard.
-    useFocusEffect(useCallback(() => {
-        if (!user?.id) return;
-        const stamp = hubsQuery.dataUpdatedAt;
-        if (!stamp || Date.now() - stamp > 30_000) {
-            hubsQuery.refetch();
-        }
-    }, [user?.id, hubsQuery.refetch, hubsQuery.dataUpdatedAt]));
+    // Bottom tabs keep this screen mounted; useRefetchOnFocusIfStale bridges the
+    // gap without hammering the API on every focus.
+    useRefetchOnFocusIfStale(
+        hubsQuery.refetch,
+        hubsQuery.dataUpdatedAt,
+        { enabled: !!user?.id },
+    );
 
     const onRefresh = useCallback(() => {
         // Invalidate every ['hubs', ...] entry so both joined and discovery caches

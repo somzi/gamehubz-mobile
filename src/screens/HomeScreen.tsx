@@ -1,8 +1,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
@@ -126,29 +127,18 @@ export default function HomeScreen() {
         };
     }, [allMatches]);
 
-    // Bottom tabs keep this screen mounted, so useQuery's `refetchOnMount`
-    // never fires on tab-swap — hooking into useFocusEffect is the equivalent
-    // trigger. We gate on the query's own dataUpdatedAt (>30s) instead of
-    // firing refetch() unconditionally so rapid tab-hopping doesn't hammer the
-    // API — the same 30s ceiling the old useFocusRefetch enforced.
-    useFocusEffect(useCallback(() => {
-        const now = Date.now();
-        const STALE_MS = 30_000;
-        const matchesStamp = homeMatchesQuery.dataUpdatedAt;
-        if (user?.id && (!matchesStamp || now - matchesStamp > STALE_MS)) {
-            homeMatchesQuery.refetch();
-        }
-        const activitiesStamp = hubActivitiesQuery.dataUpdatedAt;
-        if (!activitiesStamp || now - activitiesStamp > STALE_MS) {
-            hubActivitiesQuery.refetch();
-        }
-    }, [
-        user?.id,
+    // Bottom tabs keep this screen mounted, so useQuery's `refetchOnMount` never
+    // fires on tab-swap. useRefetchOnFocusIfStale bridges the gap without hammering
+    // the API on every focus — refetch only when the snapshot is >30s old.
+    useRefetchOnFocusIfStale(
         homeMatchesQuery.refetch,
         homeMatchesQuery.dataUpdatedAt,
+        { enabled: !!user?.id },
+    );
+    useRefetchOnFocusIfStale(
         hubActivitiesQuery.refetch,
         hubActivitiesQuery.dataUpdatedAt,
-    ]));
+    );
 
     const onRefresh = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: ['home-matches'] });

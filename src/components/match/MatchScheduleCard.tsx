@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { MatchComment } from '../../types/auth';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize, getOptimizedCloudinaryUrl } from '../../lib/image';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
+import { mergeMessagesById } from '../../lib/mergeMessages';
 import { AdminHelpSection } from './AdminHelpSection';
 import { MatchStreamPanel } from './MatchStreamPanel';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
@@ -431,14 +432,7 @@ export function MatchScheduleCard({
                 .then((r) => (r.ok ? r.json() : null))
                 .then((msgs: MatchComment[] | null) => {
                     if (!isActive || !Array.isArray(msgs)) return;
-                    setComments((prev) => {
-                        const known = new Set(prev.map(c => c.id));
-                        const added = msgs.filter(m => !known.has(m.id));
-                        if (added.length === 0) return prev;
-                        const merged = [...prev, ...added];
-                        merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
-                        return merged;
-                    });
+                    setComments((prev) => mergeMessagesById(prev, msgs));
                 })
                 .catch(() => { });
         });

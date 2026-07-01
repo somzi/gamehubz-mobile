@@ -1303,10 +1303,12 @@ export default function TournamentDetailsScreen() {
             icon: 'git-merge-outline',
             // Result approvals (when required) + open admin-help requests both live in the bracket.
             // Both counts come from BadgesContext (SignalR-fed) so this stays live without any
-            // extra fetching. Falls back to the loaded list length if the badge context hasn't
-            // hydrated yet (e.g. right after login before the first approvals GET returns).
+            // extra fetching. The old Math.max(badgeCount, pendingApprovals.length) fallback
+            // caused the same staleness bug as the Approvals pill — after approve, the badge
+            // drops but the loaded list still holds the old rows, and Math.max shipped the
+            // stale count until the modal was reopened.
             badge: (
-                (canManage && requiresApproval ? Math.max(pendingApprovalsBadgeCount, pendingApprovals.length) : 0)
+                (canManage && requiresApproval ? pendingApprovalsBadgeCount : 0)
                 + adminHelpCount
             ) || undefined,
             badgeTone: 'alert',
@@ -1371,9 +1373,15 @@ export default function TournamentDetailsScreen() {
 
     // Admin inbox for results awaiting approval — sits next to the help-requests pill.
     // Only shown when the tournament was created with result approval enabled. The badge
-    // count reads from BadgesContext so the pill stays live without any eager fetching;
-    // the full list is only pulled when the organizer taps the pill.
-    const approvalsPillCount = Math.max(pendingApprovalsBadgeCount, pendingApprovals.length);
+    // count is the single source of truth for the pill — BadgesContext gets a live push
+    // from the server whenever the count changes, so it's the freshest signal we have.
+    // The old Math.max(badge, pendingApprovals.length) fallback caused a real staleness
+    // bug: after approving one item the SignalR push dropped the badge (2 → 1) but the
+    // local pendingApprovals list still held 2 rows until the modal was reopened, so
+    // Math.max shipped the stale "2" back to the UI. Falling back to the list only when
+    // the badge context hasn't hydrated yet (initial < 0 sentinel via -1) keeps the
+    // first-render behaviour without the post-mutation drift.
+    const approvalsPillCount = pendingApprovalsBadgeCount;
     const approvalsPill = canManage && requiresApproval ? (
         <Pressable
             onPress={() => {

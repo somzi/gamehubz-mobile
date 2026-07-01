@@ -6,7 +6,8 @@ import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navig
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, cn } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
@@ -79,10 +80,23 @@ export default function SocialScreen() {
 function FriendsTab({ navigation }: { navigation: NavProp }) {
     const [friends, setFriends] = useState<Friend[]>([]);
     const [search, setSearch] = useState('');
+    // Debounced value drives the actual fetch; live `search` only drives the input.
+    // Keeping `search` out of the load path stops the useFocusEffect below from
+    // re-firing on every keystroke (its callback identity changes on each search
+    // update, and useFocusEffect re-runs the callback while the screen is focused
+    // — that was flooding the API with one immediate + one debounced request per
+    // typed character).
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const reqSeqRef = useRef(0);
+
+    useEffect(() => {
+        if (search === debouncedSearch) return;
+        const t = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(t);
+    }, [search, debouncedSearch]);
 
     const load = useCallback(async (q: string = '') => {
         const seq = ++reqSeqRef.current;
@@ -108,17 +122,11 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
         }
     }, []);
 
-    // Single-source-of-truth loader: debounced when the user is typing (skips first fire so we
-    // don't waste a request while the query is still being composed), immediate when they open
-    // the tab with an empty box. Merging the focus + debounce effects here avoids the previous
-    // double-fetch on mount and the stale-closure that reset the query after a tab switch.
-    const isFirst = useRef(true);
-    useFocusEffect(useCallback(() => { load(search); }, [load, search]));
-    useEffect(() => {
-        if (isFirst.current) { isFirst.current = false; return; }
-        const t = setTimeout(() => { load(search); }, 300);
-        return () => clearTimeout(t);
-    }, [search, load]);
+    // Focus reloads with the DEBOUNCED query, and the effect below fires the same
+    // query when the debounced value settles. Either can win the race; the seq
+    // guard in load() drops the loser.
+    useFocusEffect(useCallback(() => { load(debouncedSearch); }, [load, debouncedSearch]));
+    useEffect(() => { load(debouncedSearch); }, [debouncedSearch, load]);
 
     const openChat = async (friend: Friend) => {
         navigation.navigate('DirectChat', {
@@ -149,7 +157,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
             refreshControl={
                 <RefreshControl
                     refreshing={refreshing}
-                    onRefresh={() => { setRefreshing(true); load(search); }}
+                    onRefresh={() => { setRefreshing(true); load(debouncedSearch); }}
                     tintColor="#10B981"
                 />
             }
@@ -204,9 +212,19 @@ function RequestsTab() {
     const [incoming, setIncoming] = useState<FriendRequest[]>([]);
     const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
     const [search, setSearch] = useState('');
+    // Debounced value drives the query; live `search` only drives the input.
+    // Same reasoning as FriendsTab — keeping `search` out of the load path
+    // stops useFocusEffect from re-firing on every keystroke.
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const reqSeqRef = useRef(0);
+
+    useEffect(() => {
+        if (search === debouncedSearch) return;
+        const t = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(t);
+    }, [search, debouncedSearch]);
 
     const load = useCallback(async (q: string = '') => {
         const seq = ++reqSeqRef.current;
@@ -234,15 +252,9 @@ function RequestsTab() {
         }
     }, []);
 
-    // Same pattern as FriendsTab: focus fires with the current query; debounce skips the initial
-    // render so it doesn't fire an identical second request on mount / tab entry.
-    const isFirst = useRef(true);
-    useFocusEffect(useCallback(() => { load(search); }, [load, search]));
-    useEffect(() => {
-        if (isFirst.current) { isFirst.current = false; return; }
-        const t = setTimeout(() => { load(search); }, 300);
-        return () => clearTimeout(t);
-    }, [search, load]);
+    // Focus + debounce settle both fetch the debounced query. seq guard drops races.
+    useFocusEffect(useCallback(() => { load(debouncedSearch); }, [load, debouncedSearch]));
+    useEffect(() => { load(debouncedSearch); }, [debouncedSearch, load]);
 
     const accept = async (req: FriendRequest) => {
         try {
@@ -299,7 +311,7 @@ function RequestsTab() {
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
-                        onRefresh={() => { setRefreshing(true); load(search); }}
+                        onRefresh={() => { setRefreshing(true); load(debouncedSearch); }}
                         tintColor="#10B981"
                     />
                 }
@@ -447,20 +459,18 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
         enabled: !!user?.id,
         staleTime: 30_000,
         refetchOnMount: true,
+        // Keep showing the previous chats while the new search key is fetching.
+        placeholderData: keepPreviousData,
     });
 
     const chats = chatsQuery.data ?? EMPTY_CHATS;
 
-    // Bottom tabs keep this screen mounted, so useQuery's refetchOnMount doesn't
-    // fire on tab-swap. Explicit refetch when the query is stale (>30s) mirrors
-    // the semantics the manual load() had.
-    useFocusEffect(useCallback(() => {
-        if (!user?.id) return;
-        const stamp = chatsQuery.dataUpdatedAt;
-        if (!stamp || Date.now() - stamp > 30_000) {
-            chatsQuery.refetch();
-        }
-    }, [user?.id, chatsQuery.refetch, chatsQuery.dataUpdatedAt]));
+    // Bottom tabs keep this screen mounted; useRefetchOnFocusIfStale bridges the gap.
+    useRefetchOnFocusIfStale(
+        chatsQuery.refetch,
+        chatsQuery.dataUpdatedAt,
+        { enabled: !!user?.id },
+    );
 
     const onRefresh = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: ['direct-chats'] });

@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { TournamentRegion } from '../types/tournament';
@@ -86,6 +87,9 @@ export default function TournamentsScreen() {
         enabled: !!user?.id,
         staleTime: 30_000,
         refetchOnMount: true,
+        // Keep showing the previous list while a new key (tab flip) is fetching,
+        // instead of blanking to the full-screen "Loading tournaments..." view.
+        placeholderData: keepPreviousData,
     });
 
     const tournaments = useMemo(
@@ -93,16 +97,13 @@ export default function TournamentsScreen() {
         [tournamentsQuery.data],
     );
 
-    // Bottom tabs keep the screen mounted, so refetchOnMount doesn't fire on
-    // tab-swap. Refetch when the first page is >30s stale to mirror the old
-    // useFocusRefetch semantics without paying for a request every focus.
-    useFocusEffect(useCallback(() => {
-        if (!user?.id) return;
-        const stamp = tournamentsQuery.dataUpdatedAt;
-        if (!stamp || Date.now() - stamp > 30_000) {
-            tournamentsQuery.refetch();
-        }
-    }, [user?.id, tournamentsQuery.refetch, tournamentsQuery.dataUpdatedAt]));
+    // Bottom tabs keep the screen mounted; useRefetchOnFocusIfStale refetches only
+    // when the first-page snapshot is >30s stale.
+    useRefetchOnFocusIfStale(
+        tournamentsQuery.refetch,
+        tournamentsQuery.dataUpdatedAt,
+        { enabled: !!user?.id },
+    );
 
     const onRefresh = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: ['tournaments'] });

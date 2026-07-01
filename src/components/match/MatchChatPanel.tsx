@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
@@ -6,9 +6,11 @@ import * as SecureStore from 'expo-secure-store';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
+import { useTrailingDebounce } from '../../hooks/useTrailingDebounce';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
+import { mergeMessagesById } from '../../lib/mergeMessages';
 import { cn, parseUtcDate } from '../../lib/utils';
 
 // Initial page size — load a screenful fast; older messages page in on demand.
@@ -44,20 +46,20 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const connectionRef = useRef<HubConnection | null>(null);
     // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
     const didInitialScrollRef = useRef(false);
-    // Coalesces mark-read POSTs: a burst of incoming opponent messages used to fire one
-    // request per message. We only need the last one (server clears everything up to the
-    // read timestamp), so we hold off for a short trailing window.
-    const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const normalizedParticipantIds = participantIds
         .filter(Boolean)
         .map(id => (id as string).toLowerCase());
 
-    const fetchComments = async (silent = false) => {
+    // `size` lets the reconnect-backfill path pull more than the initial page size —
+    // long disconnect gaps (>30 messages) would leave an unfillable hole in the
+    // middle of the conversation with just PAGE_SIZE (the "Load earlier" cursor
+    // only walks BACKWARD from the current oldest, never fills gaps).
+    const fetchComments = async (silent = false, size: number = PAGE_SIZE) => {
         if (!matchId) return;
         if (!silent) setIsLoading(true);
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId, PAGE_SIZE));
+            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId, size));
             if (response.ok) {
                 const data = await response.json();
                 const list: MatchComment[] = Array.isArray(data) ? data : [];
@@ -66,14 +68,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     // older messages the user paged in) so we don't silently drop history.
                     // Replacing wholesale — as this used to do — wiped every "Load earlier"
                     // batch every time SignalR reconnected.
-                    setComments(prev => {
-                        const known = new Set(prev.map(c => c.id));
-                        const added = list.filter(c => !known.has(c.id));
-                        if (added.length === 0) return prev;
-                        const merged = [...prev, ...added];
-                        merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
-                        return merged;
-                    });
+                    setComments((prev) => mergeMessagesById(prev, list));
                 } else {
                     setComments(list);
                     setHasMore(list.length >= PAGE_SIZE);
@@ -115,25 +110,20 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         }
     };
 
-    // Trailing debounce so a fast burst of incoming opponent messages collapses to a single
-    // /read call instead of one per message. Server marks up-to-latest anyway. The initial
-    // open still fires immediately (via the load effect below) because the timer is idle.
+    // Trailing-debounced mark-read: coalesces bursts of incoming opponent messages
+    // into a single POST, and flushes on unmount so leaving the panel within the
+    // 600ms window still fires the read (naive clearTimeout was silently dropping it).
+    const { debounced: markReadInternal } = useTrailingDebounce(async (id: string) => {
+        try {
+            await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(id), { method: 'POST' });
+            refreshBadges();
+        } catch { /* best-effort */ }
+    });
+
     const markRead = () => {
         if (!matchId) return;
-        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
-        markReadTimerRef.current = setTimeout(async () => {
-            markReadTimerRef.current = null;
-            try {
-                await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(matchId), { method: 'POST' });
-                refreshBadges();
-            } catch { /* best-effort */ }
-        }, 600);
+        markReadInternal(matchId);
     };
-
-    // Clear any pending mark-read timer on unmount so we don't fire against a stale matchId.
-    useEffect(() => () => {
-        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
-    }, []);
 
     useEffect(() => {
         if (!active || !matchId) return;
@@ -191,7 +181,9 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         connection.onreconnected(() => {
             if (!isActive) return;
             connection.invoke('JoinMatchGroup', matchId).catch(() => { });
-            fetchComments(true);
+            // Pull a larger batch to cover long disconnect windows — see fetchComments
+            // note above; 100 mirrors the DirectChatScreen reconnect backfill.
+            fetchComments(true, 100);
         });
 
         const startPromise = connection.start()

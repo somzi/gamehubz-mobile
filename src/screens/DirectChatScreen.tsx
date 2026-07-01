@@ -19,7 +19,9 @@ import * as SecureStore from 'expo-secure-store';
 import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../lib/api';
 import { parseUtcDate } from '../lib/utils';
+import { mergeMessagesById } from '../lib/mergeMessages';
 import { useAuth } from '../context/AuthContext';
+import { useTrailingDebounce } from '../hooks/useTrailingDebounce';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { DirectChat, DirectMessage } from '../types/social';
 
@@ -53,21 +55,14 @@ export default function DirectChatScreen() {
     // Guards the one-time scroll-to-bottom on first load so paging in older
     // messages (which grows the list at the top) doesn't yank the view down.
     const didInitialScrollRef = useRef(false);
-    // Coalesces mark-read POSTs during bursty incoming messages — see markReadDebounced below.
-    const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const markReadDebounced = useCallback((chatId: string) => {
-        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
-        markReadTimerRef.current = setTimeout(() => {
-            markReadTimerRef.current = null;
-            authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' })
-                .catch(() => { });
-        }, 600);
-    }, []);
-
-    useEffect(() => () => {
-        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
-    }, []);
+    // Trailing-debounced mark-read: coalesces bursts of incoming messages into a
+    // single POST, and flushes on unmount so leaving the chat within the 600ms
+    // window still fires the read (naive clearTimeout was silently dropping it).
+    const { debounced: markReadDebounced } = useTrailingDebounce((chatId: string) => {
+        authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' })
+            .catch(() => { });
+    });
 
     // ─── Bootstrap: resolve chat + load messages ────────────────────────
     // Fast path (chat list tap): the header is seeded from navigation params, so
@@ -181,11 +176,7 @@ export default function DirectChatScreen() {
             );
             if (res.ok) {
                 const older: DirectMessage[] = await res.json();
-                setMessages((prev) => {
-                    const known = new Set(prev.map((p) => p.id));
-                    const fresh = older.filter((m) => !known.has(m.id));
-                    return fresh.length ? [...fresh, ...prev] : prev;
-                });
+                setMessages((prev) => mergeMessagesById(prev, older));
                 setHasMore(older.length >= PAGE_SIZE);
             }
         } catch { /* best-effort */ }
@@ -249,22 +240,22 @@ export default function DirectChatScreen() {
         connection.onreconnected(() => {
             if (!isActive) return;
             connection.invoke('JoinChatGroup', currentChatId).catch(() => { });
-            // Backfill anything sent during the disconnect gap. The backend orders newest-first,
-            // so a naive concat left the freshly-arrived tail messages before the older ones
-            // we already had — the merged list has to be re-sorted by sentAt to render in
-            // reading order. Dedup by id handles overlap with what we already show.
-            authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(currentChatId, PAGE_SIZE))
+            // Backfill anything sent during the disconnect gap. Reconnect windows can be
+            // long on mobile (backgrounding, network switch, tunnel exit) so a small page
+            // size would leave a permanent hole in the middle of the conversation — the
+            // "Load earlier" cursor only pulls messages OLDER than the current oldest, so
+            // it can never fill a gap between our existing tail and the freshly-arrived
+            // newest 30. Using 100 covers the vast majority of real disconnect windows;
+            // if the gap is even bigger the user still has to close/reopen the chat, but
+            // that's an edge case the previous implementation already accepted.
+            const RECONNECT_BACKFILL = 100;
+            // mergeMessagesById dedupes by id and re-sorts by sentAt so newest-first
+            // backend output doesn't leave the tail out of order after concat.
+            authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(currentChatId, RECONNECT_BACKFILL))
                 .then((r) => (r.ok ? r.json() : null))
                 .then((msgs: DirectMessage[] | null) => {
                     if (!isActive || !msgs) return;
-                    setMessages((prev) => {
-                        const known = new Set(prev.map((p) => p.id));
-                        const added = msgs.filter((m) => !known.has(m.id));
-                        if (added.length === 0) return prev;
-                        const merged = [...prev, ...added];
-                        merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
-                        return merged;
-                    });
+                    setMessages((prev) => mergeMessagesById(prev, msgs));
                 })
                 .catch(() => { });
         });
