@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
@@ -128,16 +128,10 @@ export default function PlayerProfileScreen() {
         }
     }, [activeTab, userMatches.length, userTournaments.length]);
 
-    useFocusEffect(
-        useCallback(() => {
-            setUserMatches([]);
-            setMatchesPage(0);
-            setHasMoreMatches(true);
-            setUserTournaments([]);
-            setTournamentsPage(0);
-            setHasMoreTournaments(true);
-        }, [id])
-    );
+    // (Removed the useFocusEffect that wiped the tournaments / matches lists on every
+    // focus. The [id] effect above already resets them when the profile actually changes;
+    // firing on refocus just discarded the user's scroll position and re-fetched page 0
+    // every time they came back to this profile.)
 
     const loadMoreTournaments = async () => {
         if (!id || isLoadingMoreTournaments || !hasMoreTournaments) return;

@@ -31,6 +31,9 @@ export const ENDPOINTS = {
     GET_TOURNAMENT: (id: string) => `${API_BASE_URL}/api/tournament/${id}`,
     GET_TOURNAMENT_OVERVIEW: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview`,
     GET_TOURNAMENT_OVERVIEW_V2: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview/v2`,
+    // v3: same as v2 plus HasUserRegistered so the client can render the Join / Registered state
+    // without firing a second CHECK_REGISTRATION request on open.
+    GET_TOURNAMENT_OVERVIEW_V3: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview/v3`,
     REGISTER_TOURNAMENT: `${API_BASE_URL}/api/tournamentRegistration`,
     REGISTER_TEAM_IN_TOURNAMENT: (tournamentId: string, teamId: string) => `${API_BASE_URL}/api/tournamentRegistration/tournament/${tournamentId}/team/${teamId}/register`,
     GET_PENDING_REGISTRATIONS: (tournamentId: string) => `${API_BASE_URL}/api/tournamentRegistration/tournament/${tournamentId}/pending`,
@@ -91,6 +94,9 @@ export const ENDPOINTS = {
     REJECT_HUB_JOIN_REQUEST: (requestId: string) => `${API_BASE_URL}/api/Hub/join-request/${requestId}/reject`,
     UPLOAD_MATCH_EVIDENCE: (id: string) => `${API_BASE_URL}/api/match/${id}/evidence`,
     GET_MATCH_DETAILS: (id: string) => `${API_BASE_URL}/api/match/${id}/details`,
+    // One-shot combined payload: match details + streams + caller availability. Lets the
+    // match modal open in one round-trip instead of three back-to-back fetches.
+    GET_MATCH_DETAILS_FULL: (id: string) => `${API_BASE_URL}/api/match/${id}/details/full`,
     GET_MATCH_COMMENTS: (matchId: string, take?: number, before?: string) => {
         const qs = [
             take != null ? `take=${take}` : '',

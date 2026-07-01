@@ -1,10 +1,10 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -135,13 +135,10 @@ export default function EditProfileScreen() {
         }
     };
 
-    useFocusEffect(
-        useCallback(() => {
-            if (user?.id) {
-                refreshUser();
-            }
-        }, [user?.id, refreshUser])
-    );
+    // (Removed the useFocusEffect that called refreshUser() on every focus. This screen
+    // only lists menu items — the user object it reads is already kept fresh by
+    // AuthContext on login, refresh, and after each profile mutation. Firing an extra
+    // /user/{id}/info request on every entry was pure waste.)
 
     const handleLogout = () => {
         Alert.alert(

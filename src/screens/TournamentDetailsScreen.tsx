@@ -57,6 +57,10 @@ export default function TournamentDetailsScreen() {
     const pendingRegCount = tournamentApprovals(id)?.registrations ?? 0;
     // Open admin-help requests live in the bracket → badge the Bracket tab with them.
     const adminHelpCount = tournamentApprovals(id)?.adminHelp ?? 0;
+    // Matches with a proposed result awaiting the organizer's approval. Sourced from the
+    // BadgesContext cascade so the Bracket tab pill can render without firing GET_PENDING_APPROVALS
+    // on every screen focus — the full list is still fetched on demand when the modal opens.
+    const pendingApprovalsBadgeCount = tournamentApprovals(id)?.resultApprovals ?? 0;
     const [activeTab, setActiveTab] = useState('overview');
     // Mirror activeTab into a ref so the focus effect can read the live tab without taking
     // it as a dependency (which would refire the overview fetch on every tab switch).
@@ -272,6 +276,9 @@ export default function TournamentDetailsScreen() {
         await shareTournament(id, tournament.name);
     };
 
+    // Kept as a fallback for older tournaments where v3 hasn't been rolled out to the server
+    // yet — normally the v3 overview response now carries HasUserRegistered inline so this
+    // second round-trip isn't needed. Callers below only invoke it defensively.
     const checkRegistrationStatus = async () => {
         if (!id || !user?.id) return;
         try {
@@ -291,7 +298,8 @@ export default function TournamentDetailsScreen() {
         if (!silent) setIsLoading(true);
         setError(null);
         try {
-            const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V2(id);
+            // v3 = v2 + HasUserRegistered (folds the CHECK_REGISTRATION round-trip inline).
+            const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V3(id);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
                 throw new Error(`Failed to fetch tournament: ${response.status}`);
@@ -330,20 +338,24 @@ export default function TournamentDetailsScreen() {
                 // Server (v2 overview) tells us whether the caller passes the exclusivity gate.
                 // Omitted (=> false) when the user lacks access; non-exclusive tournaments don't use it.
                 hasExclusiveAccess: rawData.hasExclusiveAccess ?? rawData.HasExclusiveAccess ?? false,
+                // v3 tells us whether the caller is already registered so we don't need the
+                // separate CHECK_REGISTRATION round-trip. Field is omitted when false.
+                hasUserRegistered: rawData.hasUserRegistered ?? rawData.HasUserRegistered ?? false,
             };
 
             setTournament(normalizedTournament);
 
-            // Fetch teams and registration status in parallel so page renders with full data
-            const parallelTasks: Promise<any>[] = [];
-            if (normalizedTournament.isTeamTournament) {
-                parallelTasks.push(fetchTournamentTeams(id));
-            }
+            // Fold the registration flag from the v3 overview so the Join / Registered button
+            // renders correctly without a follow-up call. Only relevant while registration is
+            // still open (status 0/1); other statuses hide the button anyway.
             if (normalizedTournament.status === 0 || normalizedTournament.status === 1) {
-                parallelTasks.push(checkRegistrationStatus());
+                setIsUserRegistered(!!normalizedTournament.hasUserRegistered);
             }
-            if (parallelTasks.length > 0) {
-                await Promise.all(parallelTasks);
+
+            // Only team tournaments still fetch in parallel — the registration status now
+            // comes inline via the overview response.
+            if (normalizedTournament.isTeamTournament) {
+                await fetchTournamentTeams(id);
             }
         } catch (err: any) {
             console.error('Tournament fetch error:', err);
@@ -455,12 +467,10 @@ export default function TournamentDetailsScreen() {
         }
     }, [id, activeTab, canManage]);
 
-    // The pending-approval count drives both the inline pill and the red "Bracket"
-    // tab badge, so fetch it as soon as an admin opens a tournament that uses approval
-    // (not only on the bracket tab) and refresh it whenever they switch tabs.
-    useEffect(() => {
-        if (canManage && requiresApproval) fetchPendingApprovals();
-    }, [id, activeTab, canManage, requiresApproval]);
+    // The pending-approval count for the pill / tab badge now comes from BadgesContext
+    // (kept in sync by the BadgesUpdated SignalR push), so we no longer eagerly fetch the
+    // full list on every tab switch. The list itself is still fetched on demand when the
+    // organizer taps the approvals pill (handled inline where showApprovalsModal is opened).
 
     // The admin picked a problematic match — open it like a regular bracket match so
     // the chat tab and the resolve action are available. Land on the chat tab since
@@ -1292,7 +1302,13 @@ export default function TournamentDetailsScreen() {
             value: 'bracket',
             icon: 'git-merge-outline',
             // Result approvals (when required) + open admin-help requests both live in the bracket.
-            badge: ((canManage && requiresApproval ? pendingApprovals.length : 0) + adminHelpCount) || undefined,
+            // Both counts come from BadgesContext (SignalR-fed) so this stays live without any
+            // extra fetching. Falls back to the loaded list length if the badge context hasn't
+            // hydrated yet (e.g. right after login before the first approvals GET returns).
+            badge: (
+                (canManage && requiresApproval ? Math.max(pendingApprovalsBadgeCount, pendingApprovals.length) : 0)
+                + adminHelpCount
+            ) || undefined,
             badgeTone: 'alert',
         },
         ...(tournament?.isTeamTournament
@@ -1354,7 +1370,10 @@ export default function TournamentDetailsScreen() {
     ) : null;
 
     // Admin inbox for results awaiting approval — sits next to the help-requests pill.
-    // Only shown when the tournament was created with result approval enabled.
+    // Only shown when the tournament was created with result approval enabled. The badge
+    // count reads from BadgesContext so the pill stays live without any eager fetching;
+    // the full list is only pulled when the organizer taps the pill.
+    const approvalsPillCount = Math.max(pendingApprovalsBadgeCount, pendingApprovals.length);
     const approvalsPill = canManage && requiresApproval ? (
         <Pressable
             onPress={() => {
@@ -1363,25 +1382,25 @@ export default function TournamentDetailsScreen() {
             }}
             className={cn(
                 "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
-                pendingApprovals.length > 0
+                approvalsPillCount > 0
                     ? "bg-[#10B981]/10 border-[#10B981]/30"
                     : "bg-white/[0.04] border-white/[0.08]"
             )}
         >
             <Ionicons
-                name={pendingApprovals.length > 0 ? "checkmark-done" : "checkmark-done-outline"}
+                name={approvalsPillCount > 0 ? "checkmark-done" : "checkmark-done-outline"}
                 size={12}
-                color={pendingApprovals.length > 0 ? "#10B981" : "#64748B"}
+                color={approvalsPillCount > 0 ? "#10B981" : "#64748B"}
             />
             <Text className={cn(
                 "text-[10px] font-black uppercase tracking-wide",
-                pendingApprovals.length > 0 ? "text-[#10B981]" : "text-slate-500"
+                approvalsPillCount > 0 ? "text-[#10B981]" : "text-slate-500"
             )}>
                 Approvals
             </Text>
-            {pendingApprovals.length > 0 && (
+            {approvalsPillCount > 0 && (
                 <View className="min-w-[16px] h-4 px-1 rounded-full bg-[#10B981] items-center justify-center">
-                    <Text className="text-[9px] font-black text-[#0F172A]">{pendingApprovals.length}</Text>
+                    <Text className="text-[9px] font-black text-[#0F172A]">{approvalsPillCount}</Text>
                 </View>
             )}
         </Pressable>
@@ -3068,12 +3087,24 @@ export default function TournamentDetailsScreen() {
                 requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
                 tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
                 defaultTab={matchModalDefaultTab}
-                onMatchUpdate={() => {
-                    fetchBracket(); // Refresh the bracket/league data
-                    if (canManage) {
-                        fetchAdminHelpRequests(); // Keep the help-request inbox in sync
-                        fetchPendingApprovals(); // …and the pending-approval count / list
+                onMatchUpdate={(freshStructure?: any) => {
+                    // Backend now returns the refreshed bracket structure inline on
+                    // matchResult / approve / reject, so we can update local state directly
+                    // without a follow-up GET_TOURNAMENT_STRUCTURE round-trip. Falls back to
+                    // fetchBracket() for actions that don't (yet) piggy-back the structure.
+                    if (freshStructure) {
+                        setStages(freshStructure.stages || []);
+                        if (freshStructure.hubOwnerId || freshStructure.HubOwnerId) {
+                            setHubOwnerId(freshStructure.hubOwnerId || freshStructure.HubOwnerId);
+                        }
+                        setBracketCanManage(freshStructure.canManage ?? freshStructure.CanManage ?? false);
+                        setBracketRequireResultApproval(freshStructure.requireResultApproval ?? freshStructure.RequireResultApproval ?? false);
+                    } else {
+                        fetchBracket();
                     }
+                    // Approval / admin-help pill counts flow live via BadgesContext (SignalR push),
+                    // so no eager refetch here — the lists themselves are pulled on demand when the
+                    // organizer taps the pills.
                 }}
             />
 

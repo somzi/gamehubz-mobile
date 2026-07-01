@@ -155,10 +155,21 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
 
         connection.on('BadgesUpdated', (dto: BadgeCounts) => {
             if (!active || !dto) return;
+            const previous = queryClient.getQueryData<BadgeCounts>(BADGES_QUERY_KEY);
             queryClient.setQueryData(BADGES_QUERY_KEY, dto);
-            // The flat counts arrive live; refetch the per-entity breakdown so the cascade
-            // dots (hub card / tournament / Requests tab) stay in sync with the new totals.
-            queryClient.invalidateQueries({ queryKey: APPROVALS_QUERY_KEY });
+            // Only refetch the per-entity approvals breakdown when a count that ACTUALLY drives
+            // it changed. A pure DM/match-message push used to invalidate approvals every time,
+            // costing an extra GET that returned identical data. Compare the fields that feed
+            // ApprovalsBreakdown (hub joins + registrations + result approvals + admin help).
+            const approvalRelevant =
+                previous == null ||
+                previous.hubJoinRequests !== dto.hubJoinRequests ||
+                previous.pendingRegistrations !== dto.pendingRegistrations ||
+                previous.pendingResultApprovals !== dto.pendingResultApprovals ||
+                previous.adminHelpRequests !== dto.adminHelpRequests;
+            if (approvalRelevant) {
+                queryClient.invalidateQueries({ queryKey: APPROVALS_QUERY_KEY });
+            }
         });
 
         // Whenever the connection (re)establishes, pull a fresh snapshot so we

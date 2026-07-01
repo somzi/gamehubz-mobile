@@ -26,7 +26,9 @@ const AVATAR_STYLES = [
     { bg: 'rgba(96, 165, 250, 0.10)', border: 'rgba(96, 165, 250, 0.22)', icon: '#60A5FA' },
 ];
 
-export function HubCard({
+// Memoized to avoid re-rendering the whole hubs list every time an unrelated piece of
+// state changes (search input, badge tick). Callers should pass a stable onClick.
+export const HubCard = React.memo(function HubCard({
     name,
     numberOfUsers,
     numberOfTournaments = 0,
@@ -223,4 +225,4 @@ export function HubCard({
             )}
         </Pressable>
     );
-}
+});

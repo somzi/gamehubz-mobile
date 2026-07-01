@@ -170,14 +170,18 @@ export default function HubProfileScreen() {
         }
     }, [id]);
 
-    // Debounce search + initial load whenever the user switches to the Members tab
+    // Debounce search + initial load whenever the user switches to the Members tab.
+    // The list state is cleared INSIDE the setTimeout callback (not on every keystroke)
+    // so mid-search the visible results stay onscreen until the debounced fetch resolves
+    // — no more empty-flash between letters. The seq guard still handles overlapping
+    // in-flight requests.
     useEffect(() => {
         if (hubTab !== 'members') return;
         const seq = ++memberSearchSeq.current;
-        setMembers([]);
-        setMemberPage(0);
-        setHasMoreMembers(true);
         const handle = setTimeout(() => {
+            setMembers([]);
+            setMemberPage(0);
+            setHasMoreMembers(true);
             fetchMembers(0, memberSearch.trim(), seq);
         }, memberSearch ? 300 : 0);
         return () => clearTimeout(handle);

@@ -83,6 +83,11 @@ export default function TournamentsScreen() {
                 setTournaments(prev => [...prev, ...items]);
             } else {
                 setTournaments(items);
+                // Reset pagination cursors whenever we replace the list (tab switch,
+                // pull-to-refresh, focus). Without this, a leftover `page` from the
+                // previous tab silently skipped pages on the next loadMore, and a
+                // sticky `hasMore=false` blocked pagination on the new tab entirely.
+                setPage(0);
             }
 
             setHasMore(items.length === PAGE_SIZE);

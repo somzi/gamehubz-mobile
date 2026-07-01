@@ -18,7 +18,10 @@ interface FeedCardProps {
 
 const ACCENT = '#A78BFA';
 
-export function FeedCard({
+// Memoized so refreshing an adjacent card (or an unrelated setState in the parent
+// screen) doesn't re-render every visible feed item. All props are primitives except
+// onClick, which callers should keep stable (useCallback) for the memo to bite.
+export const FeedCard = React.memo(function FeedCard({
     hubName,
     hubAvatar,
     message,
@@ -195,4 +198,4 @@ export function FeedCard({
             </View>
         </Pressable>
     );
-}
+});

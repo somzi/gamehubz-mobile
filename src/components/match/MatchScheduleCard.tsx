@@ -418,6 +418,30 @@ export function MatchScheduleCard({
             }, 100);
         });
 
+        // Group membership is per-connection: withAutomaticReconnect() re-establishes the
+        // socket after a drop (common on mobile: network switch, backgrounding) but SignalR
+        // does NOT re-join our old groups. Without this handler the card looks connected
+        // but silently stops receiving new messages until the user closes and reopens it.
+        // Backfill the gap with a merged, dedup'd history pull.
+        connection.onreconnected(() => {
+            if (!isActive) return;
+            connection.invoke('JoinMatchGroup', matchId).catch(() => { });
+            authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId))
+                .then((r) => (r.ok ? r.json() : null))
+                .then((msgs: MatchComment[] | null) => {
+                    if (!isActive || !Array.isArray(msgs)) return;
+                    setComments((prev) => {
+                        const known = new Set(prev.map(c => c.id));
+                        const added = msgs.filter(m => !known.has(m.id));
+                        if (added.length === 0) return prev;
+                        const merged = [...prev, ...added];
+                        merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+                        return merged;
+                    });
+                })
+                .catch(() => { });
+        });
+
         const startPromise = connection.start()
             .then(() => {
                 if (!isActive) return;

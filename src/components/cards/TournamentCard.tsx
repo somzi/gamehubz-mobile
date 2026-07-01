@@ -50,7 +50,10 @@ const AVATAR_STYLES = [
     { bg: 'rgba(251, 191, 36, 0.10)', border: 'rgba(251, 191, 36, 0.22)', icon: '#FBBF24' },
 ];
 
-export function TournamentCard({
+// Memoized so a parent re-render (badge count tick, unrelated state change) doesn't
+// re-render every visible tournament card. Callers should pass a stable onClick
+// (useCallback) so the memo actually skips re-renders.
+export const TournamentCard = React.memo(function TournamentCard({
     name,
     status,
     date,
@@ -271,4 +274,4 @@ export function TournamentCard({
             )}
         </Pressable>
     );
-}
+});

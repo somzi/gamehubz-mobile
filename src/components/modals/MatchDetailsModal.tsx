@@ -56,7 +56,10 @@ interface MatchDetailsModalProps {
     scheduledTime?: string;
     opponentAvailability?: string[];
     myAvailability?: string[];
-    onMatchUpdate?: () => void;
+    // Optional `freshStructure` argument carries the refreshed bracket the backend now returns
+    // inline with matchResult mutations so the parent can update its bracket state without a
+    // follow-up GET_TOURNAMENT_STRUCTURE_V3 round-trip. Ignored by legacy call sites.
+    onMatchUpdate?: (freshStructure?: any) => void;
     home?: { userId: string; username: string; score: number | null };
     away?: { userId: string; username: string; score: number | null };
     evidences?: string[];
@@ -174,22 +177,10 @@ export function MatchDetailsModal({
         };
     }, []);
 
-    // Load streams when the Stream tab is relevant (scheduled / ready / completed) so the tab can
-    // show a LIVE dot and the panel has data immediately.
-    useEffect(() => {
-        if (!visible || !matchId || status === 'pending_availability') return;
-        let active = true;
-        (async () => {
-            try {
-                const res = await authenticatedFetch(ENDPOINTS.GET_MATCH_STREAMS(matchId));
-                if (res.ok && active) {
-                    const data = await res.json();
-                    setStreams(Array.isArray(data) ? data : []);
-                }
-            } catch { /* keep whatever we have */ }
-        })();
-        return () => { active = false; };
-    }, [visible, matchId, status]);
+    // Streams + availability now arrive with the details response via /details/full, so this
+    // effect only handles the standalone fallback where /details/full wasn't reachable. In the
+    // normal path setStreams / setMySlots are populated from the combo response inside
+    // fetchMatchDetails below and this effect stays inert.
 
     const formatAvatarUrl = (url?: string) => {
         if (!url) return '';
@@ -219,10 +210,10 @@ export function MatchDetailsModal({
 
     useEffect(() => {
         if (visible && matchId) {
+            // fetchMatchDetails hits /details/full which returns details + streams + the caller's
+            // availability in a single round-trip. It handles setting all three; the legacy
+            // fetchAvailability / streams effect only runs as a fallback.
             fetchMatchDetails();
-            if (status === 'pending_availability') {
-                fetchAvailability();
-            }
         }
     }, [visible, status, matchId, evidences, home, away]);
 
@@ -260,9 +251,27 @@ export function MatchDetailsModal({
         setIsLoadingDetails(true);
         setError(null);
         try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
+            // Combo endpoint: details + streams + availability in one round-trip.
+            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS_FULL(matchId));
             if (response.ok) {
-                const data = await response.json();
+                const envelope = await response.json();
+                // /details/full response shape: { details, streams, availability? }. Older /details
+                // returned the details DTO at the top level, so fall back to that when either the
+                // envelope shape is missing or a proxy/older server is in the mix.
+                const data = envelope?.details ?? envelope?.Details ?? envelope;
+                const inlineStreams = envelope?.streams ?? envelope?.Streams;
+                if (Array.isArray(inlineStreams)) setStreams(inlineStreams);
+                const inlineAvailability = envelope?.availability ?? envelope?.Availability;
+                if (inlineAvailability) {
+                    if (inlineAvailability.mySlots) setMySlots(inlineAvailability.mySlots);
+                    if (inlineAvailability.opponentSlots) setOpponentSlots(inlineAvailability.opponentSlots);
+                    if (inlineAvailability.matchDeadline) setLocalDeadline(inlineAvailability.matchDeadline);
+                    if (inlineAvailability.confirmedTime) {
+                        const confirmedDate = parseUtcDate(inlineAvailability.confirmedTime);
+                        setConfirmedTime(confirmedDate.toLocaleString());
+                        setCurrentStatus('scheduled');
+                    }
+                }
                 // For a team-tournament sub-match, GET_MATCH_DETAILS returns the parent
                 // team-match DTO (no top-level home/away — the individual players, scores and
                 // help-request flag live on the matching sub-match). Resolve our sub-match so
@@ -446,6 +455,15 @@ export function MatchDetailsModal({
                 throw new Error(text || 'Failed to report result');
             }
 
+            // Backend returns the freshly computed bracket structure inline so the parent
+            // can update state directly without an extra GET. Body may be empty on very old
+            // servers — the ?? undefined keeps that fallback path clean for the parent.
+            let freshStructure: any = undefined;
+            try {
+                const body = await response.json();
+                freshStructure = body?.structure ?? body?.Structure ?? undefined;
+            } catch { /* legacy servers return an empty body — parent will refetch */ }
+
             if (selectedImages.length > 0) {
                 await handleUploadOnly();
             }
@@ -455,7 +473,7 @@ export function MatchDetailsModal({
             // "Awaiting approval" state instead of getting bounced back to the bracket.
             const willCreateProposal = approvalRequired && !(isHubOwner || canManage) && status !== 'completed';
 
-            if (onMatchUpdate) onMatchUpdate();
+            if (onMatchUpdate) onMatchUpdate(freshStructure);
 
             if (willCreateProposal) {
                 setHomeScore('');

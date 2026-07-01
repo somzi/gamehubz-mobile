@@ -139,10 +139,6 @@ export default function ProfileScreen() {
     };
 
     useEffect(() => {
-        fetchDetailedData();
-    }, [fetchDetailedData]);
-
-    useEffect(() => {
         if (activeTab === 'tournaments' && userTournaments.length === 0 && hasMoreTournaments && !isLoadingMoreTournaments) {
             loadMoreTournaments();
         } else if (activeTab === 'matches' && userMatches.length === 0 && hasMoreMatches && !isLoadingMoreMatches) {
@@ -150,17 +146,16 @@ export default function ProfileScreen() {
         }
     }, [activeTab, userMatches.length, userTournaments.length]);
 
+    // Refresh the user's stats + profile silently when the tab regains focus. Do NOT
+    // reset the tournaments / matches lists — those are paginated and blowing them away
+    // would drop the user's scroll position and re-fetch page 0 every time they hop
+    // between bottom tabs. Explicit pull-to-refresh (if added) should call fetchDetailedData
+    // + reset separately.
     useFocusEffect(
         useCallback(() => {
             if (user?.id) {
                 refreshUser();
                 fetchDetailedData();
-                setUserMatches([]);
-                setMatchesPage(0);
-                setHasMoreMatches(true);
-                setUserTournaments([]);
-                setTournamentsPage(0);
-                setHasMoreTournaments(true);
             }
         }, [user?.id, refreshUser, fetchDetailedData])
     );

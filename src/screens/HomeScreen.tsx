@@ -322,7 +322,10 @@ export default function HomeScreen() {
                             <View className="gap-2.5">
                                 {hubActivities.slice(0, 3).map((item, index) => (
                                     <FeedCard
-                                        key={index}
+                                        // Composite key so a fresh highlight arriving at the top doesn't cause
+                                        // React to remap cards by position — a pure index key leaks the previous
+                                        // card's internal state (animation, collapsed) onto the next item.
+                                        key={`${item.tournamentId ?? item.hubName ?? 'feed'}-${item.createdOn ?? index}`}
                                         hubName={item.hubName}
                                         hubAvatar={item.hubAvatarUrl || item.hubAvatar}
                                         message={item.message}

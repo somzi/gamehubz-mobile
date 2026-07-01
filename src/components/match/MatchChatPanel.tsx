@@ -44,6 +44,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const connectionRef = useRef<HubConnection | null>(null);
     // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
     const didInitialScrollRef = useRef(false);
+    // Coalesces mark-read POSTs: a burst of incoming opponent messages used to fire one
+    // request per message. We only need the last one (server clears everything up to the
+    // read timestamp), so we hold off for a short trailing window.
+    const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const normalizedParticipantIds = participantIds
         .filter(Boolean)
@@ -57,9 +61,22 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             if (response.ok) {
                 const data = await response.json();
                 const list: MatchComment[] = Array.isArray(data) ? data : [];
-                setComments(list);
-                setHasMore(list.length >= PAGE_SIZE);
-                if (!silent) {
+                if (silent) {
+                    // Reconnect backfill: merge with what we already have (which may include
+                    // older messages the user paged in) so we don't silently drop history.
+                    // Replacing wholesale — as this used to do — wiped every "Load earlier"
+                    // batch every time SignalR reconnected.
+                    setComments(prev => {
+                        const known = new Set(prev.map(c => c.id));
+                        const added = list.filter(c => !known.has(c.id));
+                        if (added.length === 0) return prev;
+                        const merged = [...prev, ...added];
+                        merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+                        return merged;
+                    });
+                } else {
+                    setComments(list);
+                    setHasMore(list.length >= PAGE_SIZE);
                     // Let the initial batch lay out, then stop auto-scrolling so
                     // "Load earlier" prepends don't jump the view to the bottom.
                     setTimeout(() => { didInitialScrollRef.current = true; }, 400);
@@ -98,14 +115,25 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         }
     };
 
-    // Mark the chat read for the current user and refresh the badge counts.
-    const markRead = async () => {
+    // Trailing debounce so a fast burst of incoming opponent messages collapses to a single
+    // /read call instead of one per message. Server marks up-to-latest anyway. The initial
+    // open still fires immediately (via the load effect below) because the timer is idle.
+    const markRead = () => {
         if (!matchId) return;
-        try {
-            await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(matchId), { method: 'POST' });
-            refreshBadges();
-        } catch { /* best-effort */ }
+        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+        markReadTimerRef.current = setTimeout(async () => {
+            markReadTimerRef.current = null;
+            try {
+                await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(matchId), { method: 'POST' });
+                refreshBadges();
+            } catch { /* best-effort */ }
+        }, 600);
     };
+
+    // Clear any pending mark-read timer on unmount so we don't fire against a stale matchId.
+    useEffect(() => () => {
+        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+    }, []);
 
     useEffect(() => {
         if (!active || !matchId) return;

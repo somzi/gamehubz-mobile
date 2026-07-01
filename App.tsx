@@ -13,6 +13,15 @@ import { BadgesProvider } from './src/context/BadgesContext';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
 
+// Silence console.log in production builds. The codebase logs a lot of debug info
+// (auth state with usernames, navigation events, network payloads) that shouldn't
+// leak into release artifacts — both for user privacy and to save the cost of the
+// per-call JS→native bridge crossing. warn/error stay on so real problems surface.
+if (!__DEV__) {
+    // eslint-disable-next-line no-console
+    console.log = () => {};
+}
+
 // Show notifications even when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

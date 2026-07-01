@@ -103,10 +103,14 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
         }
     }, []);
 
-    useFocusEffect(useCallback(() => { load(search); }, [load]));
-
-    // debounced search
+    // Single-source-of-truth loader: debounced when the user is typing (skips first fire so we
+    // don't waste a request while the query is still being composed), immediate when they open
+    // the tab with an empty box. Merging the focus + debounce effects here avoids the previous
+    // double-fetch on mount and the stale-closure that reset the query after a tab switch.
+    const isFirst = useRef(true);
+    useFocusEffect(useCallback(() => { load(search); }, [load, search]));
     useEffect(() => {
+        if (isFirst.current) { isFirst.current = false; return; }
         const t = setTimeout(() => { load(search); }, 300);
         return () => clearTimeout(t);
     }, [search, load]);
@@ -225,9 +229,12 @@ function RequestsTab() {
         }
     }, []);
 
-    useFocusEffect(useCallback(() => { load(search); }, [load]));
-
+    // Same pattern as FriendsTab: focus fires with the current query; debounce skips the initial
+    // render so it doesn't fire an identical second request on mount / tab entry.
+    const isFirst = useRef(true);
+    useFocusEffect(useCallback(() => { load(search); }, [load, search]));
     useEffect(() => {
+        if (isFirst.current) { isFirst.current = false; return; }
         const t = setTimeout(() => { load(search); }, 300);
         return () => clearTimeout(t);
     }, [search, load]);
@@ -432,9 +439,11 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
         }
     }, []);
 
-    useFocusEffect(useCallback(() => { load(search); }, [load]));
-
+    // Same pattern: focus loads with the live query; debounce skips initial render.
+    const isFirst = useRef(true);
+    useFocusEffect(useCallback(() => { load(search); }, [load, search]));
     useEffect(() => {
+        if (isFirst.current) { isFirst.current = false; return; }
         const t = setTimeout(() => { load(search); }, 300);
         return () => clearTimeout(t);
     }, [search, load]);

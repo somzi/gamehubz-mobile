@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl } from 'react-native';
+import { View, Text, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusRefetch } from '../hooks/useFocusRefetch';
@@ -159,13 +159,26 @@ export default function HubsScreen() {
         }
     };
 
-    const handleScroll = (event: any) => {
-        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-        const paddingToBottom = 50;
-        if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-            loadMoreHubs();
-        }
-    };
+    // Kept for reference — pagination now hangs off FlatList's onEndReached. The old ScrollView
+    // path rendered every hub in the tree, which was noticeably janky for users in many hubs.
+    const renderHubItem = useCallback(({ item, index }: { item: Hub; index: number }) => (
+        <View className="mb-3">
+            <HubCard
+                name={item.name}
+                description={item.description}
+                numberOfUsers={item.numberOfUsers}
+                numberOfTournaments={item.numberOfTournaments}
+                avatarUrl={item.avatarUrl || item.logoUrl}
+                index={index}
+                isJoined={activeTab === 'joined'}
+                isVerified={(item as any).isVerified || (item as any).IsVerified}
+                badgeCount={hubApprovals(item.id)}
+                onClick={() => navigation.navigate('HubProfile', { id: item.id })}
+            />
+        </View>
+    ), [activeTab, hubApprovals, navigation]);
+
+    const keyExtractor = useCallback((item: Hub, index: number) => `${item.id}-${index}`, []);
 
     const handleCreateHub = async () => {
         if (!hubName.trim()) {
@@ -310,69 +323,53 @@ export default function HubsScreen() {
                     </Pressable>
                 </View>
             ) : (
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ paddingBottom: 24 }}
+                // FlatList virtualizes rows so a user in dozens of hubs isn't paying the render
+                // cost for every card off-screen. Pagination hangs off onEndReached instead of
+                // the old manual onScroll math.
+                <FlatList
+                    data={hubs}
+                    keyExtractor={keyExtractor}
+                    renderItem={renderHubItem}
+                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
                     refreshControl={
                         <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#818CF8" />
                     }
-                    onScroll={handleScroll}
-                    scrollEventThrottle={16}
-                >
-                    <View className="px-5">
-                        {hubs.length === 0 ? (
-                            <View className="items-center py-20">
-                                <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
-                                    <Ionicons name="people-outline" size={28} color="#334155" />
-                                </View>
-                                <Text className="text-sm font-semibold text-slate-500">
-                                    {activeTab === 'joined'
-                                        ? "You haven't joined any hubs yet"
-                                        : "No hubs found"}
-                                </Text>
-                                <Text className="text-xs text-slate-600 mt-1">
-                                    {activeTab === 'joined'
-                                        ? "Discover communities to join"
-                                        : "Try a different search"}
-                                </Text>
-                                {activeTab === 'joined' && (
-                                    <Pressable
-                                        onPress={() => setActiveTab('discovery')}
-                                        className="mt-4 px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
-                                    >
-                                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">Browse Hubs</Text>
-                                    </Pressable>
-                                )}
+                    onEndReached={loadMoreHubs}
+                    onEndReachedThreshold={0.5}
+                    removeClippedSubviews
+                    ListEmptyComponent={
+                        <View className="items-center py-20">
+                            <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
+                                <Ionicons name="people-outline" size={28} color="#334155" />
                             </View>
-                        ) : (
-                            <View className="mt-1">
-                                {hubs.map((hub, idx) => (
-                                    <View key={`${hub.id}-${idx}`} className="mb-3">
-                                        <HubCard
-                                            name={hub.name}
-                                            description={hub.description}
-                                            numberOfUsers={hub.numberOfUsers}
-                                            numberOfTournaments={hub.numberOfTournaments}
-                                            avatarUrl={hub.avatarUrl || hub.logoUrl}
-                                            index={idx}
-                                            isJoined={activeTab === 'joined'}
-                                            isVerified={(hub as any).isVerified || (hub as any).IsVerified}
-                                            // Only the hubs you manage carry approvals; the lookup
-                                            // returns 0 for everything else, so this is safe on both tabs.
-                                            badgeCount={hubApprovals(hub.id)}
-                                            onClick={() => navigation.navigate('HubProfile', { id: hub.id })}
-                                        />
-                                    </View>
-                                ))}
-                                {hasMoreHubs && isLoadingMore && (
-                                    <View className="py-6 items-center justify-center">
-                                        <ActivityIndicator size="small" color="#818CF8" />
-                                    </View>
-                                )}
+                            <Text className="text-sm font-semibold text-slate-500">
+                                {activeTab === 'joined'
+                                    ? "You haven't joined any hubs yet"
+                                    : "No hubs found"}
+                            </Text>
+                            <Text className="text-xs text-slate-600 mt-1">
+                                {activeTab === 'joined'
+                                    ? "Discover communities to join"
+                                    : "Try a different search"}
+                            </Text>
+                            {activeTab === 'joined' && (
+                                <Pressable
+                                    onPress={() => setActiveTab('discovery')}
+                                    className="mt-4 px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
+                                >
+                                    <Text className="text-xs font-bold text-indigo-400 tracking-wide">Browse Hubs</Text>
+                                </Pressable>
+                            )}
+                        </View>
+                    }
+                    ListFooterComponent={
+                        hasMoreHubs && isLoadingMore ? (
+                            <View className="py-6 items-center justify-center">
+                                <ActivityIndicator size="small" color="#818CF8" />
                             </View>
-                        )}
-                    </View>
-                </ScrollView>
+                        ) : null
+                    }
+                />
             )}
 
             <Modal

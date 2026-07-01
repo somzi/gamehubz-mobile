@@ -55,7 +55,8 @@ const RESULT_THEME = {
     },
 } as const;
 
-export function MatchHistoryCard({
+// Memoized so scrolling / loading additional pages doesn't re-render every history row.
+export const MatchHistoryCard = React.memo(function MatchHistoryCard({
     tournamentName,
     hubName,
     userName = 'Me',
@@ -278,4 +279,4 @@ export function MatchHistoryCard({
             </View>
         </Pressable>
     );
-}
+});

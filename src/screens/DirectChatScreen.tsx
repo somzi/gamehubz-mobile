@@ -53,6 +53,21 @@ export default function DirectChatScreen() {
     // Guards the one-time scroll-to-bottom on first load so paging in older
     // messages (which grows the list at the top) doesn't yank the view down.
     const didInitialScrollRef = useRef(false);
+    // Coalesces mark-read POSTs during bursty incoming messages — see markReadDebounced below.
+    const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const markReadDebounced = useCallback((chatId: string) => {
+        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+        markReadTimerRef.current = setTimeout(() => {
+            markReadTimerRef.current = null;
+            authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' })
+                .catch(() => { });
+        }, 600);
+    }, []);
+
+    useEffect(() => () => {
+        if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+    }, []);
 
     // ─── Bootstrap: resolve chat + load messages ────────────────────────
     // Fast path (chat list tap): the header is seeded from navigation params, so
@@ -218,8 +233,9 @@ export default function DirectChatScreen() {
             });
 
             if (m.senderId !== myUserId) {
-                authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(currentChatId), { method: 'POST' })
-                    .catch(() => { });
+                // Coalesce a burst of incoming messages into one /read call (the endpoint
+                // marks everything up to the read timestamp, so intermediate calls are wasted).
+                markReadDebounced(currentChatId);
             }
 
             setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
@@ -233,15 +249,21 @@ export default function DirectChatScreen() {
         connection.onreconnected(() => {
             if (!isActive) return;
             connection.invoke('JoinChatGroup', currentChatId).catch(() => { });
-            // Backfill anything sent during the disconnect gap (dedup by id below).
-            authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(currentChatId, 100))
+            // Backfill anything sent during the disconnect gap. The backend orders newest-first,
+            // so a naive concat left the freshly-arrived tail messages before the older ones
+            // we already had — the merged list has to be re-sorted by sentAt to render in
+            // reading order. Dedup by id handles overlap with what we already show.
+            authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(currentChatId, PAGE_SIZE))
                 .then((r) => (r.ok ? r.json() : null))
                 .then((msgs: DirectMessage[] | null) => {
                     if (!isActive || !msgs) return;
                     setMessages((prev) => {
                         const known = new Set(prev.map((p) => p.id));
                         const added = msgs.filter((m) => !known.has(m.id));
-                        return added.length ? [...prev, ...added] : prev;
+                        if (added.length === 0) return prev;
+                        const merged = [...prev, ...added];
+                        merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+                        return merged;
                     });
                 })
                 .catch(() => { });
