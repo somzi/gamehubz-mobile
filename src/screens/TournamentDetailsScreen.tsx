@@ -724,10 +724,12 @@ export default function TournamentDetailsScreen() {
     };
 
     // Destructive — confirm first, surfacing how many fixtures will be deleted.
+    // Only reachable when no knockout match has been played (front + back guards),
+    // so the wording no longer mentions discarding results.
     const handleResetBracket = (knockoutMatchCount: number) => {
         Alert.alert(
             'Reset bracket?',
-            `This deletes the current knockout bracket${knockoutMatchCount > 0 ? ` (${knockoutMatchCount} matches)` : ''} and any results in it. Group standings are kept — you can then correct a group result and re-draw the bracket.`,
+            `This deletes the current knockout bracket${knockoutMatchCount > 0 ? ` (${knockoutMatchCount} matches)` : ''}. Group standings are kept — you can then correct a group result and re-draw the bracket.`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Reset bracket', style: 'destructive', onPress: performResetBracket },
@@ -1405,11 +1407,24 @@ export default function TournamentDetailsScreen() {
         const hasGroupStage = stages.some((s: any) => norm(s) === 1); // StageType.GroupStage
         if (!hasGroupStage) return null;
 
-        // Knockout stages: SingleEliminationBracket (3) or DE Winners Bracket (4).
+        // Knockout stages: SingleEliminationBracket (3), DE Winners Bracket (4), DE Losers Bracket (5).
+        // Include LB so a played LB fixture on a DE tournament also disables Reset.
         const knockoutMatches = stages
-            .filter((s: any) => norm(s) === 3 || norm(s) === 4)
+            .filter((s: any) => norm(s) === 3 || norm(s) === 4 || norm(s) === 5)
             .flatMap((s: any) => (s.rounds ?? s.Rounds ?? []).flatMap((r: any) => r.matches ?? r.Matches ?? []));
         const knockoutDrawn = knockoutMatches.length > 0;
+
+        // Any 2-sided knockout match past Pending — Live (3), Completed (4) or NoShow (5) —
+        // means the result is either in flight or already recorded, so a reset would silently
+        // discard it. Byes have one side null and hold a Completed status from the draw;
+        // excluding them via home/away guards keeps the button live right after a fresh draw.
+        // Backend enforces the same rule authoritatively.
+        const anyKnockoutPlayed = knockoutMatches.some((m: any) => {
+            const home = m.home ?? m.Home;
+            const away = m.away ?? m.Away;
+            const st = m.status ?? m.Status;
+            return home && away && (st === 3 || st === 4 || st === 5);
+        });
 
         const groupStage = stages.find((s: any) => norm(s) === 1);
         const groupMatches = (groupStage?.groups ?? groupStage?.Groups ?? [])
@@ -1417,7 +1432,7 @@ export default function TournamentDetailsScreen() {
         const groupComplete = groupMatches.length > 0
             && groupMatches.every((m: any) => { const st = m.status ?? m.Status; return st === 3 || st === 4; });
 
-        const showReset = knockoutDrawn;
+        const showReset = knockoutDrawn && !anyKnockoutPlayed;
         const showDraw = !knockoutDrawn && groupComplete;
         const canSwap = knockoutDrawn && getSwappableBracketTeams().length >= 2;
         if (!showReset && !showDraw) return null;
