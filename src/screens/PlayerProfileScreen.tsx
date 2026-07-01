@@ -51,6 +51,14 @@ export default function PlayerProfileScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Stable so the memoized TournamentCard doesn't invalidate on every parent
+    // re-render (tab-flip, pagination). Per-row inline `() => openTournament(t.id)`
+    // still churns — see ProfileScreen for the same trade-off note.
+    const openTournament = useCallback(
+        (id: string) => navigation.navigate('TournamentDetails', { id }),
+        [navigation],
+    );
+
     useEffect(() => {
         let cancelled = false;
         const fetchPlayerData = async () => {
@@ -609,7 +617,7 @@ export default function PlayerProfileScreen() {
                                                 region="Global"
                                                 prizePool={`${getCurrencySymbol(t.prizeCurrency)}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
-                                                onClick={() => navigation.navigate('TournamentDetails', { id: t.id })}
+                                                onClick={() => openTournament(t.id)}
                                                 hubName={t.hubName || t.HubName}
                                                 hubAvatarUrl={t.hubAvatarUrl || t.HubAvatarUrl}
                                             />

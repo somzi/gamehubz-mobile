@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1474,8 +1475,9 @@ export function MatchScheduleCard({
                                                                     <View key={idx} className="mr-2.5">
                                                                         <Image
                                                                             source={{ uri: getOptimizedCloudinaryUrl(url, 320) }}
-                                                                            className="w-24 h-32 rounded-xl border border-white/5"
-                                                                            resizeMode="cover"
+                                                                            style={{ width: 96, height: 128, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
+                                                                            contentFit="cover"
+                                                                            cachePolicy="memory-disk"
                                                                         />
                                                                     </View>
                                                                 ))}
@@ -1507,7 +1509,7 @@ export function MatchScheduleCard({
                                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
                                                             {selectedImages.map((img, index) => (
                                                                 <View key={img.uri + index} className="mr-3 mb-2">
-                                                                    <Image source={{ uri: img.uri }} className={cn("rounded-2xl", isPremium ? "w-20 h-20 border border-white/[0.06]" : "w-20 h-20")} />
+                                                                    <Image source={{ uri: img.uri }} style={isPremium ? { width: 80, height: 80, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' } : { width: 80, height: 80, borderRadius: 16 }} />
                                                                     <Pressable onPress={() => removeImage(img.uri)} className={cn("absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full items-center justify-center", isPremium ? "bg-destructive" : "bg-destructive")}>
                                                                         <Ionicons name="close" size={12} color="white" />
                                                                     </Pressable>

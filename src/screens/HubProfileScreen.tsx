@@ -70,6 +70,16 @@ export default function HubProfileScreen() {
     const [isMembersLoading, setIsMembersLoading] = useState(false);
     const memberSearchSeq = useRef(0);
 
+    // Stable so the memoized TournamentCard doesn't invalidate on every parent
+    // re-render (member search typing, badge tick, follow state change). The
+    // inline `() => openTournament(id)` per row still creates a fresh lambda —
+    // eliminating that entirely would require changing TournamentCard's onClick
+    // signature to take an id, which is out of scope for this pass.
+    const openTournament = useCallback(
+        (tid: string) => navigation.navigate('TournamentDetails', { id: tid }),
+        [navigation],
+    );
+
 
     useFocusEffect(
         useCallback(() => {
@@ -376,7 +386,7 @@ export default function HubProfileScreen() {
                             region={tournament.region === 1 ? 'North America' : 'Europe'}
                             prizePool={`${getCurrencySymbol(tournament.prizeCurrency)}${tournament.prize}`}
                             players={new Array(tournament.numberOfParticipants || 0).fill({})}
-                            onClick={() => navigation.navigate('TournamentDetails', { id: tournament.id })}
+                            onClick={() => openTournament(tournament.id)}
                             index={index}
                             badgeCount={tournamentApprovals(tournament.id)?.total ?? 0}
                             hubName={hubData.name}

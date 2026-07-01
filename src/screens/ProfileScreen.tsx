@@ -44,6 +44,17 @@ export default function ProfileScreen() {
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Stable so the memoized TournamentCard doesn't invalidate on every parent
+    // re-render (tab-flip, badge tick, pagination). Note: the map below still
+    // creates a fresh `() => openTournament(t.id)` per row, so memo bails on
+    // that lambda alone — collapsing that fully would require either changing
+    // TournamentCard's onClick signature to accept an id or lifting each row
+    // into its own memoized child, both of which are out of scope here.
+    const openTournament = useCallback(
+        (id: string) => navigation.navigate('TournamentDetails', { id }),
+        [navigation],
+    );
+
     const fetchDetailedData = useCallback(async () => {
         if (!user?.id) return;
         setIsLoadingData(true);
@@ -542,7 +553,7 @@ export default function ProfileScreen() {
                                                 region="Global"
                                                 prizePool={`${getCurrencySymbol(t.prizeCurrency)}${t.prize}`}
                                                 players={new Array(t.numberOfParticipants || 0).fill({})}
-                                                onClick={() => navigation.navigate('TournamentDetails', { id: t.id })}
+                                                onClick={() => openTournament(t.id)}
                                                 hubName={t.hubName || t.HubName}
                                                 hubAvatarUrl={t.hubAvatarUrl || t.HubAvatarUrl}
                                             />

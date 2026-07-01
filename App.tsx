@@ -3,15 +3,20 @@ import { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer, LinkingOptions, NavigationContainerRef, getStateFromPath } from '@react-navigation/native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import './global.css';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { BadgesProvider } from './src/context/BadgesContext';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 // Silence console.log in production builds. The codebase logs a lot of debug info
 // (auth state with usernames, navigation events, network payloads) that shouldn't
@@ -36,14 +41,32 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       // Treat data as fresh for 30s so re-mounting a screen doesn't immediately refire
-      // the network. Keep cached data around for 5 min after a screen unmounts so going
-      // back to it paints instantly while any refetch happens in the background.
+      // the network. Keep cached data around for 24h after a screen unmounts so cold
+      // starts (see persistQueryClient below) still have entries to restore — the old
+      // 5min gcTime was shorter than a typical app session gap and would evict every
+      // query before the persister got a chance to serialize it to disk.
       staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      gcTime: 24 * 60 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
     },
   },
+});
+
+// Cold-start cache for every useQuery in the app. The persister mirrors the in-memory
+// query cache to AsyncStorage so killing the app and reopening it paints the last
+// snapshot instantly while the network fetch runs in parallel — the same cold-start
+// win the custom cache.ts helper gave Chats/Hubs, but for every RQ query (Home,
+// BadgesContext, and every future migration) at once.
+//
+// maxAge caps how long a persisted snapshot is treated as usable (24h — after that we
+// treat it as miss and skip the paint). Individual queries with a shorter staleTime
+// still refetch immediately per query; persistence only affects the FIRST paint.
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: 'gamehubz-rq-cache',
+  // Compact JSON to keep the AsyncStorage row small on large caches.
+  throttleTime: 1000,
 });
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -242,22 +265,39 @@ export default function App() {
   const [navReady, setNavReady] = useState(false);
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BadgesProvider>
-            <NavigationContainer
-              ref={navigationRef}
-              linking={linking}
-              onReady={() => setNavReady(true)}
-            >
-              <RootNavigator />
-            </NavigationContainer>
-            <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
-          </BadgesProvider>
-        </AuthProvider>
-        <StatusBar style="light" />
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    // ErrorBoundary at the very top so a render crash inside AuthProvider,
+    // NavigationContainer, or any screen surfaces a "Try again" fallback rather
+    // than a white screen. Placed OUTSIDE SafeAreaProvider so even a bug in
+    // safe-area / query-client setup still shows the fallback.
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: asyncStoragePersister,
+            // Don't restore entries older than 24h — after that the risk of a
+            // deleted/edited item flashing on cold start outweighs the paint win.
+            maxAge: 24 * 60 * 60 * 1000,
+            // Bust the whole cache when the app version changes so a shipped schema
+            // change never renders against a stale-shape snapshot.
+            buster: Constants.expoConfig?.version ?? 'dev',
+          }}
+        >
+          <AuthProvider>
+            <BadgesProvider>
+              <NavigationContainer
+                ref={navigationRef}
+                linking={linking}
+                onReady={() => setNavReady(true)}
+              >
+                <RootNavigator />
+              </NavigationContainer>
+              <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
+            </BadgesProvider>
+          </AuthProvider>
+          <StatusBar style="light" />
+        </PersistQueryClientProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

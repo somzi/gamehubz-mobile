@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { useFocusRefetch } from '../hooks/useFocusRefetch';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
@@ -35,6 +35,12 @@ interface MatchOverviewDto {
 
 const SECTION_GAP = 28;
 
+// Stable fallbacks used when a query is still loading. Reusing the same array
+// reference keeps the useMemo below from re-computing on every render before
+// the first response arrives.
+const EMPTY_MATCHES: MatchOverviewDto[] = [];
+const EMPTY_ACTIVITIES: DashboardActivityDto[] = [];
+
 // LayoutAnimation needs an explicit opt-in on Android to animate the collapse.
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -45,10 +51,7 @@ type SectionKey = 'attention' | 'active' | 'highlights';
 export default function HomeScreen() {
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const { user } = useAuth();
-    const [actionRequiredMatches, setActionRequiredMatches] = useState<MatchOverviewDto[]>([]);
-    const [myMatches, setMyMatches] = useState<MatchOverviewDto[]>([]);
-    const [hubActivities, setHubActivities] = useState<DashboardActivityDto[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [showHighlightsModal, setShowHighlightsModal] = useState(false);
     const [collapsed, setCollapsed] = useState<Record<SectionKey, boolean>>({
         attention: false,
@@ -61,69 +64,111 @@ export default function HomeScreen() {
         setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const fetchMatches = async () => {
-        if (!user?.id) return;
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_USER_HOME_MATCHES(user.id));
-            if (response.ok) {
-                const data: any[] = await response.json();
-                const normalizedData: MatchOverviewDto[] = data.map((m) => ({
-                    id: m.id || m.Id,
-                    matchId: m.matchId || m.MatchId,
-                    tournamentId: m.tournamentId || m.TournamentId,
-                    tournamentName: m.tournamentName || m.TournamentName,
-                    hubName: m.hubName || m.HubName,
-                    scheduledTime: m.scheduledTime || m.ScheduledTime || null,
-                    opponentName: m.opponentName || m.OpponentName,
-                    opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
-                    opponentNickname: m.opponentNickname || m.OpponentNickname,
-                    userNickname: m.userNickname || m.UserNickname,
-                    status: m.status !== undefined ? m.status : m.Status,
-                    isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
-                    unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
-                }));
-                const openMatches = normalizedData.filter((m) => !m.isRoundLocked);
-                setActionRequiredMatches(openMatches.filter((m) => !m.scheduledTime));
-                setMyMatches(openMatches.filter((m) => m.scheduledTime));
-            }
-        } catch (error) {
-            console.error('Error fetching home matches:', error);
-        }
-    };
+    const homeMatchesQuery = useQuery<MatchOverviewDto[]>({
+        queryKey: ['home-matches', user?.id],
+        queryFn: async () => {
+            const response = await authenticatedFetch(ENDPOINTS.GET_USER_HOME_MATCHES(user!.id));
+            if (!response.ok) throw new Error(`GET_USER_HOME_MATCHES failed: ${response.status}`);
+            const data: any[] = await response.json();
+            return data.map((m) => ({
+                id: m.id || m.Id,
+                matchId: m.matchId || m.MatchId,
+                tournamentId: m.tournamentId || m.TournamentId,
+                tournamentName: m.tournamentName || m.TournamentName,
+                hubName: m.hubName || m.HubName,
+                scheduledTime: m.scheduledTime || m.ScheduledTime || null,
+                opponentName: m.opponentName || m.OpponentName,
+                opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
+                opponentNickname: m.opponentNickname || m.OpponentNickname,
+                userNickname: m.userNickname || m.UserNickname,
+                status: m.status !== undefined ? m.status : m.Status,
+                isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
+                unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
+            }));
+        },
+        enabled: !!user?.id,
+        staleTime: 30_000,
+        // Respect staleTime — 'always' would ignore it and re-hit the API on
+        // every remount, defeating the tab-swap-is-instant win we just bought.
+        refetchOnMount: true,
+    });
 
-    const fetchHubActivities = async () => {
-        try {
+    const hubActivitiesQuery = useQuery<DashboardActivityDto[]>({
+        queryKey: ['hub-activities'],
+        queryFn: async () => {
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_ACTIVITY_HOME);
-            if (response.ok) {
-                const data: any[] = await response.json();
-                const activities: DashboardActivityDto[] = data.map((a) => ({
-                    hubName: a.hubName || a.HubName,
-                    message: a.message || a.Message,
-                    tournamentId: a.tournamentId || a.TournamentId,
-                    tournamentName: a.tournamentName || a.TournamentName,
-                    timeAgo: a.timeAgo || a.TimeAgo,
-                    createdOn: a.createdOn || a.CreatedOn,
-                    type: a.type || a.Type,
-                    hubAvatar: a.hubAvatar || a.HubAvatar,
-                    hubAvatarUrl: a.hubAvatarUrl || a.HubAvatarUrl,
-                }));
-                setHubActivities(activities);
-            }
-        } catch (error) {
-            console.error('Error fetching hub activities:', error);
+            if (!response.ok) throw new Error(`GET_HUB_ACTIVITY_HOME failed: ${response.status}`);
+            const data: any[] = await response.json();
+            return data.map((a) => ({
+                hubName: a.hubName || a.HubName,
+                message: a.message || a.Message,
+                tournamentId: a.tournamentId || a.TournamentId,
+                tournamentName: a.tournamentName || a.TournamentName,
+                timeAgo: a.timeAgo || a.TimeAgo,
+                createdOn: a.createdOn || a.CreatedOn,
+                type: a.type || a.Type,
+                hubAvatar: a.hubAvatar || a.HubAvatar,
+                hubAvatarUrl: a.hubAvatarUrl || a.HubAvatarUrl,
+            }));
+        },
+        staleTime: 30_000,
+        refetchOnMount: true,
+    });
+
+    const allMatches = homeMatchesQuery.data ?? EMPTY_MATCHES;
+    const hubActivities = hubActivitiesQuery.data ?? EMPTY_ACTIVITIES;
+
+    const { actionRequiredMatches, myMatches } = useMemo(() => {
+        const openMatches = allMatches.filter((m) => !m.isRoundLocked);
+        return {
+            actionRequiredMatches: openMatches.filter((m) => !m.scheduledTime),
+            myMatches: openMatches.filter((m) => m.scheduledTime),
+        };
+    }, [allMatches]);
+
+    // Bottom tabs keep this screen mounted, so useQuery's `refetchOnMount`
+    // never fires on tab-swap — hooking into useFocusEffect is the equivalent
+    // trigger. We gate on the query's own dataUpdatedAt (>30s) instead of
+    // firing refetch() unconditionally so rapid tab-hopping doesn't hammer the
+    // API — the same 30s ceiling the old useFocusRefetch enforced.
+    useFocusEffect(useCallback(() => {
+        const now = Date.now();
+        const STALE_MS = 30_000;
+        const matchesStamp = homeMatchesQuery.dataUpdatedAt;
+        if (user?.id && (!matchesStamp || now - matchesStamp > STALE_MS)) {
+            homeMatchesQuery.refetch();
         }
-    };
+        const activitiesStamp = hubActivitiesQuery.dataUpdatedAt;
+        if (!activitiesStamp || now - activitiesStamp > STALE_MS) {
+            hubActivitiesQuery.refetch();
+        }
+    }, [
+        user?.id,
+        homeMatchesQuery.refetch,
+        homeMatchesQuery.dataUpdatedAt,
+        hubActivitiesQuery.refetch,
+        hubActivitiesQuery.dataUpdatedAt,
+    ]));
 
-    const loadData = async () => {
-        setLoading(true);
-        await Promise.all([fetchMatches(), fetchHubActivities()]);
-        setLoading(false);
-    };
+    const onRefresh = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+        queryClient.invalidateQueries({ queryKey: ['hub-activities'] });
+    }, [queryClient]);
 
-    // Loads on focus, but skips the refetch when we already pulled fresh data within the
-    // last 30s — bouncing between bottom tabs no longer refires both home requests each time.
-    // Pull-to-refresh (onRefresh → loadData) and match-card updates still force a refresh.
-    useFocusRefetch(loadData, user?.id ?? '');
+    // Stable callback so MatchScheduleCard's React.memo actually skips
+    // re-renders when unrelated Home state changes.
+    const invalidateMatches = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+    }, [queryClient]);
+
+    // Stable so the memoized FeedCard doesn't invalidate on every parent
+    // re-render (badge tick, tab-focus refetch). The inline
+    // `() => openTournament(id)` inside the map still creates a fresh lambda
+    // per row — see other list screens for the same trade-off.
+    const openTournament = useCallback(
+        (id: string) => navigation.navigate('TournamentDetails', { id }),
+        [navigation],
+    );
 
     const greeting = useMemo(() => {
         const h = new Date().getHours();
@@ -167,8 +212,8 @@ export default function HomeScreen() {
                 className="flex-1"
                 refreshControl={
                     <RefreshControl
-                        refreshing={loading}
-                        onRefresh={loadData}
+                        refreshing={homeMatchesQuery.isFetching}
+                        onRefresh={onRefresh}
                         tintColor="#10B981"
                     />
                 }
@@ -239,7 +284,7 @@ export default function HomeScreen() {
                                         opponentNickname={match.opponentNickname}
                                         userNickname={match.userNickname}
                                         status="pending_availability"
-                                        onMatchUpdate={fetchMatches}
+                                        onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
                                     />
                                 ))}
@@ -287,7 +332,7 @@ export default function HomeScreen() {
                                                 })
                                                 : 'TBD'
                                         }
-                                        onMatchUpdate={fetchMatches}
+                                        onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
                                     />
                                 ))}
@@ -333,7 +378,7 @@ export default function HomeScreen() {
                                         timestamp={formatLocalDateTime(item.createdOn)}
                                         onClick={
                                             item.tournamentId
-                                                ? () => navigation.navigate('TournamentDetails', { id: item.tournamentId! })
+                                                ? () => openTournament(item.tournamentId!)
                                                 : undefined
                                         }
                                     />

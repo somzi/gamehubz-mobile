@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { useFocusRefetch } from '../hooks/useFocusRefetch';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -35,11 +35,29 @@ interface Hub {
     logoUrl?: string;
 }
 
+const PAGE_SIZE = 10;
+const EMPTY_HUBS: Hub[] = [];
+
+interface HubsPage {
+    items: Hub[];
+    nextPage: number | undefined;
+}
+
 export default function HubsScreen() {
     const navigation = useNavigation<HubsScreenNavigationProp>();
     const { user } = useAuth();
     const { hubApprovals } = useBadges();
+    const queryClient = useQueryClient();
+
+    // Immediate value drives the input; debounced value drives the query key.
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    useEffect(() => {
+        if (searchQuery === debouncedSearch) return;
+        const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+        return () => clearTimeout(t);
+    }, [searchQuery, debouncedSearch]);
+
     const [activeTab, setActiveTab] = useState('joined');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -48,119 +66,75 @@ export default function HubsScreen() {
     const [hubDescription, setHubDescription] = useState("");
     const [hubIsPublic, setHubIsPublic] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
-
-    const [hubs, setHubs] = useState<Hub[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    // Only for the Create Hub modal — fetch errors surface via hubsQuery.error.
+    const [createHubError, setCreateHubError] = useState<string | null>(null);
 
     // Error modal state (for backend business-rule errors like 'already owns a hub')
     const [errorModal, setErrorModal] = useState<{ title: string; message: string } | null>(null);
 
-    // Pagination State
-    const [pageNumber, setPageNumber] = useState(0);
-    const [hasMoreHubs, setHasMoreHubs] = useState(true);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-    const fetchHubs = async (showLoading = true) => {
-        if (showLoading) setLoading(true);
-        setError(null);
-        setPageNumber(0);
-        setHasMoreHubs(true);
-        try {
-            let apiUrl = ENDPOINTS.HUBS;
-
-            if (user?.id) {
-                if (activeTab === 'joined') {
-                    apiUrl = ENDPOINTS.GET_USER_HUBS(user.id, 0, searchQuery);
-                } else if (activeTab === 'discovery') {
-                    apiUrl = ENDPOINTS.GET_DISCOVERY_HUBS(user.id, 0, searchQuery);
-                }
-            }
-
-            console.log(`Fetching hubs (${activeTab}) from:`, apiUrl);
-
-            const response = await authenticatedFetch(apiUrl);
-
+    // useInfiniteQuery: pages are keyed by (activeTab, debouncedSearch, userId) so
+    // changing any of those isolates a separate cache entry — switching tabs, typing
+    // a new search, or logging in as a different user gets its own paginated stream
+    // without polluting the previous one. Cold-start persistence flows through the
+    // PersistQueryClientProvider in App.tsx, so a killed-and-reopened app paints the
+    // last-seen page instantly.
+    const hubsQuery = useInfiniteQuery<HubsPage>({
+        queryKey: ['hubs', activeTab, debouncedSearch, user?.id],
+        initialPageParam: 0,
+        queryFn: async ({ pageParam }) => {
+            const page = pageParam as number;
+            const uid = user!.id;
+            const url = activeTab === 'joined'
+                ? ENDPOINTS.GET_USER_HUBS(uid, page, debouncedSearch)
+                : ENDPOINTS.GET_DISCOVERY_HUBS(uid, page, debouncedSearch);
+            const response = await authenticatedFetch(url);
             if (!response.ok) {
-                const text = await response.text();
-                console.error('API Error Response:', text);
                 throw new Error(`Failed to fetch hubs: ${response.status}`);
             }
-
             const data = await response.json();
             const resultData = data.result || data;
-            const hubsList = Array.isArray(resultData) ? resultData : (resultData.items || []);
+            const list: Hub[] = Array.isArray(resultData) ? resultData : (resultData.items || []);
+            if (!Array.isArray(list)) throw new Error('Invalid items format received from server');
+            return {
+                items: list,
+                nextPage: list.length === PAGE_SIZE ? page + 1 : undefined,
+            };
+        },
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+        enabled: !!user?.id,
+        staleTime: 30_000,
+        refetchOnMount: true,
+    });
 
-            if (!Array.isArray(hubsList)) {
-                console.error('Invalid data format received:', data);
-                throw new Error('Invalid items format received from server');
-            }
+    const hubs = useMemo(
+        () => hubsQuery.data?.pages.flatMap((p) => p.items) ?? EMPTY_HUBS,
+        [hubsQuery.data],
+    );
 
-            setHubs(hubsList);
-            setHasMoreHubs(hubsList.length === 10); // Assume page size of 10
-        } catch (err) {
-            console.error('Fetch error:', err);
-            setError('Failed to load hubs. Please check your connection.');
-        } finally {
-            setLoading(false);
-            setIsRefreshing(false);
+    // Bottom tabs keep this screen mounted, so useInfiniteQuery's refetchOnMount
+    // never fires on tab-swap. Trigger a background refetch when the top-level
+    // (first-page) data is >30s stale, mirroring the old useFocusRefetch guard.
+    useFocusEffect(useCallback(() => {
+        if (!user?.id) return;
+        const stamp = hubsQuery.dataUpdatedAt;
+        if (!stamp || Date.now() - stamp > 30_000) {
+            hubsQuery.refetch();
         }
-    };
+    }, [user?.id, hubsQuery.refetch, hubsQuery.dataUpdatedAt]));
 
-    // Loads on focus / tab change, but skips the refetch when the same tab was loaded
-    // within 30s so tab-hopping doesn't re-pull the hub list each time. Switching the
-    // joined/discovery tab changes the key and reloads; pull-to-refresh bypasses it.
-    useFocusRefetch(() => fetchHubs(), `${activeTab}:${user?.id ?? ''}`);
+    const onRefresh = useCallback(() => {
+        // Invalidate every ['hubs', ...] entry so both joined and discovery caches
+        // refetch cleanly. Cheap on device because only the currently-mounted key
+        // has active observers and will actually fire.
+        queryClient.invalidateQueries({ queryKey: ['hubs'] });
+    }, [queryClient]);
 
-    const onRefresh = () => {
-        setIsRefreshing(true);
-        fetchHubs(false);
-    };
-
-    const loadMoreHubs = async () => {
-        if (!user?.id || isLoadingMore || !hasMoreHubs) return;
-
-        setIsLoadingMore(true);
-        const nextPage = pageNumber + 1;
-
-        try {
-            let apiUrl = "";
-            if (activeTab === 'joined') {
-                apiUrl = ENDPOINTS.GET_USER_HUBS(user.id, nextPage, searchQuery);
-            } else if (activeTab === 'discovery') {
-                apiUrl = ENDPOINTS.GET_DISCOVERY_HUBS(user.id, nextPage, searchQuery);
-            } else {
-                setHasMoreHubs(false);
-                return;
-            }
-
-            const response = await authenticatedFetch(apiUrl);
-            if (response.ok) {
-                const data = await response.json();
-                const resultData = data.result || data;
-                const hubsList = Array.isArray(resultData) ? resultData : (resultData.items || []);
-
-                if (hubsList.length > 0) {
-                    setHubs(prev => [...prev, ...hubsList]);
-                    setPageNumber(nextPage);
-                    setHasMoreHubs(hubsList.length === 10);
-                } else {
-                    setHasMoreHubs(false);
-                }
-            } else {
-                setHasMoreHubs(false);
-            }
-        } catch (error) {
-            console.error('Error fetching more hubs:', error);
-            setHasMoreHubs(false);
-        } finally {
-            setIsLoadingMore(false);
+    const loadMoreHubs = useCallback(() => {
+        if (hubsQuery.hasNextPage && !hubsQuery.isFetchingNextPage) {
+            hubsQuery.fetchNextPage();
         }
-    };
+    }, [hubsQuery]);
 
-    // Kept for reference — pagination now hangs off FlatList's onEndReached. The old ScrollView
-    // path rendered every hub in the tree, which was noticeably janky for users in many hubs.
     const renderHubItem = useCallback(({ item, index }: { item: Hub; index: number }) => (
         <View className="mb-3">
             <HubCard
@@ -182,12 +156,12 @@ export default function HubsScreen() {
 
     const handleCreateHub = async () => {
         if (!hubName.trim()) {
-            setError('Hub name is required');
+            setCreateHubError('Hub name is required');
             return;
         }
 
         setIsCreating(true);
-        setError(null);
+        setCreateHubError(null);
 
         try {
             const response = await authenticatedFetch(ENDPOINTS.CREATE_HUB, {
@@ -234,7 +208,7 @@ export default function HubsScreen() {
                         message: 'You already own a hub. Each player can only manage one hub at a time.',
                     });
                 } else {
-                    setError(errorMessage);
+                    setCreateHubError(errorMessage);
                 }
                 return;
             }
@@ -244,17 +218,20 @@ export default function HubsScreen() {
             setHubName("");
             setHubDescription("");
             setHubIsPublic(true);
-            fetchHubs(); // Refresh list
+            queryClient.invalidateQueries({ queryKey: ['hubs'] });
         } catch (err: any) {
             console.error('Create hub error:', err);
-            setError(err.message || 'Failed to create hub');
+            setCreateHubError(err.message || 'Failed to create hub');
         } finally {
             setIsCreating(false);
         }
     };
 
+    // SearchInput's onSubmit fires when the user hits enter — the query key already
+    // updates via debounced state, so this is just here to short-circuit the wait
+    // for an eager user who wants results NOW.
     const handleSearch = () => {
-        fetchHubs(true);
+        setDebouncedSearch(searchQuery);
     };
 
     const tabs: PremiumTabItem[] = [
@@ -301,22 +278,22 @@ export default function HubsScreen() {
             </View>
 
             {/* Content */}
-            {loading && !isRefreshing ? (
+            {hubsQuery.isPending && hubs.length === 0 ? (
                 <View className="flex-1 items-center justify-center">
                     <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
                         <ActivityIndicator size="small" color="#818CF8" />
                     </View>
                     <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading hubs...</Text>
                 </View>
-            ) : error ? (
+            ) : hubsQuery.isError && hubs.length === 0 ? (
                 <View className="flex-1 items-center justify-center px-6">
                     <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
                         <Ionicons name="alert-circle" size={28} color="#EF4444" />
                     </View>
                     <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
-                    <Text className="text-xs text-slate-600 text-center mb-5">{error}</Text>
+                    <Text className="text-xs text-slate-600 text-center mb-5">Failed to load hubs. Please check your connection.</Text>
                     <Pressable
-                        onPress={() => fetchHubs()}
+                        onPress={() => hubsQuery.refetch()}
                         className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                     >
                         <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
@@ -324,15 +301,17 @@ export default function HubsScreen() {
                 </View>
             ) : (
                 // FlatList virtualizes rows so a user in dozens of hubs isn't paying the render
-                // cost for every card off-screen. Pagination hangs off onEndReached instead of
-                // the old manual onScroll math.
+                // cost for every card off-screen. Pagination hangs off onEndReached via the
+                // useInfiniteQuery cursor rather than manual page-number bookkeeping.
                 <FlatList
                     data={hubs}
                     keyExtractor={keyExtractor}
                     renderItem={renderHubItem}
                     contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
                     refreshControl={
-                        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#818CF8" />
+                        // isRefetching (not isFetching) so a background paginate doesn't
+                        // spin the pull-to-refresh indicator — that would flicker on scroll.
+                        <RefreshControl refreshing={hubsQuery.isRefetching} onRefresh={onRefresh} tintColor="#818CF8" />
                     }
                     onEndReached={loadMoreHubs}
                     onEndReachedThreshold={0.5}
@@ -363,7 +342,7 @@ export default function HubsScreen() {
                         </View>
                     }
                     ListFooterComponent={
-                        hasMoreHubs && isLoadingMore ? (
+                        hubsQuery.isFetchingNextPage ? (
                             <View className="py-6 items-center justify-center">
                                 <ActivityIndicator size="small" color="#818CF8" />
                             </View>
@@ -397,7 +376,7 @@ export default function HubsScreen() {
                                 </Pressable>
                             </View>
 
-                            {error && <Text className="text-red-400 text-sm font-medium mb-3">{error}</Text>}
+                            {createHubError && <Text className="text-red-400 text-sm font-medium mb-3">{createHubError}</Text>}
 
                             <View className="mb-4">
                                 <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Hub Name</Text>

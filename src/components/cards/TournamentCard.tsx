@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, Image } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
@@ -126,7 +127,9 @@ export const TournamentCard = React.memo(function TournamentCard({
                                     <Image
                                         source={{ uri: hubAvatarUrl }}
                                         style={{ width: '100%', height: '100%' }}
-                                        resizeMode="cover"
+                                        contentFit="cover"
+                                        cachePolicy="memory-disk"
+                                        transition={150}
                                     />
                                     {/* Crisp hairline ring on top of the image so the tile has a clean
                                         cut-out edge against the card instead of a hard square. */}

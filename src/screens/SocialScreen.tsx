@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navig
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, cn } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
@@ -17,6 +18,10 @@ import { useAuth } from '../context/AuthContext';
 type TabKey = 'friends' | 'requests' | 'chats';
 type NavProp = StackNavigationProp<RootStackParamList>;
 type SocialRoute = RouteProp<MainTabParamList, 'Social'>;
+
+// Stable fallback so the derived useMemo below doesn't churn on every render
+// before the first response lands.
+const EMPTY_CHATS: DirectChat[] = [];
 
 export default function SocialScreen() {
     const navigation = useNavigation<NavProp>();
@@ -415,40 +420,53 @@ function RequestsTab() {
 
 function ChatsTab({ navigation }: { navigation: NavProp }) {
     const { user } = useAuth();
-    const [chats, setChats] = useState<DirectChat[]>([]);
+    const queryClient = useQueryClient();
+
+    // Immediate value drives the input; debounced value drives the query key so
+    // we don't fire a fresh network round-trip on every keystroke. Same 300ms
+    // window the old manual load() used, just moved into a single ref.
     const [search, setSearch] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const reqSeqRef = useRef(0);
-
-    const load = useCallback(async (q: string = '') => {
-        const seq = ++reqSeqRef.current;
-        try {
-            const res = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHATS(q));
-            if (seq !== reqSeqRef.current) return;
-            if (res.ok) {
-                const data = await res.json();
-                if (seq !== reqSeqRef.current) return;
-                setChats(Array.isArray(data) ? sortChats(data) : []);
-            }
-        } finally {
-            if (seq === reqSeqRef.current) {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        }
-    }, []);
-
-    // Same pattern: focus loads with the live query; debounce skips initial render.
-    const isFirst = useRef(true);
-    useFocusEffect(useCallback(() => { load(search); }, [load, search]));
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     useEffect(() => {
-        if (isFirst.current) { isFirst.current = false; return; }
-        const t = setTimeout(() => { load(search); }, 300);
+        if (search === debouncedSearch) return;
+        const t = setTimeout(() => setDebouncedSearch(search), 300);
         return () => clearTimeout(t);
-    }, [search, load]);
+    }, [search, debouncedSearch]);
 
-    if (loading) return <Loading />;
+    // Cold-start cache is handled globally by PersistQueryClientProvider in App.tsx —
+    // the last snapshot for each (userId, search) key restores before render, so no
+    // manual hydration effect is needed here.
+    const chatsQuery = useQuery<DirectChat[]>({
+        queryKey: ['direct-chats', user?.id, debouncedSearch],
+        queryFn: async () => {
+            const res = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHATS(debouncedSearch));
+            if (!res.ok) throw new Error(`GET_DIRECT_CHATS failed: ${res.status}`);
+            const data = await res.json();
+            return Array.isArray(data) ? sortChats(data) : [];
+        },
+        enabled: !!user?.id,
+        staleTime: 30_000,
+        refetchOnMount: true,
+    });
+
+    const chats = chatsQuery.data ?? EMPTY_CHATS;
+
+    // Bottom tabs keep this screen mounted, so useQuery's refetchOnMount doesn't
+    // fire on tab-swap. Explicit refetch when the query is stale (>30s) mirrors
+    // the semantics the manual load() had.
+    useFocusEffect(useCallback(() => {
+        if (!user?.id) return;
+        const stamp = chatsQuery.dataUpdatedAt;
+        if (!stamp || Date.now() - stamp > 30_000) {
+            chatsQuery.refetch();
+        }
+    }, [user?.id, chatsQuery.refetch, chatsQuery.dataUpdatedAt]));
+
+    const onRefresh = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+    }, [queryClient]);
+
+    if (chatsQuery.isPending && chats.length === 0) return <Loading />;
 
     return (
         <FlatList
@@ -464,8 +482,10 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
             }
             refreshControl={
                 <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={() => { setRefreshing(true); load(search); }}
+                    // isFetching (not isPending) so pull-to-refresh spins for background
+                    // refetches too, not just the very first load.
+                    refreshing={chatsQuery.isFetching}
+                    onRefresh={onRefresh}
                     tintColor="#10B981"
                 />
             }

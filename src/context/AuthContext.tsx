@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useCallback, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, AuthResponse, UserSocial } from '../types/auth';
 import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToLogout } from '../lib/api';
 import * as SecureStore from 'expo-secure-store';
@@ -49,6 +51,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Push notifications
     const { checkAndSync, requestAndSync } = usePushNotifications();
 
+    // React-query client — used to clear the in-memory query cache on
+    // logout/delete-account so a subsequent login as a DIFFERENT user doesn't
+    // paint the previous user's snapshot from the persisted store on cold-start.
+    const queryClient = useQueryClient();
+
+    // Drop everything the previous session left behind: react-query's in-memory
+    // cache and the on-disk snapshot the PersistQueryClientProvider maintains.
+    // Every screen now flows through react-query (Home, ChatsTab, HubsScreen,
+    // BadgesContext), so clearing these two is enough to guarantee a fresh
+    // login as a DIFFERENT user never paints the previous user's snapshot.
+    const wipeSessionCache = useCallback(async () => {
+        try { queryClient.clear(); } catch { /* best-effort */ }
+        // Persister keeps a single blob under this key; blowing it away means
+        // the next cold start has no snapshot to restore and re-hits the API
+        // freshly (correct behavior for account-switch / delete-account).
+        await AsyncStorage.removeItem('gamehubz-rq-cache').catch(() => {});
+    }, [queryClient]);
+
     useEffect(() => {
         const loadStoredAuth = async () => {
             try {
@@ -77,6 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadStoredAuth();
 
         const unsubscribe = subscribeToLogout(() => {
+            // Force-logout path (401 → refresh failed). Wipe cached data here too so
+            // an expired session can't paint the previous account's snapshot after
+            // the user re-logs in. wipeSessionCache reads no state, only clears the
+            // react-query in-memory cache + AsyncStorage snapshot, so calling it
+            // from this stale-closure callback is safe.
+            wipeSessionCache().catch(() => { });
             _setUser(null);
             setToken(null);
             setRefreshToken(null);
@@ -466,6 +492,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.error('[AuthContext] Logout API error:', error);
             }
         }
+        // Wipe cached data so a subsequent login as a different user doesn't
+        // paint the previous account's snapshot from the persisted store.
+        await wipeSessionCache();
         await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_meta');
@@ -475,7 +504,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(null);
         setRefreshToken(null);
         setAuthToken(null);
-    }, [refreshToken, token]);
+    }, [refreshToken, token, wipeSessionCache]);
 
     const deleteAccount = useCallback(async (): Promise<boolean> => {
         setIsLoading(true);
@@ -485,6 +514,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (response.ok) {
+                await wipeSessionCache();
                 await SecureStore.deleteItemAsync('access_token');
                 await SecureStore.deleteItemAsync('refresh_token');
                 await SecureStore.deleteItemAsync('user_meta');
@@ -501,7 +531,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [wipeSessionCache]);
 
     useEffect(() => {
         setAuthToken(token);

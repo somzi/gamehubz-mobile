@@ -7,8 +7,8 @@ import {
     Pressable,
     Modal,
     AppState,
-    Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -178,7 +178,13 @@ function Avatar({
             }}
         >
             {url ? (
-                <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <Image
+                    source={{ uri: url }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={150}
+                />
             ) : (
                 <Text style={{ color: C.text, fontWeight: '800', fontSize: Math.round(size * 0.38) }}>
                     {initials || '?'}

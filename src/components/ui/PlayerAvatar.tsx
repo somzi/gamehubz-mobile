@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { cn } from '../../lib/utils';
 import { getOptimizedCloudinaryUrl } from '../../lib/image';
 
@@ -52,7 +53,9 @@ export function PlayerAvatar({ src, name, size = "md", className }: PlayerAvatar
                 <Image
                     source={{ uri: optimizedSrc }}
                     style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    transition={150}
                 />
             ) : (
                 <Text className={cn("text-foreground font-semibold", textSizes[size])}>

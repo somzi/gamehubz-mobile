@@ -191,8 +191,16 @@ export const subscribeToLogout = (listener: () => void) => {
 };
 export const triggerLogout = () => { logoutListeners.forEach(l => l()); };
 
+// 15 second network timeout. On a solid connection every real endpoint responds
+// in well under a second; anything past 15s is almost always a hung TLS handshake
+// or a stuck server response that used to leave the UI spinner spinning forever.
+// Timeouts surface as a normal axios error that our interceptors and callers
+// already handle, and react-query will surface the retry-once behaviour on top.
+const NETWORK_TIMEOUT_MS = 15_000;
+
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
+    timeout: NETWORK_TIMEOUT_MS,
 });
 
 apiClient.interceptors.request.use(async (config) => {
@@ -318,11 +326,29 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             // Prefer the in-memory token (same reasoning as the axios interceptor).
             let token = authToken || (await SecureStore.getItemAsync('access_token').catch(() => null));
 
-            let fetchResponse = await fetch(url, {
-                method: options.method || 'POST',
-                headers: buildFormHeaders(token),
-                body: options.body,
-            });
+            // Uploads get a longer timeout than regular JSON calls — 90s covers even a
+            // heavy set of match-evidence screenshots on a slow LTE link. Anything past
+            // that is almost certainly a stuck connection; the AbortController rejects
+            // the fetch with a normal error so the caller can surface it (same code
+            // path as the "Upload failed" branch below).
+            const uploadTimeout = 90_000;
+
+            const doUpload = async (activeToken: string | null) => {
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), uploadTimeout);
+                try {
+                    return await fetch(url, {
+                        method: options.method || 'POST',
+                        headers: buildFormHeaders(activeToken),
+                        body: options.body,
+                        signal: controller.signal,
+                    });
+                } finally {
+                    clearTimeout(timer);
+                }
+            };
+
+            let fetchResponse = await doUpload(token);
 
             // Uploads use raw fetch and so bypass the axios 401→refresh interceptor.
             // Handle the same refresh-and-retry here once, so an expired token mid-upload
@@ -330,11 +356,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             if (fetchResponse.status === 401) {
                 try {
                     const newAccess = await doRefresh();
-                    fetchResponse = await fetch(url, {
-                        method: options.method || 'POST',
-                        headers: buildFormHeaders(newAccess),
-                        body: options.body,
-                    });
+                    fetchResponse = await doUpload(newAccess);
                 } catch {
                     await SecureStore.deleteItemAsync('access_token').catch(() => { });
                     await SecureStore.deleteItemAsync('refresh_token').catch(() => { });

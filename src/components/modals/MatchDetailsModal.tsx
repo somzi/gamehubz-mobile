@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
@@ -962,8 +963,9 @@ export function MatchDetailsModal({
                                             <View className="rounded-2xl overflow-hidden border border-white/5">
                                                 <Image
                                                     source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                                    className="w-36 h-48 bg-muted"
-                                                    resizeMode="cover"
+                                                    style={{ width: 144, height: 192, backgroundColor: '#1E293B' }}
+                                                    contentFit="cover"
+                                                    cachePolicy="memory-disk"
                                                 />
                                             </View>
                                         </Pressable>
@@ -1100,7 +1102,7 @@ export function MatchDetailsModal({
                             {selectedImages.map((img, index) => (
                                 <View key={img.uri + index} className="mr-3 mb-2">
                                     <View className="rounded-2xl overflow-hidden border border-white/5">
-                                        <Image source={{ uri: img.uri }} className="w-20 h-20" />
+                                        <Image source={{ uri: img.uri }} style={{ width: 80, height: 80 }} />
                                     </View>
                                     <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#0B1120] shadow-sm">
                                         <Ionicons name="close" size={10} color="white" />
@@ -1434,8 +1436,9 @@ export function MatchDetailsModal({
                                     <View className="rounded-2xl overflow-hidden border border-white/5">
                                         <Image
                                             source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                            className="w-28 h-40 bg-muted"
-                                            resizeMode="cover"
+                                            style={{ width: 112, height: 160, backgroundColor: '#1E293B' }}
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
                                         />
                                     </View>
                                 </Pressable>
@@ -1468,7 +1471,7 @@ export function MatchDetailsModal({
                                 {selectedImages.map((img, index) => (
                                     <View key={img.uri + index} className="mr-3 mb-2">
                                         <View className="rounded-2xl overflow-hidden border border-white/5">
-                                            <Image source={{ uri: img.uri }} className="w-20 h-20" />
+                                            <Image source={{ uri: img.uri }} style={{ width: 80, height: 80 }} />
                                         </View>
                                         <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-[#0B1120] shadow-sm">
                                             <Ionicons name="close" size={10} color="white" />
@@ -1737,8 +1740,9 @@ export function MatchDetailsModal({
                     {previewImage && (
                         <Image
                             source={{ uri: previewImage }}
-                            className="w-full h-full"
-                            resizeMode="contain"
+                            style={{ width: '100%', height: '100%' }}
+                            contentFit="contain"
+                            cachePolicy="memory-disk"
                         />
                     )}
                 </View>

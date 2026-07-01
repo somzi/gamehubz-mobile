@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { TournamentRegion } from '../types/tournament';
@@ -9,8 +10,7 @@ import { TournamentCard } from '../components/cards/TournamentCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
-import { useFocusRefetch } from '../hooks/useFocusRefetch';
-import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
+import { formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -28,6 +28,11 @@ interface Tournament {
     participantsCount?: number;
 }
 
+interface TournamentsPage {
+    items: any[];
+    nextPage: number | undefined;
+}
+
 const PAGE_SIZE = 10;
 
 const TAB_TO_STATUS: Record<string, number> = {
@@ -37,88 +42,77 @@ const TAB_TO_STATUS: Record<string, number> = {
     'completed': 3,
 };
 
+const EMPTY_TOURNAMENTS: any[] = [];
+
 export default function TournamentsScreen() {
     const navigation = useNavigation<TournamentsScreenNavigationProp>();
     const { user } = useAuth();
+    const queryClient = useQueryClient();
     const insets = useSafeAreaInsets();
 
     const [activeTab, setActiveTab] = useState('live');
 
-    const [tournaments, setTournaments] = useState<Tournament[]>([]);
-    const [page, setPage] = useState(0);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isMoreLoading, setIsMoreLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-
-    const fetchTournaments = async (pageNum: number, shouldAppend = false) => {
-        if (!user?.id) return;
-
-        if (pageNum === 0) setIsLoading(true);
-        else setIsMoreLoading(true);
-
-        setError(null);
-
-        try {
+    // useInfiniteQuery: pages are keyed by (activeTab, userId) so switching tabs
+    // isolates a separate cache entry — the previous tab's page cursor never
+    // leaks into the new one (which used to skip pages when the manual `page`
+    // state carried over). Cold-start persistence flows through the
+    // PersistQueryClientProvider in App.tsx.
+    const tournamentsQuery = useInfiniteQuery<TournamentsPage>({
+        queryKey: ['tournaments', activeTab, user?.id],
+        initialPageParam: 0,
+        queryFn: async ({ pageParam }) => {
+            const page = pageParam as number;
             const status = TAB_TO_STATUS[activeTab] ?? 2;
-            const url = ENDPOINTS.GET_USER_TOURNAMENTS(user.id, status, pageNum, PAGE_SIZE);
-
+            const url = ENDPOINTS.GET_USER_TOURNAMENTS(user!.id, status, page, PAGE_SIZE);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No body');
-                console.error(`Fetch failed with status ${response.status}: ${text}`);
-                throw new Error(`Failed to fetch tournaments (${response.status})`);
+                throw new Error(`Failed to fetch tournaments (${response.status}): ${text}`);
             }
-
             const data = await response.json();
-            // Handle various response structures: PascalCase, camelCase, or nested in 'result'
+            // Backend response has been through several revisions — this accepts each
+            // shape rather than requiring the client to be updated in lockstep.
             const resultData = data.result || data;
             const items = resultData.Tournaments ||
                 resultData.tournaments ||
                 resultData.items ||
                 (Array.isArray(resultData) ? resultData : []);
+            return {
+                items,
+                nextPage: items.length === PAGE_SIZE ? page + 1 : undefined,
+            };
+        },
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+        enabled: !!user?.id,
+        staleTime: 30_000,
+        refetchOnMount: true,
+    });
 
-            if (shouldAppend) {
-                setTournaments(prev => [...prev, ...items]);
-            } else {
-                setTournaments(items);
-                // Reset pagination cursors whenever we replace the list (tab switch,
-                // pull-to-refresh, focus). Without this, a leftover `page` from the
-                // previous tab silently skipped pages on the next loadMore, and a
-                // sticky `hasMore=false` blocked pagination on the new tab entirely.
-                setPage(0);
-            }
+    const tournaments = useMemo(
+        () => tournamentsQuery.data?.pages.flatMap((p) => p.items) ?? EMPTY_TOURNAMENTS,
+        [tournamentsQuery.data],
+    );
 
-            setHasMore(items.length === PAGE_SIZE);
-        } catch (err: any) {
-            console.error('Error fetching tournaments:', err);
-            setError(err.message || 'An unexpected error occurred');
-        } finally {
-            setIsLoading(false);
-            setIsMoreLoading(false);
-            setIsRefreshing(false);
+    // Bottom tabs keep the screen mounted, so refetchOnMount doesn't fire on
+    // tab-swap. Refetch when the first page is >30s stale to mirror the old
+    // useFocusRefetch semantics without paying for a request every focus.
+    useFocusEffect(useCallback(() => {
+        if (!user?.id) return;
+        const stamp = tournamentsQuery.dataUpdatedAt;
+        if (!stamp || Date.now() - stamp > 30_000) {
+            tournamentsQuery.refetch();
         }
-    };
+    }, [user?.id, tournamentsQuery.refetch, tournamentsQuery.dataUpdatedAt]));
 
-    // Loads page 0 on focus / tab change, but skips it when the same tab was loaded within
-    // 30s, so flipping between bottom tabs doesn't re-pull an unchanged list every time.
-    // Switching the status tab changes the key and always reloads; pull-to-refresh bypasses it.
-    useFocusRefetch(() => fetchTournaments(0, false), `${activeTab}:${user?.id ?? ''}`);
+    const onRefresh = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+    }, [queryClient]);
 
-    const onRefresh = () => {
-        setIsRefreshing(true);
-        setPage(0);
-        fetchTournaments(0, false);
-    };
-
-    const loadMore = () => {
-        if (!isLoading && !isMoreLoading && hasMore) {
-            const nextPage = page + 1;
-            setPage(nextPage);
-            fetchTournaments(nextPage, true);
+    const loadMore = useCallback(() => {
+        if (tournamentsQuery.hasNextPage && !tournamentsQuery.isFetchingNextPage) {
+            tournamentsQuery.fetchNextPage();
         }
-    };
+    }, [tournamentsQuery]);
 
     const getRegionName = (region?: number) => {
         switch (region) {
@@ -141,13 +135,19 @@ export default function TournamentsScreen() {
         }
     };
 
-
     const tabs: PremiumTabItem[] = [
         { label: 'Live', value: 'live', icon: 'radio' },
         { label: 'Upcoming', value: 'upcoming', icon: 'time' },
         { label: 'Open', value: 'open', icon: 'add-circle' },
         { label: 'Completed', value: 'completed', icon: 'checkmark-circle' },
     ];
+
+    // Stable so FlatList's PureComponent doesn't invalidate on unrelated parent
+    // re-renders (tab flip, badge push).
+    const keyExtractor = useCallback(
+        (item: any, index: number) => `${item.Id || item.id || 'tournament'}-${index}`,
+        [],
+    );
 
     const renderTournament = useCallback(({ item: tournament, index }: { item: any; index: number }) => (
         <View className="mb-3">
@@ -194,22 +194,24 @@ export default function TournamentsScreen() {
                 />
             </View>
 
-            {isLoading && tournaments.length === 0 ? (
+            {tournamentsQuery.isPending && tournaments.length === 0 ? (
                 <View className="flex-1 items-center justify-center">
                     <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
                         <ActivityIndicator size="small" color="#818CF8" />
                     </View>
                     <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading tournaments...</Text>
                 </View>
-            ) : error && tournaments.length === 0 ? (
+            ) : tournamentsQuery.isError && tournaments.length === 0 ? (
                 <View className="flex-1 items-center justify-center px-6">
                     <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
                         <Ionicons name="alert-circle" size={28} color="#EF4444" />
                     </View>
                     <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
-                    <Text className="text-xs text-slate-600 text-center mb-5">{error}</Text>
+                    <Text className="text-xs text-slate-600 text-center mb-5">
+                        {(tournamentsQuery.error as Error)?.message ?? 'An unexpected error occurred'}
+                    </Text>
                     <Pressable
-                        onPress={() => fetchTournaments(0, false)}
+                        onPress={() => tournamentsQuery.refetch()}
                         className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                     >
                         <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
@@ -218,11 +220,13 @@ export default function TournamentsScreen() {
             ) : (
                 <FlatList
                     data={tournaments}
-                    keyExtractor={(item: any, index) => `${item.Id || item.id || 'tournament'}-${index}`}
+                    keyExtractor={keyExtractor}
                     renderItem={renderTournament}
                     contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
                     refreshControl={
-                        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#818CF8" />
+                        // isRefetching (not isFetching) so a background paginate doesn't
+                        // spin the pull-to-refresh indicator on scroll.
+                        <RefreshControl refreshing={tournamentsQuery.isRefetching} onRefresh={onRefresh} tintColor="#818CF8" />
                     }
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.5}
@@ -236,7 +240,7 @@ export default function TournamentsScreen() {
                         </View>
                     }
                     ListFooterComponent={
-                        isMoreLoading ? (
+                        tournamentsQuery.isFetchingNextPage ? (
                             <View className="py-6 items-center justify-center">
                                 <ActivityIndicator size="small" color="#818CF8" />
                             </View>
