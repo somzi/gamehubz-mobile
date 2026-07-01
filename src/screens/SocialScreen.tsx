@@ -122,11 +122,10 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
         }
     }, []);
 
-    // Focus reloads with the DEBOUNCED query, and the effect below fires the same
-    // query when the debounced value settles. Either can win the race; the seq
-    // guard in load() drops the loser.
+    // Single loader: useFocusEffect re-runs its callback both on focus AND whenever
+    // debouncedSearch changes while focused (typing requires focus), so one effect
+    // covers mount, tab re-entry and search settle without firing duplicates.
     useFocusEffect(useCallback(() => { load(debouncedSearch); }, [load, debouncedSearch]));
-    useEffect(() => { load(debouncedSearch); }, [debouncedSearch, load]);
 
     const openChat = async (friend: Friend) => {
         navigation.navigate('DirectChat', {
@@ -252,9 +251,9 @@ function RequestsTab() {
         }
     }, []);
 
-    // Focus + debounce settle both fetch the debounced query. seq guard drops races.
+    // Single loader — same reasoning as FriendsTab: the focus effect re-runs on
+    // focus and on every debouncedSearch settle, so no separate effect is needed.
     useFocusEffect(useCallback(() => { load(debouncedSearch); }, [load, debouncedSearch]));
-    useEffect(() => { load(debouncedSearch); }, [debouncedSearch, load]);
 
     const accept = async (req: FriendRequest) => {
         try {

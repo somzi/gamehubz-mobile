@@ -1372,15 +1372,12 @@ export default function TournamentDetailsScreen() {
     ) : null;
 
     // Admin inbox for results awaiting approval — sits next to the help-requests pill.
-    // Only shown when the tournament was created with result approval enabled. The badge
-    // count is the single source of truth for the pill — BadgesContext gets a live push
-    // from the server whenever the count changes, so it's the freshest signal we have.
-    // The old Math.max(badge, pendingApprovals.length) fallback caused a real staleness
-    // bug: after approving one item the SignalR push dropped the badge (2 → 1) but the
-    // local pendingApprovals list still held 2 rows until the modal was reopened, so
-    // Math.max shipped the stale "2" back to the UI. Falling back to the list only when
-    // the badge context hasn't hydrated yet (initial < 0 sentinel via -1) keeps the
-    // first-render behaviour without the post-mutation drift.
+    // Only shown when the tournament was created with result approval enabled. The
+    // BadgesContext count is the single source of truth for the pill — it gets a live
+    // SignalR push whenever the count changes. Deliberately NOT Math.max'd with the
+    // locally loaded pendingApprovals list: after an approve, the push drops the badge
+    // but the stale list (only refreshed when the pill is tapped) would keep the old
+    // higher number on screen.
     const approvalsPillCount = pendingApprovalsBadgeCount;
     const approvalsPill = canManage && requiresApproval ? (
         <Pressable
