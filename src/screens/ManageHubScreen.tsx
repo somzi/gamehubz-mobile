@@ -179,7 +179,13 @@ export default function ManageHubScreen() {
         }
     };
 
-    const handleUpdateHub = async (name: string, description: string, isPublic: boolean) => {
+    const handleUpdateHub = async (
+        name: string,
+        description: string,
+        isPublic: boolean,
+        discordWebhookUrl: string,
+        discordNotificationSettings: string,
+    ) => {
         try {
             const response = await authenticatedFetch(ENDPOINTS.UPDATE_HUB, {
                 method: 'POST',
@@ -188,6 +194,9 @@ export default function ManageHubScreen() {
                     name: name,
                     description: description,
                     isPublic: isPublic,
+                    // Empty string = clear the webhook (null would mean "not sent" and preserve it)
+                    discordWebhookUrl: discordWebhookUrl,
+                    discordNotificationSettings: discordNotificationSettings,
                 }),
             });
 
@@ -373,6 +382,8 @@ export default function ManageHubScreen() {
                 initialName={hubData?.name || ''}
                 initialDescription={hubData?.description || ''}
                 initialIsPublic={hubData?.isPublic !== false}
+                initialDiscordWebhookUrl={hubData?.discordWebhookUrl || ''}
+                initialDiscordNotificationSettings={hubData?.discordNotificationSettings || null}
                 onClose={() => setShowEditModal(false)}
                 onSave={handleUpdateHub}
             />
