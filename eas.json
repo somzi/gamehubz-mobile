@@ -7,15 +7,18 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "credentialsSource": "remote"
+      "credentialsSource": "remote",
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
-      "credentialsSource": "remote"
+      "credentialsSource": "remote",
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "credentialsSource": "remote"
+      "credentialsSource": "remote",
+      "channel": "production"
     }
   },
   "submit": {
