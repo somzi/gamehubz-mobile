@@ -129,6 +129,7 @@ export function MatchScheduleCard({
     const commentsScrollRef = useRef<ScrollView>(null);
     const mainScrollViewRef = useRef<ScrollView>(null);
     const connectionRef = useRef<HubConnection | null>(null);
+    const commentInputRef = useRef<TextInput>(null);
 
     // Collapsible sections state
     const [isEvidenceExpanded, setIsEvidenceExpanded] = useState(true);
@@ -219,6 +220,10 @@ export function MatchScheduleCard({
     const handleSendComment = async () => {
         if (!newComment.trim() || !matchId) return;
 
+        // Keep the keyboard up across sends (Discord-style): re-assert focus before the
+        // async round-trip — a no-op when already focused, and it re-opens the keyboard
+        // if a near-miss tap on the message list just dismissed it.
+        commentInputRef.current?.focus();
         setIsSendingComment(true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
@@ -1614,7 +1619,10 @@ export function MatchScheduleCard({
                                                     nestedScrollEnabled
                                                     showsVerticalScrollIndicator={false}
                                                     keyboardShouldPersistTaps="handled"
-                                                    keyboardDismissMode="on-drag"
+                                                    // iOS: 'interactive' (drag down onto the keyboard to dismiss, Discord-style)
+                                                    // so a small scroll while composing doesn't drop the keyboard.
+                                                    // Android doesn't support 'interactive' — keep 'on-drag' there.
+                                                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                                                     contentContainerStyle={{ paddingVertical: 10 }}
                                                     onContentSizeChange={() => commentsScrollRef.current?.scrollToEnd({ animated: false })}
                                                 >
@@ -1707,6 +1715,7 @@ export function MatchScheduleCard({
                                 <View className="p-2 border-t border-white/5 pt-4">
                                     <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
                                         <TextInput
+                                            ref={commentInputRef}
                                             className={cn(
                                                 "flex-1 px-4 py-3 text-white font-medium",
                                             )}
@@ -1722,6 +1731,10 @@ export function MatchScheduleCard({
                                         <Pressable
                                             onPress={handleSendComment}
                                             disabled={!newComment.trim() || isSendingComment}
+                                            // Taps that land a few px above the button hit the message list,
+                                            // which dismisses the keyboard and swallows the tap — extend the
+                                            // touch target so near-misses still send.
+                                            hitSlop={{ top: 14, bottom: 10, left: 6, right: 10 }}
                                             // Background MUST live in className — a function style on Pressable is
                                             // not applied reliably here. bg-emerald-500 (bright green) when there's
                                             // text, bg-white/5 (dark) when empty. Mirrors the friends DM send button.

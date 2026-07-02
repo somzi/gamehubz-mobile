@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
@@ -44,6 +44,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const [loadingEarlier, setLoadingEarlier] = useState(false);
     const scrollRef = useRef<ScrollView>(null);
     const connectionRef = useRef<HubConnection | null>(null);
+    const inputRef = useRef<TextInput>(null);
     // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
     const didInitialScrollRef = useRef(false);
 
@@ -207,6 +208,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
 
     const handleSend = async () => {
         if (!newComment.trim() || !matchId || isSending) return;
+        // Keep the keyboard up across sends (Discord-style): re-assert focus before the
+        // async round-trip — a no-op when already focused, and it re-opens the keyboard
+        // if a near-miss tap on the message list just dismissed it.
+        inputRef.current?.focus();
         setIsSending(true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
@@ -249,7 +254,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     nestedScrollEnabled
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
-                    keyboardDismissMode="on-drag"
+                    // iOS: 'interactive' (drag down onto the keyboard to dismiss, Discord-style)
+                    // so a small scroll while composing doesn't drop the keyboard.
+                    // Android doesn't support 'interactive' — keep 'on-drag' there.
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                     contentContainerStyle={{ paddingVertical: 10 }}
                     onContentSizeChange={() => {
                         if (!didInitialScrollRef.current) {
@@ -354,6 +362,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             <View className="py-3 border-t border-white/5">
                 <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
                     <TextInput
+                        ref={inputRef}
                         className="flex-1 px-4 py-3 text-white font-medium"
                         placeholder="Type a message..."
                         placeholderTextColor="#64748B"
@@ -367,6 +376,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     <Pressable
                         onPress={handleSend}
                         disabled={!newComment.trim() || isSending}
+                        // Taps that land a few px above the button hit the message list,
+                        // which dismisses the keyboard and swallows the tap — extend the
+                        // touch target so near-misses still send.
+                        hitSlop={{ top: 14, bottom: 10, left: 6, right: 10 }}
                         // Background MUST live in className — a function style on Pressable is not
                         // applied reliably here, so bg-emerald-500 (bright green) when there's text,
                         // bg-white/5 (dark) when empty. Mirrors the friends DM send button.

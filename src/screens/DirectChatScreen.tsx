@@ -52,6 +52,7 @@ export default function DirectChatScreen() {
 
     const listRef = useRef<FlatList<DirectMessage>>(null);
     const connectionRef = useRef<HubConnection | null>(null);
+    const inputRef = useRef<TextInput>(null);
     // Guards the one-time scroll-to-bottom on first load so paging in older
     // messages (which grows the list at the top) doesn't yank the view down.
     const didInitialScrollRef = useRef(false);
@@ -296,6 +297,10 @@ export default function DirectChatScreen() {
         if (!chat?.id) return;
         const content = input.trim();
         if (!content || sending) return;
+        // Keep the keyboard up across sends (Discord-style): re-assert focus before the
+        // async round-trip — a no-op when already focused, and it re-opens the keyboard
+        // if a near-miss tap on the message list just dismissed it.
+        inputRef.current?.focus();
         try {
             setSending(true);
             setSendError(null);
@@ -368,6 +373,13 @@ export default function DirectChatScreen() {
                     data={messages}
                     keyExtractor={(m) => m.id}
                     contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}
+                    // Without this the list CAPTURES the first tap while the keyboard is up
+                    // (default 'never'): the keyboard drops and the tap is swallowed, so
+                    // sending took two taps. 'handled' keeps tap-on-list-to-dismiss but
+                    // lets taps land on their targets.
+                    keyboardShouldPersistTaps="handled"
+                    // iOS: drag down onto the keyboard to dismiss (Discord-style).
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                     initialNumToRender={15}
                     maxToRenderPerBatch={15}
                     windowSize={11}
@@ -444,6 +456,7 @@ export default function DirectChatScreen() {
                         style={{ minHeight: 52 }}
                     >
                         <TextInput
+                            ref={inputRef}
                             value={input}
                             onChangeText={setInput}
                             placeholder="Type a message..."
@@ -455,6 +468,10 @@ export default function DirectChatScreen() {
                         <Pressable
                             onPress={send}
                             disabled={!input.trim() || sending}
+                            // Taps that land a few px above the button hit the message list,
+                            // which dismisses the keyboard and swallows the tap — extend the
+                            // touch target so near-misses still send.
+                            hitSlop={{ top: 14, bottom: 10, left: 6, right: 10 }}
                             className={`w-11 h-11 rounded-full items-center justify-center ${
                                 input.trim() && !sending ? 'bg-emerald-500' : 'bg-white/5'
                             }`}
