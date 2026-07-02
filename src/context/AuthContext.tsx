@@ -222,6 +222,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             countryName: apiUser.CountryName ?? apiUser.countryName ?? null,
             countryFlag: apiUser.CountryFlag ?? apiUser.countryFlag ?? null,
             avatarUrl: apiUser.avatarUrl || apiUser.AvatarUrl || apiUser.Avatar || apiUser.avatar || undefined,
+            discordUsername: apiUser.DiscordUsername ?? apiUser.discordUsername ?? null,
+            // Missing (older payloads) counts as enabled — matches the backend default.
+            discordDmEnabled: (apiUser.DiscordDmEnabled ?? apiUser.discordDmEnabled) !== false,
             userSocials: (apiUser.UserSocials || apiUser.userSocials || []).map((s: any) => ({
                 ...s,
                 id: s.Id || s.id,

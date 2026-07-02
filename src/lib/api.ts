@@ -21,6 +21,11 @@ export const ENDPOINTS = {
     GET_PLAYER_STATS: (id: string) => `${API_BASE_URL}/api/UserProfile/v2/${id}/stats`,
     USER_SOCIAL: `${API_BASE_URL}/api/UserSocial`,
     GET_USER_INFO: (id: string) => `${API_BASE_URL}/api/UserProfile/${id}/info`,
+    // Discord bot account link (OAuth runs fully on the backend; the app just opens authorizeUrl).
+    // Link status arrives on GET_USER_INFO as discordUsername + discordDmEnabled.
+    DISCORD_LINK_START: `${API_BASE_URL}/api/Discord/link/start`,
+    DISCORD_UNLINK: `${API_BASE_URL}/api/Discord/link`,
+    DISCORD_DM_ENABLED: `${API_BASE_URL}/api/Discord/dm-enabled`,
     GET_USER_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/joined?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     GET_DISCOVERY_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/discovery?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     GET_PROFILE_TOURNAMENTS: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/UserProfile/${userId}/tournaments?pageNumber=${pageNumber}`,
