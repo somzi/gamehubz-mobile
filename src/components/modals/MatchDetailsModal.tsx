@@ -23,6 +23,10 @@ import { MatchStage } from '../../types/tournament';
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
 export interface MatchResultDetailDto {
+    /** Backend MatchStatus (1 Pending / 2 Scheduled / 3 Live / 4 Completed / 5 NoShow).
+     *  Optional — older backends don't send it; used to detect a completed match when the
+     *  modal was opened from a deep link with no bracket context. */
+    status?: number;
     homeUser: string;
     homeUserId: string;
     awayUser: string;
@@ -228,6 +232,7 @@ export function MatchDetailsModal({
         const hp = sub?.homePlayer || sub?.HomePlayer;
         const ap = sub?.awayPlayer || sub?.AwayPlayer;
         return {
+            status: sub?.status ?? sub?.Status,
             homeUser: hp?.username || hp?.Username || '',
             homeUserId: hp?.userId || hp?.UserId || '',
             awayUser: ap?.username || ap?.Username || '',
@@ -282,6 +287,7 @@ export function MatchDetailsModal({
                     ? mapSubMatchDetails(data, subMatches)
                     : {
                         ...data,
+                        status: data.status ?? data.Status,
                         homeUser: data.homeUser || data.HomeUser || '',
                         homeUserId: data.homeUserId || data.HomeUserId || '',
                         awayUser: data.awayUser || data.AwayUser || '',
@@ -746,11 +752,24 @@ export function MatchDetailsModal({
     const isAway = (away?.userId || matchDetails?.awayUserId)?.toLowerCase() === user?.id?.toLowerCase();
     const isParticipant = !!(isHome || isAway);
 
+    // Deep links (push notifications) open this modal with only a matchId — the parent passes a
+    // bare { id } shell, so the status/home/away props are missing. The /details/full payload is
+    // then the only source of truth: trust its Status when it says Completed (4) so a played
+    // match never renders the empty submit form, and fall back to its pairing for the names the
+    // shell can't provide. Props win when present — bracket taps keep today's behavior.
+    const effectiveStatus: MatchStatus = matchDetails?.status === 4 ? 'completed' : status;
+    const effectiveHome = home ?? (matchDetails?.homeUser
+        ? { userId: matchDetails.homeUserId, username: matchDetails.homeUser, score: null }
+        : undefined);
+    const effectiveAway = away ?? (matchDetails?.awayUser
+        ? { userId: matchDetails.awayUserId, username: matchDetails.awayUser, score: null }
+        : undefined);
+
     // Participants only get Edit/Delete when the result is cleanly revertable (canRevert). Owners/admins
     // also get them when the bracket has progressed downstream — they can cascade-reopen the collateral
     // (handled with a listing confirmation). Byes (a missing side) carry no result to edit.
-    const canEditResult = status === 'completed' && !isEditMode
-        && (canRevert || ((isHubOwner || canManage) && !!home && !!away));
+    const canEditResult = effectiveStatus === 'completed' && !isEditMode
+        && (canRevert || ((isHubOwner || canManage) && !!effectiveHome && !!effectiveAway));
 
     const canSubmit = isParticipant || isHubOwner || canManage;
 
@@ -758,7 +777,7 @@ export function MatchDetailsModal({
     // The tournament setting reaches us either from the parent (bracket structure) or the match details payload.
     const approvalRequired = !!(requireResultApproval || matchDetails?.requireResultApproval);
     const proposedByUserId = matchDetails?.proposedByUserId || null;
-    const hasPendingProposal = approvalRequired && !!proposedByUserId && status !== 'completed';
+    const hasPendingProposal = approvalRequired && !!proposedByUserId && effectiveStatus !== 'completed';
     const isProposer = hasPendingProposal && !!user?.id && proposedByUserId?.toLowerCase() === user.id.toLowerCase();
     const isPrivileged = isHubOwner || canManage;
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
@@ -770,7 +789,7 @@ export function MatchDetailsModal({
     const isEliminationMatch = stage !== undefined && stage !== null && Number(stage) !== MatchStage.GroupStage;
     const hasDownstream = !!nextMatchId || !!nextMatchLoserBracketId;
     const bothPlayersSet = !!(home?.username || matchDetails?.homeUserId) && !!(away?.username || matchDetails?.awayUserId);
-    const canDoubleWalkover = isPrivileged && status !== 'completed' && status !== 'pending_availability'
+    const canDoubleWalkover = isPrivileged && effectiveStatus !== 'completed' && effectiveStatus !== 'pending_availability'
         && isEliminationMatch && hasDownstream && bothPlayersSet;
 
     const adminHelpRequested = !!matchDetails?.adminHelpRequested;
@@ -784,10 +803,10 @@ export function MatchDetailsModal({
     const showChatTab = !isTournamentCompleted && (isParticipant || isPrivileged);
     // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
-    const showStreamTab = status !== 'pending_availability';
+    const showStreamTab = effectiveStatus !== 'pending_availability';
     const hasLiveStream = streams.some(s => s.status === MatchStreamStatus.Live);
     // Completed matches keep the conversation visible but block new messages.
-    const isChatReadOnly = status === 'completed';
+    const isChatReadOnly = effectiveStatus === 'completed';
     const adminHelpRequestedByMe = !!user?.id &&
         matchDetails?.adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase();
 
@@ -1309,9 +1328,9 @@ export function MatchDetailsModal({
                     {/* Players & Score Input */}
                     <View className="flex-row items-center justify-center gap-4">
                         <View className="flex-1 items-center gap-3">
-                            <PlayerAvatar src={homeAvatar} name={home?.username || 'Home'} size="lg" className="rounded-2xl border-0" />
+                            <PlayerAvatar src={homeAvatar} name={effectiveHome?.username || 'Home'} size="lg" className="rounded-2xl border-0" />
                             <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
-                                {home?.username || 'Home'}
+                                {effectiveHome?.username || 'Home'}
                             </Text>
                             <TextInput
                                 className={cn("bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10", !canSubmit && "opacity-40")}
@@ -1329,9 +1348,9 @@ export function MatchDetailsModal({
                             </View>
                         </View>
                         <View className="flex-1 items-center gap-3">
-                            <PlayerAvatar src={awayAvatar} name={away?.username || opponentName || 'Away'} size="lg" className="rounded-2xl border-0" />
+                            <PlayerAvatar src={awayAvatar} name={effectiveAway?.username || opponentName || 'Away'} size="lg" className="rounded-2xl border-0" />
                             <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
-                                {away?.username || opponentName || 'Away'}
+                                {effectiveAway?.username || opponentName || 'Away'}
                             </Text>
                             <TextInput
                                 className={cn("bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10", !canSubmit && "opacity-40")}
@@ -1613,7 +1632,7 @@ export function MatchDetailsModal({
                         <MatchStreamPanel
                             matchId={matchId}
                             isParticipant={isParticipant}
-                            isCompleted={status === 'completed'}
+                            isCompleted={effectiveStatus === 'completed'}
                             currentUserId={user?.id}
                             initialStreams={streams}
                             onStreamsChange={setStreams}
@@ -1652,9 +1671,9 @@ export function MatchDetailsModal({
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 40 }}
                 >
-                    {status === 'completed' ? (
+                    {effectiveStatus === 'completed' ? (
                         renderCompletedMatch()
-                    ) : (status === 'scheduled' || status === 'ready_phase') ? (
+                    ) : (effectiveStatus === 'scheduled' || effectiveStatus === 'ready_phase') ? (
                         renderScheduledMatch()
                     ) : (
                         <View className="flex-1">

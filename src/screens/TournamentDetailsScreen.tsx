@@ -51,7 +51,7 @@ export default function TournamentDetailsScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const route = useRoute<TournamentDetailsRouteProp>();
     const { id } = route.params;
-    const { tournamentApprovals } = useBadges();
+    const { tournamentApprovals, refresh: refreshBadges } = useBadges();
     // Pending team/solo registrations awaiting the organizer's approval — cascaded from the
     // Hubs-tab badge so the Teams/Players tab + Requests sub-tab show a dot before you open them.
     const pendingRegCount = tournamentApprovals(id)?.registrations ?? 0;
@@ -3107,9 +3107,12 @@ export default function TournamentDetailsScreen() {
                     } else {
                         fetchBracket();
                     }
-                    // Approval / admin-help pill counts flow live via BadgesContext (SignalR push),
-                    // so no eager refetch here — the lists themselves are pulled on demand when the
-                    // organizer taps the pills.
+                    // Pill counts (approvals / admin help) come from the BadgesContext cascade.
+                    // The SignalR push covers participants, but an organizer approving someone
+                    // else's result isn't pushed on every path — invalidate eagerly so the
+                    // bracket-tab pill drops the moment the action lands instead of after the
+                    // next background refetch. The lists themselves stay on-demand (pill tap).
+                    refreshBadges();
                 }}
             />
 
