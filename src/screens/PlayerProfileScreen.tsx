@@ -13,7 +13,7 @@ import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
 import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
-import { shareUser } from '../lib/share';
+import { SharePlayerCardModal } from '../components/modals/SharePlayerCardModal';
 import { Button } from '../components/ui/Button';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { FriendActionBar } from '../components/profile/FriendActionBar';
@@ -50,6 +50,7 @@ export default function PlayerProfileScreen() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [shareCardVisible, setShareCardVisible] = useState(false);
 
     // Stable so the memoized TournamentCard doesn't invalidate on every parent
     // re-render (tab-flip, pagination). Per-row inline `() => openTournament(t.id)`
@@ -309,8 +310,8 @@ export default function PlayerProfileScreen() {
         }
     };
 
-    const handleShare = async () => {
-        await shareUser(id, userInfo?.username || userInfo?.nickName);
+    const handleShare = () => {
+        setShareCardVisible(true);
     };
 
     return (
@@ -686,6 +687,22 @@ export default function PlayerProfileScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            <SharePlayerCardModal
+                visible={shareCardVisible}
+                onClose={() => setShareCardVisible(false)}
+                playerId={id}
+                name={userInfo.nickName || userInfo.username || 'Player'}
+                avatarUrl={userInfo.avatarUrl}
+                stats={{
+                    matches: displayData.totalMatches,
+                    winRate: displayData.winPercentage,
+                    wins: displayData.wins,
+                    draws: displayData.draws,
+                    losses: displayData.losses,
+                    trophies: displayData.tournamentsWon,
+                }}
+            />
         </SafeAreaView>
     );
 }

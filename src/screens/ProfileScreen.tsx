@@ -15,7 +15,7 @@ import { PlayerMatchesDto } from '../types/user';
 import { SocialType } from '../types/auth';
 import { cn, parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl } from '../lib/social';
-import { shareUser } from '../lib/share';
+import { SharePlayerCardModal } from '../components/modals/SharePlayerCardModal';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
@@ -43,6 +43,7 @@ export default function ProfileScreen() {
 
     const [isLoadingData, setIsLoadingData] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [shareCardVisible, setShareCardVisible] = useState(false);
 
     // Stable so the memoized TournamentCard doesn't invalidate on every parent
     // re-render (tab-flip, badge tick, pagination). Note: the map below still
@@ -250,7 +251,7 @@ export default function ProfileScreen() {
                 <Text className="text-lg font-black text-white tracking-tight">Profile</Text>
                 <View className="flex-row items-center gap-2">
                     <Pressable
-                        onPress={() => { if (user?.id) shareUser(user.id, user.username); }}
+                        onPress={() => { if (user?.id) setShareCardVisible(true); }}
                         className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
                         accessibilityLabel="Share profile"
                     >
@@ -615,6 +616,24 @@ export default function ProfileScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            {user?.id && (
+                <SharePlayerCardModal
+                    visible={shareCardVisible}
+                    onClose={() => setShareCardVisible(false)}
+                    playerId={user.id}
+                    name={user.nickName || user.username || 'Player'}
+                    avatarUrl={user.avatarUrl}
+                    stats={{
+                        matches: displayData.totalMatches,
+                        winRate: displayData.winPercentage,
+                        wins: displayData.wins,
+                        draws: displayData.draws,
+                        losses: displayData.losses,
+                        trophies: displayData.tournamentsWon,
+                    }}
+                />
+            )}
         </SafeAreaView>
     );
 }
