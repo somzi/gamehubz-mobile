@@ -327,6 +327,9 @@ export function MatchScheduleCard({
                 throw new Error(text || 'Failed to approve result');
             }
             setModalVisible(false);
+            // The consumed proposal drops both this user's "result to confirm" badge and the
+            // organizer pill cascade — refresh eagerly instead of relying on the SignalR push.
+            refreshBadges();
             if (onMatchUpdate) onMatchUpdate();
         } catch (err: any) {
             console.error('[MatchScheduleCard] Approve error:', err);
@@ -351,6 +354,7 @@ export function MatchScheduleCard({
             }
             // Refresh details so the modal returns to the empty-score state and the proposer can resubmit.
             await fetchDbHomeUserId();
+            refreshBadges();
             if (onMatchUpdate) onMatchUpdate();
         } catch (err: any) {
             console.error('[MatchScheduleCard] Reject error:', err);
@@ -1585,7 +1589,7 @@ export function MatchScheduleCard({
                                                     requestedByMe={!!user?.id && adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase()}
                                                     isParticipant={true}
                                                     canResolve={!!user?.id && !!hubOwnerUserId && hubOwnerUserId.toLowerCase() === user.id.toLowerCase()}
-                                                    onChanged={() => { fetchDbHomeUserId(); }}
+                                                    onChanged={() => { fetchDbHomeUserId(); refreshBadges(); }}
                                                 />
                                             </View>
                                         )}

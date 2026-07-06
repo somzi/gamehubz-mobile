@@ -17,7 +17,7 @@ import { useBadges } from '../context/BadgesContext';
 import { SocialLinks } from '../components/profile/SocialLinks';
 import { SocialType } from '../types/auth';
 import { getSocialUrl } from '../lib/social';
-import { shareHub } from '../lib/share';
+import { ShareHubCardModal } from '../components/modals/ShareHubCardModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
@@ -62,6 +62,7 @@ export default function HubProfileScreen() {
     const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(true);
     const [isAboutOpen, setIsAboutOpen] = useState(false);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
+    const [shareCardVisible, setShareCardVisible] = useState(false);
     const [isUnfollowing, setIsUnfollowing] = useState(false);
     const [memberSearch, setMemberSearch] = useState('');
     const [members, setMembers] = useState<any[]>([]);
@@ -451,8 +452,8 @@ export default function HubProfileScreen() {
         );
     }
 
-    const handleShare = async () => {
-        await shareHub(id, hubData?.name);
+    const handleShare = () => {
+        setShareCardVisible(true);
     };
 
     return (
@@ -788,6 +789,21 @@ export default function HubProfileScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            <ShareHubCardModal
+                visible={shareCardVisible}
+                onClose={() => setShareCardVisible(false)}
+                hubId={id}
+                name={hubData.name || 'Hub'}
+                avatarUrl={hubData.avatarUrl || hubData.logoUrl}
+                isVerified={!!(hubData.isVerified || hubData.IsVerified)}
+                isPublic={isPublic}
+                ownerName={hubData.ownerName || hubData.OwnerName || null}
+                stats={{
+                    followers: hubData.numberOfUsers || 0,
+                    tournaments: hubData.numberOfTournaments || 0,
+                }}
+            />
 
             <ConfirmationModal
                 visible={showUnfollowConfirm}

@@ -17,7 +17,7 @@ import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, getCurrencyLabel } from '../lib/utils';
-import { shareTournament } from '../lib/share';
+import { ShareTournamentCardModal } from '../components/modals/ShareTournamentCardModal';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
@@ -142,6 +142,7 @@ export default function TournamentDetailsScreen() {
     const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<'match' | 'chat'>('match');
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [shareCardVisible, setShareCardVisible] = useState(false);
 
     // Team tournament states
     const [showTeamRegistration, setShowTeamRegistration] = useState(false);
@@ -271,9 +272,9 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const handleShare = async () => {
+    const handleShare = () => {
         if (!tournament) return;
-        await shareTournament(id, tournament.name);
+        setShareCardVisible(true);
     };
 
     // Kept as a fallback for older tournaments where v3 hasn't been rolled out to the server
@@ -453,6 +454,11 @@ export default function TournamentDetailsScreen() {
                 awayAvatarUrl: it.awayAvatarUrl ?? it.AwayAvatarUrl ?? null,
             }));
             setPendingApprovals(normalized);
+            // Reconcile the pill/tab badge with the authoritative list just fetched. The badge
+            // cascade normally updates via the BadgesUpdated push, but that push is lost when
+            // the SignalR connection is down (e.g. after an API restart exhausts the automatic
+            // reconnect attempts) — leaving a stale count that this fetch proves wrong.
+            refreshBadges();
         } catch (err) {
             console.error('Pending approvals fetch error:', err);
         } finally {
@@ -1108,7 +1114,11 @@ export default function TournamentDetailsScreen() {
                 RoundNumber: selectedRoundForDeadline.roundNumber,
                 Deadline: deadlineStr ? new Date(deadlineStr.replace(' ', 'T')).toISOString() : null,
                 RoundStart: openAtStr ? new Date(openAtStr.replace(' ', 'T')).toISOString() : null,
-                StageId: selectedRoundForDeadline.stageId ?? null
+                StageId: selectedRoundForDeadline.stageId ?? null,
+                // Declarative save: an empty field in the modal means "no open time" (round is
+                // open) / "no deadline" — without these flags the backend treats null as "keep".
+                ClearRoundStart: !openAtStr,
+                ClearDeadline: !deadlineStr
             };
 
             const response = await authenticatedFetch(ENDPOINTS.SET_ROUND_SCHEDULE(id), {
@@ -3113,6 +3123,10 @@ export default function TournamentDetailsScreen() {
                     // bracket-tab pill drops the moment the action lands instead of after the
                     // next background refetch. The lists themselves stay on-demand (pill tap).
                     refreshBadges();
+                    // The HELP REQUESTS pill renders from this locally fetched list (not the
+                    // cascade), and resolving from the match modal doesn't re-enter the bracket
+                    // tab — refetch it here or the resolved request keeps its pill count.
+                    if (canManage) fetchAdminHelpRequests();
                 }}
             />
 
@@ -3211,6 +3225,27 @@ export default function TournamentDetailsScreen() {
                 onConfirm={handleSwapBracket}
                 busy={isSwapping}
             />
+
+            {tournament && (
+                <ShareTournamentCardModal
+                    visible={shareCardVisible}
+                    onClose={() => setShareCardVisible(false)}
+                    tournamentId={id}
+                    name={tournament.name || 'Tournament'}
+                    status={Number(tournament.status)}
+                    isTeam={!!tournament.isTeamTournament}
+                    participants={tournament.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0)}
+                    teamSize={tournament.teamSize}
+                    prize={tournament.prize && Number(tournament.prize) > 0 ? tournament.prize : null}
+                    prizeCurrency={tournament.prizeCurrency}
+                    format={tournament.format}
+                    startDate={tournament.startDate}
+                    region={tournament.region}
+                    countries={tournament.countries}
+                    countryFlags={tournament.countryFlags}
+                    hubName={tournament.hubName || null}
+                />
+            )}
         </SafeAreaView>
     );
 }

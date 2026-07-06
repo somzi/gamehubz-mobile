@@ -149,7 +149,12 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
                 accessTokenFactory: async () =>
                     (await SecureStore.getItemAsync('access_token').catch(() => null)) ?? '',
             })
-            .withAutomaticReconnect()
+            .withAutomaticReconnect({
+                // The default policy gives up after 4 attempts (~42s), freezing every badge
+                // until the app restarts whenever the API restarts or the network blips for
+                // longer than that. Retry forever with exponential backoff capped at 30s.
+                nextRetryDelayInMilliseconds: (ctx) => Math.min(30_000, 1_000 * Math.pow(2, ctx.previousRetryCount)),
+            })
             .configureLogging(LogLevel.Warning)
             .build();
 
