@@ -6,30 +6,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import Modal from 'react-native-modal';
 import { Ionicons } from '@expo/vector-icons';
 import { translateMessage } from '../../lib/translationApi';
-
-interface Language {
-  label: string;
-  code: string;
-  flag: string;
-}
-
-const LANGUAGES: Language[] = [
-  { label: 'Srpski', code: 'SR', flag: '🇷🇸' },
-  { label: 'English', code: 'EN-US', flag: '🇬🇧' },
-  { label: 'Español', code: 'ES', flag: '🇪🇸' },
-  { label: 'German', code: 'DE', flag: '🇩🇪' },
-  { label: 'French', code: 'FR', flag: '🇫🇷' },
-  { label: 'Hindi', code: 'HI', flag: '🇮🇳' },
-  { label: 'Arabic', code: 'AR', flag: '🇸🇦' },
-  { label: 'Português', code: 'PT-PT', flag: '🇵🇹' },
-  { label: 'Italiano', code: 'IT', flag: '🇮🇹' },
-  { label: 'Türkçe', code: 'TR', flag: '🇹🇷' },
-  { label: 'Русский', code: 'RU', flag: '🇷🇺' },
-  { label: 'Polski', code: 'PL', flag: '🇵🇱' },
-];
+import {
+  Language,
+  TranslateLanguageSheet,
+} from './TranslateLanguageSheet';
 
 export interface ChatMessageProps {
   id: string;
@@ -148,44 +130,12 @@ export function ChatMessage({ text, isOwn }: ChatMessageProps): JSX.Element {
         </View>
       )}
 
-      <Modal
-        isVisible={sheetOpen}
-        onBackdropPress={closeSheet}
-        onBackButtonPress={closeSheet}
-        style={styles.modal}
-        backdropOpacity={0.55}
-        useNativeDriver
-        hideModalContentWhileAnimating
-        animationIn="slideInUp"
-        animationOut="slideOutDown"
-      >
-        <View style={styles.sheet}>
-          <View style={styles.dragHandle} />
-          <Text style={styles.sheetTitle}>Translate to…</Text>
-          {LANGUAGES.map((lang, idx) => (
-            <Pressable
-              key={lang.code}
-              onPress={() => onPickLanguage(lang)}
-              style={[
-                styles.sheetRow,
-                idx === LANGUAGES.length - 1 && styles.sheetRowLast,
-              ]}
-              android_ripple={{ color: '#22304D' }}
-            >
-              <Text style={styles.sheetRowText}>
-                {lang.flag}  {lang.label}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={closeSheet}
-            style={styles.sheetCancel}
-            android_ripple={{ color: '#22304D' }}
-          >
-            <Text style={styles.sheetCancelText}>Cancel</Text>
-          </Pressable>
-        </View>
-      </Modal>
+      <TranslateLanguageSheet
+        visible={sheetOpen}
+        activeCode={translatedLang?.code ?? null}
+        onSelect={onPickLanguage}
+        onClose={closeSheet}
+      />
     </View>
   );
 }
@@ -243,64 +193,5 @@ const styles = StyleSheet.create({
     color: '#7FB0FF',
     fontSize: 11,
     textDecorationLine: 'underline',
-  },
-  modal: {
-    justifyContent: 'flex-end',
-    margin: 0,
-  },
-  sheet: {
-    backgroundColor: '#1C2538',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 28,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#3A4D71',
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  sheetTitle: {
-    color: '#9BA8C2',
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 6,
-    paddingBottom: 14,
-  },
-  sheetRow: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2C3A57',
-  },
-  sheetRowLast: {
-    borderBottomWidth: 0,
-  },
-  sheetRowText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'left',
-  },
-  sheetCancel: {
-    backgroundColor: 'transparent',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#2C3A57',
-    marginTop: 8,
-  },
-  sheetCancelText: {
-    color: '#FF6B6B',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
   },
 });
