@@ -12,7 +12,6 @@ import {
     EmblemRing,
     SideStat,
     StatDivider,
-    StatRing,
     StatPill,
     PosterWordmark,
 } from './ShareCardShell';
@@ -80,6 +79,8 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
     const prizeText = prize != null && String(prize).trim() !== '' ? String(prize).trim() : null;
     const formatLabel = FORMAT_SHORT[Number(format)] ?? 'Custom';
 
+    const currencyLabel = getCurrencyLabel(prizeCurrency);
+
     let regionValue = REGION_SHORT[Number(region)] ?? 'Global';
     let regionLabel = 'REGION';
     if (countries && countries.length === 1) {
@@ -132,13 +133,13 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                     </View>
                 </View>
 
-                {/* Prize takes the ring when there is one; otherwise participants do. */}
-                <View style={{ marginTop: 22, flexDirection: 'row', alignItems: 'center' }}>
+                {/* Prize takes the center column when there is one; otherwise participants do. */}
+                <View style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center' }}>
                     {prizeText ? (
                         <>
                             <SideStat icon="people" iconColor="rgba(129,140,248,0.75)" value={participants} label={participantsLabel} />
                             <StatDivider />
-                            <StatRing value={prizeText} label={`${getCurrencyLabel(prizeCurrency)} PRIZE`.trim()} ringColors={['#FBBF24', '#A78BFA']} valueColor="#FBBF24" />
+                            <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={prizeText} label={`${currencyLabel.toUpperCase()} PRIZE`} valueColor="#FBBF24" />
                             <StatDivider />
                             <SideStat icon="list" iconColor="rgba(167,139,250,0.75)" value={formatLabel} label="FORMAT" valueSize={15} />
                         </>
@@ -146,7 +147,7 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                         <>
                             <SideStat icon="list" iconColor="rgba(167,139,250,0.75)" value={formatLabel} label="FORMAT" valueSize={15} />
                             <StatDivider />
-                            <StatRing value={participants} label={participantsLabel} ringColors={['#A78BFA', '#FBBF24']} />
+                            <SideStat icon="people" iconColor="rgba(129,140,248,0.75)" value={participants} label={participantsLabel} />
                             <StatDivider />
                             <SideStat icon="globe-outline" iconColor="rgba(52,211,153,0.75)" value={regionValue} label={regionLabel} valueSize={16} />
                         </>

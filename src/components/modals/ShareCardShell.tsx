@@ -269,7 +269,12 @@ export function StatRing({ value, label, ringColors, valueColor = '#F8FAFC' }: {
                 >
                     {value}
                 </Text>
-                <Text style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1.4, color: '#64748B', marginTop: 2 }} numberOfLines={1}>{label}</Text>
+                <Text
+                    style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1.4, color: '#64748B', marginTop: 2, lineHeight: 12, maxWidth: size - 32, textAlign: 'center' }}
+                    numberOfLines={2}
+                >
+                    {label}
+                </Text>
             </View>
         </View>
     );
