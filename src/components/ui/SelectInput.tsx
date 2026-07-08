@@ -49,7 +49,7 @@ export function SelectInput({
                 activeOpacity={0.7}
                 onPress={() => setModalVisible(true)}
                 className={`
-                    flex-row items-center w-full h-14 bg-[#131B2E]/50 border rounded-2xl px-4
+                    flex-row items-center w-full h-14 bg-card/50 border rounded-2xl px-4
                     ${error ? 'border-destructive/50' : 'border-white/5'}
                 `}
             >
@@ -91,13 +91,13 @@ export function SelectInput({
                     className="flex-1 bg-black/60 justify-end"
                     onPress={() => setModalVisible(false)}
                 >
-                    <View className="bg-[#0F172A] w-full rounded-t-[32px] border-t border-white/10 overflow-hidden pb-10">
+                    <View className="bg-background w-full rounded-t-[32px] border-t border-white/10 overflow-hidden pb-10">
                         {/* Drag Handle */}
                         <View className="items-center py-3">
                             <View className="w-12 h-1.5 bg-white/10 rounded-full" />
                         </View>
 
-                        <View className="px-6 py-4 flex-row justify-between items-center bg-[#131B2E]/50">
+                        <View className="px-6 py-4 flex-row justify-between items-center bg-card/50">
                             <Text className="text-xl font-black text-white tracking-tight">
                                 {label || 'Select Option'}
                             </Text>

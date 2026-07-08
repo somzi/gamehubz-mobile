@@ -179,7 +179,7 @@ export default function ManageTournamentScreen() {
 
     if (isLoading && !tournament) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]">
+            <SafeAreaView className="flex-1 bg-background">
                 <PageHeader title="Manage Tournament" showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#10B981" />
@@ -193,7 +193,7 @@ export default function ManageTournamentScreen() {
     // actions (delete, cancel) against an id that doesn't exist anymore.
     if (!tournament) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <PageHeader title="Manage Tournament" showBack />
                 <View className="flex-1 items-center justify-center px-8">
                     <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center border border-red-500/20 mb-4">
@@ -208,7 +208,7 @@ export default function ManageTournamentScreen() {
                             onPress={fetchTournamentDetails}
                             className="bg-emerald-500 px-5 py-3 rounded-2xl active:opacity-80"
                         >
-                            <Text className="text-[#0F172A] font-black text-sm uppercase tracking-wider">Retry</Text>
+                            <Text className="text-primary-foreground font-black text-sm uppercase tracking-wider">Retry</Text>
                         </Pressable>
                         <Pressable
                             onPress={() => navigation.goBack()}
@@ -223,7 +223,7 @@ export default function ManageTournamentScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title="Manage Tournament" showBack />
 
             <ScrollView className="flex-1 px-6">

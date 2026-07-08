@@ -209,7 +209,7 @@ export default function EditProfileScreen() {
                         </TouchableOpacity>
                     </View>
                     <Text className="text-xl font-bold text-white mt-3">{user?.username || 'Guest'}</Text>
-                    <Text className="text-gray-500 text-sm">{user?.email || ''}</Text>
+                    <Text className="text-slate-500 text-sm">{user?.email || ''}</Text>
                 </View>
 
                 {/* Settings Menu List */}

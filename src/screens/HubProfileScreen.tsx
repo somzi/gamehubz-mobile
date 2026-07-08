@@ -368,7 +368,7 @@ export default function HubProfileScreen() {
     const renderTournamentList = () => {
         if (tournaments.length === 0 && !isListLoading) {
             return (
-                <View className="bg-[#131B2E] rounded-[24px] p-10 border border-white/5 items-center">
+                <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
                     <Ionicons name="trophy-outline" size={48} color="#1E293B" />
                     <Text className="text-slate-600 mt-4 text-center text-sm">No tournaments found</Text>
                 </View>
@@ -406,7 +406,7 @@ export default function HubProfileScreen() {
 
     if (isLoading) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-row items-center justify-between px-6 py-2">
                     <Pressable
                         onPress={() => navigation.goBack()}
@@ -427,7 +427,7 @@ export default function HubProfileScreen() {
 
     if (error || !hubData) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-row items-center justify-between px-6 py-2">
                     <Pressable
                         onPress={() => navigation.goBack()}
@@ -443,7 +443,7 @@ export default function HubProfileScreen() {
                     <Text className="text-red-400 mt-4 text-center font-medium">{error || 'Hub not found'}</Text>
                     <Pressable
                         onPress={fetchHubDetails}
-                        className="mt-6 bg-[#131B2E] px-8 py-3 rounded-2xl border border-white/5"
+                        className="mt-6 bg-card px-8 py-3 rounded-2xl border border-white/5"
                     >
                         <Text className="text-white font-bold">Retry</Text>
                     </Pressable>
@@ -457,7 +457,7 @@ export default function HubProfileScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             {/* Top Bar */}
             <View className="flex-row items-center justify-between px-6 py-2">
                 <Pressable
@@ -501,15 +501,15 @@ export default function HubProfileScreen() {
             >
                 {/* ─── Unified Hub Hero ─── */}
                 <View className="px-5 mt-4">
-                    <View className="bg-[#131B2E] rounded-[28px] border border-white/5 overflow-hidden">
+                    <View className="bg-card rounded-[28px] border border-white/5 overflow-hidden">
                         {/* Accent gradient bar */}
-                        <View className="h-1.5 bg-[#10B981]" />
+                        <View className="h-1.5 bg-primary" />
 
                         <View className="p-5">
                             {/* Avatar + Name + Stats row */}
                             <View className="flex-row items-center">
                                 <View className="mr-4">
-                                    <View className="p-[3px] rounded-[22px] border-2 border-[#10B981]">
+                                    <View className="p-[3px] rounded-[22px] border-2 border-primary">
                                         <PlayerAvatar
                                             name={hubData.name}
                                             src={hubData.avatarUrl || hubData.logoUrl}
@@ -559,7 +559,7 @@ export default function HubProfileScreen() {
                                     : hasPendingRequest
                                         ? "bg-amber-500/15 border border-amber-500/30"
                                         : isPublic
-                                            ? "bg-[#10B981]"
+                                            ? "bg-primary"
                                             : "bg-amber-500";
                                 const textColor = isFollowing
                                     ? "text-slate-400"
@@ -728,7 +728,7 @@ export default function HubProfileScreen() {
                                     </View>
                                 </View>
 
-                                <View className="bg-[#131B2E] rounded-2xl border border-white/5 overflow-hidden">
+                                <View className="bg-card rounded-2xl border border-white/5 overflow-hidden">
                                     {members.map((member, index) => {
                                         const mId = member.userId || member.UserId;
                                         const mName = member.username || member.Username || 'Unknown';
@@ -781,9 +781,9 @@ export default function HubProfileScreen() {
                                 </View>
                             </>
                         ) : (
-                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 overflow-hidden">
+                            <View className="bg-card rounded-2xl border border-white/5 overflow-hidden">
                                 <View className="py-12 items-center justify-center px-6">
-                                    <View className="w-16 h-16 rounded-2xl bg-[#0F172A] items-center justify-center mb-4 border border-white/5">
+                                    <View className="w-16 h-16 rounded-2xl bg-background items-center justify-center mb-4 border border-white/5">
                                         <Ionicons name="lock-closed-outline" size={28} color="#334155" />
                                     </View>
                                     <Text className="text-white font-black text-lg text-center">Private Content</Text>
@@ -812,9 +812,9 @@ export default function HubProfileScreen() {
                                 {renderTournamentList()}
                             </>
                         ) : (
-                            <View className="bg-[#131B2E] rounded-2xl border border-white/5 overflow-hidden">
+                            <View className="bg-card rounded-2xl border border-white/5 overflow-hidden">
                                 <View className="py-12 items-center justify-center px-6">
-                                    <View className="w-16 h-16 rounded-2xl bg-[#0F172A] items-center justify-center mb-4 border border-white/5">
+                                    <View className="w-16 h-16 rounded-2xl bg-background items-center justify-center mb-4 border border-white/5">
                                         <Ionicons name="lock-closed-outline" size={28} color="#334155" />
                                     </View>
                                     <Text className="text-white font-black text-lg text-center">Private Content</Text>

@@ -439,7 +439,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             <TouchableOpacity
                 onPress={onPress}
                 disabled={disabled}
-                className={`bg-[#131B2E] p-4 h-14 rounded-xl border border-white/10 flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
+                className={`bg-card p-4 h-14 rounded-xl border border-white/10 flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
             >
                 <Text className="text-white text-sm" numberOfLines={1}>{value}</Text>
                 <Ionicons name="chevron-down" size={16} color="#94A3B8" />
@@ -459,7 +459,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         return (
             <Modal visible={visible} transparent animationType="fade">
                 <Pressable className="flex-1 bg-black/60 justify-center px-6" onPress={onCloseModal}>
-                    <View className="bg-[#131B2E] rounded-3xl border border-white/10 max-h-[60%] overflow-hidden shadow-2xl">
+                    <View className="bg-card rounded-3xl border border-white/10 max-h-[60%] overflow-hidden shadow-2xl">
                         <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
                             {options.map(opt => {
                                 const active = multi
@@ -473,7 +473,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             onSelect(opt.value);
                                             if (!multi) onCloseModal();
                                         }}
-                                        className={`p-4 mb-2 rounded-2xl flex-row justify-between items-center ${active ? 'bg-primary' : 'bg-[#1E293B]'}`}
+                                        className={`p-4 mb-2 rounded-2xl flex-row justify-between items-center ${active ? 'bg-primary' : 'bg-card-elevated'}`}
                                     >
                                         <Text className={`${active ? 'text-black' : 'text-white'} font-semibold`}>
                                             {opt.label}
@@ -503,7 +503,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 className="flex-1 bg-black/80 justify-end"
             >
                 <View
-                    className="bg-[#0f172a] w-full rounded-t-[40px] border-t border-white/10 shadow-2xl overflow-hidden"
+                    className="bg-background w-full rounded-t-[40px] border-t border-white/10 shadow-2xl overflow-hidden"
                     style={{ maxHeight: '90%' }}
                 >
                     <View className="flex-row justify-between items-center p-6 border-b border-white/5">
@@ -522,7 +522,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                             <View className="mb-6">
                                 <Text className="text-sm font-bold text-white mb-3">Tournament Name</Text>
                                 <TextInput
-                                    className={`bg-[#131B2E] p-4 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                    className={`bg-card p-4 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                     placeholder="Enter tournament name"
                                     placeholderTextColor="#6b7280"
                                     value={name}
@@ -535,7 +535,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 <Text className="text-sm font-bold text-white mb-3">Description</Text>
                                 <TextInput
                                     multiline
-                                    className="bg-[#131B2E] p-4 h-24 rounded-xl text-white border border-white/10"
+                                    className="bg-card p-4 h-24 rounded-xl text-white border border-white/10"
                                     placeholder="Describe your tournament..."
                                     placeholderTextColor="#6b7280"
                                     textAlignVertical="top"
@@ -548,7 +548,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 <Text className="text-sm font-bold text-white mb-3">Rules</Text>
                                 <TextInput
                                     multiline
-                                    className="bg-[#131B2E] p-4 h-24 rounded-xl text-white border border-white/10"
+                                    className="bg-card p-4 h-24 rounded-xl text-white border border-white/10"
                                     placeholder="Tournament rules..."
                                     placeholderTextColor="#6b7280"
                                     textAlignVertical="top"
@@ -561,7 +561,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 <View className="flex-1">
                                     <Text className="text-sm font-bold text-white mb-3">Prize Pool</Text>
                                     <TextInput
-                                        className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                        className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                         placeholder="Amount"
                                         placeholderTextColor="#6b7280"
                                         keyboardType="numeric"
@@ -582,20 +582,20 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <Ionicons name="globe-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                     <Text className="text-sm font-bold text-white">Tournament Scope</Text>
                                 </View>
-                                <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 mb-3 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 mb-3 ${!canEditAll ? 'opacity-50' : ''}`}>
                                     <Pressable
                                         onPress={() => { if (canEditAll) setScopeMode('region'); }}
                                         disabled={!canEditAll}
                                         className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'region' ? 'bg-primary' : ''}`}
                                     >
-                                        <Text className={`text-sm font-bold ${scopeMode === 'region' ? 'text-[#0F172A]' : 'text-slate-400'}`}>By Region</Text>
+                                        <Text className={`text-sm font-bold ${scopeMode === 'region' ? 'text-primary-foreground' : 'text-slate-400'}`}>By Region</Text>
                                     </Pressable>
                                     <Pressable
                                         onPress={() => { if (canEditAll) setScopeMode('country'); }}
                                         disabled={!canEditAll}
                                         className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'country' ? 'bg-primary' : ''}`}
                                     >
-                                        <Text className={`text-sm font-bold ${scopeMode === 'country' ? 'text-[#0F172A]' : 'text-slate-400'}`}>By Country</Text>
+                                        <Text className={`text-sm font-bold ${scopeMode === 'country' ? 'text-primary-foreground' : 'text-slate-400'}`}>By Country</Text>
                                     </Pressable>
                                 </View>
 
@@ -619,7 +619,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 <View className="flex-1">
                                     <Text className="text-sm font-bold text-white mb-3">Max Players *</Text>
                                     <TextInput
-                                        className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                        className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                         placeholder="e.g. 16"
                                         placeholderTextColor="#6b7280"
                                         keyboardType="numeric"
@@ -643,7 +643,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             <Text className="text-sm font-bold text-white">{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
                                         </View>
                                         <TextInput
-                                            className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 text-sm ${!canEditAll ? 'opacity-50' : ''}`}
+                                            className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 text-sm ${!canEditAll ? 'opacity-50' : ''}`}
                                             placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
                                             placeholderTextColor="#6b7280"
                                             keyboardType="numeric"
@@ -660,7 +660,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <TouchableOpacity
                                             onPress={() => { if (canEditAll) setShowTeamWinConditionPicker(true); }}
                                             disabled={!canEditAll}
-                                            className={`bg-[#131B2E] px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
+                                            className={`bg-card px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
                                         >
                                             <Text className="text-white text-sm" numberOfLines={1}>
                                                 {teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select'}
@@ -676,7 +676,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <View className="flex-1">
                                         <Text className="text-sm font-bold text-white mb-3">Groups Count</Text>
                                         <TextInput
-                                            className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                            className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                             placeholder="e.g. 4"
                                             placeholderTextColor="#6b7280"
                                             keyboardType="numeric"
@@ -688,7 +688,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <View className="flex-1">
                                         <Text className="text-sm font-bold text-white mb-3">Qualifiers / Group</Text>
                                         <TextInput
-                                            className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                            className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                             placeholder="e.g. 2"
                                             placeholderTextColor="#6b7280"
                                             keyboardType="numeric"
@@ -706,7 +706,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <View className="flex-1">
                                             <Text className="text-sm font-bold text-white mb-3">Swiss Rounds</Text>
                                             <TextInput
-                                                className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                                className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                                 placeholder="Auto"
                                                 placeholderTextColor="#6b7280"
                                                 keyboardType="numeric"
@@ -730,7 +730,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <View>
                                             <Text className="text-sm font-bold text-white mb-3">Direct Qualifiers (optional play-in)</Text>
                                             <TextInput
-                                                className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                                className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                                 placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
                                                 placeholderTextColor="#6b7280"
                                                 keyboardType="numeric"
@@ -754,7 +754,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <View className="flex-row gap-4">
                                         <View className="flex-1">
                                             <TextInput
-                                                className={`bg-[#131B2E] px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
+                                                className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
                                                 placeholder="e.g. 2"
                                                 placeholderTextColor="#6b7280"
                                                 keyboardType="numeric"
@@ -766,7 +766,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <TouchableOpacity
                                             onPress={() => { if (canEditAll) setShowDurationUnitPicker(true); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 bg-[#131B2E] px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
+                                            className={`flex-1 bg-card px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
                                         >
                                             <Text className="text-white font-medium">{roundDurationUnit}</Text>
                                             <Ionicons name="chevron-down" size={20} color="#94A3B8" />
@@ -782,10 +782,10 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 </View>
                                 {/* Approval can be toggled any time — even mid-tournament — since it only
                                     affects how future results are confirmed, not the bracket structure. */}
-                                <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+                                <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
                                     <Pressable
                                         onPress={() => setRequireResultApproval(false)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-indigo-600' : ''}`}
                                     >
                                         <Text className={`text-xs font-bold tracking-wide ${!requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
                                             NO
@@ -793,7 +793,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     </Pressable>
                                     <Pressable
                                         onPress={() => setRequireResultApproval(true)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-[#4F46E5]' : ''}`}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-indigo-600' : ''}`}
                                     >
                                         <Text className={`text-xs font-bold tracking-wide ${requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
                                             YES
@@ -810,11 +810,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <Ionicons name="sparkles-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                     <Text className="text-sm font-bold text-white">Exclusive Members Only</Text>
                                 </View>
-                                <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
                                     <Pressable
                                         onPress={() => { if (canEditAll) setIsExclusive(false); }}
                                         disabled={!canEditAll}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isExclusive ? 'bg-[#4F46E5]' : ''}`}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isExclusive ? 'bg-indigo-600' : ''}`}
                                     >
                                         <Text className={`text-xs font-bold tracking-wide ${!isExclusive ? 'text-white' : 'text-zinc-500'}`}>
                                             NO
@@ -823,7 +823,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <Pressable
                                         onPress={() => { if (canEditAll) setIsExclusive(true); }}
                                         disabled={!canEditAll}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isExclusive ? 'bg-[#4F46E5]' : ''}`}
+                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isExclusive ? 'bg-indigo-600' : ''}`}
                                     >
                                         <Text className={`text-xs font-bold tracking-wide ${isExclusive ? 'text-white' : 'text-zinc-500'}`}>
                                             YES
@@ -841,11 +841,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                         <Text className="text-sm font-bold text-white">Double Round Robin</Text>
                                     </View>
-                                    <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                    <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
                                         <Pressable
                                             onPress={() => { if (canEditAll) setDoubleRoundRobin(false); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!doubleRoundRobin ? 'bg-[#4F46E5]' : ''}`}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!doubleRoundRobin ? 'bg-indigo-600' : ''}`}
                                         >
                                             <Text className={`text-xs font-bold tracking-wide ${!doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
                                                 NO
@@ -854,7 +854,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <Pressable
                                             onPress={() => { if (canEditAll) setDoubleRoundRobin(true); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${doubleRoundRobin ? 'bg-[#4F46E5]' : ''}`}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${doubleRoundRobin ? 'bg-indigo-600' : ''}`}
                                         >
                                             <Text className={`text-xs font-bold tracking-wide ${doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
                                                 YES
@@ -873,11 +873,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                         <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
                                     </View>
-                                    <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                    <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
                                         <Pressable
                                             onPress={() => { if (canEditAll) setKnockoutType('1'); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '1' ? 'bg-[#4F46E5]' : ''}`}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '1' ? 'bg-indigo-600' : ''}`}
                                         >
                                             <Text className={`text-xs font-bold tracking-wide ${knockoutType === '1' ? 'text-white' : 'text-zinc-500'}`}>
                                                 SINGLE
@@ -886,7 +886,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <Pressable
                                             onPress={() => { if (canEditAll) setKnockoutType('2'); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '2' ? 'bg-[#4F46E5]' : ''}`}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '2' ? 'bg-indigo-600' : ''}`}
                                         >
                                             <Text className={`text-xs font-bold tracking-wide ${knockoutType === '2' ? 'text-white' : 'text-zinc-500'}`}>
                                                 DOUBLE
@@ -905,11 +905,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <Ionicons name="medal-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                         <Text className="text-sm font-bold text-white">Third Place Match</Text>
                                     </View>
-                                    <View className={`bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
+                                    <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
                                         <Pressable
                                             onPress={() => { if (canEditAll) setHasThirdPlaceMatch(false); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!hasThirdPlaceMatch ? 'bg-[#4F46E5]' : ''}`}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!hasThirdPlaceMatch ? 'bg-indigo-600' : ''}`}
                                         >
                                             <Text className={`text-xs font-bold tracking-wide ${!hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
                                                 NO
@@ -918,7 +918,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <Pressable
                                             onPress={() => { if (canEditAll) setHasThirdPlaceMatch(true); }}
                                             disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${hasThirdPlaceMatch ? 'bg-[#4F46E5]' : ''}`}
+                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${hasThirdPlaceMatch ? 'bg-indigo-600' : ''}`}
                                         >
                                             <Text className={`text-xs font-bold tracking-wide ${hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
                                                 YES
@@ -937,7 +937,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <TouchableOpacity
                                         onPress={() => setShowStartDatePicker(true)}
                                         disabled={!canEditAll}
-                                        className={`bg-[#131B2E] px-4 h-14 rounded-xl border border-white/10 justify-center ${!canEditAll ? 'opacity-50' : ''}`}
+                                        className={`bg-card px-4 h-14 rounded-xl border border-white/10 justify-center ${!canEditAll ? 'opacity-50' : ''}`}
                                     >
                                         <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
                                             {startDate ? new Date(startDate).toLocaleString() : 'Select Start Date'}
@@ -949,7 +949,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                     <TouchableOpacity
                                         onPress={() => setShowRegDeadlinePicker(true)}
                                         disabled={!canEditDeadline}
-                                        className={`bg-[#131B2E] px-4 h-14 rounded-xl border border-white/10 justify-center ${!canEditDeadline ? 'opacity-50' : ''}`}
+                                        className={`bg-card px-4 h-14 rounded-xl border border-white/10 justify-center ${!canEditDeadline ? 'opacity-50' : ''}`}
                                     >
                                         <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
                                             {registrationDeadline ? new Date(registrationDeadline).toLocaleString() : 'Select Deadline'}
@@ -962,7 +962,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                         </View>
                     </ScrollView>
 
-                    <View className="p-6 bg-[#131B2E] border-t border-white/5" style={{ paddingBottom: insets.bottom + 20 }}>
+                    <View className="p-6 bg-card border-t border-white/5" style={{ paddingBottom: insets.bottom + 20 }}>
                         {error && (
                             <Text className="text-red-500 text-xs mb-4 text-center">{error}</Text>
                         )}

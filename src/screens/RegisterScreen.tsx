@@ -151,7 +151,7 @@ export default function RegisterScreen() {
                                 className="absolute -inset-4 bg-primary opacity-20 rounded-full" 
                                 style={{ transform: [{ scale: 1.1 }] }}
                             />
-                            <View className="w-20 h-20 bg-[#131B2E] rounded-[28px] items-center justify-center border border-white/10 shadow-xl shadow-primary/20">
+                            <View className="w-20 h-20 bg-card rounded-[28px] items-center justify-center border border-white/10 shadow-xl shadow-primary/20">
                                 <View className="w-14 h-14 bg-primary/10 rounded-[20px] items-center justify-center">
                                     <Ionicons name="person-add" size={32} color="#10B981" />
                                 </View>

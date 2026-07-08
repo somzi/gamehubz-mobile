@@ -542,7 +542,7 @@ function TwitchHighlighterButton({ stream }: { stream: MatchStream }) {
 function PendingReplay({ channelUrl }: { channelUrl?: string | null }) {
     return (
         <View
-            className="rounded-2xl border border-white/[0.06] bg-[#0B1120] items-center justify-center px-5"
+            className="rounded-2xl border border-white/[0.06] bg-background-deep items-center justify-center px-5"
             style={{ aspectRatio: 16 / 9 }}
         >
             <View className="w-12 h-12 rounded-2xl bg-yellow-500/10 items-center justify-center mb-3">
@@ -600,7 +600,7 @@ function StartArea({
                                 key={`${c.platform}-${c.username}`}
                                 disabled={submitting}
                                 onPress={() => onStart(c.platform, c.username)}
-                                className="flex-row items-center gap-3 p-4 rounded-2xl bg-[#131B2E] border border-white/[0.06] active:opacity-70"
+                                className="flex-row items-center gap-3 p-4 rounded-2xl bg-card border border-white/[0.06] active:opacity-70"
                             >
                                 <View className="w-10 h-10 rounded-2xl items-center justify-center" style={{ backgroundColor: `${meta.color}1A` }}>
                                     <PlatformIcon platform={c.platform} size={20} color={meta.color} />
@@ -619,7 +619,7 @@ function StartArea({
                     </Pressable>
                 </View>
             ) : (
-                <View className="p-4 rounded-2xl bg-[#131B2E] border border-white/[0.06] gap-3">
+                <View className="p-4 rounded-2xl bg-card border border-white/[0.06] gap-3">
                     <SelectInput placeholder="Select platform" options={platformOptions} value={platform} onSelect={setPlatform} />
                     {platform !== undefined && (
                         <Input placeholder="Your channel / handle" value={handle} onChangeText={setHandle} autoCapitalize="none" />

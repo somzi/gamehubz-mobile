@@ -38,7 +38,7 @@ export function CountryListModal({ visible, onClose, codes, title = 'Eligible Co
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
             <Pressable className="flex-1 bg-black/60 justify-end" onPress={onClose}>
                 <Pressable
-                    className="bg-[#0F172A] w-full rounded-t-[32px] border-t border-white/10 overflow-hidden"
+                    className="bg-background w-full rounded-t-[32px] border-t border-white/10 overflow-hidden"
                     style={{ height: '70%' }}
                     onPress={() => { /* swallow taps inside */ }}
                 >
@@ -46,11 +46,11 @@ export function CountryListModal({ visible, onClose, codes, title = 'Eligible Co
                         <View className="w-12 h-1.5 bg-white/10 rounded-full" />
                     </View>
 
-                    <View className="px-6 py-3 flex-row justify-between items-center bg-[#131B2E]/50">
+                    <View className="px-6 py-3 flex-row justify-between items-center bg-card/50">
                         <View className="flex-row items-center gap-2.5">
                             <Text className="text-xl font-black text-white tracking-tight">{title}</Text>
-                            <View className="bg-[#10B981]/15 px-2.5 py-0.5 rounded-full">
-                                <Text className="text-[#10B981] text-xs font-black">{codes.length}</Text>
+                            <View className="bg-primary/15 px-2.5 py-0.5 rounded-full">
+                                <Text className="text-primary text-xs font-black">{codes.length}</Text>
                             </View>
                         </View>
                         <TouchableOpacity
@@ -63,7 +63,7 @@ export function CountryListModal({ visible, onClose, codes, title = 'Eligible Co
 
                     {showSearch && (
                         <View className="px-4 pt-3 pb-1">
-                            <View className="flex-row items-center bg-[#131B2E] border border-white/5 rounded-2xl px-4 h-12">
+                            <View className="flex-row items-center bg-card border border-white/5 rounded-2xl px-4 h-12">
                                 <Ionicons name="search" size={18} color="#64748B" />
                                 <TextInput
                                     value={search}

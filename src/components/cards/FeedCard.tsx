@@ -36,7 +36,7 @@ export const FeedCard = React.memo(function FeedCard({
             <Pressable
                 onPress={onClick}
                 className={cn(
-                    'w-[260px] bg-[#131B2E] rounded-3xl p-5 mr-3 active:opacity-90',
+                    'w-[260px] bg-card rounded-3xl p-5 mr-3 active:opacity-90',
                     className
                 )}
             >

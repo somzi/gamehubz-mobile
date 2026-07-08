@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
 
 interface SearchInputProps {
     value: string;
@@ -31,7 +32,7 @@ export function SearchInput({ value, onChange, onSubmit, placeholder, className 
                     onPress={onSubmit}
                     className="absolute right-3 p-1 rounded-lg bg-primary/20"
                 >
-                    <Ionicons name="arrow-forward" size={18} color="#8B5CF6" />
+                    <Ionicons name="arrow-forward" size={18} color={COLORS.primary} />
                 </Pressable>
             )}
         </View>

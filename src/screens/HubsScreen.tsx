@@ -242,7 +242,7 @@ export default function HubsScreen() {
     ];
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             {/* Premium header */}
             <View className="px-6 pt-4 pb-2">
                 <View className="flex-row items-center justify-between">

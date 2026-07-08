@@ -995,13 +995,13 @@ export function MatchScheduleCard({
                 statusBarTranslucent={true}
             >
                 <View
-                    className={cn("flex-1", isPremium ? "bg-[#0B1120]" : "bg-background")}
+                    className={cn("flex-1", isPremium ? "bg-background-deep" : "bg-background")}
                     style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 >
                     <KeyboardWrapper {...keyboardWrapperProps}>
                         <View className={cn(
                             "flex-1 px-5 pt-5",
-                            isPremium ? "bg-[#0B1120]" : "bg-card"
+                            isPremium ? "bg-background-deep" : "bg-card"
                         )}>
                             {/* Drag Handle */}
                             <View className="w-10 h-1 bg-white/10 rounded-full self-center mb-4" />
@@ -1169,11 +1169,11 @@ export function MatchScheduleCard({
                                                 {hasPendingProposal && !isEditingProposal && (
                                                     <View className={cn(
                                                         "rounded-[20px] p-4",
-                                                        isPremium ? "bg-[#131B2E]/60 border border-white/[0.06]" : "bg-muted/10 border border-border/10"
+                                                        isPremium ? "bg-card/60 border border-white/[0.06]" : "bg-muted/10 border border-border/10"
                                                     )}>
                                                         <View className="items-center mb-3">
-                                                            <View className="bg-[#F59E0B]/10 px-3 py-1 rounded-full">
-                                                                <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-[3px]">
+                                                            <View className="bg-warning/10 px-3 py-1 rounded-full">
+                                                                <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">
                                                                     {isProposer ? 'Awaiting Approval' : 'Result Reported'}
                                                                 </Text>
                                                             </View>
@@ -1188,11 +1188,11 @@ export function MatchScheduleCard({
                                                         </View>
 
                                                         <View className="flex-row items-center justify-center gap-3">
-                                                            <Text className="text-4xl font-black text-[#F59E0B]">
+                                                            <Text className="text-4xl font-black text-warning">
                                                                 {visualLeftScore ?? 0}
                                                             </Text>
                                                             <Text className="text-xl font-black text-white/20">:</Text>
-                                                            <Text className="text-4xl font-black text-[#F59E0B]">
+                                                            <Text className="text-4xl font-black text-warning">
                                                                 {visualRightScore ?? 0}
                                                             </Text>
                                                         </View>
@@ -1216,12 +1216,12 @@ export function MatchScheduleCard({
                                                                     <Pressable
                                                                         onPress={handleApproveProposal}
                                                                         disabled={isApproving || isRejecting}
-                                                                        className="flex-1 bg-[#10B981] rounded-2xl py-3 items-center active:opacity-80"
+                                                                        className="flex-1 bg-primary rounded-2xl py-3 items-center active:opacity-80"
                                                                     >
                                                                         {isApproving ? (
                                                                             <ActivityIndicator size="small" color="#0F172A" />
                                                                         ) : (
-                                                                            <Text className="text-xs font-black text-[#0F172A] uppercase tracking-wider">Approve</Text>
+                                                                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">Approve</Text>
                                                                         )}
                                                                     </Pressable>
                                                                 )}
@@ -1232,9 +1232,9 @@ export function MatchScheduleCard({
                                                                             setAwayScore(String(visualRightScore ?? ''));
                                                                             setIsEditingProposal(true);
                                                                         }}
-                                                                        className="flex-1 bg-[#F59E0B]/10 border border-[#F59E0B]/25 rounded-2xl py-3 items-center active:opacity-70"
+                                                                        className="flex-1 bg-warning/10 border border-warning/25 rounded-2xl py-3 items-center active:opacity-70"
                                                                     >
-                                                                        <Text className="text-xs font-black text-[#F59E0B] uppercase tracking-wider">Edit</Text>
+                                                                        <Text className="text-xs font-black text-warning uppercase tracking-wider">Edit</Text>
                                                                     </Pressable>
                                                                 )}
                                                             </View>
@@ -1271,13 +1271,13 @@ export function MatchScheduleCard({
                                                 {isEditingProposal && (
                                                     <View className={cn(
                                                         "rounded-[20px] p-4 flex-row items-center gap-3",
-                                                        isPremium ? "bg-[#F59E0B]/[0.08] border border-[#F59E0B]/20" : "bg-[#F59E0B]/10 border border-[#F59E0B]/20"
+                                                        isPremium ? "bg-warning/[0.08] border border-warning/20" : "bg-warning/10 border border-warning/20"
                                                     )}>
-                                                        <View className="w-10 h-10 rounded-2xl bg-[#F59E0B]/15 items-center justify-center">
+                                                        <View className="w-10 h-10 rounded-2xl bg-warning/15 items-center justify-center">
                                                             <Ionicons name="create-outline" size={18} color="#F59E0B" />
                                                         </View>
                                                         <View className="flex-1">
-                                                            <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-[2px]">Editing Your Report</Text>
+                                                            <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">Editing Your Report</Text>
                                                             <Text className={cn(
                                                                 "text-[11px] mt-0.5",
                                                                 isPremium ? "text-slate-400" : "text-muted-foreground"
@@ -1290,7 +1290,7 @@ export function MatchScheduleCard({
                                                 {/* Players VS Section */}
                                                 <View className={cn(
                                                     "rounded-[20px] p-4 pt-6",
-                                                    isPremium ? "bg-[#131B2E]/60 border border-white/[0.04]" : "bg-muted/5"
+                                                    isPremium ? "bg-card/60 border border-white/[0.04]" : "bg-muted/5"
                                                 )}>
                                                     <View className="flex-row items-center justify-between pb-2">
                                                         {/* Home Player (You) */}
@@ -1303,7 +1303,7 @@ export function MatchScheduleCard({
                                                                     src={user?.avatarUrl}
                                                                     name={user?.username || 'You'}
                                                                     size={isPremium ? "xl" : "lg"}
-                                                                    className={cn(isPremium ? "border-2 border-[#0B1120]" : "")}
+                                                                    className={cn(isPremium ? "border-2 border-background-deep" : "")}
                                                                 />
                                                             </View>
                                                             <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
@@ -1322,7 +1322,7 @@ export function MatchScheduleCard({
                                                                     className={cn(
                                                                         "w-full text-center font-black",
                                                                         isPremium
-                                                                            ? "bg-[#0B1120] h-14 rounded-2xl text-2xl text-[#10B981] border border-white/[0.06]"
+                                                                            ? "bg-background-deep h-14 rounded-2xl text-2xl text-primary border border-white/[0.06]"
                                                                             : "bg-muted/30 h-12 rounded-2xl text-lg text-foreground border-border/10"
                                                                     )}
                                                                     placeholder="0"
@@ -1358,7 +1358,7 @@ export function MatchScheduleCard({
                                                                     src={opponentAvatarUrl}
                                                                     name={opponentName}
                                                                     size={isPremium ? "xl" : "lg"}
-                                                                    className={cn(isPremium ? "border-2 border-[#0B1120]" : "")}
+                                                                    className={cn(isPremium ? "border-2 border-background-deep" : "")}
                                                                 />
                                                             </View>
                                                             <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
@@ -1377,7 +1377,7 @@ export function MatchScheduleCard({
                                                                     className={cn(
                                                                         "w-full text-center font-black",
                                                                         isPremium
-                                                                            ? "bg-[#0B1120] h-14 rounded-2xl text-2xl text-white border border-white/[0.06]"
+                                                                            ? "bg-background-deep h-14 rounded-2xl text-2xl text-white border border-white/[0.06]"
                                                                             : "bg-muted/30 h-12 rounded-2xl text-lg text-foreground border-border/10"
                                                                     )}
                                                                     placeholder="0"
@@ -1450,7 +1450,7 @@ export function MatchScheduleCard({
                                                     adding screenshots and the opponent can verify before approving. */}
                                                 <View className={cn(
                                                     "rounded-[20px] p-4",
-                                                    isPremium ? "bg-[#131B2E]/60 border border-white/[0.04]" : "bg-muted/5"
+                                                    isPremium ? "bg-card/60 border border-white/[0.04]" : "bg-muted/5"
                                                 )}>
                                                     <View className="flex-row items-center justify-between mb-4">
                                                         <View className="flex-row items-center gap-2">
@@ -1667,8 +1667,8 @@ export function MatchScheduleCard({
                                                                             </Text>
                                                                         )}
                                                                         {isAdminMessage && (
-                                                                            <View className="bg-[#F59E0B]/15 px-1.5 py-0.5 rounded-full border border-[#F59E0B]/25">
-                                                                                <Text className="text-[8px] font-black text-[#F59E0B] uppercase tracking-widest">Admin</Text>
+                                                                            <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
+                                                                                <Text className="text-[8px] font-black text-warning uppercase tracking-widest">Admin</Text>
                                                                             </View>
                                                                         )}
                                                                         <Text className="text-[9px] font-bold text-slate-500">

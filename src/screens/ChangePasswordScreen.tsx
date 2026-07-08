@@ -146,7 +146,7 @@ export default function ChangePasswordScreen() {
                             secureTextEntry
                         />
 
-                        <Text className="text-gray-500 text-xs mt-2">
+                        <Text className="text-slate-500 text-xs mt-2">
                             Password must be at least 6 characters long.
                         </Text>
                     </View>

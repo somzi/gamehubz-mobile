@@ -52,7 +52,7 @@ export function PendingApprovalsModal({
                 <Pressable className="absolute inset-0" onPress={onClose} />
 
                 <View
-                    className="bg-[#0B1120] rounded-t-[32px] border-t border-x border-white/10"
+                    className="bg-background-deep rounded-t-[32px] border-t border-x border-white/10"
                     style={{ height: '92%' }}
                 >
                     {/* Drag handle */}
@@ -61,7 +61,7 @@ export function PendingApprovalsModal({
                     {/* Header */}
                     <View className="flex-row items-center justify-between px-6 py-4">
                         <View className="flex-row items-center gap-3">
-                            <View className="w-10 h-10 rounded-2xl bg-[#10B981]/15 items-center justify-center">
+                            <View className="w-10 h-10 rounded-2xl bg-primary/15 items-center justify-center">
                                 <Ionicons name="checkmark-done" size={18} color="#10B981" />
                             </View>
                             <View>
@@ -92,7 +92,7 @@ export function PendingApprovalsModal({
                             </View>
                         ) : items.length === 0 ? (
                             <View className="py-12 items-center">
-                                <View className="w-16 h-16 rounded-full bg-[#10B981]/10 border border-[#10B981]/20 items-center justify-center mb-4">
+                                <View className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                                     <Ionicons name="checkmark-done" size={26} color="#10B981" />
                                 </View>
                                 <Text className="text-sm font-black text-white uppercase tracking-widest">No Pending Approvals</Text>
@@ -105,7 +105,7 @@ export function PendingApprovalsModal({
                                 <Pressable
                                     key={item.matchId}
                                     onPress={() => onSelect(item)}
-                                    className="bg-[#131B2E] rounded-[24px] border border-[#10B981]/20 mb-3 overflow-hidden active:opacity-80"
+                                    className="bg-card rounded-[24px] border border-primary/20 mb-3 overflow-hidden active:opacity-80"
                                 >
                                     <View className="flex-row">
                                         {/* Emerald accent bar */}
@@ -120,8 +120,8 @@ export function PendingApprovalsModal({
                                                     </Text>
                                                 </View>
                                                 <View className="flex-row items-center gap-1.5">
-                                                    <View className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                                                    <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-wider">
+                                                    <View className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                                    <Text className="text-[10px] font-black text-primary uppercase tracking-wider">
                                                         Awaiting approval
                                                     </Text>
                                                 </View>
@@ -172,7 +172,7 @@ export function PendingApprovalsModal({
                                                     </Text>
                                                 </View>
                                                 <View className="flex-row items-center gap-1">
-                                                    <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-wider">Review</Text>
+                                                    <Text className="text-[10px] font-black text-primary uppercase tracking-wider">Review</Text>
                                                     <Ionicons name="chevron-forward" size={12} color="#10B981" />
                                                 </View>
                                             </View>

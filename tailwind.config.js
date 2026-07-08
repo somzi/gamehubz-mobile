@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const { COLORS } = require('./src/lib/theme');
+
 module.exports = {
   content: [
     "./App.{js,jsx,ts,tsx}",
@@ -9,46 +11,54 @@ module.exports = {
     extend: {
       colors: {
         // Background colors - matching premium profile design
-        background: "#0F172A",
-        foreground: "#F8FAFC", // Slate-50
+        background: COLORS.background,
+        "background-deep": COLORS.backgroundDeep,
+        foreground: COLORS.foreground, // Slate-50
 
         // Card colors
-        card: "#131B2E",
-        "card-foreground": "#F8FAFC",
-        "card-elevated": "#1E293B",
+        card: COLORS.card,
+        "card-foreground": COLORS.foreground,
+        "card-elevated": COLORS.cardElevated,
 
         // Popover
-        popover: "#131B2E",
-        "popover-foreground": "#F8FAFC",
+        popover: COLORS.card,
+        "popover-foreground": COLORS.foreground,
 
         // Primary - Emerald (matching premium design)
-        primary: "#10B981",
-        "primary-foreground": "#0F172A",
+        primary: COLORS.primary,
+        "primary-bright": COLORS.primaryBright,
+        "primary-foreground": COLORS.primaryForeground,
 
         // Secondary
-        secondary: "#1E293B",
+        secondary: COLORS.cardElevated,
         "secondary-foreground": "#F1F5F9",
 
         // Muted
-        muted: "#1E293B",
-        "muted-foreground": "#94A3B8", // Slate-400
+        muted: COLORS.cardElevated,
+        "muted-foreground": COLORS.slate400, // Slate-400
 
         // Accent - Emerald/Teal
-        accent: "#10B981",
-        "accent-foreground": "#0F172A",
+        accent: COLORS.primary,
+        "accent-foreground": COLORS.primaryForeground,
 
         // Status colors
-        destructive: "#EF4444",
-        "destructive-foreground": "#F8FAFC",
-        success: "#10B981",
-        "success-foreground": "#F8FAFC",
-        live: "#F43F5E",
-        "live-foreground": "#F8FAFC",
+        destructive: COLORS.destructive,
+        "destructive-foreground": COLORS.foreground,
+        success: COLORS.primary,
+        "success-foreground": COLORS.foreground,
+        live: COLORS.live,
+        "live-foreground": COLORS.foreground,
+        warning: COLORS.warning,
+        highlight: COLORS.highlight,
+        info: COLORS.info,
+        team: COLORS.team,
+        "team-foreground": COLORS.teamForeground,
 
         // Border and input
-        border: "rgba(255, 255, 255, 0.1)",
-        input: "rgba(255, 255, 255, 0.05)",
-        ring: "#10B981",
+        border: COLORS.border,
+        "border-subtle": COLORS.borderSubtle,
+        input: COLORS.input,
+        ring: COLORS.primary,
       },
       borderRadius: {
         lg: "0.75rem",

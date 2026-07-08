@@ -11,6 +11,7 @@ import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { formatDateSafe } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { COLORS } from '../lib/theme';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
 
@@ -510,7 +511,7 @@ export default function HubMembersScreen() {
             {activeTab === 'members' && (
                 isLoading ? (
                     <View className="flex-1 items-center justify-center">
-                        <ActivityIndicator size="large" color="#8B5CF6" />
+                        <ActivityIndicator size="large" color={COLORS.primary} />
                     </View>
                 ) : (
                     <FlatList
@@ -599,7 +600,7 @@ export default function HubMembersScreen() {
                                             <Text className="text-white font-medium text-base" numberOfLines={1}>
                                                 {request.username}
                                             </Text>
-                                            <Text className="text-gray-500 text-xs">
+                                            <Text className="text-slate-500 text-xs">
                                                 Requested {formatDateSafe(request.requestedAt, 'recently')}
                                             </Text>
                                         </View>

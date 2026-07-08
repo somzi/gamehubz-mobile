@@ -176,8 +176,8 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             onPress={canShowDetails ? onPress : undefined}
             disabled={!canShowDetails}
             className={cn(
-                "rounded-[20px] bg-[#131B2E] border overflow-hidden",
-                canReport ? "border-emerald-500/30" : isAwaitingApproval ? "border-[#F59E0B]/25" : "border-white/[0.06]",
+                "rounded-[20px] bg-card border overflow-hidden",
+                canReport ? "border-emerald-500/30" : isAwaitingApproval ? "border-warning/25" : "border-white/[0.06]",
                 className
             )}
             style={({ pressed }) => ({
@@ -206,7 +206,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                     canReport
                         ? "bg-emerald-500/[0.08]"
                         : isAwaitingApproval
-                            ? "bg-[#F59E0B]/[0.10]"
+                            ? "bg-warning/[0.10]"
                             : isLive
                                 ? "bg-emerald-500/[0.06]"
                                 : "bg-white/[0.02]"
@@ -226,7 +226,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         <>
                             <View className="flex-row items-center gap-1.5">
                                 <Ionicons name="hourglass-outline" size={11} color="#F59E0B" />
-                                <Text className="text-[10px] font-black text-[#F59E0B] uppercase tracking-[1.5px]">
+                                <Text className="text-[10px] font-black text-warning uppercase tracking-[1.5px]">
                                     Awaiting Approval
                                 </Text>
                             </View>
@@ -252,7 +252,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                     {!canReport && !isAwaitingApproval && isDoubleWalkover && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="play-skip-forward-outline" size={11} color="#F59E0B" />
-                            <Text className="text-[10px] font-bold text-[#F59E0B] uppercase tracking-[1.5px]">
+                            <Text className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
                                 Double Walkover
                             </Text>
                         </View>

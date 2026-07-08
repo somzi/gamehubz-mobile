@@ -15,6 +15,7 @@ import { RequestVerificationModal } from '../components/modals/RequestVerificati
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { StatusModal } from '../components/modals/StatusModal';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
+import { COLORS } from '../lib/theme';
 
 type ManageHubScreenRouteProp = RouteProp<RootStackParamList, 'ManageHub'>;
 type ManageHubScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -263,7 +264,7 @@ export default function ManageHubScreen() {
             <SafeAreaView className="flex-1 bg-background">
                 <PageHeader title="Manage Hub" showBack />
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#8B5CF6" />
+                    <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -301,7 +302,7 @@ export default function ManageHubScreen() {
                         )}
                     </View>
                     <Text className="text-xl font-bold text-white text-center mt-3">{hubData?.name || 'Hub'}</Text>
-                    <Text className="text-gray-500 text-sm text-center mt-1" numberOfLines={1}>
+                    <Text className="text-slate-500 text-sm text-center mt-1" numberOfLines={1}>
                         {'Management Dashboard'}
                     </Text>
                 </View>

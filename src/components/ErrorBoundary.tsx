@@ -44,7 +44,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
         const message = this.state.error.message || 'The app hit an unexpected error.';
         return (
-            <View className="flex-1 bg-[#0F172A] items-center justify-center px-6">
+            <View className="flex-1 bg-background items-center justify-center px-6">
                 <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
                     <Ionicons name="warning" size={28} color="#EF4444" />
                 </View>

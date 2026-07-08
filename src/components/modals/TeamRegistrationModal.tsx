@@ -83,7 +83,7 @@ export function TeamRegistrationModal({
                     onPress={onClose}
                 >
                     <Pressable
-                        className="bg-[#0f172a] rounded-3xl border border-white/10 shadow-2xl w-full max-w-md max-h-[85%]"
+                        className="bg-background rounded-3xl border border-white/10 shadow-2xl w-full max-w-md max-h-[85%]"
                         onPress={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -120,7 +120,7 @@ export function TeamRegistrationModal({
                                             </Text>
                                         </View>
                                         <TextInput
-                                            className="bg-[#131B2E] p-4 rounded-xl text-white border border-white/10"
+                                            className="bg-card p-4 rounded-xl text-white border border-white/10"
                                             placeholder={TEAM_LABELS.TEAM_NAME_PLACEHOLDER}
                                             placeholderTextColor="#6b7280"
                                             value={teamName}
@@ -129,7 +129,7 @@ export function TeamRegistrationModal({
                                     </View>
 
                                     {/* Private Team Toggle */}
-                                    <View className="flex-row items-center justify-between bg-[#131B2E] p-4 rounded-xl border border-white/5">
+                                    <View className="flex-row items-center justify-between bg-card p-4 rounded-xl border border-white/5">
                                         <View className="flex-1 mr-4 gap-1">
                                             <View className="flex-row items-center gap-2">
                                                 <Ionicons name="lock-closed-outline" size={16} color="#3B82F6" />
@@ -155,7 +155,7 @@ export function TeamRegistrationModal({
                                         onPress={handleCreateTeam}
                                         loading={isCreating}
                                         disabled={isCreating || !teamName.trim()}
-                                        className="bg-[#00E5A0] py-4 rounded-2xl w-full"
+                                        className="bg-team py-4 rounded-2xl w-full"
                                     >
                                         {TEAM_LABELS.CREATE_TEAM_BUTTON}
                                     </Button>

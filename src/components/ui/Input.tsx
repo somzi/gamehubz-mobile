@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TextInput, TextInputProps, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../lib/theme';
 
 interface InputProps extends TextInputProps {
     label?: string;
@@ -35,13 +36,13 @@ export function Input({
                     <Ionicons
                         name={leftIcon}
                         size={20}
-                        color={error ? "hsl(0, 72%, 51%)" : "hsl(220, 15%, 55%)"}
+                        color={error ? COLORS.destructive : COLORS.slate400}
                         style={{ marginRight: 8 }}
                     />
                 )}
                 <TextInput
                     className="flex-1 text-foreground text-base h-full"
-                    placeholderTextColor="hsl(220, 15%, 55%)"
+                    placeholderTextColor={COLORS.slate500}
                     {...props}
                 />
                 {rightIcon && (
@@ -49,7 +50,7 @@ export function Input({
                         <Ionicons
                             name={rightIcon}
                             size={20}
-                            color="hsl(220, 15%, 55%)"
+                            color={COLORS.slate400}
                         />
                     </TouchableOpacity>
                 )}

@@ -31,7 +31,7 @@ export function StreamPlayer({ source, title = 'Open stream', platform, live, is
 
     if (source.kind === 'external') {
         return (
-            <View className="rounded-2xl border border-white/[0.06] bg-[#131B2E] p-5 items-center">
+            <View className="rounded-2xl border border-white/[0.06] bg-card p-5 items-center">
                 <View className="w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center mb-3">
                     <Ionicons name="open-outline" size={22} color="#10B981" />
                 </View>
@@ -44,7 +44,7 @@ export function StreamPlayer({ source, title = 'Open stream', platform, live, is
                     className="mt-4 bg-primary rounded-2xl py-3 px-6 flex-row items-center gap-2 active:opacity-80"
                 >
                     <Ionicons name="play" size={16} color="#0F172A" />
-                    <Text className="text-xs font-black text-[#0F172A] uppercase tracking-widest">{title}</Text>
+                    <Text className="text-xs font-black text-primary-foreground uppercase tracking-widest">{title}</Text>
                 </Pressable>
             </View>
         );

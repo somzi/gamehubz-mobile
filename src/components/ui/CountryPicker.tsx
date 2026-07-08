@@ -107,7 +107,7 @@ export function CountryPicker({
                 activeOpacity={locked ? 1 : 0.7}
                 onPress={openModal}
                 className={`
-                    flex-row items-center w-full min-h-[56px] py-2 bg-[#131B2E]/50 border rounded-2xl px-4
+                    flex-row items-center w-full min-h-[56px] py-2 bg-card/50 border rounded-2xl px-4
                     ${error ? 'border-destructive/50' : 'border-white/5'}
                     ${locked ? 'opacity-70' : ''}
                 `}
@@ -155,7 +155,7 @@ export function CountryPicker({
                     onPress={() => setModalVisible(false)}
                 >
                     <Pressable
-                        className="bg-[#0F172A] w-full rounded-t-[32px] border-t border-white/10 overflow-hidden"
+                        className="bg-background w-full rounded-t-[32px] border-t border-white/10 overflow-hidden"
                         style={{ height: '78%' }}
                         onPress={() => { /* swallow so taps inside don't close */ }}
                     >
@@ -163,7 +163,7 @@ export function CountryPicker({
                             <View className="w-12 h-1.5 bg-white/10 rounded-full" />
                         </View>
 
-                        <View className="px-6 py-3 flex-row justify-between items-center bg-[#131B2E]/50">
+                        <View className="px-6 py-3 flex-row justify-between items-center bg-card/50">
                             <Text className="text-xl font-black text-white tracking-tight">
                                 {label || (multiple ? 'Select Countries' : 'Select Country')}
                             </Text>
@@ -176,7 +176,7 @@ export function CountryPicker({
                         </View>
 
                         <View className="px-4 pt-3 pb-1">
-                            <View className="flex-row items-center bg-[#131B2E] border border-white/5 rounded-2xl px-4 h-12">
+                            <View className="flex-row items-center bg-card border border-white/5 rounded-2xl px-4 h-12">
                                 <Ionicons name="search" size={18} color="#64748B" />
                                 <TextInput
                                     value={search}
@@ -242,7 +242,7 @@ export function CountryPicker({
                                     onPress={() => setModalVisible(false)}
                                     className="bg-primary h-12 rounded-2xl items-center justify-center"
                                 >
-                                    <Text className="text-[#0F172A] font-black text-base">
+                                    <Text className="text-primary-foreground font-black text-base">
                                         Done{selectedMulti.length > 0 ? ` (${selectedMulti.length})` : ''}
                                     </Text>
                                 </TouchableOpacity>

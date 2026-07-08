@@ -45,7 +45,7 @@ export default function SocialScreen() {
     );
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             {/* ─── Header ──────────────────────────────────────── */}
             <View className="px-5 pt-2 pb-3">
                 <Text className="text-white text-2xl font-black tracking-tight">Social</Text>

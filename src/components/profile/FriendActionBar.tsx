@@ -114,7 +114,7 @@ export function FriendActionBar({ otherUserId, otherUsername }: Props) {
     if (loading) {
         return (
             <View className="px-5 mt-3">
-                <View className="bg-[#131B2E] rounded-2xl py-3 items-center border border-white/[0.04]">
+                <View className="bg-card rounded-2xl py-3 items-center border border-white/[0.04]">
                     <ActivityIndicator size="small" color="#10B981" />
                 </View>
             </View>

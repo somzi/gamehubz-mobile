@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { StatusModal } from '../components/modals/StatusModal';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
+import { COLORS } from '../lib/theme';
 
 const friendlyForgotError = (raw: string): string => {
     const msg = raw.toLowerCase();
@@ -108,7 +109,7 @@ export default function ForgotPasswordScreen() {
                 >
                     <View className="items-center mb-10">
                         <View className="w-20 h-20 bg-primary/20 rounded-2xl items-center justify-center mb-6">
-                            <Ionicons name="mail-unread-outline" size={40} color="hsl(185, 75%, 45%)" />
+                            <Ionicons name="mail-unread-outline" size={40} color={COLORS.primary} />
                         </View>
 
                         <Text className="text-3xl font-bold text-foreground mb-2 text-center">Reset Password</Text>

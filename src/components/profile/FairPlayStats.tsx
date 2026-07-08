@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../ui/Card';
 import { cn } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
 
 interface FairPlayStatsProps {
     fairPlayScore: number;
@@ -45,7 +46,7 @@ export function FairPlayStats({
                 <View className="flex-row items-center justify-between mb-3">
                     <View className="flex-row items-center gap-2">
                         <View className="w-8 h-8 rounded-lg items-center justify-center bg-primary/20">
-                            <Ionicons name="shield-checkmark" size={16} color="hsl(185, 75%, 45%)" />
+                            <Ionicons name="shield-checkmark" size={16} color={COLORS.primary} />
                         </View>
                         <Text className="font-medium text-foreground">Fair Play Score</Text>
                     </View>
@@ -74,7 +75,7 @@ export function FairPlayStats({
             <View className="flex-row gap-3">
                 <View className="flex-1 bg-card p-4 rounded-xl border border-border/50 items-center">
                     <View className="w-8 h-8 rounded-lg items-center justify-center bg-muted mb-2">
-                        <Ionicons name="trending-up" size={16} color="hsl(220, 15%, 55%)" />
+                        <Ionicons name="trending-up" size={16} color={COLORS.slate400} />
                     </View>
                     <Text className="text-xl font-bold text-foreground">{matchesPlayed}</Text>
                     <Text className="text-xs text-muted-foreground">Matches</Text>
@@ -88,7 +89,7 @@ export function FairPlayStats({
                         <Ionicons
                             name="warning"
                             size={16}
-                            color={noShowCount > 0 ? 'hsl(0, 72%, 51%)' : 'hsl(45, 90%, 55%)'}
+                            color={noShowCount > 0 ? COLORS.destructive : COLORS.warning}
                         />
                     </View>
                     <Text className={cn(
@@ -108,7 +109,7 @@ export function FairPlayStats({
                         <Ionicons
                             name="flag"
                             size={16}
-                            color={reportsCount > 0 ? 'hsl(0, 72%, 51%)' : 'hsl(220, 15%, 55%)'}
+                            color={reportsCount > 0 ? COLORS.destructive : COLORS.slate400}
                         />
                     </View>
                     <Text className={cn(
@@ -124,7 +125,7 @@ export function FairPlayStats({
             {/* Warning if score is low */}
             {fairPlayScore < 70 && (
                 <View className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 flex-row items-start gap-2">
-                    <Ionicons name="warning" size={16} color="hsl(0, 72%, 51%)" />
+                    <Ionicons name="warning" size={16} color={COLORS.destructive} />
                     <View className="flex-1">
                         <Text className="font-medium text-destructive">Low Fair Play Score</Text>
                         <Text className="text-xs text-muted-foreground mt-0.5">

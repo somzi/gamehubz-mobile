@@ -118,9 +118,9 @@ export function AdminHelpSection({
                 <Pressable
                     onPress={handleRequestPress}
                     disabled={isSubmitting}
-                    className="bg-[#F59E0B]/[0.06] rounded-[20px] border border-[#F59E0B]/20 p-4 flex-row items-center gap-3 active:opacity-70"
+                    className="bg-warning/[0.06] rounded-[20px] border border-warning/20 p-4 flex-row items-center gap-3 active:opacity-70"
                 >
-                    <View className="w-10 h-10 rounded-2xl bg-[#F59E0B]/15 items-center justify-center">
+                    <View className="w-10 h-10 rounded-2xl bg-warning/15 items-center justify-center">
                         {isSubmitting ? (
                             <ActivityIndicator size="small" color="#F59E0B" />
                         ) : (
@@ -128,7 +128,7 @@ export function AdminHelpSection({
                         )}
                     </View>
                     <View className="flex-1">
-                        <Text className="text-[11px] font-black text-[#F59E0B] uppercase tracking-[2px]">Need Help?</Text>
+                        <Text className="text-[11px] font-black text-warning uppercase tracking-[2px]">Need Help?</Text>
                         <Text className="text-[11px] text-slate-400 mt-0.5">
                             Problem with this match? Notify the tournament admins.
                         </Text>
@@ -153,13 +153,13 @@ export function AdminHelpSection({
     }
 
     return (
-        <View className="bg-[#F59E0B]/[0.08] rounded-[20px] border border-[#F59E0B]/25 p-4">
+        <View className="bg-warning/[0.08] rounded-[20px] border border-warning/25 p-4">
             <View className="flex-row items-center gap-3">
-                <View className="w-10 h-10 rounded-2xl bg-[#F59E0B]/15 items-center justify-center">
+                <View className="w-10 h-10 rounded-2xl bg-warning/15 items-center justify-center">
                     <Ionicons name="alert-circle" size={20} color="#F59E0B" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-[11px] font-black text-[#F59E0B] uppercase tracking-[2px]">Admin Help Requested</Text>
+                    <Text className="text-[11px] font-black text-warning uppercase tracking-[2px]">Admin Help Requested</Text>
                     <Text className="text-[11px] text-slate-400 mt-0.5">
                         {canResolve
                             ? 'A player asked for help here. Check the match chat and mark it resolved when done.'
@@ -173,14 +173,14 @@ export function AdminHelpSection({
                 <Pressable
                     onPress={handleResolve}
                     disabled={isResolving}
-                    className="mt-3 bg-[#10B981] rounded-2xl py-3 items-center flex-row justify-center gap-2 active:opacity-80"
+                    className="mt-3 bg-primary rounded-2xl py-3 items-center flex-row justify-center gap-2 active:opacity-80"
                 >
                     {isResolving ? (
                         <ActivityIndicator size="small" color="#0F172A" />
                     ) : (
                         <>
                             <Ionicons name="checkmark-circle" size={16} color="#0F172A" />
-                            <Text className="text-xs font-black text-[#0F172A] uppercase tracking-wider">Mark Resolved</Text>
+                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">Mark Resolved</Text>
                         </>
                     )}
                 </Pressable>

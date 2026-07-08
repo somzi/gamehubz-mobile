@@ -251,7 +251,7 @@ export default function PlayerProfileScreen() {
 
     if (isLoading) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-row items-center px-6 py-2">
                     <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
                         <Ionicons name="arrow-back" size={24} color="white" />
@@ -267,7 +267,7 @@ export default function PlayerProfileScreen() {
 
     if (error || !userInfo) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-row items-center px-6 py-2">
                     <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
                         <Ionicons name="arrow-back" size={24} color="white" />
@@ -275,7 +275,7 @@ export default function PlayerProfileScreen() {
                 </View>
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                    <Text className="text-[#EF4444] mt-4 text-center font-medium">{error || 'Player not found'}</Text>
+                    <Text className="text-destructive mt-4 text-center font-medium">{error || 'Player not found'}</Text>
                 </View>
             </SafeAreaView>
         );
@@ -315,7 +315,7 @@ export default function PlayerProfileScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top']}>
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             {/* Top Bar with Back Button */}
             <View className="flex-row items-center justify-between px-6 py-2">
                 <Pressable
@@ -343,7 +343,7 @@ export default function PlayerProfileScreen() {
             >
                 {/* ─── Profile Card ─── */}
                 <View className="mx-5 mt-3">
-                    <View className="bg-[#131B2E] rounded-3xl p-5">
+                    <View className="bg-card rounded-3xl p-5">
                         {/* Header: Avatar + Info side by side */}
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                             {/* Avatar with glow border */}
@@ -373,7 +373,7 @@ export default function PlayerProfileScreen() {
                                     <View className="flex-row items-center bg-emerald-500/10 px-2.5 py-1 rounded-lg" style={{ flexShrink: 1 }}>
                                         <Ionicons name="game-controller" size={12} color="#10B981" />
                                         <Text
-                                            className="text-[#10B981] font-bold text-xs ml-1.5"
+                                            className="text-primary font-bold text-xs ml-1.5"
                                             numberOfLines={1}
                                             style={{ flexShrink: 1 }}
                                         >
@@ -437,14 +437,14 @@ export default function PlayerProfileScreen() {
                         {activeTab === 'stats' && (
                             <View style={{ gap: 10 }}>
                                 {/* ─── Quick Stats ─── */}
-                                <View className="flex-row bg-[#131B2E] rounded-2xl p-1" style={{ gap: 2 }}>
+                                <View className="flex-row bg-card rounded-2xl p-1" style={{ gap: 2 }}>
                                     <View className="flex-1 py-2 items-center">
                                         <Text className="text-white text-base font-black">{displayData.totalMatches}</Text>
                                         <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">Played</Text>
                                     </View>
                                     <View className="w-[1px] bg-white/[0.04] my-2" />
                                     <View className="flex-1 py-2 items-center">
-                                        <Text className="text-[#10B981] text-base font-black">{displayData.wins}</Text>
+                                        <Text className="text-primary text-base font-black">{displayData.wins}</Text>
                                         <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">Wins</Text>
                                     </View>
                                     <View className="w-[1px] bg-white/[0.04] my-2" />
@@ -460,7 +460,7 @@ export default function PlayerProfileScreen() {
                                 </View>
 
                                 {/* ─── Recent Form ─── */}
-                                <View className="bg-[#131B2E] rounded-3xl p-4">
+                                <View className="bg-card rounded-3xl p-4">
                                     <View className="flex-row items-center justify-between mb-3">
                                         <View className="flex-row items-center" style={{ gap: 8 }}>
                                             <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
@@ -471,15 +471,15 @@ export default function PlayerProfileScreen() {
                                         {performanceList.length > 0 && (
                                             <View className="flex-row items-center" style={{ gap: 8 }}>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-[#10B981]" />
+                                                    <View className="w-2 h-2 rounded-full bg-primary" />
                                                     <Text className="text-[8px] text-slate-500 font-bold uppercase">Win</Text>
                                                 </View>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-[#EAB308]" />
+                                                    <View className="w-2 h-2 rounded-full bg-yellow-500" />
                                                     <Text className="text-[8px] text-slate-500 font-bold uppercase">Draw</Text>
                                                 </View>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-[#EF4444]" />
+                                                    <View className="w-2 h-2 rounded-full bg-destructive" />
                                                     <Text className="text-[8px] text-slate-500 font-bold uppercase">Loss</Text>
                                                 </View>
                                             </View>
@@ -493,13 +493,13 @@ export default function PlayerProfileScreen() {
                                                         <View
                                                             className={cn(
                                                                 "w-7 h-7 rounded-lg items-center justify-center",
-                                                                match.outcome === 'W' ? "bg-[#10B981]/15" : match.outcome === 'D' ? "bg-[#EAB308]/15" : "bg-[#EF4444]/15"
+                                                                match.outcome === 'W' ? "bg-primary/15" : match.outcome === 'D' ? "bg-yellow-500/15" : "bg-destructive/15"
                                                             )}
                                                             style={{ borderWidth: 1.5, borderColor: match.outcome === 'W' ? 'rgba(16,185,129,0.3)' : match.outcome === 'D' ? 'rgba(234,179,8,0.3)' : 'rgba(239,68,68,0.3)' }}
                                                         >
                                                             <Text className={cn(
                                                                 "text-[10px] font-black",
-                                                                match.outcome === 'W' ? "text-[#10B981]" : match.outcome === 'D' ? "text-[#EAB308]" : "text-[#EF4444]"
+                                                                match.outcome === 'W' ? "text-primary" : match.outcome === 'D' ? "text-yellow-500" : "text-destructive"
                                                             )}>
                                                                 {match.outcome}
                                                             </Text>
@@ -532,7 +532,7 @@ export default function PlayerProfileScreen() {
                                 </View>
 
                                 {/* ─── Win Rate Hero ─── */}
-                                <View className="bg-[#131B2E] rounded-3xl p-5 items-center">
+                                <View className="bg-card rounded-3xl p-5 items-center">
                                     <View style={{
                                         width: 100,
                                         height: 100,
@@ -565,14 +565,14 @@ export default function PlayerProfileScreen() {
                                         <View>
                                             <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-[#10B981]" />
+                                                    <View className="w-2 h-2 rounded-full bg-primary" />
                                                     <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Wins</Text>
                                                 </View>
-                                                <Text className="text-[#10B981] text-sm font-black">{displayData.wins}</Text>
+                                                <Text className="text-primary text-sm font-black">{displayData.wins}</Text>
                                             </View>
                                             <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
                                                 <View
-                                                    className="h-full bg-[#10B981] rounded-full"
+                                                    className="h-full bg-primary rounded-full"
                                                     style={{ width: displayData.totalMatches > 0 ? `${(displayData.wins / displayData.totalMatches) * 100}%` : '0%' }}
                                                 />
                                             </View>
@@ -580,14 +580,14 @@ export default function PlayerProfileScreen() {
                                         <View>
                                             <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-[#EAB308]" />
+                                                    <View className="w-2 h-2 rounded-full bg-yellow-500" />
                                                     <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Draws</Text>
                                                 </View>
-                                                <Text className="text-[#EAB308] text-sm font-black">{displayData.draws}</Text>
+                                                <Text className="text-yellow-500 text-sm font-black">{displayData.draws}</Text>
                                             </View>
                                             <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
                                                 <View
-                                                    className="h-full bg-[#EAB308] rounded-full"
+                                                    className="h-full bg-yellow-500 rounded-full"
                                                     style={{ width: displayData.totalMatches > 0 ? `${(displayData.draws / displayData.totalMatches) * 100}%` : '0%' }}
                                                 />
                                             </View>
@@ -595,14 +595,14 @@ export default function PlayerProfileScreen() {
                                         <View>
                                             <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-[#EF4444]" />
+                                                    <View className="w-2 h-2 rounded-full bg-destructive" />
                                                     <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Losses</Text>
                                                 </View>
-                                                <Text className="text-[#EF4444] text-sm font-black">{displayData.losses}</Text>
+                                                <Text className="text-destructive text-sm font-black">{displayData.losses}</Text>
                                             </View>
                                             <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
                                                 <View
-                                                    className="h-full bg-[#EF4444] rounded-full"
+                                                    className="h-full bg-destructive rounded-full"
                                                     style={{ width: displayData.totalMatches > 0 ? `${(displayData.losses / displayData.totalMatches) * 100}%` : '0%' }}
                                                 />
                                             </View>
@@ -637,7 +637,7 @@ export default function PlayerProfileScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View className="bg-[#131B2E] rounded-[24px] p-10 border border-white/5 items-center">
+                                    <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
                                         <Ionicons name="trophy-outline" size={48} color="#1E293B" />
                                         <Text className="text-slate-600 mt-4 text-center text-sm">No tournaments found.</Text>
                                     </View>
@@ -677,7 +677,7 @@ export default function PlayerProfileScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View className="bg-[#131B2E] rounded-[24px] p-10 border border-white/5 items-center">
+                                    <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
                                         <Ionicons name="documents-outline" size={48} color="#1E293B" />
                                         <Text className="text-slate-600 mt-4 text-center text-sm">No match history available yet.</Text>
                                     </View>

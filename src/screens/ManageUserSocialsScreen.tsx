@@ -226,7 +226,7 @@ export default function ManageUserSocialsScreen() {
                     {/* Discord bot link — DM notifications; separate from the public social links below */}
                     <View className="mb-6">
                         <Text className="text-lg font-bold text-foreground mb-4">Discord</Text>
-                        <View className="p-4 bg-[#131B2E] rounded-2xl border border-white/[0.06]">
+                        <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <View className="flex-row items-center gap-3">
                                 <View
                                     className="w-10 h-10 rounded-xl items-center justify-center border"
@@ -304,7 +304,7 @@ export default function ManageUserSocialsScreen() {
                                 {socials.map((social) => (
                                     <View
                                         key={social.socialType!}
-                                        className="flex-row items-center justify-between p-4 bg-[#131B2E] rounded-2xl border border-white/[0.06]"
+                                        className="flex-row items-center justify-between p-4 bg-card rounded-2xl border border-white/[0.06]"
                                     >
                                         <View className="flex-row items-center gap-3">
                                             <View className="w-10 h-10 rounded-xl bg-indigo-500/10 items-center justify-center border border-indigo-500/20">
@@ -343,7 +343,7 @@ export default function ManageUserSocialsScreen() {
                     {/* Add New Account */}
                     <View className="mb-8">
                         <Text className="text-lg font-bold text-foreground mb-4">Add Account</Text>
-                        <View className="p-4 bg-[#131B2E] rounded-2xl border border-white/[0.06]">
+                        <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <SelectInput
                                 placeholder="Select Platform"
                                 options={socialTypeOptions}

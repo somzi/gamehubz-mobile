@@ -50,7 +50,7 @@ export function TranslateLanguageSheet({
       onRequestClose={onClose}
     >
       <View
-        className="flex-1 bg-[#0B1120]"
+        className="flex-1 bg-background-deep"
         style={{ paddingTop: Math.max(insets.top, 50) }}
       >
         <View className="flex-row items-center justify-between px-6 pb-4 border-b border-white/5">

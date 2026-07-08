@@ -312,8 +312,8 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                                             </Text>
                                         )}
                                         {isAdminMessage && !isMyComment && (
-                                            <View className="bg-[#F59E0B]/15 px-1.5 py-0.5 rounded-full border border-[#F59E0B]/25">
-                                                <Text className="text-[8px] font-black text-[#F59E0B] uppercase tracking-widest">Admin</Text>
+                                            <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
+                                                <Text className="text-[8px] font-black text-warning uppercase tracking-widest">Admin</Text>
                                             </View>
                                         )}
                                         <Text className="text-[9px] font-bold text-slate-500">

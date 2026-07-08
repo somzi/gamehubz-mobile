@@ -332,7 +332,7 @@ export default function DirectChatScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top', 'bottom']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
                 <Header onBack={() => navigation.goBack()} chat={null} />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#10B981" />
@@ -343,7 +343,7 @@ export default function DirectChatScreen() {
 
     if (error || !chat) {
         return (
-            <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top', 'bottom']}>
+            <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
                 <Header onBack={() => navigation.goBack()} chat={null} />
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
@@ -356,7 +356,7 @@ export default function DirectChatScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]" edges={['top', 'bottom']}>
+        <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
             <Header
                 onBack={() => navigation.goBack()}
                 chat={chat}
@@ -438,7 +438,7 @@ export default function DirectChatScreen() {
                 />
 
                 <View
-                    className="border-t border-white/[0.04] bg-[#0B1120] px-3 pt-3 pb-2"
+                    className="border-t border-white/[0.04] bg-background-deep px-3 pt-3 pb-2"
                 >
                     {sendError && (
                         <View className="flex-row items-center bg-red-500/10 border border-red-500/25 rounded-2xl px-3 py-2 mb-2">
@@ -452,7 +452,7 @@ export default function DirectChatScreen() {
                         </View>
                     )}
                     <View
-                        className="flex-row items-end gap-2 bg-[#131B2E] border border-white/[0.06] rounded-3xl px-3 py-1.5"
+                        className="flex-row items-end gap-2 bg-card border border-white/[0.06] rounded-3xl px-3 py-1.5"
                         style={{ minHeight: 52 }}
                     >
                         <TextInput
@@ -509,7 +509,7 @@ function Header({
 }) {
     return (
         <View
-            className="flex-row items-center px-3 py-3 border-b border-white/[0.04] bg-[#0B1120]"
+            className="flex-row items-center px-3 py-3 border-b border-white/[0.04] bg-background-deep"
         >
             <Pressable
                 onPress={onBack}

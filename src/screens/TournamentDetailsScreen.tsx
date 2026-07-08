@@ -1360,7 +1360,7 @@ export default function TournamentDetailsScreen() {
             className={cn(
                 "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
                 adminHelpRequests.length > 0
-                    ? "bg-[#F59E0B]/10 border-[#F59E0B]/30"
+                    ? "bg-warning/10 border-warning/30"
                     : "bg-white/[0.04] border-white/[0.08]"
             )}
         >
@@ -1371,13 +1371,13 @@ export default function TournamentDetailsScreen() {
             />
             <Text className={cn(
                 "text-[10px] font-black uppercase tracking-wide",
-                adminHelpRequests.length > 0 ? "text-[#F59E0B]" : "text-slate-500"
+                adminHelpRequests.length > 0 ? "text-warning" : "text-slate-500"
             )}>
                 Help Requests
             </Text>
             {adminHelpRequests.length > 0 && (
-                <View className="min-w-[16px] h-4 px-1 rounded-full bg-[#F59E0B] items-center justify-center">
-                    <Text className="text-[9px] font-black text-[#0F172A]">{adminHelpRequests.length}</Text>
+                <View className="min-w-[16px] h-4 px-1 rounded-full bg-warning items-center justify-center">
+                    <Text className="text-[9px] font-black text-primary-foreground">{adminHelpRequests.length}</Text>
                 </View>
             )}
         </Pressable>
@@ -1400,7 +1400,7 @@ export default function TournamentDetailsScreen() {
             className={cn(
                 "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
                 approvalsPillCount > 0
-                    ? "bg-[#10B981]/10 border-[#10B981]/30"
+                    ? "bg-primary/10 border-primary/30"
                     : "bg-white/[0.04] border-white/[0.08]"
             )}
         >
@@ -1411,13 +1411,13 @@ export default function TournamentDetailsScreen() {
             />
             <Text className={cn(
                 "text-[10px] font-black uppercase tracking-wide",
-                approvalsPillCount > 0 ? "text-[#10B981]" : "text-slate-500"
+                approvalsPillCount > 0 ? "text-primary" : "text-slate-500"
             )}>
                 Approvals
             </Text>
             {approvalsPillCount > 0 && (
-                <View className="min-w-[16px] h-4 px-1 rounded-full bg-[#10B981] items-center justify-center">
-                    <Text className="text-[9px] font-black text-[#0F172A]">{approvalsPillCount}</Text>
+                <View className="min-w-[16px] h-4 px-1 rounded-full bg-primary items-center justify-center">
+                    <Text className="text-[9px] font-black text-primary-foreground">{approvalsPillCount}</Text>
                 </View>
             )}
         </Pressable>
@@ -1846,7 +1846,7 @@ export default function TournamentDetailsScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-[#0F172A]">
+        <SafeAreaView className="flex-1 bg-background">
             <PageHeader
                 title="Tournament"
                 showBack
@@ -1883,19 +1883,19 @@ export default function TournamentDetailsScreen() {
                     </View>
                 }
             />
-            <ScrollView className="flex-1 bg-[#0F172A]">
+            <ScrollView className="flex-1 bg-background">
                 <View className="animate-slide-up">
                     {/* Hero Section */}
-                    <View className="px-4 py-6 bg-[#0F172A]">
+                    <View className="px-4 py-6 bg-background">
                         <View className="mb-4">
                             <View className="flex-row items-start justify-between mb-2">
                                 <Text className="text-3xl font-black text-white leading-tight flex-1 mr-3">{tournament.name}</Text>
                                 {(() => {
                                     const s = Number(tournament.status);
                                     if (s === 3) return (
-                                        <View className="bg-[#064E3B] px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-[#10B981]/20 mt-1">
-                                            <View className="w-2 h-2 rounded-full bg-[#10B981]" />
-                                            <Text className="text-[10px] font-black text-[#10B981] uppercase tracking-tighter">LIVE</Text>
+                                        <View className="bg-emerald-900 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-primary/20 mt-1">
+                                            <View className="w-2 h-2 rounded-full bg-primary" />
+                                            <Text className="text-[10px] font-black text-primary uppercase tracking-tighter">LIVE</Text>
                                         </View>
                                     );
                                     if (s === 4) return (
@@ -2044,7 +2044,7 @@ export default function TournamentDetailsScreen() {
                             {canManage &&
                                 (tournament?.status === 0 || tournament?.status === 1) && (
                                     <Button
-                                        className="w-full mb-4 bg-[#EF4444]"
+                                        className="w-full mb-4 bg-destructive"
                                         onPress={handleCloseRegistration}
                                         loading={isLoading}
                                     >
@@ -2056,7 +2056,7 @@ export default function TournamentDetailsScreen() {
                             {canManage &&
                                 tournament?.status === 2 && (
                                     <Button
-                                        className="w-full mb-4 bg-[#10B981]"
+                                        className="w-full mb-4 bg-primary"
                                         onPress={handleOpenRegistration}
                                         loading={isLoading}
                                     >
@@ -2086,16 +2086,16 @@ export default function TournamentDetailsScreen() {
                             {tournament.isTeamTournament && !isLoadingTeams && userTeam && (
                                 <Pressable
                                     onPress={() => navigation.navigate('TeamDashboard', { teamId: userTeam.teamId, tournamentId: id, teamSize: tournament?.teamSize, tournamentStatus: tournament?.status })}
-                                    className="mb-4 bg-gradient-to-r from-[#1A233A] to-[#131B2E] border border-[#00E5A0]/30 rounded-[24px] overflow-hidden"
+                                    className="mb-4 bg-gradient-to-r from-[#1A233A] to-[#131B2E] border border-team/30 rounded-[24px] overflow-hidden"
                                 >
                                     <View className="px-5 py-4 flex-row items-center justify-between">
                                         <View className="flex-row items-center gap-4">
-                                            <View className="w-12 h-12 bg-[#00E5A0]/10 rounded-2xl items-center justify-center shadow-sm shadow-[#00E5A0]/20 border border-[#00E5A0]/20">
+                                            <View className="w-12 h-12 bg-team/10 rounded-2xl items-center justify-center shadow-sm shadow-team/20 border border-team/20">
                                                 <Ionicons name="shield-half" size={24} color="#00E5A0" />
                                             </View>
                                             <View>
                                                 <Text className="text-white font-black text-lg tracking-wide">{TEAM_LABELS.MY_TEAM_BUTTON}</Text>
-                                                <Text className="text-[#00E5A0]/80 text-[11px] font-bold tracking-widest uppercase mt-0.5">Manage Your Roster</Text>
+                                                <Text className="text-team/80 text-[11px] font-bold tracking-widest uppercase mt-0.5">Manage Your Roster</Text>
                                             </View>
                                         </View>
                                         <View className="w-10 h-10 bg-white/5 border border-white/5 rounded-full items-center justify-center">
@@ -2288,7 +2288,7 @@ export default function TournamentDetailsScreen() {
                                 isLoadingTeams ? (
                                     <ActivityIndicator size="small" color="#00E5A0" />
                                 ) : tournamentTeams.length === 0 ? (
-                                    <View className="bg-[#131B2E]/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
+                                    <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
                                         <Text className="text-slate-400 mt-4 text-center">{TEAM_LABELS.NO_TEAMS_REGISTERED}</Text>
                                     </View>
@@ -2312,7 +2312,7 @@ export default function TournamentDetailsScreen() {
                                             <View key={teamId || index.toString()} className="flex-row items-start gap-3 mb-2">
                                                 <Pressable
                                                     onPress={() => setExpandedTeamId(isExpanded ? null : (teamId || null))}
-                                                    className={`flex-1 bg-[#131B2E] p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-[#00E5A0]/30' : 'border-white/[0.06]'}`}
+                                                    className={`flex-1 bg-card p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-team/30' : 'border-white/[0.06]'}`}
                                                 >
                                                     <LinearGradient
                                                         colors={['rgba(255,255,255,0.05)', 'transparent']}
@@ -2321,7 +2321,7 @@ export default function TournamentDetailsScreen() {
                                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                                                     />
                                                     <View className="flex-row items-center gap-4">
-                                                        <View className="w-12 h-12 rounded-2xl bg-[#00E5A0]/10 items-center justify-center border border-[#00E5A0]/20 shadow-sm shadow-[#00E5A0]/20">
+                                                        <View className="w-12 h-12 rounded-2xl bg-team/10 items-center justify-center border border-team/20 shadow-sm shadow-team/20">
                                                             <Ionicons name="shield-half-outline" size={24} color="#00E5A0" />
                                                         </View>
                                                         <View className="flex-1">
@@ -2330,8 +2330,8 @@ export default function TournamentDetailsScreen() {
                                                             </Text>
                                                             <View className="flex-row items-center gap-2 mt-1">
                                                                 {(memberCount >= teamSize && teamSize > 0) ? (
-                                                                    <View className="bg-[#00E5A0]/10 px-2 py-0.5 rounded-full border border-[#00E5A0]/20 flex-shrink-0">
-                                                                        <Text className="text-[9px] font-black text-[#00E5A0] uppercase">
+                                                                    <View className="bg-team/10 px-2 py-0.5 rounded-full border border-team/20 flex-shrink-0">
+                                                                        <Text className="text-[9px] font-black text-team uppercase">
                                                                             {TEAM_LABELS.TEAM_FULL}
                                                                         </Text>
                                                                     </View>
@@ -2341,9 +2341,9 @@ export default function TournamentDetailsScreen() {
                                                                     </Text>
                                                                 )}
                                                                 {captain && (
-                                                                    <View className="flex-row items-center gap-1 bg-[#F59E0B]/10 px-2 rounded-full py-0.5 border border-[#F59E0B]/20 flex-shrink">
+                                                                    <View className="flex-row items-center gap-1 bg-warning/10 px-2 rounded-full py-0.5 border border-warning/20 flex-shrink">
                                                                         <Ionicons name="shield" size={10} color="#F59E0B" />
-                                                                        <Text className="text-[9px] text-[#F59E0B] font-black uppercase flex-shrink" numberOfLines={1}>
+                                                                        <Text className="text-[9px] text-warning font-black uppercase flex-shrink" numberOfLines={1}>
                                                                             {captain?.username || captain?.Username}
                                                                         </Text>
                                                                     </View>
@@ -2365,9 +2365,9 @@ export default function TournamentDetailsScreen() {
                                                                         <Pressable
                                                                             key={(m.userId || m.UserId) || mIdx.toString()}
                                                                             onPress={() => navigation.navigate('PlayerProfile', { id: m.userId || m.UserId })}
-                                                                            className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-[#F59E0B]/[0.08] border-[#F59E0B]/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
+                                                                            className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-warning/[0.08] border-warning/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
                                                                         >
-                                                                            <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-[#F59E0B]/50' : 'border border-white/10'}`}>
+                                                                            <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-warning/50' : 'border border-white/10'}`}>
                                                                                 <PlayerAvatar name={m.username || m.Username} src={m.avatarUrl || m.AvatarUrl} size="sm" />
                                                                             </View>
                                                                             <View className="flex-1">
@@ -2375,7 +2375,7 @@ export default function TournamentDetailsScreen() {
                                                                                 {isMemberCaptain ? (
                                                                                     <View className="flex-row items-center gap-1 mt-0.5">
                                                                                         <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
-                                                                                        <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-wider">Captain</Text>
+                                                                                        <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
                                                                                     </View>
                                                                                 ) : (
                                                                                     <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
@@ -2408,12 +2408,12 @@ export default function TournamentDetailsScreen() {
                                                             {/* Join Button inside Expanded View */}
                                                             {(!userTeam && !isUserRegistered && memberCount < teamSize && teamSize > 0) && (
                                                                 <Button
-                                                                    className={t.requiresApproval || t.RequiresApproval ? "bg-[#3B82F6] py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-[#3B82F6]/20" : "bg-[#00E5A0] py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-[#00E5A0]/20"}
+                                                                    className={t.requiresApproval || t.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
                                                                     onPress={() => handleJoinTeam(teamId as string, t.requiresApproval || t.RequiresApproval)}
                                                                     loading={joiningTeamId === teamId}
                                                                     disabled={joiningTeamId !== null || t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending'}
                                                                 >
-                                                                    <Text className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center" : "text-[#0F172A] font-black uppercase tracking-widest text-sm text-center"}>
+                                                                    <Text className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center"}>
                                                                         {(t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending')
                                                                             ? 'Request Pending'
                                                                             : (t.requiresApproval || t.RequiresApproval) ? 'Request to Join' : 'Join This Team'}
@@ -2453,7 +2453,7 @@ export default function TournamentDetailsScreen() {
                                 isLoadingOpenTeams ? (
                                     <ActivityIndicator size="small" color="#3B82F6" />
                                 ) : openTeams.length === 0 ? (
-                                    <View className="bg-[#131B2E]/50 p-8 rounded-3xl border border-white/5 items-center justify-center mt-2">
+                                    <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center mt-2">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
                                         <Text className="text-slate-400 mt-4 text-center">No open teams looking for players right now.</Text>
                                     </View>
@@ -2476,7 +2476,7 @@ export default function TournamentDetailsScreen() {
                                             <View key={teamId || index.toString()} className="flex-row items-start gap-3 mb-2">
                                                 <Pressable
                                                     onPress={() => setExpandedTeamId(isExpanded ? null : (teamId || null))}
-                                                    className={`flex-1 bg-[#131B2E] p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-[#3B82F6]/30' : 'border-white/[0.06]'}`}
+                                                    className={`flex-1 bg-card p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-blue-500/30' : 'border-white/[0.06]'}`}
                                                 >
                                                     <LinearGradient
                                                         colors={['rgba(255,255,255,0.05)', 'transparent']}
@@ -2485,7 +2485,7 @@ export default function TournamentDetailsScreen() {
                                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                                                     />
                                                     <View className="flex-row items-center gap-4">
-                                                        <View className="w-12 h-12 rounded-2xl bg-[#3B82F6]/10 items-center justify-center border border-[#3B82F6]/20 shadow-sm shadow-[#3B82F6]/20">
+                                                        <View className="w-12 h-12 rounded-2xl bg-blue-500/10 items-center justify-center border border-blue-500/20 shadow-sm shadow-blue-500/20">
                                                             <Ionicons name="game-controller-outline" size={24} color="#3B82F6" />
                                                         </View>
                                                         <View className="flex-1">
@@ -2494,8 +2494,8 @@ export default function TournamentDetailsScreen() {
                                                             </Text>
                                                             <View className="flex-row items-center gap-2 mt-1">
                                                                 {(memberCount >= teamSize && teamSize > 0) ? (
-                                                                    <View className="bg-[#3B82F6]/10 px-2 py-0.5 rounded-full border border-[#3B82F6]/20 flex-shrink-0">
-                                                                        <Text className="text-[9px] font-black text-[#3B82F6] uppercase">
+                                                                    <View className="bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 flex-shrink-0">
+                                                                        <Text className="text-[9px] font-black text-blue-500 uppercase">
                                                                             {TEAM_LABELS.TEAM_FULL}
                                                                         </Text>
                                                                     </View>
@@ -2505,9 +2505,9 @@ export default function TournamentDetailsScreen() {
                                                                     </Text>
                                                                 )}
                                                                 {captain && (
-                                                                    <View className="flex-row items-center gap-1 bg-[#F59E0B]/10 px-2 rounded-full py-0.5 border border-[#F59E0B]/20 flex-shrink">
+                                                                    <View className="flex-row items-center gap-1 bg-warning/10 px-2 rounded-full py-0.5 border border-warning/20 flex-shrink">
                                                                         <Ionicons name="shield" size={10} color="#F59E0B" />
-                                                                        <Text className="text-[9px] text-[#F59E0B] font-black uppercase flex-shrink" numberOfLines={1}>
+                                                                        <Text className="text-[9px] text-warning font-black uppercase flex-shrink" numberOfLines={1}>
                                                                             {captain?.username || captain?.Username}
                                                                         </Text>
                                                                     </View>
@@ -2529,9 +2529,9 @@ export default function TournamentDetailsScreen() {
                                                                         <Pressable
                                                                             key={(m.userId || m.UserId) || mIdx.toString()}
                                                                             onPress={() => navigation.navigate('PlayerProfile', { id: m.userId || m.UserId })}
-                                                                            className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-[#F59E0B]/[0.08] border-[#F59E0B]/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
+                                                                            className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-warning/[0.08] border-warning/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
                                                                         >
-                                                                            <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-[#F59E0B]/50' : 'border border-white/10'}`}>
+                                                                            <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-warning/50' : 'border border-white/10'}`}>
                                                                                 <PlayerAvatar name={m.username || m.Username} src={m.avatarUrl || m.AvatarUrl} size="sm" />
                                                                             </View>
                                                                             <View className="flex-1">
@@ -2539,7 +2539,7 @@ export default function TournamentDetailsScreen() {
                                                                                 {isMemberCaptain ? (
                                                                                     <View className="flex-row items-center gap-1 mt-0.5">
                                                                                         <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
-                                                                                        <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-wider">Captain</Text>
+                                                                                        <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
                                                                                     </View>
                                                                                 ) : (
                                                                                     <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
@@ -2581,12 +2581,12 @@ export default function TournamentDetailsScreen() {
 
                                                                 return (
                                                                     <Button
-                                                                        className={t.requiresApproval || t.RequiresApproval ? "bg-[#3B82F6] py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-[#3B82F6]/20" : "bg-[#00E5A0] py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-[#00E5A0]/20"}
+                                                                        className={t.requiresApproval || t.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
                                                                         onPress={() => handleJoinTeam(teamId as string, t.requiresApproval || t.RequiresApproval)}
                                                                         loading={joiningTeamId === teamId}
                                                                         disabled={joiningTeamId !== null || isPending}
                                                                     >
-                                                                        <Text className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center" : "text-[#0F172A] font-black uppercase tracking-widest text-sm text-center"}>
+                                                                        <Text className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center"}>
                                                                             {isPending
                                                                                 ? 'Request Pending'
                                                                                 : (t.requiresApproval || t.RequiresApproval) ? 'Request to Join' : 'Join This Team'}
@@ -2627,7 +2627,7 @@ export default function TournamentDetailsScreen() {
                                                     size="sm"
                                                     onPress={handleApproveAll}
                                                     loading={isLoadingPending}
-                                                    className="bg-[#10B981]"
+                                                    className="bg-primary"
                                                 >
                                                     Approve All
                                                 </Button>
@@ -2638,7 +2638,7 @@ export default function TournamentDetailsScreen() {
                                     {isLoadingPending ? (
                                         <ActivityIndicator size="small" color="#F59E0B" />
                                     ) : pendingRegistrations.length === 0 ? (
-                                        <View className="bg-[#131B2E]/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
+                                        <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#F59E0B" />
                                             <Text className="text-slate-400 mt-4 text-center">No pending requests.</Text>
                                         </View>
@@ -2674,7 +2674,7 @@ export default function TournamentDetailsScreen() {
                                                 <View key={teamId || regId || index.toString()} className="mb-3">
                                                     <Pressable
                                                         onPress={() => setExpandedTeamId(isExpanded ? null : (teamId || null))}
-                                                        className={`bg-[#131B2E] p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-[#F59E0B]/30' : 'border-white/[0.06]'}`}
+                                                        className={`bg-card p-5 rounded-[24px] border overflow-hidden ${isExpanded ? 'border-warning/30' : 'border-white/[0.06]'}`}
                                                     >
                                                         <LinearGradient
                                                             colors={['rgba(255,255,255,0.05)', 'transparent']}
@@ -2683,7 +2683,7 @@ export default function TournamentDetailsScreen() {
                                                             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                                                         />
                                                         <View className="flex-row items-center gap-4">
-                                                            <View className="w-12 h-12 rounded-2xl bg-[#F59E0B]/10 items-center justify-center border border-[#F59E0B]/20 shadow-sm shadow-[#F59E0B]/20">
+                                                            <View className="w-12 h-12 rounded-2xl bg-warning/10 items-center justify-center border border-warning/20 shadow-sm shadow-warning/20">
                                                                 <Ionicons name="shield-half-outline" size={24} color="#F59E0B" />
                                                             </View>
                                                             <View className="flex-1">
@@ -2692,8 +2692,8 @@ export default function TournamentDetailsScreen() {
                                                                 </Text>
                                                                 <View className="flex-row items-center gap-2 mt-1">
                                                                     {(memberCount >= teamSize && teamSize > 0) ? (
-                                                                        <View className="bg-[#F59E0B]/10 px-2 py-0.5 rounded-full border border-[#F59E0B]/20 flex-shrink-0">
-                                                                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase">
+                                                                        <View className="bg-warning/10 px-2 py-0.5 rounded-full border border-warning/20 flex-shrink-0">
+                                                                            <Text className="text-[9px] font-black text-warning uppercase">
                                                                                 {TEAM_LABELS.TEAM_FULL}
                                                                             </Text>
                                                                         </View>
@@ -2703,9 +2703,9 @@ export default function TournamentDetailsScreen() {
                                                                         </Text>
                                                                     )}
                                                                     {captain && (
-                                                                        <View className="flex-row items-center gap-1 bg-[#F59E0B]/10 px-2 rounded-full py-0.5 border border-[#F59E0B]/20 flex-shrink">
+                                                                        <View className="flex-row items-center gap-1 bg-warning/10 px-2 rounded-full py-0.5 border border-warning/20 flex-shrink">
                                                                             <Ionicons name="shield" size={10} color="#F59E0B" />
-                                                                            <Text className="text-[9px] text-[#F59E0B] font-black uppercase flex-shrink" numberOfLines={1}>
+                                                                            <Text className="text-[9px] text-warning font-black uppercase flex-shrink" numberOfLines={1}>
                                                                                 {captain?.username || captain?.Username}
                                                                             </Text>
                                                                         </View>
@@ -2727,9 +2727,9 @@ export default function TournamentDetailsScreen() {
                                                                             <Pressable
                                                                                 key={(m.userId || m.UserId) || mIdx.toString()}
                                                                                 onPress={() => navigation.navigate('PlayerProfile', { id: m.userId || m.UserId })}
-                                                                                className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-[#F59E0B]/[0.08] border-[#F59E0B]/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
+                                                                                className={`flex-row items-center gap-3 p-3 rounded-2xl border active:opacity-70 ${isMemberCaptain ? 'bg-warning/[0.08] border-warning/25' : 'bg-white/[0.04] border-white/[0.08]'}`}
                                                                             >
-                                                                                <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-[#F59E0B]/50' : 'border border-white/10'}`}>
+                                                                                <View className={`rounded-full p-[2.5px] ${isMemberCaptain ? 'border-2 border-warning/50' : 'border border-white/10'}`}>
                                                                                     <PlayerAvatar name={m.username || m.Username} src={m.avatarUrl || m.AvatarUrl} size="sm" />
                                                                                 </View>
                                                                                 <View className="flex-1">
@@ -2737,7 +2737,7 @@ export default function TournamentDetailsScreen() {
                                                                                     {isMemberCaptain ? (
                                                                                         <View className="flex-row items-center gap-1 mt-0.5">
                                                                                             <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
-                                                                                            <Text className="text-[9px] font-black text-[#F59E0B] uppercase tracking-wider">Captain</Text>
+                                                                                            <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
                                                                                         </View>
                                                                                     ) : (
                                                                                         <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
@@ -2774,14 +2774,14 @@ export default function TournamentDetailsScreen() {
                                                             <Pressable
                                                                 onPress={() => handleApprove(regId)}
                                                                 disabled={processingId !== null}
-                                                                className="flex-1 flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-[#10B981]/15 border border-[#10B981]/30 active:opacity-60"
+                                                                className="flex-1 flex-row items-center justify-center gap-2 h-11 rounded-2xl bg-primary/15 border border-primary/30 active:opacity-60"
                                                             >
                                                                 {processingId === regId ? (
                                                                     <ActivityIndicator size="small" color="#10B981" />
                                                                 ) : (
                                                                     <>
                                                                         <Ionicons name="checkmark" size={18} color="#10B981" />
-                                                                        <Text className="text-[#10B981] font-bold text-sm">Approve</Text>
+                                                                        <Text className="text-primary font-bold text-sm">Approve</Text>
                                                                     </>
                                                                 )}
                                                             </Pressable>
@@ -2849,7 +2849,7 @@ export default function TournamentDetailsScreen() {
                                 isLoadingParticipants ? (
                                     <ActivityIndicator size="small" color="#3B82F6" />
                                 ) : participants.length === 0 ? (
-                                    <View className="bg-[#131B2E]/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
+                                    <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
                                         <Text className="text-slate-400 mt-4 text-center">No confirmed players yet.</Text>
                                     </View>
@@ -2971,7 +2971,7 @@ export default function TournamentDetailsScreen() {
                                                 size="sm"
                                                 onPress={handleApproveAll}
                                                 loading={isLoadingPending}
-                                                className="bg-[#10B981]"
+                                                className="bg-primary"
                                             >
                                                 Approve All
                                             </Button>
@@ -2980,7 +2980,7 @@ export default function TournamentDetailsScreen() {
                                     {isLoadingPending ? (
                                         <ActivityIndicator size="small" color="#F59E0B" />
                                     ) : pendingRegistrations.length === 0 ? (
-                                        <View className="bg-[#131B2E]/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
+                                        <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
                                             <Text className="text-slate-400 mt-4 text-center">No pending registrations.</Text>
                                         </View>

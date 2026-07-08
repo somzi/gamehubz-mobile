@@ -13,6 +13,7 @@ import { Button } from '../components/ui/Button';
 import { SelectInput } from '../components/ui/SelectInput';
 import { StatusModal } from '../components/modals/StatusModal';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { COLORS } from '../lib/theme';
 
 type ManageHubSocialsRouteProp = RouteProp<RootStackParamList, 'ManageHubSocials'>;
 type ManageHubSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -204,7 +205,7 @@ export default function ManageHubSocialsScreen() {
             <SafeAreaView className="flex-1 bg-background">
                 <PageHeader title="Manage Socials" showBack />
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#8B5CF6" />
+                    <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
             </SafeAreaView>
         );
@@ -232,7 +233,7 @@ export default function ManageHubSocialsScreen() {
                                         >
                                             <View className="flex-row items-center gap-3">
                                                 <View className="w-8 h-8 rounded-full bg-accent/20 items-center justify-center">
-                                                    <Ionicons name={getSocialIcon(socialType!) as any} size={16} color="hsl(45, 90%, 55%)" />
+                                                    <Ionicons name={getSocialIcon(socialType!) as any} size={16} color={COLORS.warning} />
                                                 </View>
                                                 <View>
                                                     <Text className="text-sm font-bold text-foreground">{getSocialLabel(socialType!)}</Text>

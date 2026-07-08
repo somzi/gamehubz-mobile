@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
 import { cn } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
 
 interface ButtonProps {
     onPress?: () => void;
@@ -43,7 +44,7 @@ export function Button({
             ]}
         >
             {loading ? (
-                <ActivityIndicator color={variant === 'outline' ? '#8B5CF6' : '#FAFAFA'} />
+                <ActivityIndicator color={variant === 'default' ? COLORS.primaryForeground : COLORS.foreground} />
             ) : (
                 typeof children === 'string' || typeof children === 'number' ? (
                     <Text

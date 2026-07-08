@@ -44,7 +44,7 @@ export function SwapBracketModal({ visible, onClose, teams, onConfirm, busy }: S
             <View className="flex-1 bg-black/60 justify-end">
                 <Pressable className="absolute inset-0" onPress={busy ? undefined : onClose} />
 
-                <View className="bg-[#131B2E] rounded-t-[32px] border-t border-x border-white/[0.06] overflow-hidden" style={{ maxHeight: '85%' }}>
+                <View className="bg-card rounded-t-[32px] border-t border-x border-white/[0.06] overflow-hidden" style={{ maxHeight: '85%' }}>
                     {/* Header */}
                     <View className="px-6 pt-5 pb-4 border-b border-white/[0.05]">
                         <View className="flex-row items-center gap-2.5">

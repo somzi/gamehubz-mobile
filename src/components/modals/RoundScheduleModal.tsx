@@ -143,8 +143,8 @@ export function RoundScheduleModal({ visible, onClose, onSave, roundNumber, init
     return (
         <Modal visible={visible} transparent animationType="fade">
             <Pressable className="flex-1 bg-black/80 justify-center px-4" onPress={onClose}>
-                <Pressable className="bg-[#0f172a] rounded-[32px] border border-white/10 overflow-hidden shadow-2xl">
-                    <View className="px-6 py-5 border-b border-white/5 bg-[#131B2E] flex-row justify-between items-center">
+                <Pressable className="bg-background rounded-[32px] border border-white/10 overflow-hidden shadow-2xl">
+                    <View className="px-6 py-5 border-b border-white/5 bg-card flex-row justify-between items-center">
                         <Text className="text-xl font-bold text-white">Round {roundNumber} Schedule</Text>
                         <TouchableOpacity onPress={onClose} className="p-2 bg-white/5 rounded-full z-10">
                             <Ionicons name="close" size={20} color="#94A3B8" />

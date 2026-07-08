@@ -385,7 +385,7 @@ export function HourlyAvailabilityPicker({
                     <Pressable className="absolute inset-0 bg-black/70" onPress={closePicker} />
 
                     <View
-                        className="bg-[#0B1120] rounded-t-[32px] border-t border-white/[0.08] overflow-hidden"
+                        className="bg-background-deep rounded-t-[32px] border-t border-white/[0.08] overflow-hidden"
                         style={{ maxHeight: '90%', paddingBottom: Math.max(insets.bottom, 14) }}
                     >
                         <ScrollView

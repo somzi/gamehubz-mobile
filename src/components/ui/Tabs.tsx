@@ -24,7 +24,7 @@ export function Tabs({ tabs, activeTab, onTabChange, variant = 'default' }: Tabs
                             className={cn(
                                 "px-4 py-2 rounded-full border",
                                 activeTab === tab.value
-                                    ? "bg-[#4F46E5] border-[#4F46E5]"
+                                    ? "bg-indigo-600 border-[#4F46E5]"
                                     : "bg-transparent border-white/10"
                             )}
                         >
@@ -42,7 +42,7 @@ export function Tabs({ tabs, activeTab, onTabChange, variant = 'default' }: Tabs
     }
 
     return (
-        <View className="bg-[#131B2E] p-1 rounded-2xl flex-row border border-white/5">
+        <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
             {tabs.map((tab) => (
                 <Pressable
                     key={tab.value}
@@ -52,7 +52,7 @@ export function Tabs({ tabs, activeTab, onTabChange, variant = 'default' }: Tabs
                     }}
                     className={cn(
                         "flex-1 py-3 px-1 rounded-xl items-center justify-center",
-                        activeTab === tab.value ? "bg-[#4F46E5]" : ""
+                        activeTab === tab.value ? "bg-indigo-600" : ""
                     )}
                 >
                     <Text className={cn(

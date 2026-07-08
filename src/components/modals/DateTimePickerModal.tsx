@@ -183,7 +183,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                         <TouchableOpacity
                             key={item}
                             onPress={() => onSelect(item)}
-                            className={`w-12 h-12 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-[#131B2E] border-white/5'
+                            className={`w-12 h-12 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-card border-white/5'
                                 }`}
                         >
                             <Text className={`font-bold ${active ? 'text-background' : 'text-white'}`}>
@@ -210,8 +210,8 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                     onPress={onClose}
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                 />
-                <View className="bg-[#0f172a] rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
-                    <View className="p-6 border-b border-white/5 bg-[#131B2E] flex-row justify-between items-center">
+                <View className="bg-background rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
+                    <View className="p-6 border-b border-white/5 bg-card flex-row justify-between items-center">
                         <Text className="text-xl font-bold text-white">{title}</Text>
                         <TouchableOpacity onPress={onClose} className="p-2 bg-white/5 rounded-full">
                             <Ionicons name="close" size={20} color="#94A3B8" />
@@ -243,7 +243,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                         </View>
                     </ScrollView>
 
-                    <View className="p-6 bg-[#131B2E] border-t border-white/5 space-y-3">
+                    <View className="p-6 bg-card border-t border-white/5 space-y-3">
                         <TouchableOpacity
                             onPress={handleConfirm}
                             className="w-full py-4 rounded-2xl bg-primary items-center shadow-lg shadow-primary/30"
