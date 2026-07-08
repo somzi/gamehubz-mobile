@@ -60,7 +60,7 @@ export default function HubProfileScreen() {
     const [hasMore, setHasMore] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(true);
-    const [isAboutOpen, setIsAboutOpen] = useState(false);
+    const [isAboutOpen, setIsAboutOpen] = useState(true);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
     const [shareCardVisible, setShareCardVisible] = useState(false);
     const [isUnfollowing, setIsUnfollowing] = useState(false);
@@ -619,7 +619,7 @@ export default function HubProfileScreen() {
                             <InfoRow
                                 icon="people"
                                 iconColor="#818CF8"
-                                label="Followers"
+                                label="Members"
                                 value={(hubData.numberOfUsers || 0).toLocaleString()}
                             />
                             <InfoRow
@@ -628,6 +628,42 @@ export default function HubProfileScreen() {
                                 label="Tournaments"
                                 value={String(hubData.numberOfTournaments || 0)}
                             />
+                            <InfoRow
+                                icon={isPublic ? 'globe-outline' : 'lock-closed'}
+                                iconColor={isPublic ? '#34D399' : '#F59E0B'}
+                                label="Access"
+                                value={isPublic ? 'Public' : 'Private'}
+                            />
+                            {(hubData.createdOn || hubData.CreatedOn) && (
+                                <InfoRow
+                                    icon="calendar-outline"
+                                    iconColor="#38BDF8"
+                                    label="Established"
+                                    value={formatDateSafe(hubData.createdOn || hubData.CreatedOn)}
+                                />
+                            )}
+                            {(() => {
+                                // Old backends don't send userHubRole — fall back to the flags we do have.
+                                const myRole = hubData.userHubRole ?? hubData.UserHubRole
+                                    ?? (isOwner ? HubRole.HubOwner : isAdmin ? HubRole.HubAdmin : null);
+                                if (myRole == null) return null;
+                                const roleMeta = getRoleMeta(myRole);
+                                return (
+                                    <InfoRow
+                                        icon={roleMeta.icon as any}
+                                        iconColor={roleMeta.iconColor}
+                                        label="Your Role"
+                                        value={
+                                            <View className={`flex-row items-center px-2 py-1 rounded-full ${roleMeta.bg}`} style={{ gap: 4 }}>
+                                                <Ionicons name={roleMeta.icon as any} size={10} color={roleMeta.iconColor} />
+                                                <Text className={`text-[10px] font-black uppercase tracking-wide ${roleMeta.color}`}>
+                                                    {roleMeta.label}
+                                                </Text>
+                                            </View>
+                                        }
+                                    />
+                                );
+                            })()}
                             {(hubData.ownerName || hubData.OwnerName) && (
                                 <InfoRow
                                     icon="person"

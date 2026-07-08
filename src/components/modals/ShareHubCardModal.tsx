@@ -92,7 +92,7 @@ function HubCardPoster({ name, avatarUrl, isVerified, isPublic, ownerName, stats
                 <View style={{ marginTop: 26, flexDirection: 'row', alignItems: 'center' }}>
                     <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={stats.tournaments} label="TOURNAMENTS" valueColor="#FBBF24" />
                     <StatDivider />
-                    <StatRing value={stats.followers.toLocaleString()} label="FOLLOWERS" ringColors={['#34D399', '#2DD4ED']} />
+                    <StatRing value={stats.followers.toLocaleString()} label="MEMBERS" ringColors={['#34D399', '#2DD4ED']} />
                     <StatDivider />
                     <SideStat
                         icon={isPublic ? 'globe-outline' : 'lock-closed'}
