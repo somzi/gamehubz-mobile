@@ -16,38 +16,11 @@ import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { StatusModal } from '../components/modals/StatusModal';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import { COLORS } from '../lib/theme';
+import { SectionLabel } from '../components/ui/SectionLabel';
+import { MenuItem } from '../components/ui/MenuItem';
 
 type ManageHubScreenRouteProp = RouteProp<RootStackParamList, 'ManageHub'>;
 type ManageHubScreenNavigationProp = StackNavigationProp<RootStackParamList>;
-
-interface MenuItemProps {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    onPress: () => void;
-    color?: string;
-    showChevron?: boolean;
-}
-
-function MenuItem({ icon, label, onPress, color = "#71717A", showChevron = true }: MenuItemProps) {
-    return (
-        <Pressable
-            onPress={onPress}
-            className="flex-row items-center justify-between py-4 border-b border-white/5"
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-        >
-            <View className="flex-row items-center gap-4">
-                <Ionicons name={icon} size={22} color={color} />
-                <Text 
-                    className="font-medium text-base"
-                    style={{ color: color === "#71717A" ? "#FFFFFF" : color }}
-                >
-                    {label}
-                </Text>
-            </View>
-            {showChevron && <Ionicons name="chevron-forward" size={18} color="#3F3F46" />}
-        </Pressable>
-    );
-}
 
 export default function ManageHubScreen() {
     const route = useRoute<ManageHubScreenRouteProp>();
@@ -279,7 +252,7 @@ export default function ManageHubScreen() {
 
             <ScrollView className="flex-1 px-6">
                 {/* Hub Info Preview with Avatar Upload */}
-                <View className="items-center py-6 border-b border-white/5 mb-4">
+                <View className="items-center py-6 mb-2">
                     <View className="relative">
                         <PlayerAvatar
                             name={hubData?.name || 'Hub'}
@@ -307,69 +280,84 @@ export default function ManageHubScreen() {
                     </Text>
                 </View>
 
-                {/* Management Menu */}
-                <View className="space-y-1">
-                    <MenuItem
-                        icon="person-add-outline"
-                        label="Manage Members"
-                        onPress={() => navigation.navigate('HubMembers', { hubId })}
-                    />
+                {/* Management Menu — grouped cards */}
+                <View className="gap-5">
+                    <View>
+                        <SectionLabel icon="people" title="Community" color={COLORS.info} />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            <MenuItem
+                                icon="person-add-outline"
+                                label="Manage Members"
+                                onPress={() => navigation.navigate('HubMembers', { hubId })}
+                            />
+                            <MenuItem
+                                icon="trophy-outline"
+                                label="Create Tournament"
+                                onPress={() => setShowCreateTournamentModal(true)}
+                                isLast
+                            />
+                        </View>
+                    </View>
+
+                    <View>
+                        <SectionLabel icon="settings" title="Hub Settings" />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            {isOwner && (
+                                <MenuItem
+                                    icon="create-outline"
+                                    label="Edit Hub Info"
+                                    onPress={() => setShowEditModal(true)}
+                                />
+                            )}
+                            <MenuItem
+                                icon="share-social-outline"
+                                label="Manage Socials"
+                                onPress={() => navigation.navigate('ManageHubSocials', { hubId })}
+                                isLast={!isOwner}
+                            />
+                            {isOwner && (
+                                <MenuItem
+                                    icon="shield-checkmark-outline"
+                                    label="Verification"
+                                    onPress={() => setShowVerificationModal(true)}
+                                    isLast
+                                    rightElement={
+                                        hubData?.isVerified ? (
+                                            <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                                <Ionicons name="checkmark" size={11} color="#38BDF8" />
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">Verified</Text>
+                                            </View>
+                                        ) : verificationStatus === 0 ? (
+                                            <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                                <Ionicons name="time-outline" size={11} color={COLORS.warning} />
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pending</Text>
+                                            </View>
+                                        ) : verificationStatus === 2 ? (
+                                            <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                                <Ionicons name="close" size={11} color={COLORS.destructive} />
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">Rejected</Text>
+                                            </View>
+                                        ) : null
+                                    }
+                                />
+                            )}
+                        </View>
+                    </View>
+
                     {isOwner && (
-                        <MenuItem
-                            icon="create-outline"
-                            label="Edit Hub Info"
-                            onPress={() => setShowEditModal(true)}
-                        />
-                    )}
-                    <MenuItem
-                        icon="share-social-outline"
-                        label="Manage Socials"
-                        onPress={() => navigation.navigate('ManageHubSocials', { hubId })}
-                    />
-                    <MenuItem
-                        icon="trophy-outline"
-                        label="Create Tournament"
-                        onPress={() => setShowCreateTournamentModal(true)}
-                    />
-                    {isOwner && (
-                        <Pressable
-                            onPress={() => setShowVerificationModal(true)}
-                            className="flex-row items-center justify-between py-4 border-b border-white/5"
-                            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                        >
-                            <View className="flex-row items-center gap-4">
-                                <Ionicons name="shield-checkmark-outline" size={22} color="#71717A" />
-                                <Text className="font-medium text-base text-white">Verification</Text>
+                        <View>
+                            <SectionLabel icon="exit-outline" title="Owner Actions" color={COLORS.destructive} />
+                            <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                                <MenuItem
+                                    icon="trash-outline"
+                                    label="Delete Hub"
+                                    onPress={handleDeleteHub}
+                                    destructive
+                                    showChevron={false}
+                                    isLast
+                                />
                             </View>
-                            <View className="flex-row items-center" style={{ gap: 8 }}>
-                                {hubData?.isVerified ? (
-                                    <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                        <Ionicons name="checkmark" size={11} color="#38BDF8" />
-                                        <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">Verified</Text>
-                                    </View>
-                                ) : verificationStatus === 0 ? (
-                                    <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                        <Ionicons name="time-outline" size={11} color="#F59E0B" />
-                                        <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pending</Text>
-                                    </View>
-                                ) : verificationStatus === 2 ? (
-                                    <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                        <Ionicons name="close" size={11} color="#EF4444" />
-                                        <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">Rejected</Text>
-                                    </View>
-                                ) : null}
-                                <Ionicons name="chevron-forward" size={18} color="#3F3F46" />
-                            </View>
-                        </Pressable>
-                    )}
-                    {isOwner && (
-                        <MenuItem
-                            icon="trash-outline"
-                            label="Delete Hub"
-                            onPress={handleDeleteHub}
-                            color="#EF4444"
-                            showChevron={false}
-                        />
+                        </View>
                     )}
                 </View>
 

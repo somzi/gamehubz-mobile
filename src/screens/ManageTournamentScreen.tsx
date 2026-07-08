@@ -9,35 +9,12 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { EditTournamentModal } from '../components/modals/EditTournamentModal';
 import { StatusModal } from '../components/modals/StatusModal';
+import { SectionLabel } from '../components/ui/SectionLabel';
+import { MenuItem } from '../components/ui/MenuItem';
+import { COLORS } from '../lib/theme';
 
 type ManageTournamentScreenRouteProp = RouteProp<RootStackParamList, 'ManageTournament'>;
 type ManageTournamentScreenNavigationProp = StackNavigationProp<RootStackParamList>;
-
-interface MenuItemProps {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    onPress: () => void;
-    color?: string;
-    showChevron?: boolean;
-    destructive?: boolean;
-}
-
-function MenuItem({ icon, label, onPress, color = "#94A3B8", showChevron = true, destructive = false }: MenuItemProps) {
-    return (
-        <Pressable
-            onPress={onPress}
-            className="flex-row items-center justify-between py-5 border-b border-white/5"
-        >
-            <View className="flex-row items-center gap-4">
-                <View className={`w-10 h-10 rounded-xl items-center justify-center ${destructive ? 'bg-red-500/10' : 'bg-white/5'}`}>
-                    <Ionicons name={icon} size={20} color={destructive ? '#EF4444' : color} />
-                </View>
-                <Text className={`font-semibold text-base ${destructive ? 'text-red-500' : 'text-white'}`}>{label}</Text>
-            </View>
-            {showChevron && <Ionicons name="chevron-forward" size={18} color="#3F3F46" />}
-        </Pressable>
-    );
-}
 
 export default function ManageTournamentScreen() {
     const route = useRoute<ManageTournamentScreenRouteProp>();
@@ -227,7 +204,7 @@ export default function ManageTournamentScreen() {
             <PageHeader title="Manage Tournament" showBack />
 
             <ScrollView className="flex-1 px-6">
-                <View className="items-center py-8 border-b border-white/5 mb-6">
+                <View className="items-center py-8 mb-2">
                     <View className="w-20 h-20 rounded-3xl bg-primary/10 items-center justify-center border border-primary/20 mb-4">
                         <Ionicons name="trophy" size={40} color="#10B981" />
                     </View>
@@ -241,31 +218,50 @@ export default function ManageTournamentScreen() {
                     </Text>
                 </View>
 
-                <View className="space-y-1">
-                    <MenuItem
-                        icon="create-outline"
-                        label="Edit Tournament Info"
-                        onPress={() => setShowEditModal(true)}
-                    />
-                    
-                    {tournament?.status === 3 && (
-                        <MenuItem
-                            icon="stop-circle-outline"
-                            label="Cancel Tournament"
-                            onPress={promptCancelTournament}
-                            destructive
-                        />
-                    )}
+                <View className="gap-5">
+                    <View>
+                        <SectionLabel icon="trophy" title="Tournament" />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            <MenuItem
+                                icon="create-outline"
+                                label="Edit Tournament Info"
+                                onPress={() => setShowEditModal(true)}
+                                isLast
+                            />
+                        </View>
+                    </View>
 
-                    {(tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
-                        <MenuItem
-                            icon="trash-outline"
-                            label="Delete Tournament"
-                            onPress={promptDeleteTournament}
-                            destructive
-                        />
+                    {(tournament?.status === 3 ||
+                        tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
+                        <View>
+                            <SectionLabel icon="exit-outline" title="Admin Actions" color={COLORS.destructive} />
+                            <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                                {tournament?.status === 3 && (
+                                    <MenuItem
+                                        icon="stop-circle-outline"
+                                        label="Cancel Tournament"
+                                        onPress={promptCancelTournament}
+                                        destructive
+                                        showChevron={false}
+                                        isLast
+                                    />
+                                )}
+                                {(tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
+                                    <MenuItem
+                                        icon="trash-outline"
+                                        label="Delete Tournament"
+                                        onPress={promptDeleteTournament}
+                                        destructive
+                                        showChevron={false}
+                                        isLast
+                                    />
+                                )}
+                            </View>
+                        </View>
                     )}
                 </View>
+
+                <View className="h-10" />
             </ScrollView>
 
             <EditTournamentModal

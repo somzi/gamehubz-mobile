@@ -14,51 +14,11 @@ import { ActivityIndicator, TouchableOpacity } from 'react-native';
 import { StatusModal } from '../components/modals/StatusModal';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import Constants from 'expo-constants';
-import { cn } from '../lib/utils';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
-import { PressableScale } from '../components/ui/PressableScale';
+import { MenuItem } from '../components/ui/MenuItem';
 
 type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
-
-interface MenuItemProps {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    onPress: () => void;
-    destructive?: boolean;
-    showChevron?: boolean;
-    isLast?: boolean;
-}
-
-function MenuItem({ icon, label, onPress, destructive = false, showChevron = true, isLast = false }: MenuItemProps) {
-    return (
-        <PressableScale
-            onPress={onPress}
-            pressedScale={0.98}
-            className={cn(
-                "flex-row items-center justify-between py-3.5 px-4",
-                !isLast && "border-b border-white/5"
-            )}
-        >
-            <View className="flex-row items-center gap-3">
-                <View
-                    className={cn(
-                        "w-9 h-9 rounded-xl items-center justify-center border",
-                        destructive
-                            ? "bg-red-500/10 border-red-500/20"
-                            : "bg-white/[0.04] border-white/[0.06]"
-                    )}
-                >
-                    <Ionicons name={icon} size={17} color={destructive ? COLORS.destructive : COLORS.slate300} />
-                </View>
-                <Text className={cn("font-semibold text-[15px]", destructive ? "text-red-400" : "text-white")}>
-                    {label}
-                </Text>
-            </View>
-            {showChevron && <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />}
-        </PressableScale>
-    );
-}
 
 export default function EditProfileScreen() {
     const { user, logout, deleteAccount, refreshUser } = useAuth();
