@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Input } from '../components/ui/Input';
@@ -89,38 +90,44 @@ export default function ForgotPasswordScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <StatusBar style="light" />
-            
+            {/* Ambient emerald glow behind the hero — decoration only */}
+            <LinearGradient
+                colors={['rgba(16, 185, 129, 0.12)', 'rgba(15, 23, 42, 0)']}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280 }}
+                pointerEvents="none"
+            />
+
             <View className="px-6 pt-4 pb-2">
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    className="w-10 h-10 bg-secondary rounded-full items-center justify-center border border-border"
+                    className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 items-center justify-center"
                 >
-                    <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
+                    <Ionicons name="arrow-back" size={20} color={COLORS.foreground} />
                 </TouchableOpacity>
             </View>
 
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 className="flex-1"
             >
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1, paddingTop: 40 }}
                     className="px-6"
                 >
-                    <View className="items-center mb-10">
-                        <View className="w-20 h-20 bg-primary/20 rounded-2xl items-center justify-center mb-6">
-                            <Ionicons name="mail-unread-outline" size={40} color={COLORS.primary} />
+                    <View className="items-center mb-8">
+                        <View className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mb-5">
+                            <Ionicons name="mail-unread-outline" size={30} color={COLORS.primary} />
                         </View>
 
-                        <Text className="text-3xl font-bold text-foreground mb-2 text-center">Reset Password</Text>
-                        <Text className="text-muted-foreground text-center px-4">
+                        <Text className="text-3xl font-black text-white mb-2 text-center tracking-tight">Reset password</Text>
+                        <Text className="text-slate-400 text-center px-6 text-[13px] leading-5">
                             Enter your email address and we'll send you a 6-digit code to reset your password.
                         </Text>
                     </View>
 
-                    <View className="gap-4 w-full max-w-sm self-center">
+                    <View className="w-full max-w-sm self-center bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5 gap-4">
                         <Input
-                            label="Email Address"
+                            label="EMAIL ADDRESS"
                             placeholder="your@email.com"
                             value={email}
                             onChangeText={(text) => { setEmail(text); setError(undefined); }}
@@ -133,10 +140,13 @@ export default function ForgotPasswordScreen() {
                         <Button
                             onPress={handleSendCode}
                             loading={isLoading}
-                            className="mt-6"
+                            className="mt-1 h-14 rounded-2xl shadow-lg shadow-primary/30"
                             size="lg"
                         >
-                            Send Reset Code
+                            <View className="flex-row items-center justify-center gap-2">
+                                <Text className="text-primary-foreground font-black text-base">Send Reset Code</Text>
+                                <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
+                            </View>
                         </Button>
                     </View>
                 </ScrollView>

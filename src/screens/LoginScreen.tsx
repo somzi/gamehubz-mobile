@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS } from '../lib/theme';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Input } from '../components/ui/Input';
@@ -52,6 +54,12 @@ export default function LoginScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <StatusBar style="light" />
+            {/* Ambient emerald glow behind the hero — decoration only */}
+            <LinearGradient
+                colors={['rgba(16, 185, 129, 0.12)', 'rgba(15, 23, 42, 0)']}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280 }}
+                pointerEvents="none"
+            />
             <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -68,7 +76,7 @@ export default function LoginScreen() {
                         keyboardShouldPersistTaps="handled"
                         showsVerticalScrollIndicator={false}
                     >
-                        {/* HEADER SEKCIJA: Logo i Welcome Text gurnuti gore */}
+                        {/* ── Hero: centered brand logo ── */}
                         <View className="items-center mb-10 mt-4">
                             <View className="mb-5 shadow-2xl shadow-primary/20">
                                 <Image
@@ -88,8 +96,8 @@ export default function LoginScreen() {
                             </Text>
                         </View>
 
-                        {/* FORMA SEKCIJA */}
-                        <View className="gap-4 w-full max-w-sm self-center">
+                        {/* ── Form card ── */}
+                        <View className="w-full max-w-sm self-center bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5 gap-4">
                             <Input
                                 label="EMAIL ADDRESS"
                                 placeholder="entered@email.com"
@@ -114,30 +122,34 @@ export default function LoginScreen() {
                             />
 
                             <TouchableOpacity
-                                className="self-end -mt-2"
+                                className="self-end -mt-1"
                                 onPress={() => navigation.navigate('ForgotPassword' as any)}
+                                hitSlop={8}
                             >
-                                <Text className="text-primary text-sm font-medium">Forgot Password?</Text>
+                                <Text className="text-primary text-xs font-black uppercase tracking-wide">
+                                    Forgot Password?
+                                </Text>
                             </TouchableOpacity>
 
                             <Button
                                 onPress={handleLogin}
                                 loading={isLoading}
-                                className="mt-4 h-16 rounded-2xl shadow-lg shadow-primary/30"
+                                className="mt-1 h-16 rounded-2xl shadow-lg shadow-primary/30"
                                 size="lg"
                             >
                                 <View className="flex-row items-center justify-center gap-2">
                                     <Text className="text-primary-foreground font-black text-lg">Log In</Text>
-                                    <Ionicons name="chevron-forward" size={18} color="#0F172A" />
+                                    <Ionicons name="chevron-forward" size={18} color={COLORS.primaryForeground} />
                                 </View>
                             </Button>
+                        </View>
 
-                            <View className="flex-row items-center justify-center mt-8">
-                                <Text className="text-muted-foreground">Don't have an account? </Text>
-                                <TouchableOpacity onPress={() => navigation.navigate('Register' as any)}>
-                                    <Text className="text-primary font-bold">Sign Up</Text>
-                                </TouchableOpacity>
-                            </View>
+                        {/* ── Footer ── */}
+                        <View className="flex-row items-center justify-center mt-8">
+                            <Text className="text-slate-500">Don't have an account? </Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('Register' as any)} hitSlop={8}>
+                                <Text className="text-primary font-black">Sign Up</Text>
+                            </TouchableOpacity>
                         </View>
                     </ScrollView>
                 </KeyboardAvoidingView>
