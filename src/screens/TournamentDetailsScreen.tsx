@@ -412,6 +412,9 @@ export default function TournamentDetailsScreen() {
                 matchId: it.matchId || it.MatchId,
                 teamMatchId: it.teamMatchId ?? it.TeamMatchId ?? null,
                 roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
+                groupName: it.groupName ?? it.GroupName ?? null,
+                homeTeamName: it.homeTeamName ?? it.HomeTeamName ?? null,
+                awayTeamName: it.awayTeamName ?? it.AwayTeamName ?? null,
                 status: it.status ?? it.Status ?? 0,
                 scheduledStartTime: it.scheduledStartTime ?? it.ScheduledStartTime ?? null,
                 requestedByUserId: it.requestedByUserId ?? it.RequestedByUserId ?? null,
@@ -442,6 +445,9 @@ export default function TournamentDetailsScreen() {
             const normalized: PendingApprovalItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
                 matchId: it.matchId || it.MatchId,
                 roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
+                groupName: it.groupName ?? it.GroupName ?? null,
+                homeTeamName: it.homeTeamName ?? it.HomeTeamName ?? null,
+                awayTeamName: it.awayTeamName ?? it.AwayTeamName ?? null,
                 status: it.status ?? it.Status ?? 0,
                 scheduledStartTime: it.scheduledStartTime ?? it.ScheduledStartTime ?? null,
                 proposedHomeScore: it.proposedHomeScore ?? it.ProposedHomeScore ?? null,
@@ -492,7 +498,9 @@ export default function TournamentDetailsScreen() {
         setSelectedMatch({
             id: item.matchId,
             status: item.status,
-            roundName: item.roundNumber ? `Round ${item.roundNumber}` : 'Match',
+            roundName: [item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+                .filter(Boolean)
+                .join(' · ') || 'Match',
             startTime: item.scheduledStartTime,
             home: item.homeUserId
                 ? { userId: item.homeUserId, username: item.homeUsername || 'Player', score: null }
@@ -514,7 +522,9 @@ export default function TournamentDetailsScreen() {
         setSelectedMatch({
             id: item.matchId,
             status: item.status,
-            roundName: item.roundNumber ? `Round ${item.roundNumber}` : 'Match',
+            roundName: [item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+                .filter(Boolean)
+                .join(' · ') || 'Match',
             startTime: item.scheduledStartTime,
             home: item.homeUserId
                 ? { userId: item.homeUserId, username: item.homeUsername || 'Player', score: null }

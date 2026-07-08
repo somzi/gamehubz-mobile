@@ -1,11 +1,16 @@
 import React from 'react';
 import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { AdminInboxMatchCard } from './AdminInboxMatchCard';
 
 export interface PendingApprovalItem {
     matchId: string;
     roundNumber?: number | null;
+    /** Group-stage matches only, e.g. "Group A". */
+    groupName?: string | null;
+    /** Team-tournament sub-matches only — each player's tournament team. */
+    homeTeamName?: string | null;
+    awayTeamName?: string | null;
     status: number;
     scheduledStartTime?: string | null;
     proposedHomeScore?: number | null;
@@ -102,83 +107,32 @@ export function PendingApprovalsModal({
                             </View>
                         ) : (
                             items.map((item) => (
-                                <Pressable
+                                <AdminInboxMatchCard
                                     key={item.matchId}
+                                    tone="primary"
+                                    eyebrow={[item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+                                        .filter(Boolean)
+                                        .join(' · ') || 'Match'}
+                                    home={{
+                                        username: item.homeUsername,
+                                        avatarUrl: item.homeAvatarUrl,
+                                        teamName: item.homeTeamName,
+                                    }}
+                                    away={{
+                                        username: item.awayUsername,
+                                        avatarUrl: item.awayAvatarUrl,
+                                        teamName: item.awayTeamName,
+                                    }}
+                                    proposedScore={{
+                                        home: item.proposedHomeScore ?? null,
+                                        away: item.proposedAwayScore ?? null,
+                                    }}
+                                    footerIcon="flag"
+                                    footerLabel="Reported by"
+                                    footerName={item.proposedByUsername || 'a player'}
+                                    ctaLabel="Review"
                                     onPress={() => onSelect(item)}
-                                    className="bg-card rounded-[24px] border border-primary/20 mb-3 overflow-hidden active:opacity-80"
-                                >
-                                    <View className="flex-row">
-                                        {/* Emerald accent bar */}
-                                        <View style={{ width: 4, backgroundColor: '#10B981', opacity: 0.7 }} />
-
-                                        <View className="flex-1 p-4">
-                                            {/* Top row: round + status */}
-                                            <View className="flex-row items-center justify-between mb-3">
-                                                <View className="bg-white/5 px-2.5 py-1 rounded-full border border-white/10">
-                                                    <Text className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                                        {item.roundNumber ? `Round ${item.roundNumber}` : 'Match'}
-                                                    </Text>
-                                                </View>
-                                                <View className="flex-row items-center gap-1.5">
-                                                    <View className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                                    <Text className="text-[10px] font-black text-primary uppercase tracking-wider">
-                                                        Awaiting approval
-                                                    </Text>
-                                                </View>
-                                            </View>
-
-                                            {/* Players + proposed score */}
-                                            <View className="flex-row items-center">
-                                                <View className="flex-row items-center flex-1 gap-2.5">
-                                                    <PlayerAvatar
-                                                        src={item.homeAvatarUrl || undefined}
-                                                        name={item.homeUsername || 'Player'}
-                                                        size="sm"
-                                                    />
-                                                    <Text className="text-sm font-bold text-white flex-shrink" numberOfLines={1}>
-                                                        {item.homeUsername || 'TBD'}
-                                                    </Text>
-                                                </View>
-                                                <View className="px-3 flex-row items-center gap-2">
-                                                    <Text className="text-base font-black text-white">
-                                                        {item.proposedHomeScore ?? '–'}
-                                                    </Text>
-                                                    <Text className="text-[10px] font-black text-slate-600">:</Text>
-                                                    <Text className="text-base font-black text-white">
-                                                        {item.proposedAwayScore ?? '–'}
-                                                    </Text>
-                                                </View>
-                                                <View className="flex-row items-center flex-1 gap-2.5 justify-end">
-                                                    <Text className="text-sm font-bold text-white flex-shrink text-right" numberOfLines={1}>
-                                                        {item.awayUsername || 'TBD'}
-                                                    </Text>
-                                                    <PlayerAvatar
-                                                        src={item.awayAvatarUrl || undefined}
-                                                        name={item.awayUsername || 'Player'}
-                                                        size="sm"
-                                                    />
-                                                </View>
-                                            </View>
-
-                                            {/* Reported by + CTA */}
-                                            <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-white/5">
-                                                <View className="flex-row items-center gap-1.5 flex-1">
-                                                    <Ionicons name="flag-outline" size={12} color="#94A3B8" />
-                                                    <Text className="text-[11px] text-slate-400 font-medium" numberOfLines={1}>
-                                                        Reported by{' '}
-                                                        <Text className="font-black text-slate-300">
-                                                            {item.proposedByUsername || 'a player'}
-                                                        </Text>
-                                                    </Text>
-                                                </View>
-                                                <View className="flex-row items-center gap-1">
-                                                    <Text className="text-[10px] font-black text-primary uppercase tracking-wider">Review</Text>
-                                                    <Ionicons name="chevron-forward" size={12} color="#10B981" />
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </View>
-                                </Pressable>
+                                />
                             ))
                         )}
                     </ScrollView>

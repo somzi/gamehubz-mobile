@@ -92,7 +92,7 @@ export function HelpCenterScreen() {
                 <View className="mt-8">
                     <SectionLabel icon="mail" title="Still need help?" color={COLORS.info} />
                     <TouchableOpacity
-                        onPress={() => Linking.openURL('mailto:support@codespheresolutions.de')}
+                        onPress={() => Linking.openURL('mailto:support@codespheresolutions.dev')}
                         className="bg-card p-4 rounded-2xl border border-white/[0.06] flex-row items-center gap-3 active:opacity-70"
                     >
                         <View className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 items-center justify-center">
@@ -100,7 +100,7 @@ export function HelpCenterScreen() {
                         </View>
                         <View className="flex-1">
                             <Text className="text-white font-bold text-sm">Email Support</Text>
-                            <Text className="text-slate-500 text-xs mt-0.5">support@codespheresolutions.de</Text>
+                            <Text className="text-slate-500 text-xs mt-0.5">support@codespheresolutions.dev</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />
                     </TouchableOpacity>
