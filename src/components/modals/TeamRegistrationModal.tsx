@@ -75,7 +75,7 @@ export function TeamRegistrationModal({
             onRequestClose={onClose}
         >
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior="padding"
                 className="flex-1"
             >
                 <Pressable

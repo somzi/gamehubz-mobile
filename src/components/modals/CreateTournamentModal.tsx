@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     Pressable,
     ActivityIndicator,
+    KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
@@ -561,7 +562,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
     return (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-            <View
+            {/* 'padding' shrinks the centered card when the keyboard is up so the focused
+                input stays visible (matches the EditHubModal keyboard pattern). */}
+            <KeyboardAvoidingView
+                behavior="padding"
                 className="flex-1 bg-black/80 px-4 justify-center"
                 style={{
                     paddingTop: insets.top + 20,
@@ -1161,7 +1165,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         initialValue={registrationDeadline}
                     />
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </View>
     );
 }

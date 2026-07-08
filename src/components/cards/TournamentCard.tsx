@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
+import { PressableScale } from '../ui/PressableScale';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cn } from '../../lib/utils';
@@ -71,11 +72,7 @@ export const TournamentCard = React.memo(function TournamentCard({
     const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
 
     return (
-        <Pressable
-            onPress={onClick}
-            style={({ pressed }) => ({ opacity: pressed ? 0.92 : 1 })}
-            className={className}
-        >
+        <PressableScale onPress={onClick} className={className}>
             <View
                 className="rounded-[24px] overflow-hidden"
                 style={{
@@ -275,6 +272,6 @@ export const TournamentCard = React.memo(function TournamentCard({
                     </Text>
                 </View>
             )}
-        </Pressable>
+        </PressableScale>
     );
 });

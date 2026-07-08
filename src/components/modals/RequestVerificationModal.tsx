@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
@@ -179,7 +179,8 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <Pressable className="flex-1 bg-black/60 justify-center items-center px-5" onPress={onClose}>
+            <KeyboardAvoidingView behavior="padding" className="flex-1">
+                <Pressable className="flex-1 bg-black/60 justify-center items-center px-5" onPress={onClose}>
                 <Pressable
                     className="bg-card rounded-3xl w-full max-w-md border border-white/5 overflow-hidden"
                     onPress={(e) => e.stopPropagation()}
@@ -219,7 +220,8 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                         </View>
                     )}
                 </Pressable>
-            </Pressable>
+                </Pressable>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

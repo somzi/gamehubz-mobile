@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
+import { Text, ActivityIndicator } from 'react-native';
 import { cn } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
+import { PressableScale } from './PressableScale';
 
 interface ButtonProps {
     onPress?: () => void;
@@ -23,9 +24,12 @@ export function Button({
     className
 }: ButtonProps) {
     return (
-        <Pressable
+        <PressableScale
             onPress={onPress}
             disabled={disabled || loading}
+            // Callers size buttons in rows via `flex-1` — the animated wrapper has to
+            // carry the flex, otherwise the button collapses to its content width.
+            containerStyle={className?.includes('flex-1') ? { flex: 1 } : undefined}
             className={cn(
                 "rounded-lg items-center justify-center flex-row",
                 size === 'default' && "px-4 py-3",
@@ -39,9 +43,6 @@ export function Button({
                 (disabled || loading) && "opacity-50",
                 className
             )}
-            style={({ pressed }) => [
-                pressed && !disabled && !loading && styles.pressed
-            ]}
         >
             {loading ? (
                 <ActivityIndicator color={variant === 'default' ? COLORS.primaryForeground : COLORS.foreground} />
@@ -66,12 +67,6 @@ export function Button({
                     children
                 )
             )}
-        </Pressable>
+        </PressableScale>
     );
 }
-
-const styles = StyleSheet.create({
-    pressed: {
-        opacity: 0.7,
-    },
-});

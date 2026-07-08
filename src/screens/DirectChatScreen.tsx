@@ -363,9 +363,11 @@ export default function DirectChatScreen() {
                 onAvatarPress={() => navigation.navigate('PlayerProfile', { id: chat.otherUserId })}
             />
 
+            {/* Android: adjustResize already shrinks the window for the keyboard — 'height'
+                on top of it double-compensates (jumpy composer), so KAV is iOS-only. */}
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}
             >
                 <FlatList

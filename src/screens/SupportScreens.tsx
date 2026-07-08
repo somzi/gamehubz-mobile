@@ -5,6 +5,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { PressableScale } from '../components/ui/PressableScale';
 import { COLORS } from '../lib/theme';
 
 const DISCORD_BLURPLE = '#5865F2';
@@ -50,9 +51,10 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
     };
 
     return (
-        <Pressable
+        <PressableScale
             onPress={toggle}
-            className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 active:opacity-80"
+            pressedScale={0.98}
+            className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4"
         >
             <View className="flex-row items-center justify-between gap-3">
                 <Text className="text-white font-bold text-sm flex-1 leading-5">{question}</Text>
@@ -63,7 +65,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
             {open && (
                 <Text className="text-slate-400 text-[13px] leading-5 mt-3">{answer}</Text>
             )}
-        </Pressable>
+        </PressableScale>
     );
 }
 

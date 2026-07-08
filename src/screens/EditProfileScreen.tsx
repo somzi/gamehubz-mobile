@@ -17,6 +17,7 @@ import Constants from 'expo-constants';
 import { cn } from '../lib/utils';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { PressableScale } from '../components/ui/PressableScale';
 
 type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -31,10 +32,11 @@ interface MenuItemProps {
 
 function MenuItem({ icon, label, onPress, destructive = false, showChevron = true, isLast = false }: MenuItemProps) {
     return (
-        <Pressable
+        <PressableScale
             onPress={onPress}
+            pressedScale={0.98}
             className={cn(
-                "flex-row items-center justify-between py-3.5 px-4 active:opacity-70",
+                "flex-row items-center justify-between py-3.5 px-4",
                 !isLast && "border-b border-white/5"
             )}
         >
@@ -54,7 +56,7 @@ function MenuItem({ icon, label, onPress, destructive = false, showChevron = tru
                 </Text>
             </View>
             {showChevron && <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />}
-        </Pressable>
+        </PressableScale>
     );
 }
 

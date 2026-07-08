@@ -499,7 +499,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             onRequestClose={onClose}
         >
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior="padding"
                 className="flex-1 bg-black/80 justify-end"
             >
                 <View

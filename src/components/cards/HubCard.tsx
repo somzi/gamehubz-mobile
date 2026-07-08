@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
+import { PressableScale } from '../ui/PressableScale';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,11 +47,7 @@ export const HubCard = React.memo(function HubCard({
     const accentTint = isJoined ? 'rgba(16, 185, 129, 0.05)' : 'rgba(129, 140, 248, 0.04)';
 
     return (
-        <Pressable
-            onPress={onClick}
-            style={({ pressed }) => ({ opacity: pressed ? 0.92 : 1 })}
-            className={className}
-        >
+        <PressableScale onPress={onClick} className={className}>
             <View
                 className="rounded-[24px] overflow-hidden"
                 style={{
@@ -224,6 +221,6 @@ export const HubCard = React.memo(function HubCard({
                 </View>
             </View>
 
-        </Pressable>
+        </PressableScale>
     );
 });

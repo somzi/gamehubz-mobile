@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
+import { PressableScale } from '../ui/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -33,10 +34,10 @@ export const FeedCard = React.memo(function FeedCard({
 }: FeedCardProps) {
     if (variant === 'compact') {
         return (
-            <Pressable
+            <PressableScale
                 onPress={onClick}
                 className={cn(
-                    'w-[260px] bg-card rounded-3xl p-5 mr-3 active:opacity-90',
+                    'w-[260px] bg-card rounded-3xl p-5 mr-3',
                     className
                 )}
             >
@@ -75,12 +76,12 @@ export const FeedCard = React.memo(function FeedCard({
                         </Text>
                     </View>
                 )}
-            </Pressable>
+            </PressableScale>
         );
     }
 
     return (
-        <Pressable onPress={onClick} className="active:opacity-90">
+        <PressableScale onPress={onClick}>
             <View
                 className={cn('rounded-[22px] overflow-hidden', className)}
                 style={{
@@ -196,6 +197,6 @@ export const FeedCard = React.memo(function FeedCard({
                     </View>
                 </View>
             </View>
-        </Pressable>
+        </PressableScale>
     );
 });
