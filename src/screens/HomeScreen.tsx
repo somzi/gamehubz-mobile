@@ -12,6 +12,8 @@ import { MatchScheduleCard } from '../components/match/MatchScheduleCard';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { EmptyState } from '../components/ui/EmptyState';
+import { COLORS } from '../lib/theme';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
 import { parseUtcDate, formatLocalDateTime } from '../lib/utils';
@@ -329,8 +331,8 @@ export default function HomeScreen() {
                             </View>
                         ) : (
                             <EmptyState
-                                iconName="game-controller-outline"
-                                iconColor="#10B981"
+                                icon="game-controller-outline"
+                                color={COLORS.primary}
                                 title="No active matches"
                                 description="Your competitive matches will appear here once they start"
                             />
@@ -376,8 +378,8 @@ export default function HomeScreen() {
                             </View>
                         ) : (
                             <EmptyState
-                                iconName="planet-outline"
-                                iconColor="#A78BFA"
+                                icon="planet-outline"
+                                color={COLORS.highlight}
                                 title="No highlights yet"
                                 description="Activity from your hubs will appear here"
                             />
@@ -471,26 +473,3 @@ function SectionHeader({
     );
 }
 
-interface EmptyStateProps {
-    iconName: keyof typeof Ionicons.glyphMap;
-    iconColor: string;
-    title: string;
-    description: string;
-}
-
-function EmptyState({ iconName, iconColor, title, description }: EmptyStateProps) {
-    return (
-        <View className="py-12 items-center justify-center bg-white/[0.02] rounded-3xl border border-white/[0.04]">
-            <View
-                className="w-14 h-14 rounded-2xl items-center justify-center mb-3"
-                style={{ backgroundColor: iconColor + '22' }}
-            >
-                <Ionicons name={iconName} size={26} color={iconColor} />
-            </View>
-            <Text className="text-white font-black text-sm">{title}</Text>
-            <Text className="text-slate-500 text-xs mt-1 text-center px-10">
-                {description}
-            </Text>
-        </View>
-    );
-}

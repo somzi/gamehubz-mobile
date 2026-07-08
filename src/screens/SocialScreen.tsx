@@ -13,6 +13,7 @@ import { parseUtcDate, cn } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { EmptyState as EmptyStateBase } from '../components/ui/EmptyState';
 import { useBadges } from '../context/BadgesContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -630,20 +631,13 @@ function EmptyState({
     subtitle: string;
 }) {
     return (
-        <View className="items-center mt-24 px-6">
-            <View
-                style={{
-                    width: 72, height: 72, borderRadius: 24,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: 'rgba(16,185,129,0.06)',
-                    borderWidth: 1, borderColor: 'rgba(16,185,129,0.14)',
-                }}
-            >
-                <Ionicons name={icon} size={30} color="#10B981" />
-            </View>
-            <Text className="text-white font-black text-base mt-4 mb-1">{title}</Text>
-            <Text className="text-slate-500 text-xs text-center font-medium leading-5">{subtitle}</Text>
-        </View>
+        <EmptyStateBase
+            icon={icon}
+            title={title}
+            description={subtitle}
+            variant="plain"
+            className="mt-8"
+        />
     );
 }
 

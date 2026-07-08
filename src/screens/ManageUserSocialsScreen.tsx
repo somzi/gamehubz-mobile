@@ -17,6 +17,7 @@ import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 
 const DISCORD_BLURPLE = '#5865F2';
@@ -332,13 +333,12 @@ export default function ManageUserSocialsScreen() {
                                 ))}
                             </View>
                         ) : (
-                            <View className="py-10 items-center justify-center bg-white/[0.02] rounded-2xl border border-white/5">
-                                <View className="w-12 h-12 rounded-2xl bg-indigo-500/10 items-center justify-center mb-3">
-                                    <Ionicons name="share-social-outline" size={24} color="#818CF8" />
-                                </View>
-                                <Text className="text-white font-bold text-sm">No social accounts yet</Text>
-                                <Text className="text-slate-500 text-xs mt-1">Add your social links below</Text>
-                            </View>
+                            <EmptyState
+                                icon="share-social-outline"
+                                color={COLORS.info}
+                                title="No social accounts yet"
+                                description="Add your social links below"
+                            />
                         )}
                     </View>
 

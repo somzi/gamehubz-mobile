@@ -13,6 +13,8 @@ import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
 import { formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { EmptyState } from '../components/ui/EmptyState';
+import { COLORS } from '../lib/theme';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -232,13 +234,13 @@ export default function TournamentsScreen() {
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.5}
                     ListEmptyComponent={
-                        <View className="items-center py-20">
-                            <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
-                                <Ionicons name="trophy-outline" size={28} color="#334155" />
-                            </View>
-                            <Text className="text-sm font-semibold text-slate-500">No tournaments found</Text>
-                            <Text className="text-xs text-slate-600 mt-1">Check back later for new events</Text>
-                        </View>
+                        <EmptyState
+                            variant="plain"
+                            icon="trophy-outline"
+                            color={COLORS.info}
+                            title="No tournaments found"
+                            description="Check back later for new events"
+                        />
                     }
                     ListFooterComponent={
                         tournamentsQuery.isFetchingNextPage ? (

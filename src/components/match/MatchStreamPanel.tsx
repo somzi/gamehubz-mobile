@@ -9,6 +9,7 @@ import { getLiveEmbed, getVodEmbed, getPlatformMeta } from '../../lib/stream';
 import { StreamPlayer } from './StreamPlayer';
 import { PlatformIcon } from './PlatformIcon';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { EmptyState as EmptyStateBase } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectInput } from '../ui/SelectInput';
@@ -651,12 +652,10 @@ function StartArea({
 
 function EmptyState() {
     return (
-        <View className="py-12 items-center justify-center bg-white/[0.02] rounded-2xl border border-white/5">
-            <View className="w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center mb-3">
-                <Ionicons name="videocam-outline" size={24} color="#10B981" />
-            </View>
-            <Text className="text-white font-bold text-sm">No stream for this match</Text>
-            <Text className="text-slate-500 text-xs mt-1">Check back when a player goes live.</Text>
-        </View>
+        <EmptyStateBase
+            icon="videocam-outline"
+            title="No stream for this match"
+            description="Check back when a player goes live."
+        />
     );
 }

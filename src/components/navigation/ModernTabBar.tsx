@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
     },
     tabLabel: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '700',
         marginTop: 4,
         letterSpacing: 0.2,
@@ -239,8 +239,8 @@ const styles = StyleSheet.create({
     },
     badgeText: {
         color: '#FFFFFF',
-        fontSize: 9,
+        fontSize: 10,
         fontWeight: '900',
-        lineHeight: 12,
+        lineHeight: 13,
     },
 });

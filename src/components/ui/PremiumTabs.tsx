@@ -122,14 +122,13 @@ function PremiumTabButton({
                 className="font-black uppercase"
                 style={{
                     color: active ? accentColorActive : '#64748B',
-                    fontSize: 11,
+                    fontSize: 12,
                     letterSpacing: 0.6,
                     flexShrink: 1,
                 }}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
-                allowFontScaling={false}
             >
                 {tab.label}
             </Text>
@@ -147,7 +146,7 @@ function PremiumTabButton({
                     <Text
                         className="font-black"
                         style={{
-                            fontSize: 9,
+                            fontSize: 10,
                             color: tab.badgeTone === 'alert'
                                 ? '#FFFFFF'
                                 : active ? accentColorActive : '#64748B',

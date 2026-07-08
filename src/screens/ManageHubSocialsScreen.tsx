@@ -15,6 +15,7 @@ import { StatusModal } from '../components/modals/StatusModal';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { EmptyState } from '../components/ui/EmptyState';
 
 type ManageHubSocialsRouteProp = RouteProp<RootStackParamList, 'ManageHubSocials'>;
 type ManageHubSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -252,13 +253,12 @@ export default function ManageHubSocialsScreen() {
                                 })}
                             </View>
                         ) : (
-                            <View className="py-10 items-center justify-center bg-white/[0.02] rounded-2xl border border-white/5">
-                                <View className="w-12 h-12 rounded-2xl bg-warning/10 items-center justify-center mb-3">
-                                    <Ionicons name="share-social-outline" size={24} color={COLORS.warning} />
-                                </View>
-                                <Text className="text-white font-bold text-sm">No social accounts yet</Text>
-                                <Text className="text-slate-500 text-xs mt-1">Add your hub's social links below</Text>
-                            </View>
+                            <EmptyState
+                                icon="share-social-outline"
+                                color={COLORS.warning}
+                                title="No social accounts yet"
+                                description="Add your hub's social links below"
+                            />
                         )}
                     </View>
 

@@ -17,6 +17,8 @@ import { HubCard } from '../components/cards/HubCard';
 import { StatusModal } from '../components/modals/StatusModal';
 import { Toggle } from '../components/ui/Toggle';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { EmptyState } from '../components/ui/EmptyState';
+import { COLORS } from '../lib/theme';
 
 import { API_BASE_URL, ENDPOINTS, authenticatedFetch } from '../lib/api';
 
@@ -319,29 +321,25 @@ export default function HubsScreen() {
                     onEndReachedThreshold={0.5}
                     removeClippedSubviews
                     ListEmptyComponent={
-                        <View className="items-center py-20">
-                            <View className="w-16 h-16 rounded-3xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
-                                <Ionicons name="people-outline" size={28} color="#334155" />
-                            </View>
-                            <Text className="text-sm font-semibold text-slate-500">
-                                {activeTab === 'joined'
-                                    ? "You haven't joined any hubs yet"
-                                    : "No hubs found"}
-                            </Text>
-                            <Text className="text-xs text-slate-600 mt-1">
-                                {activeTab === 'joined'
-                                    ? "Discover communities to join"
-                                    : "Try a different search"}
-                            </Text>
-                            {activeTab === 'joined' && (
+                        <EmptyState
+                            variant="plain"
+                            icon="people-outline"
+                            color={COLORS.info}
+                            title={activeTab === 'joined'
+                                ? "You haven't joined any hubs yet"
+                                : "No hubs found"}
+                            description={activeTab === 'joined'
+                                ? "Discover communities to join"
+                                : "Try a different search"}
+                            action={activeTab === 'joined' ? (
                                 <Pressable
                                     onPress={() => setActiveTab('discovery')}
-                                    className="mt-4 px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
+                                    className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                                 >
                                     <Text className="text-xs font-bold text-indigo-400 tracking-wide">Browse Hubs</Text>
                                 </Pressable>
-                            )}
-                        </View>
+                            ) : undefined}
+                        />
                     }
                     ListFooterComponent={
                         hubsQuery.isFetchingNextPage ? (

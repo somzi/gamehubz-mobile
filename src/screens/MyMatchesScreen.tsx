@@ -8,6 +8,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 
 interface MatchOverviewDto {
@@ -119,15 +120,11 @@ export default function MyMatchesScreen() {
                             />
                         ))
                     ) : (
-                        <View className="py-12 items-center justify-center bg-white/[0.02] rounded-3xl border border-white/[0.04]">
-                            <View className="w-14 h-14 rounded-2xl bg-primary/10 items-center justify-center mb-3">
-                                <Ionicons name="game-controller-outline" size={26} color={COLORS.primary} />
-                            </View>
-                            <Text className="text-white font-black text-sm">No matches found</Text>
-                            <Text className="text-slate-500 text-xs mt-1 text-center px-10">
-                                Check back later or join a tournament
-                            </Text>
-                        </View>
+                        <EmptyState
+                            icon="game-controller-outline"
+                            title="No matches found"
+                            description="Check back later or join a tournament"
+                        />
                     )}
                 </View>
             </ScrollView>
