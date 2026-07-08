@@ -76,6 +76,14 @@ export interface TeamMatchDetailsDto {
     Status?: 'Pending' | 'Completed' | 'TieBreakRequired' | 'Processing' | number;
     winnerTeamParticipantId: string | null;
     WinnerTeamParticipantId?: string | null;
+    homeTeamParticipantId?: string | null;
+    HomeTeamParticipantId?: string | null;
+    awayTeamParticipantId?: string | null;
+    AwayTeamParticipantId?: string | null;
+    // Tournament's TeamWinCondition: MatchWins=0, AggregateScore=1.
+    // Normalized to the string form on fetch; null when an older backend omits it.
+    winCondition?: 'MatchWins' | 'AggregateScore' | number | null;
+    WinCondition?: 'MatchWins' | 'AggregateScore' | number | null;
     homeTeam: TeamMatchTeamInfoDto | null;
     HomeTeam?: TeamMatchTeamInfoDto | null;
     awayTeam: TeamMatchTeamInfoDto | null;

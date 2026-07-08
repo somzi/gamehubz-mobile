@@ -237,7 +237,9 @@ function TeamCrest({
                 )}
             </View>
             <Text
-                numberOfLines={2}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
                 style={{
                     marginTop: 8,
                     fontSize: 12,
@@ -311,6 +313,14 @@ export function TeamMatchDetailModal({
                 teamMatchId: raw.teamMatchId || raw.TeamMatchId || '',
                 status: raw.status ?? raw.Status ?? 'Pending',
                 winnerTeamParticipantId: raw.winnerTeamParticipantId || raw.WinnerTeamParticipantId || null,
+                homeTeamParticipantId: raw.homeTeamParticipantId || raw.HomeTeamParticipantId || null,
+                awayTeamParticipantId: raw.awayTeamParticipantId || raw.AwayTeamParticipantId || null,
+                winCondition: (() => {
+                    const wc = raw.winCondition ?? raw.WinCondition;
+                    if (wc === 1 || wc === 'AggregateScore') return 'AggregateScore';
+                    if (wc === 0 || wc === 'MatchWins') return 'MatchWins';
+                    return null;
+                })(),
                 homeTeam: home ? {
                     teamId: home.teamId || home.TeamId || '',
                     teamName: home.teamName || home.TeamName || '',
@@ -548,11 +558,47 @@ export function TeamMatchDetailModal({
         return hasResult && (sm.status === 'Completed' || sm.status === 4 || !!sm.winnerUserId);
     }).length ?? 0;
 
-    // Hero score colour rules: winner glows emerald, the rest sit muted. Falls back to neutral when tied.
     const homeWins = data?.aggregateScore?.homeTeamWins ?? 0;
     const awayWins = data?.aggregateScore?.awayTeamWins ?? 0;
-    const homeIsHeroWinner = homeWins > awayWins;
-    const awayIsHeroWinner = awayWins > homeWins;
+    const homeTotal = data?.aggregateScore?.homeTeamTotalScore ?? 0;
+    const awayTotal = data?.aggregateScore?.awayTeamTotalScore ?? 0;
+
+    // Which metric decides this match — the tournament's TeamWinCondition.
+    // null (older backend payload without the field) keeps the legacy behavior:
+    // wins in the hero, aggregate in the strip, heuristic winner chip.
+    const winCondition = data?.winCondition ?? null;
+    const isAggregateCondition = winCondition === 'AggregateScore';
+
+    // Single source of truth for "who's ahead / who won". Backend's
+    // WinnerTeamParticipantId is authoritative; otherwise mirror the backend rules
+    // (BracketService.ProcessTeamMatchResultInner) for the tournament's win condition.
+    const winnerSide: 'home' | 'away' | null = (() => {
+        const wid = data?.winnerTeamParticipantId ? String(data.winnerTeamParticipantId).toLowerCase() : null;
+        if (wid) {
+            const homePid = data?.homeTeamParticipantId ? String(data.homeTeamParticipantId).toLowerCase() : null;
+            const awayPid = data?.awayTeamParticipantId ? String(data.awayTeamParticipantId).toLowerCase() : null;
+            if (homePid && wid === homePid) return 'home';
+            if (awayPid && wid === awayPid) return 'away';
+            // Older payloads carry team ids only — keep the previous comparison as a fallback.
+            if (data?.homeTeam?.teamId && wid === String(data.homeTeam.teamId).toLowerCase()) return 'home';
+            if (data?.awayTeam?.teamId && wid === String(data.awayTeam.teamId).toLowerCase()) return 'away';
+        }
+        if (isAggregateCondition) {
+            if (homeTotal !== awayTotal) return homeTotal > awayTotal ? 'home' : 'away';
+            if (homeWins !== awayWins) return homeWins > awayWins ? 'home' : 'away';
+            return null;
+        }
+        if (homeWins !== awayWins) return homeWins > awayWins ? 'home' : 'away';
+        // Legacy heuristic when the win condition is unknown.
+        if (winCondition === null && homeTotal !== awayTotal) return homeTotal > awayTotal ? 'home' : 'away';
+        return null;
+    })();
+
+    // Hero shows the deciding metric large; the other metric lives in the strip below.
+    const heroHomeScore = isAggregateCondition ? homeTotal : homeWins;
+    const heroAwayScore = isAggregateCondition ? awayTotal : awayWins;
+    const homeIsHeroWinner = winnerSide === 'home';
+    const awayIsHeroWinner = winnerSide === 'away';
 
     if (!visible) return null;
 
@@ -666,19 +712,37 @@ export function TeamMatchDetailModal({
                                         paddingTop: 16,
                                     }}
                                 >
-                                    <View
-                                        style={{
-                                            backgroundColor: 'rgba(255,255,255,0.04)',
-                                            borderWidth: 1,
-                                            borderColor: C.border,
-                                            paddingHorizontal: 9,
-                                            paddingVertical: 4,
-                                            borderRadius: 999,
-                                        }}
-                                    >
-                                        <Text style={{ fontSize: 8, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                            Best of {totalSubs || '—'}
-                                        </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                        <View
+                                            style={{
+                                                backgroundColor: 'rgba(255,255,255,0.04)',
+                                                borderWidth: 1,
+                                                borderColor: C.border,
+                                                paddingHorizontal: 9,
+                                                paddingVertical: 4,
+                                                borderRadius: 999,
+                                            }}
+                                        >
+                                            <Text style={{ fontSize: 8, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                                Best of {totalSubs || '—'}
+                                            </Text>
+                                        </View>
+                                        {winCondition !== null && (
+                                            <View
+                                                style={{
+                                                    backgroundColor: 'rgba(255,255,255,0.04)',
+                                                    borderWidth: 1,
+                                                    borderColor: C.border,
+                                                    paddingHorizontal: 9,
+                                                    paddingVertical: 4,
+                                                    borderRadius: 999,
+                                                }}
+                                            >
+                                                <Text style={{ fontSize: 8, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                                    {isAggregateCondition ? 'Aggregate Score' : 'Match Wins'}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
                                     <StatusPill state={teamState} />
                                 </View>
@@ -708,10 +772,10 @@ export function TeamMatchDetailModal({
                                                     lineHeight: 50,
                                                     fontWeight: '900',
                                                     letterSpacing: -1.5,
-                                                    color: homeIsHeroWinner ? C.emerald : (homeWins === awayWins ? C.text : 'rgba(255,255,255,0.18)'),
+                                                    color: homeIsHeroWinner ? C.emerald : (winnerSide === null ? C.text : 'rgba(255,255,255,0.18)'),
                                                 }}
                                             >
-                                                {homeWins}
+                                                {heroHomeScore}
                                             </Text>
                                             <Text style={{ fontSize: 22, fontWeight: '900', color: 'rgba(255,255,255,0.10)', marginHorizontal: 8 }}>
                                                 :
@@ -722,10 +786,10 @@ export function TeamMatchDetailModal({
                                                     lineHeight: 50,
                                                     fontWeight: '900',
                                                     letterSpacing: -1.5,
-                                                    color: awayIsHeroWinner ? C.emerald : (homeWins === awayWins ? C.text : 'rgba(255,255,255,0.18)'),
+                                                    color: awayIsHeroWinner ? C.emerald : (winnerSide === null ? C.text : 'rgba(255,255,255,0.18)'),
                                                 }}
                                             >
-                                                {awayWins}
+                                                {heroAwayScore}
                                             </Text>
                                         </View>
                                     </View>
@@ -753,12 +817,12 @@ export function TeamMatchDetailModal({
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                         <Ionicons name="stats-chart" size={11} color={C.textFaint} />
                                         <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                            Aggregate
+                                            {isAggregateCondition ? 'Match Wins' : 'Aggregate'}
                                         </Text>
                                         <Text style={{ fontSize: 11, fontWeight: '900', color: C.textDim, marginLeft: 2 }}>
-                                            {data?.aggregateScore?.homeTeamTotalScore ?? 0}
+                                            {isAggregateCondition ? homeWins : homeTotal}
                                             <Text style={{ color: C.textGhost }}>  –  </Text>
-                                            {data?.aggregateScore?.awayTeamTotalScore ?? 0}
+                                            {isAggregateCondition ? awayWins : awayTotal}
                                         </Text>
                                     </View>
                                     <Text style={{ fontSize: 10, fontWeight: '900', color: C.textFaint, letterSpacing: 1.5, textTransform: 'uppercase' }}>
@@ -1040,42 +1104,24 @@ export function TeamMatchDetailModal({
                         <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
                             {teamState === 'completed' ? (
                                 (() => {
-                                    let winnerIsHome = false;
-                                    let isTie = false;
-                                    let winnerCalculated = false;
-
-                                    const matchWinsHome = homeWins;
-                                    const matchWinsAway = awayWins;
-                                    const totalScoreHome = data?.aggregateScore?.homeTeamTotalScore ?? 0;
-                                    const totalScoreAway = data?.aggregateScore?.awayTeamTotalScore ?? 0;
-
-                                    if (data?.winnerTeamParticipantId) {
-                                        if (data?.homeTeam?.teamId === data?.winnerTeamParticipantId) {
-                                            winnerIsHome = true;
-                                            winnerCalculated = true;
-                                        } else if (data?.awayTeam?.teamId === data?.winnerTeamParticipantId) {
-                                            winnerIsHome = false;
-                                            winnerCalculated = true;
-                                        }
-                                    }
-
-                                    if (!winnerCalculated) {
-                                        if (matchWinsHome !== matchWinsAway) {
-                                            winnerIsHome = matchWinsHome > matchWinsAway;
-                                        } else if (totalScoreHome !== totalScoreAway) {
-                                            winnerIsHome = totalScoreHome > totalScoreAway;
-                                        } else {
-                                            isTie = true;
-                                        }
-                                    }
+                                    // winnerSide already folds in the backend winner id and the
+                                    // tournament's win condition — this block only shapes the labels.
+                                    const isTie = winnerSide === null;
+                                    const winnerIsHome = winnerSide === 'home';
 
                                     const winningTeamName = isTie ? 'Match Draw' : (winnerIsHome ? data?.homeTeam?.teamName : data?.awayTeam?.teamName);
-                                    const winningWins = winnerIsHome ? matchWinsHome : matchWinsAway;
-                                    const losingWins = winnerIsHome ? matchWinsAway : matchWinsHome;
-                                    const winningTotal = winnerIsHome ? totalScoreHome : totalScoreAway;
-                                    const losingTotal = winnerIsHome ? totalScoreAway : totalScoreHome;
-                                    const isMatchWinsTie = matchWinsHome === matchWinsAway;
-                                    const isBigWin = Math.abs(winningWins - losingWins) >= 2;
+                                    const winningWins = winnerIsHome ? homeWins : awayWins;
+                                    const losingWins = winnerIsHome ? awayWins : homeWins;
+                                    const winningTotal = winnerIsHome ? homeTotal : awayTotal;
+                                    const losingTotal = winnerIsHome ? awayTotal : homeTotal;
+                                    // Name the metric that actually decided the match. Under the
+                                    // aggregate condition, totals decide unless tied (then wins broke
+                                    // the tie); under match wins — wins. Unknown condition keeps the
+                                    // old heuristic: wins tied → the aggregate must have decided.
+                                    const decidedByAggregate = isAggregateCondition
+                                        ? winningTotal !== losingTotal
+                                        : winCondition === null && winningWins === losingWins;
+                                    const isBigWin = !decidedByAggregate && Math.abs(winningWins - losingWins) >= 2;
 
                                     return (
                                         <View
@@ -1131,14 +1177,14 @@ export function TeamMatchDetailModal({
                                                         }}
                                                     >
                                                         <Ionicons
-                                                            name={isTie ? 'calculator' : (isMatchWinsTie ? 'calculator' : (isBigWin ? 'flame' : 'flag'))}
+                                                            name={isTie || decidedByAggregate ? 'calculator' : (isBigWin ? 'flame' : 'flag')}
                                                             size={11}
                                                             color={C.emerald}
                                                         />
                                                         <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
                                                             {isTie
-                                                                ? `Draw · ${winningWins} – ${losingWins}`
-                                                                : isMatchWinsTie
+                                                                ? `Draw · ${isAggregateCondition ? `${winningTotal} – ${losingTotal}` : `${winningWins} – ${losingWins}`}`
+                                                                : decidedByAggregate
                                                                     ? `Aggregate Win · ${winningTotal} – ${losingTotal}`
                                                                     : `${isBigWin ? 'Dominant Win' : 'Match Wins'} · ${winningWins} – ${losingWins}`}
                                                         </Text>

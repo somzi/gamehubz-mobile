@@ -335,6 +335,8 @@ export default function TournamentDetailsScreen() {
                 hubName: rawData.hubName || rawData.HubName,
                 isTeamTournament: rawData.isTeamTournament ?? rawData.IsTeamTournament ?? false,
                 teamSize: rawData.teamSize ?? rawData.TeamSize ?? null,
+                // TeamWinCondition enum: MatchWins=0, AggregateScore=1 (null when omitted).
+                teamWinCondition: rawData.teamWinCondition ?? rawData.TeamWinCondition ?? null,
                 isExclusive: rawData.isExclusive ?? rawData.IsExclusive ?? false,
                 // Server (v2 overview) tells us whether the caller passes the exclusivity gate.
                 // Omitted (=> false) when the user lacks access; non-exclusive tournaments don't use it.
@@ -2143,6 +2145,16 @@ export default function TournamentDetailsScreen() {
                                         iconColor="#F472B6"
                                         label="Team Size"
                                         value={`${tournament.teamSize || '?'}v${tournament.teamSize || '?'}`}
+                                    />
+                                )}
+                                {tournament.isTeamTournament && tournament.teamWinCondition !== null && (
+                                    <InfoRow
+                                        icon="podium"
+                                        iconColor="#FBBF24"
+                                        label="Win Condition"
+                                        value={(tournament.teamWinCondition === 1 || tournament.teamWinCondition === 'AggregateScore')
+                                            ? 'Aggregate Score'
+                                            : 'Match Wins'}
                                     />
                                 )}
                                 <InfoRow
