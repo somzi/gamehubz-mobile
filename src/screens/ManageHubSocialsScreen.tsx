@@ -14,6 +14,7 @@ import { SelectInput } from '../components/ui/SelectInput';
 import { StatusModal } from '../components/modals/StatusModal';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { COLORS } from '../lib/theme';
+import { SectionLabel } from '../components/ui/SectionLabel';
 
 type ManageHubSocialsRouteProp = RouteProp<RootStackParamList, 'ManageHubSocials'>;
 type ManageHubSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -215,48 +216,55 @@ export default function ManageHubSocialsScreen() {
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title="Manage Hub Socials" showBack />
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 className="flex-1"
             >
-                <ScrollView className="flex-1 px-4 py-6">
-                    <View className="mb-8">
-                        <Text className="text-lg font-bold text-foreground mb-4">Social Accounts</Text>
+                <ScrollView className="flex-1 px-4 py-6" keyboardShouldPersistTaps="handled">
+                    <View className="mb-6">
+                        <SectionLabel icon="share-social" title="Social Accounts" color={COLORS.warning} />
 
                         {hubSocials && hubSocials.length > 0 ? (
-                            <View className="mb-4 gap-3">
+                            <View className="gap-3">
                                 {hubSocials.map((social) => {
                                     const socialType = social.socialType || social.type;
                                     return (
                                         <View
                                             key={socialType!}
-                                            className="flex-row items-center justify-between p-3 bg-card rounded-xl border border-border/30"
+                                            className="flex-row items-center justify-between p-4 bg-card rounded-2xl border border-white/[0.06]"
                                         >
                                             <View className="flex-row items-center gap-3">
-                                                <View className="w-8 h-8 rounded-full bg-accent/20 items-center justify-center">
-                                                    <Ionicons name={getSocialIcon(socialType!) as any} size={16} color={COLORS.warning} />
+                                                <View className="w-10 h-10 rounded-xl bg-warning/10 items-center justify-center border border-warning/20">
+                                                    <Ionicons name={getSocialIcon(socialType!) as any} size={18} color={COLORS.warning} />
                                                 </View>
                                                 <View>
-                                                    <Text className="text-sm font-bold text-foreground">{getSocialLabel(socialType!)}</Text>
-                                                    <Text className="text-xs text-muted-foreground">{social.username}</Text>
+                                                    <Text className="text-sm font-bold text-white">{getSocialLabel(socialType!)}</Text>
+                                                    <Text className="text-xs text-slate-500">@{social.username}</Text>
                                                 </View>
                                             </View>
                                             <TouchableOpacity
                                                 onPress={() => handleRemoveSocial(social)}
-                                                className="p-2"
+                                                className="w-9 h-9 rounded-xl bg-red-500/10 items-center justify-center border border-red-500/20"
                                             >
-                                                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                                                <Ionicons name="trash-outline" size={16} color={COLORS.destructive} />
                                             </TouchableOpacity>
                                         </View>
                                     );
                                 })}
                             </View>
                         ) : (
-                            <Text className="text-muted-foreground italic mb-4">No social accounts connected</Text>
+                            <View className="py-10 items-center justify-center bg-white/[0.02] rounded-2xl border border-white/5">
+                                <View className="w-12 h-12 rounded-2xl bg-warning/10 items-center justify-center mb-3">
+                                    <Ionicons name="share-social-outline" size={24} color={COLORS.warning} />
+                                </View>
+                                <Text className="text-white font-bold text-sm">No social accounts yet</Text>
+                                <Text className="text-slate-500 text-xs mt-1">Add your hub's social links below</Text>
+                            </View>
                         )}
+                    </View>
 
-                        <View className="p-4 bg-muted/10 rounded-xl border border-dashed border-border/50">
-                            <Text className="text-sm font-medium text-muted-foreground mb-3">Add New Account</Text>
-
+                    <View className="mb-8">
+                        <SectionLabel icon="add-circle" title="Add Account" />
+                        <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <SelectInput
                                 placeholder="Select Platform"
                                 options={socialTypeOptions}

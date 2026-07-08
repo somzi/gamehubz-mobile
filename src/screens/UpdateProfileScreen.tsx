@@ -18,6 +18,8 @@ import { ActivityIndicator } from 'react-native';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import { CountryPicker } from '../components/ui/CountryPicker';
 import { getRegionName } from '../lib/countries';
+import { SectionLabel } from '../components/ui/SectionLabel';
+import { COLORS } from '../lib/theme';
 
 type UpdateProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -179,10 +181,10 @@ export default function UpdateProfileScreen() {
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title="Edit Profile Info" showBack />
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 className="flex-1"
             >
-                <ScrollView className="flex-1 px-4 py-6">
+                <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
                     {/* Avatar Section */}
                     <View className="items-center mb-8">
                         <View className="relative">
@@ -207,42 +209,52 @@ export default function UpdateProfileScreen() {
                         <Text className="text-sm font-medium text-muted-foreground mt-3">Change Profile Photo</Text>
                     </View>
 
-                    <View className="mb-8">
-                        <Text className="text-lg font-bold text-foreground mb-4">Basic Info</Text>
-                        <Input
-                            label="Username"
-                            value={username}
-                            onChangeText={setUsername}
-                            placeholder="Enter username"
-                        />
-                        <View className="h-4" />
-                        <Input
-                            label="Nickname"
-                            value={nickName}
-                            onChangeText={setNickName}
-                            placeholder="In-game nick"
-                        />
-                        <View className="h-4" />
-                        <CountryPicker
-                            label="Country"
-                            value={country}
-                            onSelect={setCountry}
-                            locked={countryLocked}
-                        />
-                        {!countryLocked && country && (
-                            <View className="flex-row items-center mt-2 ml-1">
-                                <Ionicons name="earth-outline" size={13} color="#64748B" />
-                                <Text className="text-slate-500 text-xs font-medium ml-1.5">
-                                    Region: {getRegionName(user?.region)} → updates to match your country
-                                </Text>
-                            </View>
-                        )}
+                    <View className="mb-8 bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
+                        <SectionLabel icon="person" title="Basic Info" />
+                        <View className="gap-4">
+                            <Input
+                                label="USERNAME"
+                                value={username}
+                                onChangeText={setUsername}
+                                placeholder="Enter username"
+                                leftIcon="person-outline"
+                            />
+                            <Input
+                                label="NICKNAME"
+                                value={nickName}
+                                onChangeText={setNickName}
+                                placeholder="In-game nick"
+                                leftIcon="id-card-outline"
+                            />
+                            <CountryPicker
+                                label="COUNTRY"
+                                value={country}
+                                onSelect={setCountry}
+                                locked={countryLocked}
+                            />
+                            {!countryLocked && country && (
+                                <View className="flex-row items-center -mt-2 ml-1">
+                                    <Ionicons name="earth-outline" size={13} color={COLORS.slate500} />
+                                    <Text className="text-slate-500 text-xs font-medium ml-1.5">
+                                        Region: {getRegionName(user?.region)} → updates to match your country
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 </ScrollView>
 
-                <View className="p-4 border-t border-border/30 bg-background">
-                    <Button onPress={handleSave} loading={isLoading} size="lg">
-                        Save Changes
+                <View className="p-5 border-t border-white/5 bg-background">
+                    <Button
+                        onPress={handleSave}
+                        loading={isLoading}
+                        size="lg"
+                        className="h-14 rounded-2xl shadow-lg shadow-primary/30"
+                    >
+                        <View className="flex-row items-center justify-center gap-2">
+                            <Text className="text-primary-foreground font-black text-base">Save Changes</Text>
+                            <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
+                        </View>
                     </Button>
                 </View>
             </KeyboardAvoidingView>

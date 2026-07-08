@@ -16,6 +16,8 @@ import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { SectionLabel } from '../components/ui/SectionLabel';
+import { COLORS } from '../lib/theme';
 
 const DISCORD_BLURPLE = '#5865F2';
 
@@ -219,13 +221,13 @@ export default function ManageUserSocialsScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title="Manage Socials" showBack />
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 className="flex-1"
             >
-                <ScrollView className="flex-1 px-4 py-6" showsVerticalScrollIndicator={false}>
+                <ScrollView className="flex-1 px-4 py-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     {/* Discord bot link — DM notifications; separate from the public social links below */}
                     <View className="mb-6">
-                        <Text className="text-lg font-bold text-foreground mb-4">Discord</Text>
+                        <SectionLabel icon="logo-discord" title="Discord" color={DISCORD_BLURPLE} />
                         <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <View className="flex-row items-center gap-3">
                                 <View
@@ -297,7 +299,7 @@ export default function ManageUserSocialsScreen() {
 
                     {/* Connected Accounts */}
                     <View className="mb-6">
-                        <Text className="text-lg font-bold text-foreground mb-4">Connected Accounts</Text>
+                        <SectionLabel icon="share-social" title="Connected Accounts" color={COLORS.info} />
 
                         {socials.length > 0 ? (
                             <View className="gap-3">
@@ -342,7 +344,7 @@ export default function ManageUserSocialsScreen() {
 
                     {/* Add New Account */}
                     <View className="mb-8">
-                        <Text className="text-lg font-bold text-foreground mb-4">Add Account</Text>
+                        <SectionLabel icon="add-circle" title="Add Account" />
                         <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <SelectInput
                                 placeholder="Select Platform"

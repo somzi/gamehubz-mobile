@@ -14,6 +14,9 @@ import { ActivityIndicator, TouchableOpacity } from 'react-native';
 import { StatusModal } from '../components/modals/StatusModal';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import Constants from 'expo-constants';
+import { cn } from '../lib/utils';
+import { COLORS } from '../lib/theme';
+import { SectionLabel } from '../components/ui/SectionLabel';
 
 type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -21,21 +24,36 @@ interface MenuItemProps {
     icon: keyof typeof Ionicons.glyphMap;
     label: string;
     onPress: () => void;
-    color?: string;
+    destructive?: boolean;
     showChevron?: boolean;
+    isLast?: boolean;
 }
 
-function MenuItem({ icon, label, onPress, color = "#71717A", showChevron = true }: MenuItemProps) {
+function MenuItem({ icon, label, onPress, destructive = false, showChevron = true, isLast = false }: MenuItemProps) {
     return (
         <Pressable
             onPress={onPress}
-            className="flex-row items-center justify-between py-4 border-b border-white/5"
+            className={cn(
+                "flex-row items-center justify-between py-3.5 px-4 active:opacity-70",
+                !isLast && "border-b border-white/5"
+            )}
         >
-            <View className="flex-row items-center gap-4">
-                <Ionicons name={icon} size={22} color={color} />
-                <Text className="text-white font-medium text-base">{label}</Text>
+            <View className="flex-row items-center gap-3">
+                <View
+                    className={cn(
+                        "w-9 h-9 rounded-xl items-center justify-center border",
+                        destructive
+                            ? "bg-red-500/10 border-red-500/20"
+                            : "bg-white/[0.04] border-white/[0.06]"
+                    )}
+                >
+                    <Ionicons name={icon} size={17} color={destructive ? COLORS.destructive : COLORS.slate300} />
+                </View>
+                <Text className={cn("font-semibold text-[15px]", destructive ? "text-red-400" : "text-white")}>
+                    {label}
+                </Text>
             </View>
-            {showChevron && <Ionicons name="chevron-forward" size={18} color="#3F3F46" />}
+            {showChevron && <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />}
         </Pressable>
     );
 }
@@ -212,52 +230,72 @@ export default function EditProfileScreen() {
                     <Text className="text-slate-500 text-sm">{user?.email || ''}</Text>
                 </View>
 
-                {/* Settings Menu List */}
-                <View className="space-y-1">
-                    <MenuItem
-                        icon="person-outline"
-                        label="Edit Profile Info"
-                        onPress={() => navigation.navigate('UpdateProfile')}
-                    />
-                    <MenuItem
-                        icon="share-social-outline"
-                        label="Manage Socials"
-                        onPress={() => navigation.navigate('ManageUserSocials')}
-                    />
-                    <MenuItem
-                        icon="lock-closed-outline"
-                        label="Password & Security"
-                        onPress={() => navigation.navigate('ChangePassword')}
-                    />
-                    <MenuItem
-                        icon="help-circle-outline"
-                        label="Help Center"
-                        onPress={() => navigation.navigate('HelpCenter')}
-                    />
-                    <MenuItem
-                        icon="mail-outline"
-                        label="Contact Us"
-                        onPress={() => navigation.navigate('ContactUs')}
-                    />
-                    <MenuItem
-                        icon="information-circle-outline"
-                        label="About Us"
-                        onPress={() => navigation.navigate('AboutUs')}
-                    />
-                    <MenuItem
-                        icon="log-out-outline"
-                        label="Log Out"
-                        onPress={handleLogout}
-                        color="#EF4444"
-                        showChevron={false}
-                    />
-                    <MenuItem
-                        icon="trash-outline"
-                        label="Delete Account"
-                        onPress={handleDeleteAccount}
-                        color="#EF4444"
-                        showChevron={false}
-                    />
+                {/* Settings Menu — grouped cards */}
+                <View className="gap-5">
+                    <View>
+                        <SectionLabel icon="person" title="Account" />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            <MenuItem
+                                icon="person-outline"
+                                label="Edit Profile Info"
+                                onPress={() => navigation.navigate('UpdateProfile')}
+                            />
+                            <MenuItem
+                                icon="share-social-outline"
+                                label="Manage Socials"
+                                onPress={() => navigation.navigate('ManageUserSocials')}
+                            />
+                            <MenuItem
+                                icon="lock-closed-outline"
+                                label="Password & Security"
+                                onPress={() => navigation.navigate('ChangePassword')}
+                                isLast
+                            />
+                        </View>
+                    </View>
+
+                    <View>
+                        <SectionLabel icon="help-buoy" title="Support" color={COLORS.info} />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            <MenuItem
+                                icon="help-circle-outline"
+                                label="Help Center"
+                                onPress={() => navigation.navigate('HelpCenter')}
+                            />
+                            <MenuItem
+                                icon="mail-outline"
+                                label="Contact Us"
+                                onPress={() => navigation.navigate('ContactUs')}
+                            />
+                            <MenuItem
+                                icon="information-circle-outline"
+                                label="About Us"
+                                onPress={() => navigation.navigate('AboutUs')}
+                                isLast
+                            />
+                        </View>
+                    </View>
+
+                    <View>
+                        <SectionLabel icon="exit-outline" title="Account Actions" color={COLORS.destructive} />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            <MenuItem
+                                icon="log-out-outline"
+                                label="Log Out"
+                                onPress={handleLogout}
+                                destructive
+                                showChevron={false}
+                            />
+                            <MenuItem
+                                icon="trash-outline"
+                                label="Delete Account"
+                                onPress={handleDeleteAccount}
+                                destructive
+                                showChevron={false}
+                                isLast
+                            />
+                        </View>
+                    </View>
                 </View>
 
                 <View className="py-12 items-center opacity-30">

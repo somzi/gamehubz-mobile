@@ -16,6 +16,7 @@ import { SelectInput } from '../components/ui/SelectInput';
 import { CountryPicker } from '../components/ui/CountryPicker';
 import { getCountries, getRegionName } from '../lib/countries';
 import { StatusModal } from '../components/modals/StatusModal';
+import { SectionLabel } from '../components/ui/SectionLabel';
 
 export default function RegisterScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -326,16 +327,5 @@ export default function RegisterScreen() {
                 message={statusModalConfig.message}
             />
         </SafeAreaView>
-    );
-}
-
-function SectionLabel({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
-    return (
-        <View className="flex-row items-center gap-2 mb-4">
-            <View className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 items-center justify-center">
-                <Ionicons name={icon} size={13} color={COLORS.primary} />
-            </View>
-            <Text className="text-slate-300 text-[11px] font-black uppercase tracking-[2px]">{title}</Text>
-        </View>
     );
 }

@@ -5,6 +5,9 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { StatusModal } from '../components/modals/StatusModal';
+import { SectionLabel } from '../components/ui/SectionLabel';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../lib/theme';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 
@@ -16,6 +19,7 @@ export default function ChangePasswordScreen() {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPasswords, setShowPasswords] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
     const [showStatusModal, setShowStatusModal] = useState(false);
@@ -113,52 +117,63 @@ export default function ChangePasswordScreen() {
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title="Change Password" showBack />
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 className="flex-1"
             >
-                <ScrollView className="flex-1 px-6 py-8">
-                    <View className="space-y-6">
-                        <Input
-                            label="Current Password"
-                            value={currentPassword}
-                            onChangeText={setCurrentPassword}
-                            placeholder="Enter current password"
-                            secureTextEntry
-                        />
+                <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
+                    <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
+                        <SectionLabel icon="lock-closed" title="Security" />
+                        <View className="gap-4">
+                            <Input
+                                label="CURRENT PASSWORD"
+                                value={currentPassword}
+                                onChangeText={setCurrentPassword}
+                                placeholder="Enter current password"
+                                secureTextEntry={!showPasswords}
+                                leftIcon="lock-closed-outline"
+                                rightIcon={showPasswords ? "eye-off-outline" : "eye-outline"}
+                                onRightIconPress={() => setShowPasswords(!showPasswords)}
+                            />
 
-                        <View className="h-4" />
+                            <Input
+                                label="NEW PASSWORD"
+                                value={newPassword}
+                                onChangeText={setNewPassword}
+                                placeholder="Enter new password"
+                                secureTextEntry={!showPasswords}
+                                leftIcon="key-outline"
+                            />
 
-                        <Input
-                            label="New Password"
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                            placeholder="Enter new password"
-                            secureTextEntry
-                        />
+                            <Input
+                                label="RETYPE NEW PASSWORD"
+                                value={confirmPassword}
+                                onChangeText={setConfirmPassword}
+                                placeholder="Confirm new password"
+                                secureTextEntry={!showPasswords}
+                                leftIcon="checkmark-circle-outline"
+                            />
 
-                        <View className="h-2" />
-
-                        <Input
-                            label="Retype New Password"
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            placeholder="Confirm new password"
-                            secureTextEntry
-                        />
-
-                        <Text className="text-slate-500 text-xs mt-2">
-                            Password must be at least 6 characters long.
-                        </Text>
+                            <View className="flex-row items-center gap-1.5 mt-1">
+                                <Ionicons name="information-circle-outline" size={13} color={COLORS.slate500} />
+                                <Text className="text-slate-500 text-xs">
+                                    Password must be at least 6 characters long.
+                                </Text>
+                            </View>
+                        </View>
                     </View>
                 </ScrollView>
 
-                <View className="p-6 border-t border-white/5">
+                <View className="p-5 border-t border-white/5">
                     <Button
                         onPress={handleChangePassword}
                         loading={isProcessing}
                         size="lg"
+                        className="h-14 rounded-2xl shadow-lg shadow-primary/30"
                     >
-                        Update Password
+                        <View className="flex-row items-center justify-center gap-2">
+                            <Text className="text-primary-foreground font-black text-base">Update Password</Text>
+                            <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
+                        </View>
                     </Button>
                 </View>
             </KeyboardAvoidingView>

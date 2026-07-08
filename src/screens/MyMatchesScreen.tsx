@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native';
+import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,8 @@ import { MatchScheduleCard } from '../components/match/MatchScheduleCard';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
-import { cn } from '../lib/utils';
+import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { COLORS } from '../lib/theme';
 
 interface MatchOverviewDto {
     id: string;
@@ -71,10 +72,12 @@ export default function MyMatchesScreen() {
         return true;
     });
 
-    const tabs: { id: typeof activeTab; label: string }[] = [
-        { id: 'all', label: 'All' },
-        { id: 'pending', label: 'Pending' },
-        { id: 'scheduled', label: 'Scheduled' },
+    const pendingCount = matches.filter(m => !m.scheduledTime).length;
+
+    const tabs: PremiumTabItem[] = [
+        { value: 'all', label: 'All', icon: 'apps' },
+        { value: 'pending', label: 'Pending', icon: 'time', badge: pendingCount > 0 ? pendingCount : undefined },
+        { value: 'scheduled', label: 'Scheduled', icon: 'calendar' },
     ];
 
     return (
@@ -84,31 +87,17 @@ export default function MyMatchesScreen() {
                 showBack={true}
             />
 
-            <View className="flex-row px-4 mb-4 gap-2">
-                {tabs.map(tab => (
-                    <Pressable
-                        key={tab.id}
-                        onPress={() => setActiveTab(tab.id)}
-                        className={cn(
-                            "px-4 py-2 rounded-xl border",
-                            activeTab === tab.id
-                                ? "bg-primary/10 border-primary/30"
-                                : "bg-white/5 border-white/5"
-                        )}
-                    >
-                        <Text className={cn(
-                            "text-xs font-bold uppercase tracking-wider",
-                            activeTab === tab.id ? "text-primary" : "text-slate-500"
-                        )}>
-                            {tab.label}
-                        </Text>
-                    </Pressable>
-                ))}
+            <View className="px-4 pb-3">
+                <PremiumTabs
+                    tabs={tabs}
+                    activeTab={activeTab}
+                    onTabChange={(value) => setActiveTab(value as typeof activeTab)}
+                />
             </View>
 
             <ScrollView
                 className="flex-1 px-4"
-                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchMatches} tintColor="#10B981" />}
+                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchMatches} tintColor={COLORS.primary} />}
                 contentContainerStyle={{ paddingBottom: 40 }}
             >
                 <View className="gap-3">
@@ -130,10 +119,14 @@ export default function MyMatchesScreen() {
                             />
                         ))
                     ) : (
-                        <View className="py-20 items-center justify-center border border-dashed border-white/5 rounded-[40px] bg-white/[0.02]">
-                            <Ionicons name="game-controller-outline" size={48} color="#1E293B" />
-                            <Text className="text-slate-400 font-bold mt-4 uppercase tracking-widest text-center">No matches found</Text>
-                            <Text className="text-slate-500 text-xs mt-2 text-center">Check back later or join a tournament</Text>
+                        <View className="py-12 items-center justify-center bg-white/[0.02] rounded-3xl border border-white/[0.04]">
+                            <View className="w-14 h-14 rounded-2xl bg-primary/10 items-center justify-center mb-3">
+                                <Ionicons name="game-controller-outline" size={26} color={COLORS.primary} />
+                            </View>
+                            <Text className="text-white font-black text-sm">No matches found</Text>
+                            <Text className="text-slate-500 text-xs mt-1 text-center px-10">
+                                Check back later or join a tournament
+                            </Text>
                         </View>
                     )}
                 </View>
