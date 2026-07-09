@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -44,9 +44,13 @@ export default function ManageHubScreen() {
         message: string;
     }>({ type: 'success', title: '', message: '' });
 
-    useEffect(() => {
-        fetchHubDetails();
-    }, [hubId]);
+    // Refetch on focus so rows reflecting hub state (e.g. the Discord Connected/Off
+    // pill) stay fresh after editing on a pushed screen and coming back.
+    useFocusEffect(
+        useCallback(() => {
+            fetchHubDetails();
+        }, [hubId])
+    );
 
     const fetchHubDetails = async () => {
         try {
@@ -157,20 +161,17 @@ export default function ManageHubScreen() {
         name: string,
         description: string,
         isPublic: boolean,
-        discordWebhookUrl: string,
-        discordNotificationSettings: string,
     ) => {
         try {
             const response = await authenticatedFetch(ENDPOINTS.UPDATE_HUB, {
                 method: 'POST',
+                // Discord fields deliberately omitted (= null on the backend, which
+                // preserves them) — they're managed on the Discord Integration screen.
                 body: JSON.stringify({
                     id: hubId,
                     name: name,
                     description: description,
                     isPublic: isPublic,
-                    // Empty string = clear the webhook (null would mean "not sent" and preserve it)
-                    discordWebhookUrl: discordWebhookUrl,
-                    discordNotificationSettings: discordNotificationSettings,
                 }),
             });
 
@@ -317,6 +318,25 @@ export default function ManageHubScreen() {
                             />
                             {isOwner && (
                                 <MenuItem
+                                    icon="logo-discord"
+                                    label="Discord"
+                                    onPress={() => navigation.navigate('ManageHubDiscord', { hubId })}
+                                    rightElement={
+                                        hubData?.discordWebhookUrl ? (
+                                            <View className="flex-row items-center bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
+                                                <Ionicons name="checkmark" size={11} color="#818CF8" />
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-indigo-300">Connected</Text>
+                                            </View>
+                                        ) : (
+                                            <View className="bg-white/[0.05] border border-white/10 px-2.5 py-1 rounded-full">
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-500">Off</Text>
+                                            </View>
+                                        )
+                                    }
+                                />
+                            )}
+                            {isOwner && (
+                                <MenuItem
                                     icon="shield-checkmark-outline"
                                     label="Verification"
                                     onPress={() => setShowVerificationModal(true)}
@@ -371,8 +391,6 @@ export default function ManageHubScreen() {
                 initialName={hubData?.name || ''}
                 initialDescription={hubData?.description || ''}
                 initialIsPublic={hubData?.isPublic !== false}
-                initialDiscordWebhookUrl={hubData?.discordWebhookUrl || ''}
-                initialDiscordNotificationSettings={hubData?.discordNotificationSettings || null}
                 onClose={() => setShowEditModal(false)}
                 onSave={handleUpdateHub}
             />
