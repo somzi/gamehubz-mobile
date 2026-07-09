@@ -12,6 +12,7 @@ import { formatDateSafe } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { COLORS } from '../lib/theme';
+import { ActionSheetModal, type ActionSheetAction } from '../components/modals/ActionSheetModal';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
 
@@ -108,6 +109,7 @@ export default function HubMembersScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
     const [isOwner, setIsOwner] = useState(false);
+    const [actionMember, setActionMember] = useState<MemberRow | null>(null);
 
     const fetchHubMeta = useCallback(async () => {
         try {
@@ -334,55 +336,66 @@ export default function HubMembersScreen() {
         );
     };
 
-    const openMemberActions = (member: MemberRow) => {
-        const buttons: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+    // Actions for the in-app sheet (replaces the old native Alert action list).
+    // Icons mirror ROLE_META — the icon shows the TARGET role of the change.
+    const memberSheetActions = (member: MemberRow): ActionSheetAction[] => {
+        const actions: ActionSheetAction[] = [];
 
         // Only the Owner can grant/revoke elevated roles (admin / exclusive).
         if (isOwner) {
             if (member.hubRole === HubRole.HubMember) {
-                buttons.push({
-                    text: 'Promote to admin',
+                actions.push({
+                    label: 'Promote to admin',
+                    icon: 'star-outline',
                     onPress: () => changeRole(member, HubRole.HubAdmin),
                 });
-                buttons.push({
-                    text: 'Promote to exclusive',
+                actions.push({
+                    label: 'Promote to exclusive',
+                    icon: 'sparkles-outline',
                     onPress: () => changeRole(member, HubRole.HubExclusive),
                 });
             } else if (member.hubRole === HubRole.HubExclusive) {
-                buttons.push({
-                    text: 'Promote to admin',
+                actions.push({
+                    label: 'Promote to admin',
+                    icon: 'star-outline',
                     onPress: () => changeRole(member, HubRole.HubAdmin),
                 });
-                buttons.push({
-                    text: 'Demote to member',
+                actions.push({
+                    label: 'Demote to member',
+                    icon: 'person-outline',
                     onPress: () => changeRole(member, HubRole.HubMember),
                 });
             } else if (member.hubRole === HubRole.HubAdmin) {
-                buttons.push({
-                    text: 'Demote to exclusive',
+                actions.push({
+                    label: 'Demote to exclusive',
+                    icon: 'sparkles-outline',
                     onPress: () => changeRole(member, HubRole.HubExclusive),
                 });
-                buttons.push({
-                    text: 'Demote to member',
+                actions.push({
+                    label: 'Demote to member',
+                    icon: 'person-outline',
                     onPress: () => changeRole(member, HubRole.HubMember),
                 });
             }
         }
 
-        buttons.push({
-            text: 'Remove from hub',
-            style: 'destructive',
+        actions.push({
+            label: 'Remove from hub',
+            icon: 'person-remove-outline',
+            destructive: true,
             onPress: () => removeMember(member),
         });
-        buttons.push({
-            text: 'Ban from hub',
-            style: 'destructive',
+        actions.push({
+            label: 'Ban from hub',
+            icon: 'ban-outline',
+            destructive: true,
             onPress: () => banMember(member),
         });
-        buttons.push({ text: 'Cancel', style: 'cancel' });
 
-        Alert.alert(member.username, 'Choose an action', buttons);
+        return actions;
     };
+
+    const openMemberActions = (member: MemberRow) => setActionMember(member);
 
     const handleApprove = async (requestId: string, username: string) => {
         markProcessing(requestId, true);
@@ -706,6 +719,17 @@ export default function HubMembersScreen() {
                     />
                 )
             )}
+
+            <ActionSheetModal
+                visible={!!actionMember}
+                onClose={() => setActionMember(null)}
+                title={actionMember?.username ?? ''}
+                subtitle="Choose an action"
+                header={actionMember ? (
+                    <PlayerAvatar name={actionMember.username} src={actionMember.avatarUrl} size="md" />
+                ) : undefined}
+                actions={actionMember ? memberSheetActions(actionMember) : []}
+            />
         </SafeAreaView>
     );
 }

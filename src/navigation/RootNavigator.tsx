@@ -17,7 +17,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
-import EditProfileScreen from '../screens/EditProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import UpdateProfileScreen from '../screens/UpdateProfileScreen';
 import ManageHubScreen from '../screens/ManageHubScreen';
 import HubMembersScreen from '../screens/HubMembersScreen';
@@ -71,8 +71,8 @@ export function RootNavigator() {
                         component={PlayerProfileScreen}
                     />
                     <Stack.Screen
-                        name="EditProfile"
-                        component={EditProfileScreen}
+                        name="Settings"
+                        component={SettingsScreen}
                     />
                     <Stack.Screen
                         name="NotFound"

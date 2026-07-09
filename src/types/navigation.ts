@@ -23,7 +23,7 @@ export type RootStackParamList = {
     HubProfile: { id: string };
     PlayerProfile: { id: string };
     NotFound: undefined;
-    EditProfile: undefined;
+    Settings: undefined;
     ChangePassword: undefined;
     HelpCenter: undefined;
     AboutUs: undefined;

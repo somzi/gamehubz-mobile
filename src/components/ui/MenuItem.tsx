@@ -18,7 +18,7 @@ interface MenuItemProps {
 }
 
 /** Settings-menu row: tinted icon chip + label + chevron, for use inside a
- *  grouped glassy card (the EditProfileScreen pattern). */
+ *  grouped glassy card (the SettingsScreen pattern). */
 export function MenuItem({
     icon,
     label,

@@ -12,13 +12,13 @@ import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
 
-type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
+type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 
 // Avatar/username editing deliberately lives ONLY in Edit Profile Info
 // (UpdateProfileScreen) — this screen is a pure settings menu.
-export default function EditProfileScreen() {
+export default function SettingsScreen() {
     const { logout, deleteAccount } = useAuth();
-    const navigation = useNavigation<EditProfileNavigationProp>();
+    const navigation = useNavigation<SettingsNavigationProp>();
 
     const [showStatusModal, setShowStatusModal] = React.useState(false);
     const [statusModalConfig, setStatusModalConfig] = React.useState<{
@@ -72,7 +72,7 @@ export default function EditProfileScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Edit Profile" showBack />
+            <PageHeader title="Settings" showBack />
 
             <ScrollView className="flex-1 px-6">
                 {/* Settings Menu — grouped cards */}

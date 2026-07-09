@@ -258,7 +258,7 @@ export default function ProfileScreen() {
                         <Ionicons name="share-outline" size={20} color="#FAFAFA" />
                     </Pressable>
                     <Pressable
-                        onPress={() => navigation.navigate('EditProfile')}
+                        onPress={() => navigation.navigate('Settings')}
                         className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10"
                     >
                         <Ionicons name="settings-outline" size={20} color="#FAFAFA" />
