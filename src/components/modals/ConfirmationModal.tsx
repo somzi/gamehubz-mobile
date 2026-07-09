@@ -64,7 +64,7 @@ export function ConfirmationModal({
                                     variant="outline"
                                     onPress={onClose}
                                     disabled={isLoading}
-                                    className="w-full"
+                                    className="w-full h-14 rounded-2xl"
                                 >
                                     {cancelText}
                                 </Button>
@@ -74,7 +74,7 @@ export function ConfirmationModal({
                                     variant={isDestructive ? 'destructive' : 'default'}
                                     onPress={onConfirm}
                                     loading={isLoading}
-                                    className="w-full"
+                                    className="w-full h-14 rounded-2xl"
                                 >
                                     {confirmText}
                                 </Button>

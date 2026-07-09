@@ -63,7 +63,7 @@ export function StatusModal({
                         </Text>
 
                         <Button
-                            className="w-full"
+                            className="w-full h-14 rounded-2xl"
                             onPress={onClose}
                             variant={type === 'error' ? 'destructive' : 'default'}
                         >

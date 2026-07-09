@@ -27,9 +27,15 @@ export function Button({
         <PressableScale
             onPress={onPress}
             disabled={disabled || loading}
-            // Callers size buttons in rows via `flex-1` — the animated wrapper has to
-            // carry the flex, otherwise the button collapses to its content width.
-            containerStyle={className?.includes('flex-1') ? { flex: 1 } : undefined}
+            // Callers size buttons via `flex-1` / `w-full` — the animated wrapper has
+            // to carry that sizing: a percentage width on the inner Pressable resolves
+            // against the auto-width wrapper, which breaks both the button width and
+            // the centering of its content.
+            containerStyle={
+                className?.includes('flex-1') ? { flex: 1 } :
+                    className?.includes('w-full') ? { width: '100%' } :
+                        undefined
+            }
             className={cn(
                 "rounded-lg items-center justify-center flex-row",
                 size === 'default' && "px-4 py-3",
@@ -39,18 +45,22 @@ export function Button({
                 variant === 'secondary' && "bg-secondary",
                 variant === 'outline' && "border border-border bg-transparent",
                 variant === 'ghost' && "bg-transparent",
-                variant === 'destructive' && "bg-destructive",
+                variant === 'destructive' && "bg-destructive/10 border border-destructive/25",
                 (disabled || loading) && "opacity-50",
                 className
             )}
         >
             {loading ? (
-                <ActivityIndicator color={variant === 'default' ? COLORS.primaryForeground : COLORS.foreground} />
+                <ActivityIndicator color={
+                    variant === 'default' ? COLORS.primaryForeground :
+                    variant === 'destructive' ? '#F87171' :
+                    COLORS.foreground
+                } />
             ) : (
                 typeof children === 'string' || typeof children === 'number' ? (
                     <Text
                         className={cn(
-                            "font-medium",
+                            "font-medium text-center",
                             size === 'default' && "text-base",
                             size === 'sm' && "text-sm",
                             size === 'lg' && "text-lg",
@@ -58,7 +68,7 @@ export function Button({
                             variant === 'secondary' && "text-secondary-foreground",
                             variant === 'outline' && "text-foreground",
                             variant === 'ghost' && "text-foreground",
-                            variant === 'destructive' && "text-destructive-foreground"
+                            variant === 'destructive' && "text-red-400 font-bold"
                         )}
                     >
                         {children}
