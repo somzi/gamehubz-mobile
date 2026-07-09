@@ -1,18 +1,12 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { PlayerAvatar } from '../components/ui/PlayerAvatar';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
-import * as ImagePicker from 'expo-image-picker';
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
-import { ActivityIndicator, TouchableOpacity } from 'react-native';
 import { StatusModal } from '../components/modals/StatusModal';
-import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import Constants from 'expo-constants';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
@@ -20,105 +14,18 @@ import { MenuItem } from '../components/ui/MenuItem';
 
 type EditProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
+// Avatar/username editing deliberately lives ONLY in Edit Profile Info
+// (UpdateProfileScreen) — this screen is a pure settings menu.
 export default function EditProfileScreen() {
-    const { user, logout, deleteAccount, refreshUser } = useAuth();
+    const { logout, deleteAccount } = useAuth();
     const navigation = useNavigation<EditProfileNavigationProp>();
 
-    // Avatar state
-    const [avatarUri, setAvatarUri] = React.useState<string | null>(null);
-    const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
     const [showStatusModal, setShowStatusModal] = React.useState(false);
     const [statusModalConfig, setStatusModalConfig] = React.useState<{
         type: 'success' | 'error' | 'info';
         title: string;
         message: string;
     }>({ type: 'success', title: '', message: '' });
-
-    const handlePickAvatar = async () => {
-        try {
-            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (permissionResult.status !== 'granted') {
-                Alert.alert('Permission Required', 'We need access to your photos to change your avatar.');
-                return;
-            }
-
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-            });
-
-            if (!result.canceled && result.assets && result.assets.length > 0) {
-                const selectedAsset = result.assets[0];
-                
-                // File size check
-                if (!isFileSizeValid(selectedAsset)) {
-                    setStatusModalConfig({
-                        type: 'error',
-                        title: 'File Too Large',
-                        message: `Maximum allowed image size is ${formatFileSize(MAX_FILE_SIZE)}. Your image is ${formatFileSize(selectedAsset.fileSize || 0)}.`
-                    });
-                    setShowStatusModal(true);
-                    return;
-                }
-
-                setAvatarUri(selectedAsset.uri);
-                handleUploadAvatar(selectedAsset);
-            }
-        } catch (error) {
-            console.error('Error picking avatar:', error);
-            Alert.alert('Error', 'Failed to pick image');
-        }
-    };
-
-    const handleUploadAvatar = async (asset: ImagePicker.ImagePickerAsset) => {
-        if (!asset.uri) return;
-
-        setIsUploadingAvatar(true);
-        try {
-            const formData = new FormData();
-            const filename = asset.uri.split('/').pop() || 'avatar.jpg';
-            const match = /\.(\w+)$/.exec(filename);
-            const type = match ? `image/${match[1]}` : `image/jpeg`;
-
-            // @ts-ignore
-            formData.append('avatar', { uri: asset.uri, name: filename, type });
-
-            const response = await authenticatedFetch(ENDPOINTS.UPLOAD_AVATAR, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (response.ok) {
-                setStatusModalConfig({
-                    type: 'success',
-                    title: 'Avatar Updated',
-                    message: 'Your profile picture has been updated successfully.'
-                });
-                setShowStatusModal(true);
-                await refreshUser();
-            } else {
-                throw new Error('Failed to upload avatar');
-            }
-        } catch (error: any) {
-            console.error('Error uploading avatar:', error);
-            setStatusModalConfig({
-                type: 'error',
-                title: 'Upload Failed',
-                message: 'Failed to update profile picture'
-            });
-            setShowStatusModal(true);
-            setAvatarUri(null);
-        } finally {
-            setIsUploadingAvatar(false);
-        }
-    };
-
-    // (Removed the useFocusEffect that called refreshUser() on every focus. This screen
-    // only lists menu items — the user object it reads is already kept fresh by
-    // AuthContext on login, refresh, and after each profile mutation. Firing an extra
-    // /user/{id}/info request on every entry was pure waste.)
 
     const handleLogout = () => {
         Alert.alert(
@@ -168,32 +75,8 @@ export default function EditProfileScreen() {
             <PageHeader title="Edit Profile" showBack />
 
             <ScrollView className="flex-1 px-6">
-                {/* User Info Header (Optional but looks nice) */}
-                <View className="items-center py-6">
-                    <View className="relative">
-                        <PlayerAvatar
-                            name={user?.username || 'Guest'}
-                            src={avatarUri || user?.avatarUrl}
-                            size="lg"
-                        />
-                        <TouchableOpacity
-                            onPress={handlePickAvatar}
-                            disabled={isUploadingAvatar}
-                            className="absolute -bottom-1 -right-1 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-background shadow-sm"
-                        >
-                            {isUploadingAvatar ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <Ionicons name="camera" size={14} color="white" />
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                    <Text className="text-xl font-bold text-white mt-3">{user?.username || 'Guest'}</Text>
-                    <Text className="text-slate-500 text-sm">{user?.email || ''}</Text>
-                </View>
-
                 {/* Settings Menu — grouped cards */}
-                <View className="gap-5">
+                <View className="gap-5 pt-4">
                     <View>
                         <SectionLabel icon="person" title="Account" />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
