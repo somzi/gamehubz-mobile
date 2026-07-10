@@ -421,7 +421,7 @@ export default function PlayerProfileScreen() {
                 </View>
 
                 {/* ─── Friend / Message / Block ─── */}
-                <FriendActionBar otherUserId={id} otherUsername={displayData.username} />
+                <FriendActionBar otherUserId={id} otherUsername={displayData.username} otherAvatarUrl={userInfo.avatarUrl} />
 
                 {/* Tabs Section */}
                 <View className="mt-2 flex-1 min-h-[500px]">

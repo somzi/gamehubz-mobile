@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -7,12 +7,16 @@ import { RootStackParamList } from '../../types/navigation';
 import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
 import { FriendRelationStatus, FriendRelationStatusInfo } from '../../types/social';
 import { ConfirmationModal } from '../modals/ConfirmationModal';
+import { ActionSheetModal, type ActionSheetAction } from '../modals/ActionSheetModal';
+import { PressableScale } from '../ui/PressableScale';
+import { PlayerAvatar } from '../ui/PlayerAvatar';
 
 type Nav = StackNavigationProp<RootStackParamList>;
 
 interface Props {
     otherUserId: string;
     otherUsername?: string;
+    otherAvatarUrl?: string;
 }
 
 type Confirm = {
@@ -22,12 +26,13 @@ type Confirm = {
     action: () => Promise<void>;
 } | null;
 
-export function FriendActionBar({ otherUserId, otherUsername }: Props) {
+export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: Props) {
     const navigation = useNavigation<Nav>();
     const [status, setStatus] = useState<FriendRelationStatusInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [confirm, setConfirm] = useState<Confirm>(null);
+    const [sheetOpen, setSheetOpen] = useState(false);
 
     const targetName = otherUsername || 'this user';
 
@@ -114,7 +119,7 @@ export function FriendActionBar({ otherUserId, otherUsername }: Props) {
     if (loading) {
         return (
             <View className="px-5 mt-3">
-                <View className="bg-card rounded-2xl py-3 items-center border border-white/[0.04]">
+                <View className="bg-card rounded-2xl h-12 items-center justify-center border border-white/[0.04]">
                     <ActivityIndicator size="small" color="#10B981" />
                 </View>
             </View>
@@ -131,6 +136,32 @@ export function FriendActionBar({ otherUserId, otherUsername }: Props) {
         s === FriendRelationStatus.OutgoingRequest ||
         s === FriendRelationStatus.IncomingRequest ||
         s === FriendRelationStatus.Friends;
+
+    // Rare/destructive actions live in the bottom sheet, not on the profile
+    // surface — the row keeps one primary action plus a quiet entry point.
+    const sheetActions: ActionSheetAction[] = [];
+    if (s === FriendRelationStatus.Friends) {
+        sheetActions.push({
+            label: 'Remove Friend',
+            icon: 'person-remove-outline',
+            destructive: true,
+            onPress: confirmRemoveFriend,
+        });
+    }
+    if (canBlock) {
+        sheetActions.push({
+            label: 'Block User',
+            icon: 'ban-outline',
+            destructive: true,
+            onPress: confirmBlock,
+        });
+    }
+
+    const sheetSubtitle =
+        s === FriendRelationStatus.Friends ? 'You are friends' :
+            s === FriendRelationStatus.OutgoingRequest ? 'Friend request sent' :
+                s === FriendRelationStatus.IncomingRequest ? 'Sent you a friend request' :
+                    'Not friends yet';
 
     return (
         <>
@@ -153,23 +184,42 @@ export function FriendActionBar({ otherUserId, otherUsername }: Props) {
                         <ActionButton icon="lock-open" label="Unblock" onPress={unblock} variant="secondary" busy={busy} />
                     )}
                     {s === FriendRelationStatus.BlockedByOther && (
-                        <View className="flex-1 bg-white/[0.03] border border-white/[0.04] rounded-2xl py-3 items-center justify-center">
+                        <View className="flex-1 bg-white/[0.03] border border-white/[0.04] rounded-2xl h-12 items-center justify-center">
                             <Text className="text-slate-500 text-xs font-bold">Not available</Text>
                         </View>
                     )}
 
-                    {/* ── Secondary icon actions ─────────────────────── */}
+                    {/* ── Secondary actions ──────────────────────────── */}
                     {s === FriendRelationStatus.IncomingRequest && (
-                        <IconButton icon="close" tint="neutral" onPress={rejectRequest} label="Decline request" busy={busy} />
+                        <IconButton icon="close" onPress={rejectRequest} label="Decline request" busy={busy} />
                     )}
                     {s === FriendRelationStatus.Friends && (
-                        <IconButton icon="heart-dislike-outline" tint="danger" onPress={confirmRemoveFriend} label="Remove friend" busy={busy} />
+                        <PressableScale
+                            onPress={() => setSheetOpen(true)}
+                            disabled={busy}
+                            accessibilityRole="button"
+                            accessibilityLabel="Manage friendship"
+                            className="h-12 px-3.5 rounded-2xl flex-row items-center justify-center bg-emerald-500/10 border border-emerald-500/25 gap-1.5"
+                        >
+                            <Ionicons name="people" size={15} color="#34D399" />
+                            <Text className="text-emerald-300 font-black text-xs">Friends</Text>
+                            <Ionicons name="chevron-down" size={12} color="#34D399" />
+                        </PressableScale>
                     )}
-                    {canBlock && (
-                        <IconButton icon="ban-outline" tint="danger" onPress={confirmBlock} label="Block user" busy={busy} />
+                    {canBlock && s !== FriendRelationStatus.Friends && (
+                        <IconButton icon="ellipsis-horizontal" onPress={() => setSheetOpen(true)} label="More options" busy={busy} />
                     )}
                 </View>
             </View>
+
+            <ActionSheetModal
+                visible={sheetOpen}
+                onClose={() => setSheetOpen(false)}
+                title={targetName}
+                subtitle={sheetSubtitle}
+                header={<PlayerAvatar src={otherAvatarUrl} name={targetName} size="md" />}
+                actions={sheetActions}
+            />
 
             <ConfirmationModal
                 visible={!!confirm}
@@ -199,13 +249,15 @@ function ActionButton({
     busy: boolean;
 }) {
     return (
-        <Pressable
+        <PressableScale
             onPress={onPress}
             disabled={busy}
-            className={`flex-1 flex-row items-center justify-center py-3 rounded-2xl ${
+            // Sizing stays on the animated wrapper — flex-1 on the inner Pressable
+            // collapses it to its padding (see Button.tsx).
+            containerStyle={{ flex: 1 }}
+            className={`flex-row items-center justify-center h-12 rounded-2xl gap-1.5 ${
                 variant === 'primary' ? 'bg-emerald-500' : 'bg-white/5 border border-white/10'
-            }`}
-            style={({ pressed }) => ({ opacity: pressed ? 0.85 : busy ? 0.6 : 1, gap: 6 })}
+            } ${busy ? 'opacity-60' : ''}`}
         >
             {busy ? (
                 <ActivityIndicator size="small" color={variant === 'primary' ? '#0F172A' : '#fff'} />
@@ -217,34 +269,27 @@ function ActionButton({
                     </Text>
                 </>
             )}
-        </Pressable>
+        </PressableScale>
     );
 }
 
 function IconButton({
-    icon, onPress, label, busy, tint = 'neutral',
+    icon, onPress, label, busy,
 }: {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
     label: string;
     busy: boolean;
-    tint?: 'neutral' | 'danger';
 }) {
-    const isDanger = tint === 'danger';
     return (
-        <Pressable
+        <PressableScale
             onPress={onPress}
             disabled={busy}
             accessibilityLabel={label}
             accessibilityRole="button"
-            className={`w-12 h-12 rounded-2xl items-center justify-center border ${
-                isDanger
-                    ? 'bg-red-500/10 border-red-500/25'
-                    : 'bg-white/5 border-white/10'
-            }`}
-            style={({ pressed }) => ({ opacity: pressed ? 0.85 : busy ? 0.6 : 1 })}
+            className={`w-12 h-12 rounded-2xl items-center justify-center bg-white/5 border border-white/10 ${busy ? 'opacity-60' : ''}`}
         >
-            <Ionicons name={icon} size={18} color={isDanger ? '#F87171' : '#FAFAFA'} />
-        </Pressable>
+            <Ionicons name={icon} size={18} color="#FAFAFA" />
+        </PressableScale>
     );
 }
