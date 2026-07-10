@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -79,10 +80,13 @@ export default function LoginScreen() {
                         {/* ── Hero: centered brand logo ── */}
                         <View className="items-center mb-10 mt-4">
                             <View className="mb-5 shadow-2xl shadow-primary/20">
+                                {/* Right-sized 330px logo.png (110dp @3x) — the full 1MB 1024px
+                                    icon.png used to pop in seconds late on dev/OTA loads. */}
                                 <Image
-                                    source={require('../../assets/icon.png')}
+                                    source={require('../../assets/logo.png')}
                                     style={{ width: 110, height: 110, borderRadius: 28 }}
-                                    resizeMode="contain"
+                                    contentFit="contain"
+                                    cachePolicy="memory-disk"
                                 />
                             </View>
 

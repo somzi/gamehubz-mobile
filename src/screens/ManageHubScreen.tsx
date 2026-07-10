@@ -276,9 +276,6 @@ export default function ManageHubScreen() {
                         )}
                     </View>
                     <Text className="text-xl font-bold text-white text-center mt-3">{hubData?.name || 'Hub'}</Text>
-                    <Text className="text-slate-500 text-sm text-center mt-1" numberOfLines={1}>
-                        {'Management Dashboard'}
-                    </Text>
                 </View>
 
                 {/* Management Menu — grouped cards */}

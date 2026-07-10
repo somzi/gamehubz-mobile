@@ -6,10 +6,8 @@ import {
     ScrollView,
     TouchableOpacity,
     Pressable,
-    ActivityIndicator,
     Modal,
     KeyboardAvoidingView,
-    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
@@ -19,6 +17,19 @@ import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTI
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
 import { DateTimePickerModal } from './DateTimePickerModal';
+import { CollapsibleSection } from '../ui/CollapsibleSection';
+import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { COLORS } from '../../lib/theme';
+
+const YES_NO_OPTIONS = [
+    { value: 'no', label: 'No' },
+    { value: 'yes', label: 'Yes' },
+] as const;
+
+const FIELD_LABEL = "text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2";
+const FIELD_INPUT = "bg-white/[0.03] px-4 h-12 rounded-2xl text-white border border-white/[0.06] text-sm";
+const FIELD_MULTILINE = "bg-white/[0.03] p-4 h-24 rounded-2xl text-white border border-white/[0.06] text-sm";
+const FIELD_HINT = "text-[11px] text-slate-500 mt-2";
 
 interface EditTournamentModalProps {
     visible: boolean;
@@ -433,16 +444,16 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         }
     };
 
-    const renderSelectField = (label: string, value: string, icon: keyof typeof Ionicons.glyphMap, onPress: () => void, disabled = false) => (
+    const renderSelectField = (label: string, value: string, onPress: () => void, disabled = false) => (
         <View className="flex-1">
-            <Text className="text-sm font-bold text-white mb-3">{label}</Text>
+            <Text className={FIELD_LABEL}>{label}</Text>
             <TouchableOpacity
                 onPress={onPress}
                 disabled={disabled}
-                className={`bg-card p-4 h-14 rounded-xl border border-white/10 flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
+                className={`bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
             >
                 <Text className="text-white text-sm" numberOfLines={1}>{value}</Text>
-                <Ionicons name="chevron-down" size={16} color="#94A3B8" />
+                {!disabled && <Ionicons name="chevron-down" size={16} color="#64748B" />}
             </TouchableOpacity>
         </View>
     );
@@ -491,6 +502,26 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
 
     if (!visible) return null;
 
+    // Collapsed-header recaps so a skimmed form still reads at a glance.
+    const basicsSummary = [
+        name.trim() || 'Unnamed',
+        getFormatLabel(),
+        maxPlayers ? `${maxPlayers} players` : null,
+    ].filter(Boolean).join(' · ');
+    const detailsSummary = (String(description).trim() || String(rules).trim()) ? 'Added' : 'Optional';
+    const accessSummary = [
+        isTeamTournament ? TEAM_LABELS.MODE_TEAM : TEAM_LABELS.MODE_SOLO,
+        scopeMode === 'region' ? getRegionLabel() : `${selectedCountries.length} ${selectedCountries.length === 1 ? 'country' : 'countries'}`,
+        isExclusive ? 'Exclusive' : null,
+    ].filter(Boolean).join(' · ');
+    const matchSettingsSummary = [
+        requireResultApproval ? 'Result approval' : null,
+        canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
+        (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
+    ].filter(Boolean).join(' · ') || 'Defaults';
+    const scheduleSummary = startDate ? `Starts ${new Date(startDate).toLocaleString()}` : 'Not set';
+    const prizeSummary = prize && prize !== '0' ? `${prize} ${getCurrencyLabel()}` : 'None';
+
     return (
         <Modal
             visible={visible}
@@ -507,470 +538,393 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     style={{ maxHeight: '90%' }}
                 >
                     <View className="flex-row justify-between items-center p-6 border-b border-white/5">
-                        <Text className="text-xl font-bold text-white">Edit Tournament</Text>
+                        <View>
+                            <Text className="text-[10px] font-black uppercase tracking-[2px] text-primary mb-0.5">Manage Tournament</Text>
+                            <Text className="text-xl font-black text-white">Edit Tournament</Text>
+                        </View>
                         <TouchableOpacity onPress={onClose} className="bg-white/5 p-2 rounded-full">
                             <Ionicons name="close" size={20} color="#94A3B8" />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView
-                        className="px-6 py-4"
+                        className="px-5 py-4"
                         contentContainerStyle={{ paddingBottom: 40 }}
                         showsVerticalScrollIndicator={false}
                     >
-                        <View>
-                            <View className="mb-6">
-                                <Text className="text-sm font-bold text-white mb-3">Tournament Name</Text>
-                                <TextInput
-                                    className={`bg-card p-4 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                    placeholder="Enter tournament name"
-                                    placeholderTextColor="#6b7280"
-                                    value={name}
-                                    onChangeText={setName}
-                                    editable={canEditAll}
-                                />
-                            </View>
-
-                            <View className="mb-6">
-                                <Text className="text-sm font-bold text-white mb-3">Description</Text>
-                                <TextInput
-                                    multiline
-                                    className="bg-card p-4 h-24 rounded-xl text-white border border-white/10"
-                                    placeholder="Describe your tournament..."
-                                    placeholderTextColor="#6b7280"
-                                    textAlignVertical="top"
-                                    value={description}
-                                    onChangeText={setDescription}
-                                />
-                            </View>
-
-                            <View className="mb-6">
-                                <Text className="text-sm font-bold text-white mb-3">Rules</Text>
-                                <TextInput
-                                    multiline
-                                    className="bg-card p-4 h-24 rounded-xl text-white border border-white/10"
-                                    placeholder="Tournament rules..."
-                                    placeholderTextColor="#6b7280"
-                                    textAlignVertical="top"
-                                    value={rules}
-                                    onChangeText={setRules}
-                                />
-                            </View>
-
-                            <View className="flex-row gap-4 mb-6">
-                                <View className="flex-1">
-                                    <Text className="text-sm font-bold text-white mb-3">Prize Pool</Text>
-                                    <TextInput
-                                        className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                        placeholder="Amount"
-                                        placeholderTextColor="#6b7280"
-                                        keyboardType="numeric"
-                                        value={prize}
-                                        onChangeText={setPrize}
-                                        editable={canEditAll}
-                                    />
-                                </View>
-                                <View className="w-32">
-                                    {renderSelectField('Currency', getCurrencyLabel(), 'cash-outline', () =>
-                                        setShowCurrencyPicker(true)
-                                        , !canEditAll)}
-                                </View>
-                            </View>
-
-                            <View className="mb-6">
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="globe-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Tournament Scope</Text>
-                                </View>
-                                <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 mb-3 ${!canEditAll ? 'opacity-50' : ''}`}>
-                                    <Pressable
-                                        onPress={() => { if (canEditAll) setScopeMode('region'); }}
-                                        disabled={!canEditAll}
-                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'region' ? 'bg-primary' : ''}`}
-                                    >
-                                        <Text className={`text-sm font-bold ${scopeMode === 'region' ? 'text-primary-foreground' : 'text-slate-400'}`}>By Region</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => { if (canEditAll) setScopeMode('country'); }}
-                                        disabled={!canEditAll}
-                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'country' ? 'bg-primary' : ''}`}
-                                    >
-                                        <Text className={`text-sm font-bold ${scopeMode === 'country' ? 'text-primary-foreground' : 'text-slate-400'}`}>By Country</Text>
-                                    </Pressable>
-                                </View>
-
-                                {scopeMode === 'region' ? (
-                                    renderSelectField('Region', getRegionLabel(), 'globe-outline', () =>
-                                        setShowRegionPicker(true)
-                                        , !canEditAll)
-                                ) : (
-                                    <View pointerEvents={canEditAll ? 'auto' : 'none'} style={{ opacity: canEditAll ? 1 : 0.5 }}>
-                                        <CountryPicker
-                                            placeholder="Select countries"
-                                            multiple
-                                            values={selectedCountries}
-                                            onToggle={toggleCountry}
-                                        />
-                                    </View>
-                                )}
-                            </View>
-
-                            <View className="flex-row gap-4 mb-6">
-                                <View className="flex-1">
-                                    <Text className="text-sm font-bold text-white mb-3">Max Players *</Text>
-                                    <TextInput
-                                        className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                        placeholder="e.g. 16"
-                                        placeholderTextColor="#6b7280"
-                                        keyboardType="numeric"
-                                        value={maxPlayers}
-                                        onChangeText={setMaxPlayers}
-                                        editable={canEditAll}
-                                    />
-                                </View>
-                                <View className="flex-1">
-                                    {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
-                                        setShowFormatPicker(true)
-                                        , !canEditAll)}
-                                </View>
-                            </View>
-
-                            {isTeamTournament && (
-                                <View className="flex-row gap-4 mb-6">
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center mb-3">
-                                            <Ionicons name="grid-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                            <Text className="text-sm font-bold text-white">{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
-                                        </View>
-                                        <TextInput
-                                            className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 text-sm ${!canEditAll ? 'opacity-50' : ''}`}
-                                            placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={teamSize}
-                                            onChangeText={setTeamSize}
-                                            editable={canEditAll}
-                                        />
-                                    </View>
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center mb-3">
-                                            <Ionicons name="trophy-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                            <Text className="text-sm font-bold text-white">Win Condition</Text>
-                                        </View>
-                                        <TouchableOpacity
-                                            onPress={() => { if (canEditAll) setShowTeamWinConditionPicker(true); }}
-                                            disabled={!canEditAll}
-                                            className={`bg-card px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
-                                        >
-                                            <Text className="text-white text-sm" numberOfLines={1}>
-                                                {teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select'}
-                                            </Text>
-                                            <Ionicons name="chevron-down" size={16} color="#94A3B8" />
-                                        </TouchableOpacity>
-                                    </View>
+                        <View className="gap-4">
+                            {/* Started tournaments lock structural fields — say so instead of leaving
+                                mysteriously disabled inputs. */}
+                            {!canEditAll && (
+                                <View className="flex-row items-start gap-2.5 bg-amber-500/[0.06] border border-amber-500/20 rounded-2xl p-3.5">
+                                    <Ionicons name="lock-closed" size={14} color={COLORS.warning} style={{ marginTop: 1 }} />
+                                    <Text style={{ color: '#FCD34D' }} className="text-xs flex-1 leading-4">
+                                        The tournament has started — only the description, rules and result approval can still be changed.
+                                    </Text>
                                 </View>
                             )}
 
-                            {selectedFormat === '5' && (
-                                <View className="flex-row gap-4 mb-6">
-                                    <View className="flex-1">
-                                        <Text className="text-sm font-bold text-white mb-3">Groups Count</Text>
+                            {/* ── Basics: name, size, format ── */}
+                            <CollapsibleSection icon="trophy" title="Basics" defaultOpen summary={basicsSummary}>
+                                <View className="gap-4">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Tournament Name *</Text>
                                         <TextInput
-                                            className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                            placeholder="e.g. 4"
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={groupsCount}
-                                            onChangeText={setGroupsCount}
+                                            className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                            placeholder="Enter tournament name"
+                                            placeholderTextColor="#334155"
+                                            value={name}
+                                            onChangeText={setName}
                                             editable={canEditAll}
                                         />
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="text-sm font-bold text-white mb-3">Qualifiers / Group</Text>
-                                        <TextInput
-                                            className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                            placeholder="e.g. 2"
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={qualifiersPerGroup}
-                                            onChangeText={setQualifiersPerGroup}
-                                            editable={canEditAll}
-                                        />
-                                    </View>
-                                </View>
-                            )}
 
-                            {isSwiss && (
-                                <View className="mb-6">
-                                    <View className="flex-row gap-4 mb-3">
+                                    <View className="flex-row gap-3">
                                         <View className="flex-1">
-                                            <Text className="text-sm font-bold text-white mb-3">Swiss Rounds</Text>
+                                            <Text className={FIELD_LABEL}>Max Players *</Text>
                                             <TextInput
-                                                className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                                placeholder="Auto"
-                                                placeholderTextColor="#6b7280"
+                                                className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                placeholder="e.g. 16"
+                                                placeholderTextColor="#334155"
                                                 keyboardType="numeric"
-                                                value={swissRounds}
-                                                onChangeText={setSwissRounds}
+                                                value={maxPlayers}
+                                                onChangeText={setMaxPlayers}
                                                 editable={canEditAll}
                                             />
                                         </View>
-                                        <View className="flex-1">
-                                            {renderSelectField(
-                                                'Knockout Stage',
-                                                SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None',
-                                                'git-merge-outline',
-                                                () => setShowSwissKnockoutPicker(true),
-                                                !canEditAll
+                                        {renderSelectField('Format', getFormatLabel(), () => setShowFormatPicker(true), !canEditAll)}
+                                    </View>
+
+                                    {selectedFormat === '5' && (
+                                        <View className="flex-row gap-3">
+                                            <View className="flex-1">
+                                                <Text className={FIELD_LABEL}>Groups Count</Text>
+                                                <TextInput
+                                                    className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                    placeholder="e.g. 4"
+                                                    placeholderTextColor="#334155"
+                                                    keyboardType="numeric"
+                                                    value={groupsCount}
+                                                    onChangeText={setGroupsCount}
+                                                    editable={canEditAll}
+                                                />
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className={FIELD_LABEL}>Qualifiers / Group</Text>
+                                                <TextInput
+                                                    className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                    placeholder="e.g. 2"
+                                                    placeholderTextColor="#334155"
+                                                    keyboardType="numeric"
+                                                    value={qualifiersPerGroup}
+                                                    onChangeText={setQualifiersPerGroup}
+                                                    editable={canEditAll}
+                                                />
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {isSwiss && (
+                                        <View className="gap-4">
+                                            <View className="flex-row gap-3">
+                                                <View className="flex-1">
+                                                    <Text className={FIELD_LABEL}>Swiss Rounds</Text>
+                                                    <TextInput
+                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                        placeholder="Auto"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={swissRounds}
+                                                        onChangeText={setSwissRounds}
+                                                        editable={canEditAll}
+                                                    />
+                                                </View>
+                                                {renderSelectField(
+                                                    'Knockout Stage',
+                                                    SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None',
+                                                    () => setShowSwissKnockoutPicker(true),
+                                                    !canEditAll
+                                                )}
+                                            </View>
+
+                                            {swissKnockoutSize > 0 && (
+                                                <View>
+                                                    <Text className={FIELD_LABEL}>Direct Qualifiers (optional play-in)</Text>
+                                                    <TextInput
+                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                        placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={swissDirect}
+                                                        onChangeText={setSwissDirect}
+                                                        editable={canEditAll}
+                                                    />
+                                                    <Text className={FIELD_HINT}>
+                                                        {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
+                                                            ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
+                                                            : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                                    </Text>
+                                                </View>
                                             )}
                                         </View>
-                                    </View>
+                                    )}
 
-                                    {swissKnockoutSize > 0 && (
+                                    {showKnockoutTypeToggle && (
                                         <View>
-                                            <Text className="text-sm font-bold text-white mb-3">Direct Qualifiers (optional play-in)</Text>
-                                            <TextInput
-                                                className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                                placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
-                                                placeholderTextColor="#6b7280"
-                                                keyboardType="numeric"
-                                                value={swissDirect}
-                                                onChangeText={setSwissDirect}
-                                                editable={canEditAll}
+                                            <Text className={FIELD_LABEL}>Knockout Bracket</Text>
+                                            <SegmentedToggle
+                                                options={[
+                                                    { value: '1', label: 'Single' },
+                                                    { value: '2', label: 'Double' },
+                                                ]}
+                                                value={knockoutType === '2' ? '2' : '1'}
+                                                onChange={setKnockoutType}
+                                                disabled={!canEditAll}
                                             />
-                                            <Text className="text-[11px] text-zinc-500 mt-2">
-                                                {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
-                                                    ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
-                                                    : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                            <Text className={FIELD_HINT}>
+                                                Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
                                             </Text>
                                         </View>
                                     )}
                                 </View>
-                            )}
+                            </CollapsibleSection>
 
-                            {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
-                                <View className="mb-6">
-                                    <Text className="text-sm font-bold text-white mb-3">How long should each round last? (optional)</Text>
-                                    <View className="flex-row gap-4">
-                                        <View className="flex-1">
-                                            <TextInput
-                                                className={`bg-card px-4 h-14 rounded-xl text-white border border-white/10 ${!canEditAll ? 'opacity-50' : ''}`}
-                                                placeholder="e.g. 2"
-                                                placeholderTextColor="#6b7280"
-                                                keyboardType="numeric"
-                                                value={roundDurationValue}
-                                                onChangeText={setRoundDurationValue}
-                                                editable={canEditAll}
-                                            />
+                            {/* ── Description & Rules (always editable) ── */}
+                            <CollapsibleSection icon="document-text" title="Description & Rules" color="#94A3B8" summary={detailsSummary}>
+                                <View className="gap-4">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Description</Text>
+                                        <TextInput
+                                            multiline
+                                            className={FIELD_MULTILINE}
+                                            placeholder="Describe your tournament..."
+                                            placeholderTextColor="#334155"
+                                            textAlignVertical="top"
+                                            value={description}
+                                            onChangeText={setDescription}
+                                        />
+                                    </View>
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Rules</Text>
+                                        <TextInput
+                                            multiline
+                                            className={FIELD_MULTILINE}
+                                            placeholder="Tournament rules..."
+                                            placeholderTextColor="#334155"
+                                            textAlignVertical="top"
+                                            value={rules}
+                                            onChangeText={setRules}
+                                        />
+                                    </View>
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Players & Access ── */}
+                            <CollapsibleSection icon="people" title="Players & Access" color="#818CF8" summary={accessSummary}>
+                                <View className="gap-4">
+                                    {isTeamTournament && (
+                                        <View className="flex-row gap-3">
+                                            <View className="flex-1">
+                                                <Text className={FIELD_LABEL}>{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
+                                                <TextInput
+                                                    className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                    placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
+                                                    placeholderTextColor="#334155"
+                                                    keyboardType="numeric"
+                                                    value={teamSize}
+                                                    onChangeText={setTeamSize}
+                                                    editable={canEditAll}
+                                                />
+                                            </View>
+                                            {renderSelectField(
+                                                'Win Condition',
+                                                teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select',
+                                                () => { if (canEditAll) setShowTeamWinConditionPicker(true); },
+                                                !canEditAll
+                                            )}
                                         </View>
-                                        <TouchableOpacity
-                                            onPress={() => { if (canEditAll) setShowDurationUnitPicker(true); }}
+                                    )}
+
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Tournament Scope</Text>
+                                        <SegmentedToggle
+                                            options={[
+                                                { value: 'region', label: 'By Region' },
+                                                { value: 'country', label: 'By Country' },
+                                            ]}
+                                            value={scopeMode}
+                                            onChange={(v) => setScopeMode(v as 'region' | 'country')}
                                             disabled={!canEditAll}
-                                            className={`flex-1 bg-card px-4 h-14 rounded-xl border border-white/10 flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
+                                        />
+                                        <View className="mt-3">
+                                            {scopeMode === 'region' ? (
+                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true), !canEditAll)
+                                            ) : (
+                                                <View pointerEvents={canEditAll ? 'auto' : 'none'} style={{ opacity: canEditAll ? 1 : 0.5 }}>
+                                                    <CountryPicker
+                                                        placeholder="Select countries"
+                                                        multiple
+                                                        values={selectedCountries}
+                                                        onToggle={toggleCountry}
+                                                    />
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Exclusive Members Only</Text>
+                                        <SegmentedToggle
+                                            options={[...YES_NO_OPTIONS]}
+                                            value={isExclusive ? 'yes' : 'no'}
+                                            onChange={(v) => setIsExclusive(v === 'yes')}
+                                            disabled={!canEditAll}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
+                                        </Text>
+                                    </View>
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Match Settings ── */}
+                            <CollapsibleSection icon="options" title="Match Settings" color="#38BDF8" summary={matchSettingsSummary}>
+                                <View className="gap-4">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Require Result Approval</Text>
+                                        {/* Approval can be toggled any time — even mid-tournament — since it only
+                                            affects how future results are confirmed, not the bracket structure. */}
+                                        <SegmentedToggle
+                                            options={[...YES_NO_OPTIONS]}
+                                            value={requireResultApproval ? 'yes' : 'no'}
+                                            onChange={(v) => setRequireResultApproval(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            Opponent must confirm a reported result. Owner / admin can override.
+                                        </Text>
+                                    </View>
+
+                                    {canShowThirdPlace && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Third Place Match</Text>
+                                            <SegmentedToggle
+                                                options={[...YES_NO_OPTIONS]}
+                                                value={hasThirdPlaceMatch ? 'yes' : 'no'}
+                                                onChange={(v) => setHasThirdPlaceMatch(v === 'yes')}
+                                                disabled={!canEditAll}
+                                            />
+                                            <Text className={FIELD_HINT}>
+                                                Adds a third place match. Skipped if fewer than 4 participants register. Takes effect when the bracket is generated.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {(selectedFormat === '0' || selectedFormat === '5') && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Double Round Robin</Text>
+                                            <SegmentedToggle
+                                                options={[...YES_NO_OPTIONS]}
+                                                value={doubleRoundRobin ? 'yes' : 'no'}
+                                                onChange={(v) => setDoubleRoundRobin(v === 'yes')}
+                                                disabled={!canEditAll}
+                                            />
+                                            <Text className={FIELD_HINT}>
+                                                Every pair plays twice — one home leg and one away leg. Doubles the match count.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Round Duration (optional)</Text>
+                                            <View className="flex-row gap-3">
+                                                <View className="flex-1">
+                                                    <TextInput
+                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                        placeholder="e.g. 2"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={roundDurationValue}
+                                                        onChangeText={setRoundDurationValue}
+                                                        editable={canEditAll}
+                                                    />
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => { if (canEditAll) setShowDurationUnitPicker(true); }}
+                                                    disabled={!canEditAll}
+                                                    className={`flex-1 bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
+                                                >
+                                                    <Text className="text-white text-sm">{roundDurationUnit}</Text>
+                                                    <Ionicons name="chevron-down" size={16} color="#64748B" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Schedule ── */}
+                            <CollapsibleSection icon="calendar" title="Schedule" defaultOpen summary={scheduleSummary}>
+                                <View className="flex-row gap-3">
+                                    <View className="flex-1">
+                                        <Text className={FIELD_LABEL}>Reg. Deadline</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setShowRegDeadlinePicker(true)}
+                                            disabled={!canEditDeadline}
+                                            className={`bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center ${!canEditDeadline ? 'opacity-50' : ''}`}
                                         >
-                                            <Text className="text-white font-medium">{roundDurationUnit}</Text>
-                                            <Ionicons name="chevron-down" size={20} color="#94A3B8" />
+                                            <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
+                                                {registrationDeadline ? new Date(registrationDeadline).toLocaleString() : 'Select Deadline'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className={FIELD_LABEL}>Start Date</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setShowStartDatePicker(true)}
+                                            disabled={!canEditAll}
+                                            className={`bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center ${!canEditAll ? 'opacity-50' : ''}`}
+                                        >
+                                            <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
+                                                {startDate ? new Date(startDate).toLocaleString() : 'Select Start Date'}
+                                            </Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
-                            )}
+                            </CollapsibleSection>
 
-                            <View className="mb-6">
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="shield-checkmark-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Require Result Approval</Text>
-                                </View>
-                                {/* Approval can be toggled any time — even mid-tournament — since it only
-                                    affects how future results are confirmed, not the bracket structure. */}
-                                <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                    <Pressable
-                                        onPress={() => setRequireResultApproval(false)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${!requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
-                                            NO
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setRequireResultApproval(true)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
-                                            YES
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                                <Text className="text-[11px] text-zinc-500 mt-2">
-                                    Opponent must confirm a reported result. Owner / admin can override.
-                                </Text>
-                            </View>
-
-                            <View className="mb-6">
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="sparkles-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Exclusive Members Only</Text>
-                                </View>
-                                <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
-                                    <Pressable
-                                        onPress={() => { if (canEditAll) setIsExclusive(false); }}
-                                        disabled={!canEditAll}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isExclusive ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${!isExclusive ? 'text-white' : 'text-zinc-500'}`}>
-                                            NO
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => { if (canEditAll) setIsExclusive(true); }}
-                                        disabled={!canEditAll}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isExclusive ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${isExclusive ? 'text-white' : 'text-zinc-500'}`}>
-                                            YES
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                                <Text className="text-[11px] text-zinc-500 mt-2">
-                                    When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
-                                </Text>
-                            </View>
-
-                            {(selectedFormat === '0' || selectedFormat === '5') && (
-                                <View className="mb-6">
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Double Round Robin</Text>
+                            {/* ── Prize Pool ── */}
+                            <CollapsibleSection icon="cash" title="Prize Pool" color={COLORS.warning} summary={prizeSummary}>
+                                <View className="flex-row gap-3">
+                                    <View className="flex-1">
+                                        <Text className={FIELD_LABEL}>Amount</Text>
+                                        <TextInput
+                                            className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                            placeholder="Amount"
+                                            placeholderTextColor="#334155"
+                                            keyboardType="numeric"
+                                            value={prize}
+                                            onChangeText={setPrize}
+                                            editable={canEditAll}
+                                        />
                                     </View>
-                                    <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
-                                        <Pressable
-                                            onPress={() => { if (canEditAll) setDoubleRoundRobin(false); }}
-                                            disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!doubleRoundRobin ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${!doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
-                                                NO
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => { if (canEditAll) setDoubleRoundRobin(true); }}
-                                            disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${doubleRoundRobin ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
-                                                YES
-                                            </Text>
-                                        </Pressable>
+                                    <View className="w-32">
+                                        {renderSelectField('Currency', getCurrencyLabel(), () => setShowCurrencyPicker(true), !canEditAll)}
                                     </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Every pair plays twice — one home leg and one away leg. Doubles the match count.
-                                    </Text>
                                 </View>
-                            )}
-
-                            {showKnockoutTypeToggle && (
-                                <View className="mb-6">
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
-                                    </View>
-                                    <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
-                                        <Pressable
-                                            onPress={() => { if (canEditAll) setKnockoutType('1'); }}
-                                            disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '1' ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '1' ? 'text-white' : 'text-zinc-500'}`}>
-                                                SINGLE
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => { if (canEditAll) setKnockoutType('2'); }}
-                                            disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${knockoutType === '2' ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${knockoutType === '2' ? 'text-white' : 'text-zinc-500'}`}>
-                                                DOUBLE
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
-                                    </Text>
-                                </View>
-                            )}
-
-                            {canShowThirdPlace && (
-                                <View className="mb-6">
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="medal-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Third Place Match</Text>
-                                    </View>
-                                    <View className={`bg-card p-1 rounded-2xl flex-row border border-white/5 ${!canEditAll ? 'opacity-50' : ''}`}>
-                                        <Pressable
-                                            onPress={() => { if (canEditAll) setHasThirdPlaceMatch(false); }}
-                                            disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!hasThirdPlaceMatch ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${!hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
-                                                NO
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => { if (canEditAll) setHasThirdPlaceMatch(true); }}
-                                            disabled={!canEditAll}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${hasThirdPlaceMatch ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
-                                                YES
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Adds a third place match. Skipped if fewer than 4 participants register. Takes effect when the bracket is generated.
-                                    </Text>
-                                </View>
-                            )}
-
-                            <View className="flex-row gap-4 mb-6">
-                                <View className="flex-1">
-                                    <Text className="text-sm font-bold text-white mb-3">Start Date</Text>
-                                    <TouchableOpacity
-                                        onPress={() => setShowStartDatePicker(true)}
-                                        disabled={!canEditAll}
-                                        className={`bg-card px-4 h-14 rounded-xl border border-white/10 justify-center ${!canEditAll ? 'opacity-50' : ''}`}
-                                    >
-                                        <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                            {startDate ? new Date(startDate).toLocaleString() : 'Select Start Date'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="text-sm font-bold text-white mb-3">Reg. Deadline</Text>
-                                    <TouchableOpacity
-                                        onPress={() => setShowRegDeadlinePicker(true)}
-                                        disabled={!canEditDeadline}
-                                        className={`bg-card px-4 h-14 rounded-xl border border-white/10 justify-center ${!canEditDeadline ? 'opacity-50' : ''}`}
-                                    >
-                                        <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                            {registrationDeadline ? new Date(registrationDeadline).toLocaleString() : 'Select Deadline'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-
+                            </CollapsibleSection>
                         </View>
                     </ScrollView>
 
-                    <View className="p-6 bg-card border-t border-white/5" style={{ paddingBottom: insets.bottom + 20 }}>
+                    <View className="p-5 bg-card border-t border-white/5" style={{ paddingBottom: insets.bottom + 16 }}>
                         {error && (
-                            <Text className="text-red-500 text-xs mb-4 text-center">{error}</Text>
+                            <Text className="text-red-400 text-xs mb-3 text-center">{error}</Text>
                         )}
                         <Button
                             onPress={handleSave}
                             disabled={isSubmitting}
                             loading={isSubmitting}
-                            className="bg-primary py-4 rounded-2xl"
+                            className="w-full h-14 rounded-2xl"
                         >
                             Save Changes
                         </Button>

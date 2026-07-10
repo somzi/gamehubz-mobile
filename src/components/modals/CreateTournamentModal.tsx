@@ -18,6 +18,19 @@ import { DateTimePickerModal } from './DateTimePickerModal';
 import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
+import { CollapsibleSection } from '../ui/CollapsibleSection';
+import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { COLORS } from '../../lib/theme';
+
+const YES_NO_OPTIONS = [
+    { value: 'no', label: 'No' },
+    { value: 'yes', label: 'Yes' },
+] as const;
+
+const FIELD_LABEL = "text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2";
+const FIELD_INPUT = "bg-white/[0.03] px-4 h-12 rounded-2xl text-white border border-white/[0.06] text-sm";
+const FIELD_MULTILINE = "bg-white/[0.03] p-4 h-24 rounded-2xl text-white border border-white/[0.06] text-sm";
+const FIELD_HINT = "text-[11px] text-slate-500 mt-2";
 
 interface CreateTournamentModalProps {
     visible: boolean;
@@ -491,26 +504,23 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const renderSelectField = (
         label: string,
         value: string,
-        icon: keyof typeof Ionicons.glyphMap,
         onPress: () => void,
-        isLoading = false
+        isLoading = false,
+        locked = false
     ) => (
         <View className="flex-1">
-            <View className="flex-row items-center mb-3">
-                <Ionicons name={icon} size={16} color="#10B981" style={{ marginRight: 6 }} />
-                <Text className="text-sm font-bold text-white">{label}</Text>
-            </View>
+            <Text className={FIELD_LABEL}>{label}</Text>
             <TouchableOpacity
                 onPress={onPress}
-                disabled={isLoading}
-                className="bg-card p-3 h-12 rounded-xl border border-white/10 flex-row justify-between items-center"
+                disabled={isLoading || locked}
+                className="bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row justify-between items-center"
             >
                 {isLoading ? (
-                    <ActivityIndicator size="small" color="#10B981" />
+                    <ActivityIndicator size="small" color={COLORS.primary} />
                 ) : (
                     <Text className="text-white text-sm" numberOfLines={1}>{value}</Text>
                 )}
-                {!isLoading && !hubId && <Ionicons name="chevron-down" size={16} color="#94A3B8" />}
+                {!isLoading && !locked && <Ionicons name="chevron-down" size={16} color="#64748B" />}
             </TouchableOpacity>
         </View>
     );
@@ -560,6 +570,26 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
     if (!visible) return null;
 
+    // Collapsed-header recaps so a skimmed form still reads at a glance.
+    const basicsSummary = [
+        name.trim() || 'No name yet',
+        getFormatLabel(),
+        maxPlayers ? `${maxPlayers} players` : null,
+    ].filter(Boolean).join(' · ');
+    const detailsSummary = (description.trim() || rules.trim()) ? 'Added' : 'Optional';
+    const accessSummary = [
+        isTeamTournament ? TEAM_LABELS.MODE_TEAM : TEAM_LABELS.MODE_SOLO,
+        scopeMode === 'region' ? getRegionLabel() : `${selectedCountries.length} ${selectedCountries.length === 1 ? 'country' : 'countries'}`,
+        isExclusive ? 'Exclusive' : null,
+    ].filter(Boolean).join(' · ');
+    const matchSettingsSummary = [
+        requireResultApproval ? 'Result approval' : null,
+        canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
+        (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
+    ].filter(Boolean).join(' · ') || 'Defaults';
+    const scheduleSummary = startDate && registrationDeadline ? `Starts ${startDate}` : 'Not set yet';
+    const prizeSummary = prizePool ? `${prizePool} ${getCurrencyLabel()}` : 'Optional';
+
     return (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
             {/* 'padding' shrinks the centered card when the keyboard is up so the focused
@@ -574,528 +604,401 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             >
                 <View className="bg-background w-full rounded-[40px] border border-white/10 shadow-2xl overflow-hidden max-h-full">
                     <View className="flex-row justify-between items-center p-6 border-b border-white/5">
-                        <Text className="text-xl font-bold text-white">Create Tournament</Text>
+                        <View>
+                            <Text className="text-[10px] font-black uppercase tracking-[2px] text-primary mb-0.5">New Tournament</Text>
+                            <Text className="text-xl font-black text-white">Create Tournament</Text>
+                        </View>
                         <TouchableOpacity onPress={onClose} className="bg-white/5 p-2 rounded-full">
                             <Ionicons name="close" size={20} color="#94A3B8" />
                         </TouchableOpacity>
                     </View>
 
                     <ScrollView
-                        className="px-6 py-4"
+                        className="px-5 py-4"
                         contentContainerStyle={{ paddingBottom: 32 }}
                         showsVerticalScrollIndicator={false}
                     >
-                        <View className="flex flex-col gap-y-6">
-                            {/* Hub Selection */}
-                            {renderSelectField(
-                                'Hub',
-                                getHubLabel(),
-                                'business-outline',
-                                () => hubId ? null : setShowHubPicker(true),
-                                isLoadingHubs
-                            )}
-
-                            <View>
-                                <Text className="text-sm font-bold text-white mb-3">Tournament Name</Text>
-                                <TextInput
-                                    className="bg-card p-4 rounded-xl text-white border border-white/10"
-                                    placeholder="Enter tournament name"
-                                    placeholderTextColor="#6b7280"
-                                    value={name}
-                                    onChangeText={setName}
-                                />
-                            </View>
-
-                            <View>
-                                <Text className="text-sm font-bold text-white mb-3">Description</Text>
-                                <TextInput
-                                    multiline
-                                    className="bg-card p-4 h-24 rounded-xl text-white border border-white/10"
-                                    placeholder="Describe your tournament..."
-                                    placeholderTextColor="#6b7280"
-                                    textAlignVertical="top"
-                                    value={description}
-                                    onChangeText={setDescription}
-                                />
-                            </View>
-
-                            <View>
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="document-text-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Rules</Text>
-                                </View>
-                                <TextInput
-                                    multiline
-                                    className="bg-card p-4 h-24 rounded-xl text-white border border-white/10"
-                                    placeholder="Enter tournament rules (e.g., Best of 3...)"
-                                    placeholderTextColor="#6b7280"
-                                    textAlignVertical="top"
-                                    value={rules}
-                                    onChangeText={setRules}
-                                />
-                            </View>
-
-                            <View className="flex-row gap-4">
-                                <View className="flex-1">
-                                    <Text className="text-sm font-bold text-white mb-3">Max Players *</Text>
-                                    <TextInput
-                                        className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                        placeholder="e.g. 16"
-                                        placeholderTextColor="#6b7280"
-                                        keyboardType="numeric"
-                                        value={maxPlayers}
-                                        onChangeText={setMaxPlayers}
-                                    />
-                                </View>
-                                <View className="flex-1">
-                                    {renderSelectField('Format', getFormatLabel(), 'list-outline', () =>
-                                        setShowFormatPicker(true)
+                        <View className="gap-4">
+                            {/* ── Basics: hub, name, size, format ── */}
+                            <CollapsibleSection icon="trophy" title="Basics" defaultOpen summary={basicsSummary}>
+                                <View className="gap-4">
+                                    {renderSelectField(
+                                        'Hub',
+                                        getHubLabel(),
+                                        () => hubId ? null : setShowHubPicker(true),
+                                        isLoadingHubs,
+                                        !!hubId
                                     )}
-                                </View>
-                            </View>
 
-                            {/* Format-specific configuration — surfaces right under the Format picker so users
-                                don't have to scroll to find the Single/Double choice or Swiss rounds. */}
-
-                            {/* Groups + Bracket: groups count and qualifiers-per-group drive the knockout size. */}
-                            {selectedFormat === '5' && (
-                                <View className="flex-row gap-4">
-                                    <View className="flex-1">
-                                        <Text className="text-sm font-bold text-white mb-3">Groups Count</Text>
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Tournament Name *</Text>
                                         <TextInput
-                                            className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                            placeholder="e.g. 4"
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={groupsCount}
-                                            onChangeText={setGroupsCount}
+                                            className={FIELD_INPUT}
+                                            placeholder="Enter tournament name"
+                                            placeholderTextColor="#334155"
+                                            value={name}
+                                            onChangeText={setName}
                                         />
-                                        <Text className="text-[11px] text-zinc-500 mt-2">
-                                            How many groups players will be split into.
-                                        </Text>
                                     </View>
-                                    <View className="flex-1">
-                                        <Text className="text-sm font-bold text-white mb-3">Qualifiers / Group</Text>
-                                        <TextInput
-                                            className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                            placeholder="e.g. 2"
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={qualifiersPerGroup}
-                                            onChangeText={setQualifiersPerGroup}
-                                        />
-                                        <Text className="text-[11px] text-zinc-500 mt-2">
-                                            How many players from each group advance to the knockout bracket.
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
 
-                            {/* Swiss: rounds count + knockout-stage size + optional direct-qualifiers play-in. */}
-                            {isSwiss && (
-                                <View className="flex flex-col gap-y-6">
-                                    <View className="flex-row gap-4">
+                                    <View className="flex-row gap-3">
                                         <View className="flex-1">
-                                            <View className="flex-row items-center mb-3">
-                                                <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                                <Text className="text-sm font-bold text-white">Swiss Rounds</Text>
-                                            </View>
+                                            <Text className={FIELD_LABEL}>Max Players *</Text>
                                             <TextInput
-                                                className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                                placeholder="Auto"
-                                                placeholderTextColor="#6b7280"
+                                                className={FIELD_INPUT}
+                                                placeholder="e.g. 16"
+                                                placeholderTextColor="#334155"
                                                 keyboardType="numeric"
-                                                value={swissRounds}
-                                                onChangeText={setSwissRounds}
+                                                value={maxPlayers}
+                                                onChangeText={setMaxPlayers}
                                             />
                                         </View>
-                                        <View className="flex-1">
-                                            <View className="flex-row items-center mb-3">
-                                                <Ionicons name="git-merge-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                                <Text className="text-sm font-bold text-white">Knockout Stage</Text>
-                                            </View>
-                                            <TouchableOpacity
-                                                onPress={() => setShowSwissKnockoutPicker(true)}
-                                                className="bg-card px-4 h-12 rounded-xl border border-white/10 flex-row items-center justify-between"
-                                            >
-                                                <Text className="text-white text-sm" numberOfLines={1}>
-                                                    {SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None'}
+                                        {renderSelectField('Format', getFormatLabel(), () => setShowFormatPicker(true))}
+                                    </View>
+
+                                    {/* Groups + Bracket: groups count and qualifiers-per-group drive the knockout size. */}
+                                    {selectedFormat === '5' && (
+                                        <View className="flex-row gap-3">
+                                            <View className="flex-1">
+                                                <Text className={FIELD_LABEL}>Groups Count</Text>
+                                                <TextInput
+                                                    className={FIELD_INPUT}
+                                                    placeholder="e.g. 4"
+                                                    placeholderTextColor="#334155"
+                                                    keyboardType="numeric"
+                                                    value={groupsCount}
+                                                    onChangeText={setGroupsCount}
+                                                />
+                                                <Text className={FIELD_HINT}>
+                                                    How many groups players will be split into.
                                                 </Text>
-                                                <Ionicons name="chevron-down" size={16} color="#94A3B8" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 -mt-3">
-                                        Everyone plays every round against opponents on a similar score. Leave rounds empty for the standard count.
-                                    </Text>
-
-                                    {swissKnockoutSize > 0 && (
-                                        <View>
-                                            <View className="flex-row items-center mb-3">
-                                                <Ionicons name="flash-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                                <Text className="text-sm font-bold text-white">Direct Qualifiers (optional play-in)</Text>
                                             </View>
-                                            <TextInput
-                                                className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                                placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
-                                                placeholderTextColor="#6b7280"
-                                                keyboardType="numeric"
-                                                value={swissDirect}
-                                                onChangeText={setSwissDirect}
+                                            <View className="flex-1">
+                                                <Text className={FIELD_LABEL}>Qualifiers / Group</Text>
+                                                <TextInput
+                                                    className={FIELD_INPUT}
+                                                    placeholder="e.g. 2"
+                                                    placeholderTextColor="#334155"
+                                                    keyboardType="numeric"
+                                                    value={qualifiersPerGroup}
+                                                    onChangeText={setQualifiersPerGroup}
+                                                />
+                                                <Text className={FIELD_HINT}>
+                                                    How many players from each group advance to the knockout bracket.
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+
+                                    {/* Swiss: rounds count + knockout-stage size + optional direct-qualifiers play-in. */}
+                                    {isSwiss && (
+                                        <View className="gap-4">
+                                            <View>
+                                                <View className="flex-row gap-3">
+                                                    <View className="flex-1">
+                                                        <Text className={FIELD_LABEL}>Swiss Rounds</Text>
+                                                        <TextInput
+                                                            className={FIELD_INPUT}
+                                                            placeholder="Auto"
+                                                            placeholderTextColor="#334155"
+                                                            keyboardType="numeric"
+                                                            value={swissRounds}
+                                                            onChangeText={setSwissRounds}
+                                                        />
+                                                    </View>
+                                                    {renderSelectField(
+                                                        'Knockout Stage',
+                                                        SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None',
+                                                        () => setShowSwissKnockoutPicker(true)
+                                                    )}
+                                                </View>
+                                                <Text className={FIELD_HINT}>
+                                                    Everyone plays every round against opponents on a similar score. Leave rounds empty for the standard count.
+                                                </Text>
+                                            </View>
+
+                                            {swissKnockoutSize > 0 && (
+                                                <View>
+                                                    <Text className={FIELD_LABEL}>Direct Qualifiers (optional play-in)</Text>
+                                                    <TextInput
+                                                        className={FIELD_INPUT}
+                                                        placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={swissDirect}
+                                                        onChangeText={setSwissDirect}
+                                                    />
+                                                    <Text className={FIELD_HINT}>
+                                                        {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
+                                                            ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round (best vs worst) for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
+                                                            : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+
+                                    {/* Bracket / Groups+Bracket / Swiss: pick Single vs Double elimination for the knockout stage. */}
+                                    {showKnockoutTypeToggle && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Knockout Bracket</Text>
+                                            <SegmentedToggle
+                                                options={[
+                                                    { value: '1', label: 'Single' },
+                                                    { value: '2', label: 'Double' },
+                                                ]}
+                                                value={currentElimType}
+                                                onChange={(v) => setCurrentElimType(v as '1' | '2')}
                                             />
-                                            <Text className="text-[11px] text-zinc-500 mt-2">
-                                                {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
-                                                    ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round (best vs worst) for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
-                                                    : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                            <Text className={FIELD_HINT}>
+                                                Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
                                             </Text>
                                         </View>
                                     )}
                                 </View>
-                            )}
+                            </CollapsibleSection>
 
-                            {/* Bracket / Groups+Bracket / Swiss: pick Single vs Double elimination for the knockout stage. */}
-                            {showKnockoutTypeToggle && (
-                                <View>
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="git-network-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Knockout Bracket</Text>
-                                    </View>
-                                    <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                        <Pressable
-                                            onPress={() => setCurrentElimType('1')}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${currentElimType === '1' ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${currentElimType === '1' ? 'text-white' : 'text-zinc-500'}`}>
-                                                SINGLE
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => setCurrentElimType('2')}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${currentElimType === '2' ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${currentElimType === '2' ? 'text-white' : 'text-zinc-500'}`}>
-                                                DOUBLE
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
-                                    </Text>
-                                </View>
-                            )}
-
-                            {/* Tournament Scope: region-based or country-based */}
-                            <View>
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="globe-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Tournament Scope</Text>
-                                </View>
-                                <View className="bg-card p-1 rounded-2xl flex-row border border-white/5 mb-3">
-                                    <Pressable
-                                        onPress={() => setScopeMode('region')}
-                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'region' ? 'bg-primary' : ''}`}
-                                    >
-                                        <Text className={`text-sm font-bold ${scopeMode === 'region' ? 'text-primary-foreground' : 'text-slate-400'}`}>By Region</Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setScopeMode('country')}
-                                        className={`flex-1 py-2.5 rounded-xl items-center ${scopeMode === 'country' ? 'bg-primary' : ''}`}
-                                    >
-                                        <Text className={`text-sm font-bold ${scopeMode === 'country' ? 'text-primary-foreground' : 'text-slate-400'}`}>By Country</Text>
-                                    </Pressable>
-                                </View>
-
-                                {scopeMode === 'region' ? (
-                                    renderSelectField('Region', getRegionLabel(), 'earth-outline', () =>
-                                        setShowRegionPicker(true)
-                                    )
-                                ) : (
-                                    <CountryPicker
-                                        placeholder="Select countries"
-                                        multiple
-                                        values={selectedCountries}
-                                        onToggle={toggleCountry}
-                                    />
-                                )}
-                            </View>
-
-                            {/* Tournament Mode Toggle */}
-                            <View>
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="people-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">{TEAM_LABELS.MODE_LABEL}</Text>
-                                </View>
-                                <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                    <Pressable
-                                        onPress={() => setIsTeamTournament(false)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isTeamTournament ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${!isTeamTournament ? 'text-white' : 'text-zinc-500'}`}>
-                                            {TEAM_LABELS.MODE_SOLO}
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setIsTeamTournament(true)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isTeamTournament ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${isTeamTournament ? 'text-white' : 'text-zinc-500'}`}>
-                                            {TEAM_LABELS.MODE_TEAM}
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-
-                            {/* Team Size & Win Cond (visible only for Team mode) */}
-                            {isTeamTournament && (
-                                <View className="flex-row gap-4 mb-2">
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center mb-3">
-                                            <Ionicons name="grid-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                            <Text className="text-sm font-bold text-white">{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
-                                        </View>
+                            {/* ── Description & Rules ── */}
+                            <CollapsibleSection icon="document-text" title="Description & Rules" color="#94A3B8" summary={detailsSummary}>
+                                <View className="gap-4">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Description</Text>
                                         <TextInput
-                                            className="bg-card px-4 h-12 rounded-xl text-white border border-white/10 text-sm"
-                                            placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
-                                            placeholderTextColor="#6b7280"
-                                            keyboardType="numeric"
-                                            value={teamSize}
-                                            onChangeText={setTeamSize}
+                                            multiline
+                                            className={FIELD_MULTILINE}
+                                            placeholder="Describe your tournament..."
+                                            placeholderTextColor="#334155"
+                                            textAlignVertical="top"
+                                            value={description}
+                                            onChangeText={setDescription}
                                         />
                                     </View>
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center mb-3">
-                                            <Ionicons name="trophy-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                            <Text className="text-sm font-bold text-white">Win Condition</Text>
-                                        </View>
-                                        <TouchableOpacity
-                                            onPress={() => setShowTeamWinConditionPicker(true)}
-                                            className="bg-card px-4 h-12 rounded-xl border border-white/10 flex-row items-center justify-between"
-                                        >
-                                            <Text className="text-white text-sm" numberOfLines={1}>
-                                                {teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select'}
-                                            </Text>
-                                            <Ionicons name="chevron-down" size={16} color="#94A3B8" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Result Approval */}
-                            <View>
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="shield-checkmark-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Require Result Approval</Text>
-                                </View>
-                                <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                    <Pressable
-                                        onPress={() => setRequireResultApproval(false)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!requireResultApproval ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${!requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
-                                            NO
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setRequireResultApproval(true)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${requireResultApproval ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${requireResultApproval ? 'text-white' : 'text-zinc-500'}`}>
-                                            YES
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                                <Text className="text-[11px] text-zinc-500 mt-2">
-                                    When ON, the opposing participant must confirm a reported result. The hub owner or admin can override.
-                                </Text>
-                            </View>
-
-                            {/* Exclusive members only */}
-                            <View>
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="sparkles-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Exclusive Members Only</Text>
-                                </View>
-                                <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                    <Pressable
-                                        onPress={() => setIsExclusive(false)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${!isExclusive ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${!isExclusive ? 'text-white' : 'text-zinc-500'}`}>
-                                            NO
-                                        </Text>
-                                    </Pressable>
-                                    <Pressable
-                                        onPress={() => setIsExclusive(true)}
-                                        className={`flex-1 py-3 rounded-xl items-center justify-center ${isExclusive ? 'bg-indigo-600' : ''}`}
-                                    >
-                                        <Text className={`text-xs font-bold tracking-wide ${isExclusive ? 'text-white' : 'text-zinc-500'}`}>
-                                            YES
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                                <Text className="text-[11px] text-zinc-500 mt-2">
-                                    When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
-                                </Text>
-                            </View>
-
-                            {/* Third Place Match (single elimination, > 2 entrants) */}
-                            {canShowThirdPlace && (
-                                <View>
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="medal-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Third Place Match</Text>
-                                    </View>
-                                    <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                        <Pressable
-                                            onPress={() => setHasThirdPlaceMatch(false)}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!hasThirdPlaceMatch ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${!hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
-                                                NO
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => setHasThirdPlaceMatch(true)}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${hasThirdPlaceMatch ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${hasThirdPlaceMatch ? 'text-white' : 'text-zinc-500'}`}>
-                                                YES
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Adds a third place match. Skipped if fewer than 4 participants register.
-                                    </Text>
-                                </View>
-                            )}
-
-                            {/* Double round robin — every pair plays twice (home + away). Shown for League and Groups+Bracket. */}
-                            {(selectedFormat === '0' || selectedFormat === '5') && (
-                                <View>
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="repeat-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Double Round Robin</Text>
-                                    </View>
-                                    <View className="bg-card p-1 rounded-2xl flex-row border border-white/5">
-                                        <Pressable
-                                            onPress={() => setDoubleRoundRobin(false)}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${!doubleRoundRobin ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${!doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
-                                                NO
-                                            </Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => setDoubleRoundRobin(true)}
-                                            className={`flex-1 py-3 rounded-xl items-center justify-center ${doubleRoundRobin ? 'bg-indigo-600' : ''}`}
-                                        >
-                                            <Text className={`text-xs font-bold tracking-wide ${doubleRoundRobin ? 'text-white' : 'text-zinc-500'}`}>
-                                                YES
-                                            </Text>
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-[11px] text-zinc-500 mt-2">
-                                        Every pair plays twice — one home leg and one away leg. Doubles the match count.
-                                    </Text>
-                                </View>
-                            )}
-
-                            {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
-                                <View>
-                                    <Text className="text-sm font-bold text-white mb-3">How long should each round last? (optional)</Text>
-                                    <View className="flex-row gap-4">
-                                        <View className="flex-1">
-                                            <TextInput
-                                                className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                                placeholder="e.g. 2"
-                                                placeholderTextColor="#6b7280"
-                                                keyboardType="numeric"
-                                                value={roundDurationValue}
-                                                onChangeText={setRoundDurationValue}
-                                            />
-                                        </View>
-                                        <TouchableOpacity
-                                            onPress={() => setShowDurationUnitPicker(true)}
-                                            className="flex-1 bg-card px-4 h-12 rounded-xl border border-white/10 flex-row items-center justify-between"
-                                        >
-                                            <Text className="text-white font-medium">{roundDurationUnit}</Text>
-                                            <Ionicons name="chevron-down" size={20} color="#94A3B8" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            )}
-
-                            <View className="flex-row gap-4">
-                                <View className="flex-1">
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="calendar-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Start Date</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={() => setShowStartDatePicker(true)}
-                                        className="bg-card px-4 h-12 rounded-xl border border-white/10 justify-center"
-                                    >
-                                        <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                            {startDate || 'Select Start Date'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                                <View className="flex-1">
-                                    <View className="flex-row items-center mb-3">
-                                        <Ionicons name="timer-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                        <Text className="text-sm font-bold text-white">Reg. Deadline</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={() => setShowRegDeadlinePicker(true)}
-                                        className="bg-card px-4 h-12 rounded-xl border border-white/10 justify-center"
-                                    >
-                                        <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                            {registrationDeadline || 'Select Deadline'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Prize Pool & Currency */}
-                            <View>
-                                <View className="flex-row items-center mb-3">
-                                    <Ionicons name="cash-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
-                                    <Text className="text-sm font-bold text-white">Prize Pool</Text>
-                                </View>
-                                <View className="flex-row gap-4">
-                                    <View className="flex-1">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Rules</Text>
                                         <TextInput
-                                            className="bg-card px-4 h-12 rounded-xl text-white border border-white/10"
-                                            placeholder="Amount (e.g. 500)"
-                                            placeholderTextColor="#6b7280"
+                                            multiline
+                                            className={FIELD_MULTILINE}
+                                            placeholder="Enter tournament rules (e.g., Best of 3...)"
+                                            placeholderTextColor="#334155"
+                                            textAlignVertical="top"
+                                            value={rules}
+                                            onChangeText={setRules}
+                                        />
+                                    </View>
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Players & Access ── */}
+                            <CollapsibleSection icon="people" title="Players & Access" color="#818CF8" summary={accessSummary}>
+                                <View className="gap-4">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{TEAM_LABELS.MODE_LABEL}</Text>
+                                        <SegmentedToggle
+                                            options={[
+                                                { value: 'solo', label: TEAM_LABELS.MODE_SOLO },
+                                                { value: 'team', label: TEAM_LABELS.MODE_TEAM },
+                                            ]}
+                                            value={isTeamTournament ? 'team' : 'solo'}
+                                            onChange={(v) => setIsTeamTournament(v === 'team')}
+                                        />
+                                    </View>
+
+                                    {/* Team Size & Win Cond (visible only for Team mode) */}
+                                    {isTeamTournament && (
+                                        <View className="flex-row gap-3">
+                                            <View className="flex-1">
+                                                <Text className={FIELD_LABEL}>{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
+                                                <TextInput
+                                                    className={FIELD_INPUT}
+                                                    placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
+                                                    placeholderTextColor="#334155"
+                                                    keyboardType="numeric"
+                                                    value={teamSize}
+                                                    onChangeText={setTeamSize}
+                                                />
+                                            </View>
+                                            {renderSelectField(
+                                                'Win Condition',
+                                                teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select',
+                                                () => setShowTeamWinConditionPicker(true)
+                                            )}
+                                        </View>
+                                    )}
+
+                                    {/* Tournament Scope: region-based or country-based */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Tournament Scope</Text>
+                                        <SegmentedToggle
+                                            options={[
+                                                { value: 'region', label: 'By Region' },
+                                                { value: 'country', label: 'By Country' },
+                                            ]}
+                                            value={scopeMode}
+                                            onChange={(v) => setScopeMode(v as 'region' | 'country')}
+                                        />
+                                        <View className="mt-3">
+                                            {scopeMode === 'region' ? (
+                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true))
+                                            ) : (
+                                                <CountryPicker
+                                                    placeholder="Select countries"
+                                                    multiple
+                                                    values={selectedCountries}
+                                                    onToggle={toggleCountry}
+                                                />
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    {/* Exclusive members only */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Exclusive Members Only</Text>
+                                        <SegmentedToggle
+                                            options={[...YES_NO_OPTIONS]}
+                                            value={isExclusive ? 'yes' : 'no'}
+                                            onChange={(v) => setIsExclusive(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
+                                        </Text>
+                                    </View>
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Match Settings ── */}
+                            <CollapsibleSection icon="options" title="Match Settings" color="#38BDF8" summary={matchSettingsSummary}>
+                                <View className="gap-4">
+                                    <View>
+                                        <Text className={FIELD_LABEL}>Require Result Approval</Text>
+                                        <SegmentedToggle
+                                            options={[...YES_NO_OPTIONS]}
+                                            value={requireResultApproval ? 'yes' : 'no'}
+                                            onChange={(v) => setRequireResultApproval(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            When ON, the opposing participant must confirm a reported result. The hub owner or admin can override.
+                                        </Text>
+                                    </View>
+
+                                    {/* Third Place Match (single elimination, > 2 entrants) */}
+                                    {canShowThirdPlace && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Third Place Match</Text>
+                                            <SegmentedToggle
+                                                options={[...YES_NO_OPTIONS]}
+                                                value={hasThirdPlaceMatch ? 'yes' : 'no'}
+                                                onChange={(v) => setHasThirdPlaceMatch(v === 'yes')}
+                                            />
+                                            <Text className={FIELD_HINT}>
+                                                Adds a third place match. Skipped if fewer than 4 participants register.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* Double round robin — every pair plays twice (home + away). Shown for League and Groups+Bracket. */}
+                                    {(selectedFormat === '0' || selectedFormat === '5') && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Double Round Robin</Text>
+                                            <SegmentedToggle
+                                                options={[...YES_NO_OPTIONS]}
+                                                value={doubleRoundRobin ? 'yes' : 'no'}
+                                                onChange={(v) => setDoubleRoundRobin(v === 'yes')}
+                                            />
+                                            <Text className={FIELD_HINT}>
+                                                Every pair plays twice — one home leg and one away leg. Doubles the match count.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Round Duration (optional)</Text>
+                                            <View className="flex-row gap-3">
+                                                <View className="flex-1">
+                                                    <TextInput
+                                                        className={FIELD_INPUT}
+                                                        placeholder="e.g. 2"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={roundDurationValue}
+                                                        onChangeText={setRoundDurationValue}
+                                                    />
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => setShowDurationUnitPicker(true)}
+                                                    className="flex-1 bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row items-center justify-between"
+                                                >
+                                                    <Text className="text-white text-sm">{roundDurationUnit}</Text>
+                                                    <Ionicons name="chevron-down" size={16} color="#64748B" />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <Text className={FIELD_HINT}>
+                                                How long each round stays open before results are due.
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Schedule ── */}
+                            <CollapsibleSection icon="calendar" title="Schedule" defaultOpen summary={scheduleSummary}>
+                                <View className="flex-row gap-3">
+                                    <View className="flex-1">
+                                        <Text className={FIELD_LABEL}>Reg. Deadline *</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setShowRegDeadlinePicker(true)}
+                                            className="bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center"
+                                        >
+                                            <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
+                                                {registrationDeadline || 'Select Deadline'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className={FIELD_LABEL}>Start Date *</Text>
+                                        <TouchableOpacity
+                                            onPress={() => setShowStartDatePicker(true)}
+                                            className="bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center"
+                                        >
+                                            <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
+                                                {startDate || 'Select Start Date'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </CollapsibleSection>
+
+                            {/* ── Prize Pool ── */}
+                            <CollapsibleSection icon="cash" title="Prize Pool" color={COLORS.warning} summary={prizeSummary}>
+                                <View className="flex-row gap-3">
+                                    <View className="flex-1">
+                                        <Text className={FIELD_LABEL}>Amount</Text>
+                                        <TextInput
+                                            className={FIELD_INPUT}
+                                            placeholder="e.g. 500"
+                                            placeholderTextColor="#334155"
                                             keyboardType="numeric"
                                             value={prizePool}
                                             onChangeText={setPrizePool}
                                         />
                                     </View>
                                     <View className="w-32">
-                                        <TouchableOpacity
-                                            onPress={() => setShowCurrencyPicker(true)}
-                                            className="bg-card p-3 h-12 rounded-xl border border-white/10 flex-row justify-between items-center"
-                                        >
-                                            <Text className="text-white text-sm">{getCurrencyLabel()}</Text>
-                                            <Ionicons name="chevron-down" size={16} color="#94A3B8" />
-                                        </TouchableOpacity>
+                                        {renderSelectField('Currency', getCurrencyLabel(), () => setShowCurrencyPicker(true))}
                                     </View>
                                 </View>
-                            </View>
+                            </CollapsibleSection>
                         </View>
                     </ScrollView>
 
-                    <View className="p-6 bg-card border-t border-white/5">
+                    <View className="p-5 bg-card border-t border-white/5">
                         {error && (
-                            <Text className="text-red-500 text-xs mb-4 text-center">{error}</Text>
+                            <Text className="text-red-400 text-xs mb-3 text-center">{error}</Text>
                         )}
                         <Button
                             onPress={handleSubmit}
                             disabled={isSubmitting}
                             loading={isSubmitting}
-                            className="bg-primary py-4 rounded-2xl"
+                            className="w-full h-14 rounded-2xl"
                         >
                             Create Tournament
                         </Button>
