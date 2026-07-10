@@ -23,17 +23,25 @@ export function Button({
     loading = false,
     className
 }: ButtonProps) {
+    // Callers size buttons via `flex-1` / `w-full` — the animated wrapper has to
+    // carry that sizing, and ONLY the wrapper: left on the inner Pressable,
+    // `flex-1` acts on the wrapper's column axis (flex-basis 0 height) and
+    // collapses the button to its padding, swallowing the label. The Pressable
+    // fills the sized wrapper via the default align-items: stretch.
+    const fillsRow = /\bflex-1\b/.test(className ?? '');
+    const fillsWidth = /\bw-full\b/.test(className ?? '');
+    const innerClassName = className
+        ?.replace(/\bflex-1\b/g, '')
+        .replace(/\bw-full\b/g, '')
+        .trim();
+
     return (
         <PressableScale
             onPress={onPress}
             disabled={disabled || loading}
-            // Callers size buttons via `flex-1` / `w-full` — the animated wrapper has
-            // to carry that sizing: a percentage width on the inner Pressable resolves
-            // against the auto-width wrapper, which breaks both the button width and
-            // the centering of its content.
             containerStyle={
-                className?.includes('flex-1') ? { flex: 1 } :
-                    className?.includes('w-full') ? { width: '100%' } :
+                fillsRow ? { flex: 1 } :
+                    fillsWidth ? { width: '100%' } :
                         undefined
             }
             className={cn(
@@ -47,7 +55,7 @@ export function Button({
                 variant === 'ghost' && "bg-transparent",
                 variant === 'destructive' && "bg-destructive/10 border border-destructive/25",
                 (disabled || loading) && "opacity-50",
-                className
+                innerClassName
             )}
         >
             {loading ? (
