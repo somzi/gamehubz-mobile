@@ -152,6 +152,9 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     const hasScore = (p: any) => p?.score !== null && p?.score !== undefined;
     const isAlreadyReported = hasScore(home) || hasScore(away);
     const isCompleted = status === 3 || status === 4;
+    // Backend MatchStatus.NoShow (5): a group/league/Swiss fixture the admin closed as a double
+    // forfeit — nobody played, nobody scored points. Terminal like Completed, rendered distinctly.
+    const isNoShow = status === 5;
     // Double walkover: a completed elimination match with both players present, no winner and no
     // scores. Both no-showed, so neither advanced (their opponent went through unopposed). The
     // no-score guard separates it from a legitimate scored draw.
@@ -160,9 +163,10 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     const isLive = status === 2;
     // A pending proposal trumps any other in-progress state — surface it clearly so participants
     // know they're waiting on an approval and not on the actual match.
-    const isAwaitingApproval = !isCompleted && !!proposedByUserId;
+    const isAwaitingApproval = !isCompleted && !isNoShow && !!proposedByUserId;
 
-    const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4);
+    // NoShow stays openable: the admin can still enter a late real result (or undo) from the modal.
+    const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4 || status === 5);
 
     const hasStartTime = !!startTime;
     const canUserReport = hasStartTime ? isParticipant : isAdmin;
@@ -200,12 +204,12 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             )}
 
             {/* Status / action header */}
-            {(canReport || isAwaitingApproval || isLive || isCompleted) && (
+            {(canReport || isAwaitingApproval || isLive || isCompleted || isNoShow) && (
                 <View className={cn(
                     "flex-row items-center justify-between px-4 py-2",
                     canReport
                         ? "bg-emerald-500/[0.08]"
-                        : isAwaitingApproval
+                        : isAwaitingApproval || isNoShow
                             ? "bg-warning/[0.10]"
                             : isLive
                                 ? "bg-emerald-500/[0.06]"
@@ -254,6 +258,14 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             <Ionicons name="play-skip-forward-outline" size={11} color="#F59E0B" />
                             <Text className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
                                 Double Walkover
+                            </Text>
+                        </View>
+                    )}
+                    {!canReport && isNoShow && (
+                        <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="ban-outline" size={11} color="#F59E0B" />
+                            <Text className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
+                                No-Show
                             </Text>
                         </View>
                     )}

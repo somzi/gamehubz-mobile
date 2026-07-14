@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, Linking, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, Linking } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,11 +10,6 @@ import { PressableScale } from '../components/ui/PressableScale';
 import { COLORS } from '../lib/theme';
 
 const DISCORD_BLURPLE = '#5865F2';
-
-// LayoutAnimation needs an explicit opt-in on Android (same guard as HomeScreen).
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const FAQS: { question: string; answer: string }[] = [
     {
@@ -45,27 +41,28 @@ const FAQS: { question: string; answer: string }[] = [
 function FaqItem({ question, answer }: { question: string; answer: string }) {
     const [open, setOpen] = useState(false);
 
-    const toggle = () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setOpen((prev) => !prev);
-    };
-
+    // Expand/collapse animates via a Reanimated layout transition on the wrapper —
+    // LayoutAnimation ghosts text on the new architecture.
     return (
-        <PressableScale
-            onPress={toggle}
-            pressedScale={0.98}
-            className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4"
-        >
-            <View className="flex-row items-center justify-between gap-3">
-                <Text className="text-white font-bold text-sm flex-1 leading-5">{question}</Text>
-                <View className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.06] items-center justify-center">
-                    <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.slate400} />
+        <Animated.View layout={LinearTransition.duration(200)} style={{ borderRadius: 16, overflow: 'hidden' }}>
+            <PressableScale
+                onPress={() => setOpen((prev) => !prev)}
+                pressedScale={0.98}
+                className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4"
+            >
+                <View className="flex-row items-center justify-between gap-3">
+                    <Text className="text-white font-bold text-sm flex-1 leading-5">{question}</Text>
+                    <View className="w-7 h-7 rounded-full bg-white/[0.04] border border-white/[0.06] items-center justify-center">
+                        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.slate400} />
+                    </View>
                 </View>
-            </View>
-            {open && (
-                <Text className="text-slate-400 text-[13px] leading-5 mt-3">{answer}</Text>
-            )}
-        </PressableScale>
+                {open && (
+                    <Animated.View entering={FadeIn.duration(150)}>
+                        <Text className="text-slate-400 text-[13px] leading-5 mt-3">{answer}</Text>
+                    </Animated.View>
+                )}
+            </PressableScale>
+        </Animated.View>
     );
 }
 
@@ -91,7 +88,7 @@ export function HelpCenterScreen() {
                     ))}
                 </View>
 
-                <View className="mt-8">
+                <Animated.View layout={LinearTransition.duration(200)} style={{ marginTop: 32 }}>
                     <SectionLabel icon="mail" title="Still need help?" color={COLORS.info} />
                     <TouchableOpacity
                         onPress={() => Linking.openURL('mailto:support@codespheresolutions.dev')}
@@ -106,7 +103,7 @@ export function HelpCenterScreen() {
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
             </ScrollView>
         </SafeAreaView>
     );

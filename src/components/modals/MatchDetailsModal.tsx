@@ -720,15 +720,19 @@ export function MatchDetailsModal({
         }
     };
 
-    // Destructive and bracket-changing (both players are eliminated and their opponent advances
-    // unopposed), so confirm first. Backend re-checks the manage permission and that the match is
-    // an unplayed elimination match.
+    // Destructive, so confirm first — with format-specific consequences: elimination walkovers
+    // eliminate both players and advance their opponent; league/group/Swiss walkovers close the
+    // fixture as a no-show double forfeit (no points for either player — deliberately not a draw).
+    // Backend re-checks the manage permission and the match state.
     const handleDoubleWalkover = () => {
         const homeName = home?.username || matchDetails?.homeUser || 'Player 1';
         const awayName = away?.username || matchDetails?.awayUser || 'Player 2';
+        const message = isEliminationMatch
+            ? `Neither ${homeName} nor ${awayName} played, so both are eliminated and their opponent advances by walkover. This usually can't be undone once the opponent moves on. Continue?`
+            : `Neither ${homeName} nor ${awayName} played, so the match closes as a no-show: no points for either player (not a draw) and the round can continue. You can still enter a real result later. Continue?`;
         Alert.alert(
             'Double walkover?',
-            `Neither ${homeName} nor ${awayName} played, so both are eliminated and their opponent advances by walkover. This usually can't be undone once the opponent moves on. Continue?`,
+            message,
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Double walkover', style: 'destructive', onPress: submitDoubleWalkover },
@@ -783,14 +787,19 @@ export function MatchDetailsModal({
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
-    // Double walkover: admin/owner only, on an unplayed elimination match with both players set and
-    // somewhere to advance the opponent into. Group/league/Swiss matches (GroupStage) are excluded —
-    // there is no "next match" for an opponent to advance through. Backend re-validates all of this.
+    // Double walkover: admin/owner only, on an unplayed match with both players set. Elimination
+    // matches additionally need somewhere to advance the surviving opponent into (this also hides
+    // the action on play-in matches, whose slots must always produce a qualifier — backend rejects
+    // them outright). Group/league/Swiss matches close as a NoShow double forfeit instead — no
+    // downstream needed, no points for either player. Backend re-validates all of this.
     const isEliminationMatch = stage !== undefined && stage !== null && Number(stage) !== MatchStage.GroupStage;
     const hasDownstream = !!nextMatchId || !!nextMatchLoserBracketId;
     const bothPlayersSet = !!(home?.username || matchDetails?.homeUserId) && !!(away?.username || matchDetails?.awayUserId);
+    // Backend MatchStatus.NoShow (5) — an already-closed no-show must not offer the action again.
+    const isNoShowClosed = matchDetails?.status === 5;
     const canDoubleWalkover = isPrivileged && effectiveStatus !== 'completed' && effectiveStatus !== 'pending_availability'
-        && isEliminationMatch && hasDownstream && bothPlayersSet;
+        && !isNoShowClosed && bothPlayersSet
+        && (!isEliminationMatch || hasDownstream);
 
     const adminHelpRequested = !!matchDetails?.adminHelpRequested;
     // Chat & admin-help visibility:
@@ -1411,9 +1420,10 @@ export function MatchDetailsModal({
                 </>
                 )}
 
-                {/* Double Walkover — admin/owner only. Both players no-showed, so the match is closed
-                    with no winner and their opponent advances unopposed. The subtitle doubles as the
-                    in-place tooltip (no hover on mobile). */}
+                {/* Double Walkover — admin/owner only. Both players no-showed: elimination matches
+                    close with no winner and their opponent advances; group/league/Swiss fixtures
+                    close as a no-show double forfeit (no points either way). The subtitle doubles
+                    as the in-place tooltip (no hover on mobile). */}
                 {canDoubleWalkover && (
                     <View className="mb-5">
                         <View className="h-px bg-white/[0.08] mb-4" />
@@ -1432,7 +1442,9 @@ export function MatchDetailsModal({
                             )}
                         </Pressable>
                         <Text className="text-[11px] text-slate-500 mt-2 text-center px-2 leading-4">
-                            Both players failed to play — closes this match with no winner and advances their opponent automatically.
+                            {isEliminationMatch
+                                ? 'Both players failed to play — closes this match with no winner and advances their opponent automatically.'
+                                : 'Both players failed to play — closes this match as a no-show. No points for either player (not a draw).'}
                         </Text>
                     </View>
                 )}

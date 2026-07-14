@@ -279,7 +279,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                             {currentRoundMatches.length > 0 && (
                                 <View className="mb-4">
                                     {/* Deadline + Edit Schedule row (only if deadline exists or admin) */}
-                                    {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4)))) && (
+                                    {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4 || m.status === 5)))) && (
                                         <View className="flex-row items-center justify-between px-1 mb-4">
                                             {currentRoundMatches[0]?.roundDeadline ? (
                                                 <View className="flex-row items-center gap-1.5">
@@ -289,7 +289,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                     </Text>
                                                 </View>
                                             ) : <View />}
-                                            {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4)) && (
+                                            {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4 || m.status === 5)) && (
                                                 <Pressable
                                                     onPress={() => onEditDeadline?.({ roundNumber: Number(activeRound), roundDeadline: currentRoundMatches[0]?.roundDeadline, roundOpenAt: currentRoundMatches[0]?.matchOpensAt })}
                                                     className="flex-row items-center gap-1 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 active:opacity-70"

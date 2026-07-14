@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -44,11 +45,6 @@ const SECTION_GAP = 28;
 const EMPTY_MATCHES: MatchOverviewDto[] = [];
 const EMPTY_ACTIVITIES: DashboardActivityDto[] = [];
 
-// LayoutAnimation needs an explicit opt-in on Android to animate the collapse.
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
 type SectionKey = 'attention' | 'active' | 'highlights';
 
 export default function HomeScreen() {
@@ -62,8 +58,9 @@ export default function HomeScreen() {
         highlights: false,
     });
 
+    // Collapse animates via Reanimated layout transitions on the section wrappers —
+    // LayoutAnimation ghosts text on the new architecture, so it's banned here.
     const toggleSection = (key: SectionKey) => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
@@ -250,7 +247,7 @@ export default function HomeScreen() {
                 <View className="px-5">
                     {/* ── Section: Needs Attention ── */}
                     {actionRequiredMatches.length > 0 && (
-                        <View>
+                        <Animated.View layout={LinearTransition.duration(200)}>
                             <SectionHeader
                                 icon="alert-circle"
                                 iconColor="#F59E0B"
@@ -263,7 +260,7 @@ export default function HomeScreen() {
                                 onToggle={() => toggleSection('attention')}
                             />
                             {!collapsed.attention && (
-                            <View className="gap-3">
+                            <Animated.View entering={FadeIn.duration(150)} style={{ gap: 12 }}>
                                 {actionRequiredMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
                                         key={match.id || match.matchId}
@@ -280,13 +277,16 @@ export default function HomeScreen() {
                                         unreadMessages={match.unreadMessages}
                                     />
                                 ))}
-                            </View>
+                            </Animated.View>
                             )}
-                        </View>
+                        </Animated.View>
                     )}
 
                     {/* ── Section: Active Matches ── */}
-                    <View style={{ marginTop: actionRequiredMatches.length > 0 ? SECTION_GAP : 0 }}>
+                    <Animated.View
+                        layout={LinearTransition.duration(200)}
+                        style={{ marginTop: actionRequiredMatches.length > 0 ? SECTION_GAP : 0 }}
+                    >
                         <SectionHeader
                             icon="game-controller"
                             iconColor="#10B981"
@@ -300,7 +300,8 @@ export default function HomeScreen() {
                         />
 
                         {!collapsed.active && (
-                        sortedActiveMatches.length > 0 ? (
+                        <Animated.View entering={FadeIn.duration(150)}>
+                        {sortedActiveMatches.length > 0 ? (
                             <View className="gap-3">
                                 {sortedActiveMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
@@ -336,12 +337,13 @@ export default function HomeScreen() {
                                 title="No active matches"
                                 description="Your competitive matches will appear here once they start"
                             />
-                        )
                         )}
-                    </View>
+                        </Animated.View>
+                        )}
+                    </Animated.View>
 
                     {/* ── Section: Highlights ── */}
-                    <View style={{ marginTop: SECTION_GAP }}>
+                    <Animated.View layout={LinearTransition.duration(200)} style={{ marginTop: SECTION_GAP }}>
                         <SectionHeader
                             icon="sparkles"
                             iconColor="#A78BFA"
@@ -355,7 +357,8 @@ export default function HomeScreen() {
                         />
 
                         {!collapsed.highlights && (
-                        hubActivities.length > 0 ? (
+                        <Animated.View entering={FadeIn.duration(150)}>
+                        {hubActivities.length > 0 ? (
                             <View className="gap-2.5">
                                 {hubActivities.slice(0, 3).map((item, index) => (
                                     <FeedCard
@@ -383,9 +386,10 @@ export default function HomeScreen() {
                                 title="No highlights yet"
                                 description="Activity from your hubs will appear here"
                             />
-                        )
                         )}
-                    </View>
+                        </Animated.View>
+                        )}
+                    </Animated.View>
                 </View>
             </ScrollView>
 
