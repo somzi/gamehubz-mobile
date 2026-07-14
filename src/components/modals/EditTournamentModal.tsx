@@ -200,7 +200,6 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const participantCount = isTeamTournament
         ? (teamSizeNum > 0 && parseInt(maxPlayers) ? Math.floor(parseInt(maxPlayers) / teamSizeNum) : 0)
         : (parseInt(maxPlayers) || 0);
-    const canShowThirdPlace = selectedFormat === String(TournamentFormat.SingleElimination) && participantCount > 2;
 
     const isSwiss = selectedFormat === String(TournamentFormat.Swiss);
     const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
@@ -217,6 +216,21 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const showKnockoutTypeToggle =
         (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers >= 4) ||
         (isSwiss && swissKnockoutSize >= 4);
+
+    // Third place exists whenever the run ends in a single-elimination bracket with real
+    // semi-finals. League never has a bracket, a double-elimination bracket decides 3rd via
+    // the losers bracket final, and pure Swiss (knockout 'None') crowns the winner straight
+    // from the standings — so those hide the toggle. Entrants = bracket slots of the phase
+    // hosting the final: group qualifiers / Swiss knockout size / everyone.
+    const thirdPlaceEntrants =
+        selectedFormat === String(TournamentFormat.GroupStageWithKnockout) ? groupsTotalQualifiers :
+        isSwiss ? swissKnockoutSize :
+        participantCount;
+    const usesDoubleElimBracket =
+        selectedFormat === String(TournamentFormat.DoubleElimination) ||
+        (showKnockoutTypeToggle && knockoutType === '2');
+    const canShowThirdPlace =
+        selectedFormat !== String(TournamentFormat.League) && !usesDoubleElimBracket && thirdPlaceEntrants > 2;
 
     useEffect(() => {
         if (!isTeamTournament) {
@@ -410,8 +424,10 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 Region: regionMapping[selectedRegion] ?? 0,
                 Countries: scopeMode === 'country' ? selectedCountries : null,
                 RoundDurationMinutes: roundDurationMinutes,
-                // Always sent so an edit never silently resets it; only changeable before the bracket is generated.
-                HasThirdPlaceMatch: hasThirdPlaceMatch,
+                // Always sent so an edit never silently resets it; only changeable before the bracket is
+                // generated. Forced off when the current format can't host one (League / double-elim /
+                // pure Swiss) so a format switch clears a stale flag.
+                HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
                 // Structural fields the backend will only honour when AllowStructuralEdits=true and the
                 // tournament hasn't started; otherwise it preserves the persisted values regardless of
@@ -814,7 +830,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                 disabled={!canEditAll}
                                             />
                                             <Text className={FIELD_HINT}>
-                                                Adds a third place match. Skipped if fewer than 4 participants register. Takes effect when the bracket is generated.
+                                                Adds a third place match between the semi-final losers. Skipped if the bracket ends up with fewer than 4 entrants. Takes effect when the bracket is generated.
                                             </Text>
                                         </View>
                                     )}

@@ -134,7 +134,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [teamSize, setTeamSize] = useState('');
     const [teamWinCondition, setTeamWinCondition] = useState('0');
 
-    // Third place play-off (single elimination only)
+    // Third place play-off (any format that ends in a single-elimination bracket)
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(false);
 
     // Result approval — when on, reported scores need opponent (or admin) confirmation.
@@ -266,9 +266,6 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         }
         return mp || 0;
     })();
-    // Third place only makes sense for a single-elimination bracket with more than 2 entrants.
-    const canShowThirdPlace = selectedFormat === String(TournamentFormat.SingleElimination) && participantCount > 2;
-
     const isSwiss = selectedFormat === String(TournamentFormat.Swiss);
     const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
     // Empty direct input = every knockout slot is a direct berth (no play-in).
@@ -302,6 +299,20 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             setKnockoutType(val);
         }
     };
+
+    // Third place exists whenever the run ends in a single-elimination bracket with real
+    // semi-finals. League never has a bracket, a double-elimination bracket decides 3rd via
+    // the losers bracket final, and pure Swiss (knockout 'None') crowns the winner straight
+    // from the standings — so those hide the toggle. Entrants = bracket slots of the phase
+    // hosting the final: group qualifiers / Swiss knockout size / everyone.
+    const thirdPlaceEntrants =
+        formatGroup === 'groups-bracket' ? groupsTotalQualifiers :
+        isSwiss ? swissKnockoutSize :
+        participantCount;
+    const usesDoubleElimBracket = formatGroup === 'bracket'
+        ? selectedFormat === String(TournamentFormat.DoubleElimination)
+        : showKnockoutTypeToggle && knockoutType === '2';
+    const canShowThirdPlace = formatGroup !== 'league' && !usesDoubleElimBracket && thirdPlaceEntrants > 2;
 
     useEffect(() => {
         if (!isTeamTournament) {
@@ -880,7 +891,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         </Text>
                                     </View>
 
-                                    {/* Third Place Match (single elimination, > 2 entrants) */}
+                                    {/* Third Place Match — hidden for League, double-elim brackets, and pure Swiss */}
                                     {canShowThirdPlace && (
                                         <View>
                                             <Text className={FIELD_LABEL}>Third Place Match</Text>
@@ -890,7 +901,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 onChange={(v) => setHasThirdPlaceMatch(v === 'yes')}
                                             />
                                             <Text className={FIELD_HINT}>
-                                                Adds a third place match. Skipped if fewer than 4 participants register.
+                                                Adds a third place match between the semi-final losers. Skipped if the bracket ends up with fewer than 4 entrants.
                                             </Text>
                                         </View>
                                     )}
