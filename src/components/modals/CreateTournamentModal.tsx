@@ -512,14 +512,19 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         }
     };
 
+    // `standalone` = rendered on its own in a column. The default flex-1 is for row
+    // usage (sharing width with siblings) — in an auto-height column flex-1 resolves
+    // to flexBasis 0 and Yoga collapses the field to height 0, so its label/box paint
+    // over whatever comes next.
     const renderSelectField = (
         label: string,
         value: string,
         onPress: () => void,
         isLoading = false,
-        locked = false
+        locked = false,
+        standalone = false
     ) => (
-        <View className="flex-1">
+        <View className={standalone ? undefined : 'flex-1'}>
             <Text className={FIELD_LABEL}>{label}</Text>
             <TouchableOpacity
                 onPress={onPress}
@@ -638,7 +643,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         getHubLabel(),
                                         () => hubId ? null : setShowHubPicker(true),
                                         isLoadingHubs,
-                                        !!hubId
+                                        !!hubId,
+                                        true
                                     )}
 
                                     <View>
@@ -849,7 +855,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         />
                                         <View className="mt-3">
                                             {scopeMode === 'region' ? (
-                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true))
+                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true), false, false, true)
                                             ) : (
                                                 <CountryPicker
                                                     placeholder="Select countries"

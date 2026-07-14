@@ -460,8 +460,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         }
     };
 
-    const renderSelectField = (label: string, value: string, onPress: () => void, disabled = false) => (
-        <View className="flex-1">
+    // `standalone` = rendered on its own in a column. The default flex-1 is for row
+    // usage — in an auto-height column flex-1 collapses the field to height 0 and it
+    // paints over the next field.
+    const renderSelectField = (label: string, value: string, onPress: () => void, disabled = false, standalone = false) => (
+        <View className={standalone ? undefined : 'flex-1'}>
             <Text className={FIELD_LABEL}>{label}</Text>
             <TouchableOpacity
                 onPress={onPress}
@@ -774,7 +777,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         />
                                         <View className="mt-3">
                                             {scopeMode === 'region' ? (
-                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true), !canEditAll)
+                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true), !canEditAll, true)
                                             ) : (
                                                 <View pointerEvents={canEditAll ? 'auto' : 'none'} style={{ opacity: canEditAll ? 1 : 0.5 }}>
                                                     <CountryPicker
