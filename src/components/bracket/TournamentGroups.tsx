@@ -66,9 +66,9 @@ interface TournamentGroupsProps {
     isAdmin?: boolean;
     onEditDeadline?: (roundInfo: { roundNumber: number; roundDeadline?: string | null; roundOpenAt?: string | null }) => void;
     tournamentStatus?: number;
-    // Swiss: explicit qualification zones — positions <= direct go straight to the knockout
-    // (green), positions <= playInEnd enter the play-in (amber). When omitted, the legacy
-    // top-2 group highlight is used.
+    // Explicit qualification zones — positions <= direct go straight to the knockout (green),
+    // positions <= playInEnd enter the play-in (amber; Swiss only — classic groups pass
+    // direct === playInEnd). When omitted, the legacy top-2 group highlight is used.
     qualificationZones?: { direct: number; playInEnd: number };
     // Swiss: total rounds scheduled — drives the "Round X of Y" header on the matches list.
     // When omitted, only "Round X" is shown (legacy group/league behaviour).

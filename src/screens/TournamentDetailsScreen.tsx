@@ -1571,6 +1571,14 @@ export default function TournamentDetailsScreen() {
             ? { direct: swissDirectCount, playInEnd: swissPlayInEnd }
             : undefined;
 
+        // Classic group stage: top N per group advance to the knockout, N = QualifiersPerGroup.
+        // direct === playInEnd → green zone only, no amber play-in row. Missing/0 value falls
+        // back to the legacy top-2 highlight inside TournamentGroups.
+        const groupQualifiers = Number(tournament?.qualifiersPerGroup ?? 0) || 0;
+        const groupZones = stageType === 1 && groupQualifiers > 0
+            ? { direct: groupQualifiers, playInEnd: groupQualifiers }
+            : undefined;
+
         // Total Swiss rounds for the "Round X of Y" header — mirrors backend GetSwissTotalRounds:
         // configured value (clamped to the no-rematch maximum) or ceil(log2(N)). N comes from the
         // Swiss group's standings (the exact participant count); maxPlayers is only a last-resort
@@ -1800,7 +1808,7 @@ export default function TournamentDetailsScreen() {
                                             isAdmin={canManage}
                                             onEditDeadline={handleEditDeadline}
                                             tournamentStatus={tournament?.status}
-                                            qualificationZones={swissZones}
+                                            qualificationZones={swissZones ?? groupZones}
                                             totalRounds={swissTotalRounds}
                                             isTeamTournament={tournament?.isTeamTournament}
                                         />
