@@ -61,9 +61,13 @@ export interface UserInfo {
     countryFlag?: string | null; // flag emoji (from backend catalog)
     userSocials: UserSocial[];
     avatarUrl?: string;
-    // Discord bot link (only present on the caller's OWN profile; stripped for others)
+    // Discord bot link. discordUserId is the public part — present for other viewers only when the
+    // owner opted in (it builds the discord.com/users profile link). username/dmEnabled/showOnProfile
+    // are owner-only (stripped for others).
     discordUsername?: string | null;
+    discordUserId?: string | null;
     discordDmEnabled?: boolean;
+    discordShowOnProfile?: boolean;
 }
 
 export interface User {
@@ -89,7 +93,9 @@ export interface User {
     tournamentParticipants: any[];
     // Discord bot link (populated from GET_USER_INFO for the logged-in user)
     discordUsername?: string | null;
+    discordUserId?: string | null;
     discordDmEnabled?: boolean;
+    discordShowOnProfile?: boolean;
 }
 
 export interface AuthResponse {

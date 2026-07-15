@@ -26,6 +26,7 @@ export const ENDPOINTS = {
     DISCORD_LINK_START: `${API_BASE_URL}/api/Discord/link/start`,
     DISCORD_UNLINK: `${API_BASE_URL}/api/Discord/link`,
     DISCORD_DM_ENABLED: `${API_BASE_URL}/api/Discord/dm-enabled`,
+    DISCORD_SHOW_ON_PROFILE: `${API_BASE_URL}/api/Discord/show-on-profile`,
     GET_USER_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/joined?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     GET_DISCOVERY_HUBS: (userId: string, pageNumber: number = 0, search: string = "") => `${API_BASE_URL}/api/Hub/user/${userId}/discovery?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
     GET_PROFILE_TOURNAMENTS: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/UserProfile/${userId}/tournaments?pageNumber=${pageNumber}`,

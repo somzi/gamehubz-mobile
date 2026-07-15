@@ -42,6 +42,7 @@ export default function ManageUserSocialsScreen() {
     // Discord bot link (OAuth runs in the system browser; the backend does the whole exchange)
     const [isConnectingDiscord, setIsConnectingDiscord] = useState(false);
     const [isTogglingDm, setIsTogglingDm] = useState(false);
+    const [isTogglingShow, setIsTogglingShow] = useState(false);
     const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
     const [isDisconnecting, setIsDisconnecting] = useState(false);
     const awaitingDiscordLink = useRef(false);
@@ -108,6 +109,24 @@ export default function ManageUserSocialsScreen() {
         }
     };
 
+    const handleToggleShowOnProfile = async (show: boolean) => {
+        if (isTogglingShow) return;
+        setIsTogglingShow(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.DISCORD_SHOW_ON_PROFILE, {
+                method: 'PUT',
+                body: JSON.stringify({ show }),
+            });
+            if (!response.ok) throw new Error(`DISCORD_SHOW_ON_PROFILE failed: ${response.status}`);
+            await refreshUser();
+        } catch (error) {
+            console.error('Error toggling Discord profile visibility:', error);
+            showDiscordError('Could not update profile visibility. Try again later.');
+        } finally {
+            setIsTogglingShow(false);
+        }
+    };
+
     const handleDisconnectDiscord = async () => {
         if (isDisconnecting) return;
         setIsDisconnecting(true);
@@ -130,7 +149,8 @@ export default function ManageUserSocialsScreen() {
         { label: 'Facebook', value: SocialType.Facebook },
         { label: 'TikTok', value: SocialType.TikTok },
         { label: 'YouTube', value: SocialType.YouTube },
-        { label: 'Discord', value: SocialType.Discord },
+        // Discord is intentionally not an "add" option — it's connected via the OAuth card above,
+        // which yields a real user id (the only thing that produces a working Discord link).
         { label: 'Telegram', value: SocialType.Telegram },
         { label: 'Twitch', value: SocialType.Twitch },
         { label: 'Kick', value: SocialType.Kick },
@@ -152,6 +172,9 @@ export default function ManageUserSocialsScreen() {
     };
 
     const getSocialLabel = (type: SocialType) => {
+        // Discord is no longer an "add" option (it's the OAuth card above), but legacy manual
+        // entries may still exist — keep its label resolvable.
+        if (type === SocialType.Discord) return 'Discord';
         return socialTypeOptions.find(opt => opt.value === type)?.label || 'Social';
     };
 
@@ -264,21 +287,38 @@ export default function ManageUserSocialsScreen() {
                             </View>
 
                             {user?.discordUsername ? (
-                                <View className="flex-row items-center justify-between mt-4 pt-4 border-t border-white/5">
-                                    <View className="flex-1 pr-3">
-                                        <Text className="text-sm font-bold text-white">DM notifications</Text>
-                                        <Text className="text-xs text-slate-500 mt-0.5">
-                                            Match reminders and messages from the GameHubz bot
-                                        </Text>
+                                <>
+                                    <View className="flex-row items-center justify-between mt-4 pt-4 border-t border-white/5">
+                                        <View className="flex-1 pr-3">
+                                            <Text className="text-sm font-bold text-white">DM notifications</Text>
+                                            <Text className="text-xs text-slate-500 mt-0.5">
+                                                Match reminders and messages from the GameHubz bot
+                                            </Text>
+                                        </View>
+                                        <Toggle
+                                            size="sm"
+                                            value={user.discordDmEnabled !== false}
+                                            onValueChange={handleToggleDiscordDm}
+                                            disabled={isTogglingDm}
+                                            activeColor={DISCORD_BLURPLE}
+                                        />
                                     </View>
-                                    <Toggle
-                                        size="sm"
-                                        value={user.discordDmEnabled !== false}
-                                        onValueChange={handleToggleDiscordDm}
-                                        disabled={isTogglingDm}
-                                        activeColor={DISCORD_BLURPLE}
-                                    />
-                                </View>
+                                    <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-white/5">
+                                        <View className="flex-1 pr-3">
+                                            <Text className="text-sm font-bold text-white">Show on profile</Text>
+                                            <Text className="text-xs text-slate-500 mt-0.5">
+                                                Let others open your Discord from your public profile
+                                            </Text>
+                                        </View>
+                                        <Toggle
+                                            size="sm"
+                                            value={user.discordShowOnProfile !== false}
+                                            onValueChange={handleToggleShowOnProfile}
+                                            disabled={isTogglingShow}
+                                            activeColor={DISCORD_BLURPLE}
+                                        />
+                                    </View>
+                                </>
                             ) : (
                                 <View className="mt-3">
                                     <Button

@@ -12,7 +12,7 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
 import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
-import { getSocialUrl } from '../lib/social';
+import { getSocialUrl, withDiscordProfileLink } from '../lib/social';
 import { SharePlayerCardModal } from '../components/modals/SharePlayerCardModal';
 import { Button } from '../components/ui/Button';
 import { TournamentCard } from '../components/cards/TournamentCard';
@@ -412,11 +412,19 @@ export default function PlayerProfileScreen() {
                                 )}
                             </View>
                         </View>
-                        {displayData.socials.length > 0 && (
-                            <View className="mt-4 pt-3" style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' }}>
-                                <SocialLinks links={mapSocialsToLinks(displayData.socials)} className="justify-center" />
-                            </View>
-                        )}
+                        {(() => {
+                            const socialLinks = withDiscordProfileLink(
+                                mapSocialsToLinks(displayData.socials),
+                                userInfo.discordUserId,
+                                userInfo.discordUsername,
+                            );
+                            if (socialLinks.length === 0) return null;
+                            return (
+                                <View className="mt-4 pt-3" style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' }}>
+                                    <SocialLinks links={socialLinks} className="justify-center" />
+                                </View>
+                            );
+                        })()}
                     </View>
                 </View>
 
