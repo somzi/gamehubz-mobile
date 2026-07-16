@@ -130,7 +130,7 @@ export function AboutUsScreen() {
                 </View>
 
                 <View className="mt-12 items-center">
-                    <Text className="text-slate-500 text-xs tracking-widest uppercase">Version {Constants.expoConfig?.version || '1.0.0'}</Text>
+                    <Text className="text-slate-500 text-xs tracking-widest uppercase w-full text-center" numberOfLines={1}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
                     <Text className="text-slate-500 text-xs mt-2">© 2026 CodeSphere Solutions</Text>
                 </View>
             </ScrollView>

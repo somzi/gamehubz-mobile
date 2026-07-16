@@ -1067,8 +1067,8 @@ export function MatchScheduleCard({
                                     active={activeModalTab === 'match'}
                                     onPress={() => setActiveModalTab('match')}
                                 >
-                                    <Text className={cn(
-                                        "text-xs font-black uppercase tracking-widest",
+                                    <Text numberOfLines={1} className={cn(
+                                        "text-xs font-black uppercase tracking-widest w-full text-center",
                                         activeModalTab === 'match' ? "text-emerald-300" : "text-slate-500"
                                     )}>Match</Text>
                                 </ModalTabButton>
@@ -1077,7 +1077,7 @@ export function MatchScheduleCard({
                                     onPress={() => setActiveModalTab('chat')}
                                 >
                                     <View className="flex-row items-center gap-2">
-                                        <Text className={cn(
+                                        <Text numberOfLines={1} className={cn(
                                             "text-xs font-black uppercase tracking-widest",
                                             activeModalTab === 'chat' ? "text-emerald-300" : "text-slate-500"
                                         )}>Chat</Text>
@@ -1102,7 +1102,7 @@ export function MatchScheduleCard({
                                         onPress={() => setActiveModalTab('stream')}
                                     >
                                         <View className="flex-row items-center gap-1.5">
-                                            <Text className={cn(
+                                            <Text numberOfLines={1} className={cn(
                                                 "text-xs font-black uppercase tracking-widest",
                                                 activeModalTab === 'stream' ? "text-emerald-300" : "text-slate-500"
                                             )}>Stream</Text>
@@ -1208,7 +1208,7 @@ export function MatchScheduleCard({
                                                                         {isRejecting ? (
                                                                             <ActivityIndicator size="small" color="#F87171" />
                                                                         ) : (
-                                                                            <Text className="text-xs font-black text-red-400 uppercase tracking-wider">Reject</Text>
+                                                                            <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Reject</Text>
                                                                         )}
                                                                     </Pressable>
                                                                 )}
@@ -1221,7 +1221,7 @@ export function MatchScheduleCard({
                                                                         {isApproving ? (
                                                                             <ActivityIndicator size="small" color="#0F172A" />
                                                                         ) : (
-                                                                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">Approve</Text>
+                                                                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>Approve</Text>
                                                                         )}
                                                                     </Pressable>
                                                                 )}
@@ -1234,7 +1234,7 @@ export function MatchScheduleCard({
                                                                         }}
                                                                         className="flex-1 bg-warning/10 border border-warning/25 rounded-2xl py-3 items-center active:opacity-70"
                                                                     >
-                                                                        <Text className="text-xs font-black text-warning uppercase tracking-wider">Edit</Text>
+                                                                        <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>Edit</Text>
                                                                     </Pressable>
                                                                 )}
                                                             </View>
@@ -1399,7 +1399,7 @@ export function MatchScheduleCard({
                                                             onPress={() => { setIsEditingProposal(false); setHomeScore(''); setAwayScore(''); setError(null); }}
                                                             className="flex-1 h-14 rounded-2xl border border-white/[0.06] bg-white/[0.04] items-center justify-center active:opacity-70"
                                                         >
-                                                            <Text className="text-xs font-black text-slate-400 uppercase tracking-widest">Cancel</Text>
+                                                            <Text className="text-xs font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>Cancel</Text>
                                                         </Pressable>
                                                     )}
                                                     <Pressable
@@ -1429,7 +1429,7 @@ export function MatchScheduleCard({
                                                                         size={18}
                                                                         color={isRoundLocked ? "#CBD5E1" : "#022C22"}
                                                                     />
-                                                                    <Text className={cn(
+                                                                    <Text numberOfLines={1} className={cn(
                                                                         "font-black uppercase tracking-widest text-xs",
                                                                         isRoundLocked ? "text-slate-200" : "text-emerald-950"
                                                                     )}>
@@ -1560,7 +1560,7 @@ export function MatchScheduleCard({
                                                             ) : (
                                                                 <>
                                                                     <Ionicons name="cloud-upload-outline" size={14} color="#818CF8" />
-                                                                    <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider">Upload Evidence</Text>
+                                                                    <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider" numberOfLines={1}>Upload Evidence</Text>
                                                                 </>
                                                             )}
                                                         </Pressable>
@@ -1575,7 +1575,7 @@ export function MatchScheduleCard({
                                                 <View className={cn("w-20 h-20 rounded-full items-center justify-center border", isPremium ? "bg-primary/20 border-primary/30" : "bg-primary/20 border-transparent")}>
                                                     <Ionicons name="checkmark" size={40} color="#10B981" />
                                                 </View>
-                                                <Text className={cn("font-black mt-6 uppercase tracking-widest", isPremium ? "text-xl text-white" : "text-foreground")}>Completed</Text>
+                                                <Text numberOfLines={1} className={cn("font-black mt-6 uppercase tracking-widest w-full text-center", isPremium ? "text-xl text-white" : "text-foreground")}>Completed</Text>
                                                 {isPremium && <Text className="text-sm font-medium text-slate-500 mt-2">Results have been recorded</Text>}
                                             </View>
                                         )}
@@ -1697,7 +1697,7 @@ export function MatchScheduleCard({
                                         ) : (
                                             <View className={cn("h-32 border border-dashed rounded-2xl items-center justify-center mb-4", isPremium ? "border-white/10 bg-white/[0.02]" : "border-border/20 bg-muted/5")}>
                                                 <Ionicons name="chatbubble-outline" size={isPremium ? 28 : 24} color={isPremium ? "#475569" : "#71717A"} />
-                                                <Text className={cn("font-bold uppercase tracking-widest mt-1", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>No messages yet</Text>
+                                                <Text numberOfLines={1} className={cn("font-bold uppercase tracking-widest mt-1 w-full text-center", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>No messages yet</Text>
                                             </View>
                                         )}
                                     </View>

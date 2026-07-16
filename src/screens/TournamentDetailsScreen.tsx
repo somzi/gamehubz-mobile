@@ -2431,7 +2431,7 @@ export default function TournamentDetailsScreen() {
                                                                     loading={joiningTeamId === teamId}
                                                                     disabled={joiningTeamId !== null || t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending'}
                                                                 >
-                                                                    <Text className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center"}>
+                                                                    <Text numberOfLines={1} className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center w-full" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center w-full"}>
                                                                         {(t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending')
                                                                             ? 'Request Pending'
                                                                             : (t.requiresApproval || t.RequiresApproval) ? 'Request to Join' : 'Join This Team'}
@@ -2604,7 +2604,7 @@ export default function TournamentDetailsScreen() {
                                                                         loading={joiningTeamId === teamId}
                                                                         disabled={joiningTeamId !== null || isPending}
                                                                     >
-                                                                        <Text className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center"}>
+                                                                        <Text numberOfLines={1} className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center w-full" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center w-full"}>
                                                                             {isPending
                                                                                 ? 'Request Pending'
                                                                                 : (t.requiresApproval || t.RequiresApproval) ? 'Request to Join' : 'Join This Team'}

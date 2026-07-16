@@ -836,7 +836,7 @@ export function MatchDetailsModal({
             return (
                 <View className="flex-1 items-center justify-center py-20">
                     <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-slate-500 mt-4 font-bold uppercase tracking-widest text-[10px]">Loading match data...</Text>
+                    <Text className="text-slate-500 mt-4 font-bold uppercase tracking-widest text-[10px] w-full text-center" numberOfLines={1}>Loading match data...</Text>
                 </View>
             );
         }
@@ -1004,7 +1004,7 @@ export function MatchDetailsModal({
                                     <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
                                         <Ionicons name="images-outline" size={18} color="#818CF8" />
                                     </View>
-                                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest">No Evidence Attached</Text>
+                                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>No Evidence Attached</Text>
                                 </View>
                             )}
                         </View>
@@ -1026,7 +1026,7 @@ export function MatchDetailsModal({
                             <View className="w-8 h-8 rounded-xl bg-primary/10 items-center justify-center">
                                 <Ionicons name="create-outline" size={16} color="#10B981" />
                             </View>
-                            <Text className="text-sm font-black text-primary uppercase tracking-widest">Edit Result</Text>
+                            <Text className="text-sm font-black text-primary uppercase tracking-widest" numberOfLines={1}>Edit Result</Text>
                         </Pressable>
                         <Pressable
                             onPress={handleDeleteResult}
@@ -1040,7 +1040,7 @@ export function MatchDetailsModal({
                                     <View className="w-8 h-8 rounded-xl bg-red-500/10 items-center justify-center">
                                         <Ionicons name="trash-outline" size={16} color="#F87171" />
                                     </View>
-                                    <Text className="text-sm font-black text-red-400 uppercase tracking-widest">Delete Result</Text>
+                                    <Text className="text-sm font-black text-red-400 uppercase tracking-widest" numberOfLines={1}>Delete Result</Text>
                                 </>
                             )}
                         </Pressable>
@@ -1122,7 +1122,7 @@ export function MatchDetailsModal({
                         </View>
                         <Pressable onPress={pickImages} className="flex-row items-center bg-primary/10 px-3 py-2 rounded-xl border border-primary/20 active:opacity-70">
                             <Ionicons name="add" size={14} color="#10B981" />
-                            <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider">Add</Text>
+                            <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider" numberOfLines={1}>Add</Text>
                         </Pressable>
                     </View>
                     {selectedImages.length > 0 ? (
@@ -1152,7 +1152,7 @@ export function MatchDetailsModal({
                         onPress={handleCancelEdit}
                         className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
                     >
-                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Cancel</Text>
+                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Cancel</Text>
                     </Pressable>
                     <Pressable
                         onPress={handleSubmitEdit}
@@ -1161,7 +1161,7 @@ export function MatchDetailsModal({
                         {isSubmitting ? (
                             <ActivityIndicator size="small" color="#0F172A" />
                         ) : (
-                            <Text className="text-sm font-black text-primary-foreground uppercase tracking-wider">Save</Text>
+                            <Text className="text-sm font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>Save</Text>
                         )}
                     </Pressable>
                 </View>
@@ -1240,7 +1240,7 @@ export function MatchDetailsModal({
                                     {isRejecting ? (
                                         <ActivityIndicator size="small" color="#F87171" />
                                     ) : (
-                                        <Text className="text-xs font-black text-red-400 uppercase tracking-wider">Reject</Text>
+                                        <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Reject</Text>
                                     )}
                                 </Pressable>
                             )}
@@ -1253,7 +1253,7 @@ export function MatchDetailsModal({
                                     {isApproving ? (
                                         <ActivityIndicator size="small" color="#0F172A" />
                                     ) : (
-                                        <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">Approve</Text>
+                                        <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>Approve</Text>
                                     )}
                                 </Pressable>
                             )}
@@ -1266,7 +1266,7 @@ export function MatchDetailsModal({
                                     }}
                                     className="flex-1 bg-warning/10 border border-warning/25 rounded-2xl py-3.5 items-center active:opacity-70"
                                 >
-                                    <Text className="text-xs font-black text-warning uppercase tracking-wider">Edit</Text>
+                                    <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>Edit</Text>
                                 </Pressable>
                             )}
                         </View>
@@ -1381,14 +1381,14 @@ export function MatchDetailsModal({
                             onPress={() => { setIsEditingProposal(false); setHomeScore(''); setAwayScore(''); setError(null); }}
                             className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
                         >
-                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Cancel</Text>
+                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Cancel</Text>
                         </Pressable>
                     ) : (
                         <Pressable
                             onPress={() => { setHomeScore(''); setAwayScore(''); setError(null); setSelectedImages([]); }}
                             className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
                         >
-                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider">Clear</Text>
+                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Clear</Text>
                         </Pressable>
                     )}
                     <Pressable
@@ -1402,8 +1402,8 @@ export function MatchDetailsModal({
                         {isSubmitting ? (
                             <ActivityIndicator size="small" color={canSubmit ? "#0F172A" : "#71717A"} />
                         ) : (
-                            <Text className={cn(
-                                "text-sm font-black uppercase tracking-wider",
+                            <Text numberOfLines={1} className={cn(
+                                "text-sm font-black uppercase tracking-wider w-full text-center",
                                 ((isRoundLocked && !isHubOwner) || !canSubmit) ? "text-slate-500" : "text-primary-foreground"
                             )}>
                                 {(isRoundLocked && !isHubOwner)
@@ -1437,7 +1437,7 @@ export function MatchDetailsModal({
                             ) : (
                                 <>
                                     <Ionicons name="play-skip-forward-outline" size={16} color="#F59E0B" />
-                                    <Text className="text-sm font-black text-warning uppercase tracking-wider">Double Walkover</Text>
+                                    <Text className="text-sm font-black text-warning uppercase tracking-wider" numberOfLines={1}>Double Walkover</Text>
                                 </>
                             )}
                         </Pressable>
@@ -1494,7 +1494,7 @@ export function MatchDetailsModal({
                             </View>
                             <Pressable onPress={pickImages} className="flex-row items-center bg-primary/10 px-3 py-2 rounded-xl border border-primary/20 active:opacity-70">
                                 <Ionicons name="add" size={14} color="#10B981" />
-                                <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider">Add</Text>
+                                <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider" numberOfLines={1}>Add</Text>
                             </Pressable>
                         </View>
                         {selectedImages.length > 0 ? (
@@ -1527,7 +1527,7 @@ export function MatchDetailsModal({
                                 ) : (
                                     <>
                                         <Ionicons name="cloud-upload-outline" size={14} color="#818CF8" />
-                                        <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider">Upload Evidence</Text>
+                                        <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider" numberOfLines={1}>Upload Evidence</Text>
                                     </>
                                 )}
                             </Pressable>
@@ -1560,7 +1560,7 @@ export function MatchDetailsModal({
                         <Ionicons name="close" size={20} color="#94A3B8" />
                     </Pressable>
                     <View className="items-center flex-1 mx-4">
-                        <Text className="text-sm font-black text-white uppercase tracking-[3px]" numberOfLines={1}>
+                        <Text className="text-sm font-black text-white uppercase tracking-[3px] w-full text-center" numberOfLines={1}>
                             {tournamentName}
                         </Text>
                         <Text className="text-[10px] text-slate-500 font-bold mt-0.5">{roundName}</Text>
@@ -1579,8 +1579,8 @@ export function MatchDetailsModal({
                                 activeTab === 'match' ? "bg-primary/15" : "bg-transparent"
                             )}
                         >
-                            <Text className={cn(
-                                "text-xs font-black uppercase tracking-widest",
+                            <Text numberOfLines={1} className={cn(
+                                "text-xs font-black uppercase tracking-widest w-full text-center",
                                 activeTab === 'match' ? "text-primary" : "text-slate-500"
                             )}>Match</Text>
                         </Pressable>
@@ -1598,7 +1598,7 @@ export function MatchDetailsModal({
                                     size={12}
                                     color={activeTab === 'chat' ? '#10B981' : '#64748B'}
                                 />
-                                <Text className={cn(
+                                <Text numberOfLines={1} className={cn(
                                     "text-xs font-black uppercase tracking-widest",
                                     activeTab === 'chat' ? "text-primary" : "text-slate-500"
                                 )}>Chat</Text>
@@ -1617,7 +1617,7 @@ export function MatchDetailsModal({
                             )}
                         >
                             <View className="flex-row items-center gap-1.5">
-                                <Text className={cn(
+                                <Text numberOfLines={1} className={cn(
                                     "text-xs font-black uppercase tracking-widest",
                                     activeTab === 'stream' ? "text-primary" : "text-slate-500"
                                 )}>Stream</Text>

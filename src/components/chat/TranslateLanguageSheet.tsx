@@ -64,7 +64,7 @@ export function TranslateLanguageSheet({
           </Pressable>
           <View className="items-center flex-1 mx-4">
             <Text
-              className="text-sm font-black text-white uppercase tracking-[3px]"
+              className="text-sm font-black text-white uppercase tracking-[3px] w-full text-center"
               numberOfLines={1}
             >
               Translate Message

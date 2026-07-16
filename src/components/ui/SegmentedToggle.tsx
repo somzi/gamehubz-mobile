@@ -29,8 +29,8 @@ export function SegmentedToggle({ options, value, onChange, disabled = false }: 
                             active && "bg-primary"
                         )}
                     >
-                        <Text className={cn(
-                            "text-xs font-black tracking-wide uppercase",
+                        <Text numberOfLines={1} className={cn(
+                            "text-xs font-black tracking-wide uppercase w-full text-center",
                             active ? "text-primary-foreground" : "text-slate-500"
                         )}>
                             {opt.label}

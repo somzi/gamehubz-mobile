@@ -246,7 +246,7 @@ export function HourlyAvailabilityPicker({
                     <View className="w-14 h-14 rounded-2xl bg-emerald-500/15 items-center justify-center mb-3">
                         <Ionicons name="checkmark-done" size={28} color="#10B981" />
                     </View>
-                    <Text className="text-white font-black text-base uppercase tracking-tight">Availability Sent</Text>
+                    <Text className="text-white font-black text-base uppercase tracking-tight w-full text-center" numberOfLines={1}>Availability Sent</Text>
                     <Text className="text-xs text-slate-400 mt-1 text-center">
                         Waiting for {opponentName} to confirm
                     </Text>
@@ -255,11 +255,11 @@ export function HourlyAvailabilityPicker({
                     <View className="flex-row gap-2.5 mt-4 w-full">
                         <View className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 items-center">
                             <Text className="text-2xl font-black text-indigo-300">{selectedSlots.size}</Text>
-                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Slots</Text>
+                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>Slots</Text>
                         </View>
                         <View className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 items-center">
                             <Text className="text-2xl font-black text-emerald-400">{mutualCount}</Text>
-                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Mutual</Text>
+                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>Mutual</Text>
                         </View>
                     </View>
 
@@ -269,7 +269,7 @@ export function HourlyAvailabilityPicker({
                         className="mt-4 w-full h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex-row items-center justify-center gap-2"
                     >
                         <Ionicons name="create-outline" size={16} color="#94A3B8" />
-                        <Text className="text-xs font-black text-slate-300 uppercase tracking-widest">Edit Slots</Text>
+                        <Text className="text-xs font-black text-slate-300 uppercase tracking-widest" numberOfLines={1}>Edit Slots</Text>
                     </Pressable>
 
                     {/* Even after availability is sent, let the user break the "waiting for opponent"
@@ -451,7 +451,7 @@ export function HourlyAvailabilityPicker({
                                                         : "bg-white/[0.03] border-white/[0.07]"
                                                 )}
                                             >
-                                                <Text className={cn(
+                                                <Text numberOfLines={1} className={cn(
                                                     "text-[11px] font-black uppercase tracking-tight",
                                                     isSelected ? "text-white" : "text-slate-400"
                                                 )}>
@@ -582,7 +582,7 @@ export function HourlyAvailabilityPicker({
                                 )}
                             >
                                 <Ionicons name="send" size={18} color={draftSlots.size > 0 ? "#ffffff" : "#475569"} />
-                                <Text className={cn(
+                                <Text numberOfLines={1} className={cn(
                                     "font-black text-base uppercase tracking-wider",
                                     draftSlots.size > 0 ? "text-white" : "text-slate-600"
                                 )}>

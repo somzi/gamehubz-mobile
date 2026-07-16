@@ -67,6 +67,7 @@ export function Button({
             ) : (
                 typeof children === 'string' || typeof children === 'number' ? (
                     <Text
+                        numberOfLines={1}
                         className={cn(
                             "font-medium text-center",
                             size === 'default' && "text-base",

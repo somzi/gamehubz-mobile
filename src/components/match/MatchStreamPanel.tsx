@@ -616,7 +616,7 @@ function StartArea({
                     })}
                     <Pressable onPress={onForceForm} className="flex-row items-center justify-center gap-2 py-3 active:opacity-60">
                         <Ionicons name="add" size={16} color="#64748B" />
-                        <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">Use another channel</Text>
+                        <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider" numberOfLines={1}>Use another channel</Text>
                     </Pressable>
                 </View>
             ) : (
@@ -637,7 +637,7 @@ function StartArea({
                     </Button>
                     {!!onCancel && (
                         <Pressable onPress={onCancel} className="items-center py-1 active:opacity-60">
-                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cancel</Text>
+                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider w-full text-center" numberOfLines={1}>Cancel</Text>
                         </Pressable>
                     )}
                 </View>
