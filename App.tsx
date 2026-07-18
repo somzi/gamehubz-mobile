@@ -165,6 +165,18 @@ function routeFromNotification(
     case 'resultproposed':
       nav.navigate('MyMatches' as any);
       return;
+    // A team tie ended level — this captain must pick a tie-break representative.
+    // focusTeamMatchId (without focusMatchId) opens the team-match modal, where the
+    // "Choose Representative" picker lives.
+    case 'teamtiebreak':
+      if (tournamentId && teamMatchId) {
+        nav.navigate('TournamentDetails', {
+          id: tournamentId,
+          focusTeamMatchId: teamMatchId,
+        });
+        return;
+      }
+      break;
     // Tournament finished — open it so the winner / final standings are visible.
     case 'tournamentwon':
       if (tournamentId) {
