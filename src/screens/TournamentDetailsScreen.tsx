@@ -47,6 +47,43 @@ import type { TeamDto } from '../types/team';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
+// Backend MatchStatus: Pending=1, Scheduled=2, Live=3, Completed=4, NoShow=5. A fixture is
+// "done" once it's Completed or closed as a no-show — anything below still has to be played.
+const isMatchDecided = (m: any) => {
+    const status = Number(m?.status ?? m?.Status);
+    return status === 4 || status === 5;
+};
+
+const stageMatches = (stage: any): any[] => [
+    ...(stage?.rounds ?? []).flatMap((r: any) => r?.matches ?? []),
+    ...(stage?.groups ?? []).flatMap((g: any) => g?.matches ?? []),
+];
+
+/**
+ * Stages come back in play order (groups → play-in → knockout), so always landing on index 0
+ * meant a Groups+Bracket tournament whose group phase is over still opened on the finished
+ * groups table with the live bracket a tap away. Pick the first stage that still has matches
+ * left to play; once everything is decided, fall back to the last stage that has content
+ * (the final bracket) rather than the groups it started from.
+ *
+ * Stages with no matches yet are skipped — a knockout stage exists in the structure before the
+ * groups finish, and jumping to its empty "waiting for the previous stage" state would be worse
+ * than showing the groups still being played.
+ */
+const pickDefaultStageIndex = (stages: any[]): number => {
+    let lastWithContent = 0;
+    for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i];
+        const matches = stageMatches(stage);
+        if (matches.length === 0) continue;
+        // A double-elim losers bracket (StageType 5) is a side branch — the title is decided in
+        // the winners bracket, so it's never the right stage to land a finished tournament on.
+        if (Number(stage?.type ?? stage?.Type) !== 5) lastWithContent = i;
+        if (matches.some((m) => !isMatchDecided(m))) return i;
+    }
+    return lastWithContent;
+};
+
 export default function TournamentDetailsScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const route = useRoute<TournamentDetailsRouteProp>();
@@ -75,6 +112,10 @@ export default function TournamentDetailsScreen() {
     const [error, setError] = useState<string | null>(null);
     const [stages, setStages] = useState<any[]>([]);
     const [selectedStageIndex, setSelectedStageIndex] = useState(0);
+    // Which tournament we've already auto-selected a stage for. The default only applies to the
+    // first structure load per tournament — later refetches (focus, result submit, SignalR) must
+    // not yank the user off a stage they picked by hand.
+    const autoSelectedStageForId = useRef<string | null>(null);
     const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
     const [loadingBracket, setLoadingBracket] = useState(false);
     const [bracketError, setBracketError] = useState<string | null>(null);
@@ -380,7 +421,18 @@ export default function TournamentDetailsScreen() {
                 throw new Error(`Failed to fetch bracket: ${response.status}`);
             }
             const data = await response.json();
-            setStages(data.stages || []);
+            const nextStages = data.stages || [];
+            setStages(nextStages);
+
+            // Open on the stage that's actually being played (see pickDefaultStageIndex).
+            if (autoSelectedStageForId.current !== id && nextStages.length > 0) {
+                autoSelectedStageForId.current = id;
+                const defaultStage = pickDefaultStageIndex(nextStages);
+                if (defaultStage > 0) {
+                    setSelectedStageIndex(defaultStage);
+                    setSelectedGroupIndex(0);
+                }
+            }
 
             // Extract hubOwnerId from bracket response
             if (data.hubOwnerId || data.HubOwnerId) {
@@ -473,6 +525,15 @@ export default function TournamentDetailsScreen() {
             setIsLoadingApprovals(false);
         }
     };
+
+    // A bracket reset / regeneration can shrink the stage list under a selection made earlier,
+    // which would leave the bracket tab blank (renderStages bails on a missing stage).
+    useEffect(() => {
+        if (stages.length > 0 && selectedStageIndex >= stages.length) {
+            setSelectedStageIndex(0);
+            setSelectedGroupIndex(0);
+        }
+    }, [stages, selectedStageIndex]);
 
     // Admins see the help-request inbox on the bracket tab; refresh whenever it opens.
     useEffect(() => {
