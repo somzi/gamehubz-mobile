@@ -1089,9 +1089,12 @@ export function MatchDetailsModal({
                                 onChangeText={(val) => setHomeScore(val.replace(/[^0-9]/g, ''))}
                             />
                         </View>
-                        <View className="w-10 items-center justify-center mt-8">
-                            <View className="bg-white/5 py-1 px-2.5 rounded-lg border border-white/10">
-                                <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest">VS</Text>
+                        {/* Bottom-anchored so the chip centers on the score inputs (h-14), not on the whole column */}
+                        <View className="w-10 items-center justify-end self-stretch">
+                            <View className="h-14 justify-center">
+                                <View className="bg-white/5 py-1 px-2.5 rounded-lg border border-white/10">
+                                    <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest">VS</Text>
+                                </View>
                             </View>
                         </View>
                         <View className="flex-1 items-center gap-3">
@@ -1351,9 +1354,12 @@ export function MatchDetailsModal({
                                 editable={canSubmit}
                             />
                         </View>
-                        <View className="w-10 items-center justify-center mt-8">
-                            <View className="bg-white/5 py-1 px-2.5 rounded-lg border border-white/10">
-                                <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest">VS</Text>
+                        {/* Bottom-anchored so the chip centers on the score inputs (h-14), not on the whole column */}
+                        <View className="w-10 items-center justify-end self-stretch">
+                            <View className="h-14 justify-center">
+                                <View className="bg-white/5 py-1 px-2.5 rounded-lg border border-white/10">
+                                    <Text className="text-[8px] text-slate-500 font-black uppercase tracking-widest">VS</Text>
+                                </View>
                             </View>
                         </View>
                         <View className="flex-1 items-center gap-3">
