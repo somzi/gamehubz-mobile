@@ -75,7 +75,7 @@ const C = {
 };
 
 type TeamState = 'pending' | 'live' | 'completed' | 'tieBreak';
-type SubState = 'pending' | 'completed' | 'awaitingApproval' | 'tieBreak';
+type SubState = 'pending' | 'completed' | 'awaitingApproval' | 'tieBreak' | 'noShow';
 
 function deriveTeamState(data: TeamMatchDetailsDto | null, tieBreak: TieBreakStatusDto | null): TeamState {
     // Backend TeamMatchStatus: Pending=1, Completed=2, TieBreakRequired=3, Processing=4.
@@ -89,6 +89,9 @@ function deriveTeamState(data: TeamMatchDetailsDto | null, tieBreak: TieBreakSta
 
 function deriveSubState(sm: SubMatchDto, approvalRequired: boolean): SubState {
     // Backend MatchStatus on sub-matches: Pending=1, Scheduled=2, Live=3, Completed=4, NoShow=5.
+    // NoShow = double walkover: the game is closed and counts for neither team (checked before
+    // the tie-break shape so a voided tie-break game reads "No Show", not another tie-break).
+    if (sm.status === 'NoShow' || sm.status === 5) return 'noShow';
     if (sm.isTieBreakMatch && !sm.winnerUserId && (sm.homeScore === null || sm.awayScore === null)) return 'tieBreak';
     const hasResult = sm.homeScore !== null && sm.awayScore !== null;
     if (hasResult && (sm.status === 'Completed' || sm.status === 4 || !!sm.winnerUserId)) return 'completed';
@@ -108,6 +111,9 @@ function paletteFor(state: TeamState | SubState) {
             return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Tie-Break' };
         case 'awaitingApproval':
             return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Awaiting Approval' };
+        case 'noShow':
+            // Administratively closed, nobody played — muted slate so it reads as "void", not progress.
+            return { accent: '#64748B', soft: 'rgba(100,116,139,0.10)', ring: 'rgba(100,116,139,0.28)', label: 'No Show' };
         default:
             return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Pending' };
     }
@@ -552,11 +558,20 @@ export function TeamMatchDetailModal({
     const approvalRequired = !!((data as any)?.requireResultApproval ?? (data as any)?.RequireResultApproval);
 
     // Progress over individual matches — drives the "X of N completed" progress strip.
+    // NoShow (double-walkover) games are terminal too: they're closed, just worth nothing.
     const totalSubs = data?.subMatches?.length ?? 0;
     const completedSubs = data?.subMatches?.filter(sm => {
+        if (sm.status === 'NoShow' || sm.status === 5) return true;
         const hasResult = sm.homeScore !== null && sm.awayScore !== null;
         return hasResult && (sm.status === 'Completed' || sm.status === 4 || !!sm.winnerUserId);
     }).length ?? 0;
+
+    // Voided tie: closed with no winner and not a single game actually played (every game a
+    // no-show double walkover). Renders its own footer — "Match Draw" would be wrong here.
+    const isVoidedTie = !!data && deriveTeamState(data, tieBreakStatus) === 'completed'
+        && !data.winnerTeamParticipantId
+        && (data.subMatches?.length ?? 0) > 0
+        && (data.subMatches ?? []).every(sm => sm.status === 'NoShow' || sm.status === 5);
 
     const homeWins = data?.aggregateScore?.homeTeamWins ?? 0;
     const awayWins = data?.aggregateScore?.awayTeamWins ?? 0;
@@ -595,8 +610,9 @@ export function TeamMatchDetailModal({
     })();
 
     // Hero shows the deciding metric large; the other metric lives in the strip below.
-    const heroHomeScore = isAggregateCondition ? homeTotal : homeWins;
-    const heroAwayScore = isAggregateCondition ? awayTotal : awayWins;
+    // A voided tie has no meaningful score — "0 : 0" would read like a played result.
+    const heroHomeScore = isVoidedTie ? '—' : (isAggregateCondition ? homeTotal : homeWins);
+    const heroAwayScore = isVoidedTie ? '—' : (isAggregateCondition ? awayTotal : awayWins);
     const homeIsHeroWinner = winnerSide === 'home';
     const awayIsHeroWinner = winnerSide === 'away';
 
@@ -1050,6 +1066,8 @@ export function TeamMatchDetailModal({
                                                     <Text style={{ fontSize: 14, fontWeight: '900', color: C.amber }}>
                                                         {phs} : {pas}
                                                     </Text>
+                                                ) : subState === 'noShow' ? (
+                                                    <Text style={{ fontSize: 14, fontWeight: '900', color: C.textFaint, letterSpacing: 2 }}>—</Text>
                                                 ) : (
                                                     <Text style={{ fontSize: 10, fontWeight: '900', color: C.textGhost, letterSpacing: 2 }}>VS</Text>
                                                 )}
@@ -1102,7 +1120,38 @@ export function TeamMatchDetailModal({
 
                         {/* ─── OUTCOME FOOTER ───────────────────────────────────────── */}
                         <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-                            {teamState === 'completed' ? (
+                            {isVoidedTie ? (
+                                // Voided tie — nobody played a single game. Muted slate, deliberately
+                                // NOT the emerald winner card and NOT "Match Draw".
+                                <View
+                                    style={{
+                                        borderRadius: 22,
+                                        backgroundColor: C.surfaceRaised,
+                                        borderWidth: 1, borderColor: 'rgba(100,116,139,0.28)',
+                                        paddingHorizontal: 20, paddingVertical: 18,
+                                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            width: 36, height: 36, borderRadius: 14,
+                                            backgroundColor: 'rgba(100,116,139,0.10)',
+                                            borderWidth: 1, borderColor: 'rgba(100,116,139,0.28)',
+                                            alignItems: 'center', justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="ban" size={16} color="#64748B" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 11, fontWeight: '900', color: '#94A3B8', letterSpacing: 1.6, textTransform: 'uppercase', marginBottom: 3 }}>
+                                            Match Voided — No Show
+                                        </Text>
+                                        <Text style={{ fontSize: 11, fontWeight: '600', color: C.textFaint, lineHeight: 15 }}>
+                                            No game was played. Nothing was awarded to either team.
+                                        </Text>
+                                    </View>
+                                </View>
+                            ) : teamState === 'completed' ? (
                                 (() => {
                                     // winnerSide already folds in the backend winner id and the
                                     // tournament's win condition — this block only shapes the labels.

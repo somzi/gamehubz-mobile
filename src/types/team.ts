@@ -33,8 +33,9 @@ export interface SubMatchDto {
     HomeScore?: number | null;
     awayScore: number | null;
     AwayScore?: number | null;
-    status: 'Pending' | 'Completed' | number;
-    Status?: 'Pending' | 'Completed' | number;
+    // 'NoShow' (MatchStatus 5) = double walkover — the game is closed and counts for neither team.
+    status: 'Pending' | 'Completed' | 'NoShow' | number;
+    Status?: 'Pending' | 'Completed' | 'NoShow' | number;
     winnerUserId: string | null;
     WinnerUserId?: string | null;
     isTieBreakMatch: boolean;

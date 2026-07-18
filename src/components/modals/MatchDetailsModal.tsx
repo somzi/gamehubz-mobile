@@ -46,6 +46,10 @@ export interface MatchResultDetailDto {
     proposedByUserId?: string | null;
     adminHelpRequested?: boolean;
     adminHelpRequestedByUserId?: string | null;
+    /** True when this match is one game of a team tie (resolved out of the parent team-match DTO).
+     *  Drives the team-aware double-walkover copy — a voided game only counts for neither team;
+     *  the tie itself is voided only if NO game ends up played. */
+    isTeamSub?: boolean;
 }
 
 interface MatchDetailsModalProps {
@@ -249,6 +253,7 @@ export function MatchDetailsModal({
             proposedByUserId: sub?.proposedByUserId ?? sub?.ProposedByUserId ?? null,
             adminHelpRequested: sub?.adminHelpRequested ?? sub?.AdminHelpRequested ?? false,
             adminHelpRequestedByUserId: sub?.adminHelpRequestedByUserId ?? sub?.AdminHelpRequestedByUserId ?? null,
+            isTeamSub: true,
         };
     };
 
@@ -722,14 +727,17 @@ export function MatchDetailsModal({
 
     // Destructive, so confirm first — with format-specific consequences: elimination walkovers
     // eliminate both players and advance their opponent; league/group/Swiss walkovers close the
-    // fixture as a no-show double forfeit (no points for either player — deliberately not a draw).
-    // Backend re-checks the manage permission and the match state.
+    // fixture as a no-show double forfeit (no points for either player — deliberately not a draw);
+    // a team-tie game closes as a no-show counting for neither team, and if no game of the tie
+    // ends up played the whole tie is voided. Backend re-checks the manage permission and state.
     const handleDoubleWalkover = () => {
         const homeName = home?.username || matchDetails?.homeUser || 'Player 1';
         const awayName = away?.username || matchDetails?.awayUser || 'Player 2';
-        const message = isEliminationMatch
-            ? `Neither ${homeName} nor ${awayName} played, so both are eliminated and their opponent advances by walkover. This usually can't be undone once the opponent moves on. Continue?`
-            : `Neither ${homeName} nor ${awayName} played, so the match closes as a no-show: no points for either player (not a draw) and the round can continue. You can still enter a real result later. Continue?`;
+        const message = matchDetails?.isTeamSub
+            ? `Neither ${homeName} nor ${awayName} played this game, so it closes as a no-show and counts for neither team. The tie is decided by the games that were played — if none end up played, the whole tie is voided (both teams out, or zero points in a league). You can still enter a real result later. Continue?`
+            : isEliminationMatch
+                ? `Neither ${homeName} nor ${awayName} played, so both are eliminated and their opponent advances by walkover. This usually can't be undone once the opponent moves on. Continue?`
+                : `Neither ${homeName} nor ${awayName} played, so the match closes as a no-show: no points for either player (not a draw) and the round can continue. You can still enter a real result later. Continue?`;
         Alert.alert(
             'Double walkover?',
             message,
@@ -791,8 +799,10 @@ export function MatchDetailsModal({
     // matches additionally need somewhere to advance the surviving opponent into (this also hides
     // the action on play-in matches, whose slots must always produce a qualifier — backend rejects
     // them outright). Group/league/Swiss matches close as a NoShow double forfeit instead — no
-    // downstream needed, no points for either player. Backend re-validates all of this.
-    const isEliminationMatch = stage !== undefined && stage !== null && Number(stage) !== MatchStage.GroupStage;
+    // downstream needed, no points for either player. Team-tie games never need a downstream:
+    // they advance through the team-match aggregation, not the Next* links. Backend re-validates.
+    const isEliminationMatch = !matchDetails?.isTeamSub
+        && stage !== undefined && stage !== null && Number(stage) !== MatchStage.GroupStage;
     const hasDownstream = !!nextMatchId || !!nextMatchLoserBracketId;
     const bothPlayersSet = !!(home?.username || matchDetails?.homeUserId) && !!(away?.username || matchDetails?.awayUserId);
     // Backend MatchStatus.NoShow (5) — an already-closed no-show must not offer the action again.
@@ -1448,9 +1458,11 @@ export function MatchDetailsModal({
                             )}
                         </Pressable>
                         <Text className="text-[11px] text-slate-500 mt-2 text-center px-2 leading-4">
-                            {isEliminationMatch
-                                ? 'Both players failed to play — closes this match with no winner and advances their opponent automatically.'
-                                : 'Both players failed to play — closes this match as a no-show. No points for either player (not a draw).'}
+                            {matchDetails?.isTeamSub
+                                ? 'Both players failed to play — closes this game as a no-show. It counts for neither team; if no game of the tie is played, the whole tie is voided.'
+                                : isEliminationMatch
+                                    ? 'Both players failed to play — closes this match with no winner and advances their opponent automatically.'
+                                    : 'Both players failed to play — closes this match as a no-show. No points for either player (not a draw).'}
                         </Text>
                     </View>
                 )}
