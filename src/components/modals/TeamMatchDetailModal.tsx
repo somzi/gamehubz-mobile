@@ -285,6 +285,11 @@ export function TeamMatchDetailModal({
     const [tieBreakStatus, setTieBreakStatus] = useState<TieBreakStatusDto | null>(null);
     const [showRepPicker, setShowRepPicker] = useState(false);
     const [isSubmittingRep, setIsSubmittingRep] = useState(false);
+    // Nomination is confirmed in a second step rather than firing on the tap: the pick that fills
+    // the last seat spawns the tie-break match and can no longer be changed. Kept as a swapped-in
+    // view INSIDE the picker (not another Modal) — the picker is already a modal inside a modal,
+    // and a third layer is exactly where iOS presentation starts misbehaving.
+    const [pendingRep, setPendingRep] = useState<{ member: TeamMemberDto; teamName: string; side: 'home' | 'away' } | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Status modal
@@ -447,6 +452,7 @@ export function TeamMatchDetailModal({
         setData(null);
         setError(null);
         setTieBreakStatus(null);
+        setPendingRep(null);
     }, [matchId]);
 
     useEffect(() => {
@@ -501,10 +507,18 @@ export function TeamMatchDetailModal({
         try {
             const status = await submitTieBreakRepresentative(data.teamMatchId, member.userId);
             setTieBreakStatus(status);
-            setShowRepPicker(false);
+            // A manager nominates for BOTH sides, so keep the picker open until both seats are
+            // filled — otherwise they'd have to reopen it for the second team.
+            const bothSeatsFilled = !!(status.homeRepresentative && status.awayRepresentative);
+            setPendingRep(null);
+            if (!isManagerPicker || bothSeatsFilled) setShowRepPicker(false);
             fetchData();
         } catch (err: unknown) {
             const message = getErrorMessage(err);
+            // Close first: the picker is a Modal stacked above this one, and StatusModal would
+            // render behind it — which reads as "nothing happened" when a pick is rejected.
+            setPendingRep(null);
+            setShowRepPicker(false);
             setStatusConfig({ type: 'error', title: 'Error', message });
             setShowStatusModal(true);
         } finally {
@@ -538,18 +552,38 @@ export function TeamMatchDetailModal({
         return false;
     })();
 
-    // Get the team members for the rep picker
-    const myTeamMembers: TeamMemberDto[] = (() => {
+    // A manager (hub owner / admin) nominates on behalf of BOTH teams — captains often go
+    // inactive mid-fixture. Captains still only ever see their own roster.
+    const isManagerPicker = !!isHubOwner && !isCaptainOfEitherTeam;
+
+    // Rosters offered in the rep picker, split per team so a manager can tell the two sides
+    // apart (a single flat list of four names says nothing about who plays for whom).
+    const repSections: { side: 'home' | 'away'; teamName: string; members: TeamMemberDto[]; currentRepId?: string }[] = (() => {
         if (!data) return [];
+
+        const home = {
+            side: 'home' as const,
+            teamName: data.homeTeam?.teamName || TEAM_LABELS.HOME_REPRESENTATIVE,
+            members: data.homeTeam?.members || [],
+            currentRepId: tieBreakStatus?.homeRepresentative?.userId,
+        };
+        const away = {
+            side: 'away' as const,
+            teamName: data.awayTeam?.teamName || TEAM_LABELS.AWAY_REPRESENTATIVE,
+            members: data.awayTeam?.members || [],
+            currentRepId: tieBreakStatus?.awayRepresentative?.userId,
+        };
+
+        if (isManagerPicker) return [home, away];
+        if (isCaptainOfHome) return [home];
+        if (isCaptainOfAway) return [away];
+
+        // Plain roster member: their own side only (the backend still rejects the submit).
         const userAsHome = data.homeTeam?.members?.some(m => m.userId.toLowerCase() === currentUserId?.toLowerCase());
+        if (userAsHome) return [home];
         const userAsAway = data.awayTeam?.members?.some(m => m.userId.toLowerCase() === currentUserId?.toLowerCase());
+        if (userAsAway) return [away];
 
-        if (userAsHome && data.homeTeam) return data.homeTeam.members || [];
-        if (userAsAway && data.awayTeam) return data.awayTeam.members || [];
-
-        if (isHubOwner) {
-            return (data.homeTeam?.members || []).concat(data.awayTeam?.members || []);
-        }
         return [];
     })();
 
@@ -937,8 +971,9 @@ export function TeamMatchDetailModal({
                                                     <ActivityIndicator size="small" color="#0F172A" />
                                                 ) : (
                                                     <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.6, textTransform: 'uppercase' }}>
-                                                        {isHubOwner && !isCaptainOfEitherTeam ? 'Admin: ' : ''}
-                                                        {hasSubmittedRep ? 'Change Representative' : String(TEAM_LABELS.SELECT_REPRESENTATIVE)}
+                                                        {isManagerPicker
+                                                            ? `Admin: ${TEAM_LABELS.SELECT_REPRESENTATIVES}`
+                                                            : hasSubmittedRep ? 'Change Representative' : String(TEAM_LABELS.SELECT_REPRESENTATIVE)}
                                                     </Text>
                                                 )}
                                             </Pressable>
@@ -1282,7 +1317,7 @@ export function TeamMatchDetailModal({
                     onRequestClose={() => setShowRepPicker(false)}
                 >
                     <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-                        <Pressable style={{ position: 'absolute', inset: 0 }} onPress={() => setShowRepPicker(false)} />
+                        <Pressable style={{ position: 'absolute', inset: 0 }} onPress={() => { setPendingRep(null); setShowRepPicker(false); }} />
                         <View
                             style={{
                                 width: '100%', maxWidth: 360,
@@ -1291,39 +1326,150 @@ export function TeamMatchDetailModal({
                                 borderWidth: 1, borderColor: C.borderStrong,
                             }}
                         >
+                        {pendingRep ? (() => {
+                            // The nomination locks in only once BOTH seats are taken — that submit
+                            // spawns the 1v1 match and the endpoint refuses any further change.
+                            const otherSeatFilled = pendingRep.side === 'home'
+                                ? !!tieBreakStatus?.awayRepresentative
+                                : !!tieBreakStatus?.homeRepresentative;
+
+                            return (
+                                <>
+                                    <View style={{ padding: 22, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                                        <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 4 }}>
+                                            Tie-Break
+                                        </Text>
+                                        <Text style={{ fontSize: 16, fontWeight: '900', color: C.text, textAlign: 'center' }}>
+                                            {TEAM_LABELS.CONFIRM_REPRESENTATIVE}
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ padding: 22, alignItems: 'center' }}>
+                                        <PlayerAvatar src={pendingRep.member.avatarUrl} name={pendingRep.member.username} size="lg" />
+                                        <Text style={{ fontSize: 18, fontWeight: '900', color: C.text, marginTop: 12, textAlign: 'center' }}>
+                                            {pendingRep.member.username}
+                                        </Text>
+                                        <Text style={{ fontSize: 12, fontWeight: '700', color: C.textDim, marginTop: 6, textAlign: 'center', lineHeight: 18 }}>
+                                            {TEAM_LABELS.WILL_PLAY_TIE_BREAK_FOR}
+                                        </Text>
+                                        <Text style={{ fontSize: 13, fontWeight: '900', color: C.amber, marginTop: 2, textAlign: 'center' }} numberOfLines={2}>
+                                            {pendingRep.teamName}
+                                        </Text>
+
+                                        {otherSeatFilled && (
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row', alignItems: 'center', gap: 8,
+                                                    backgroundColor: C.amberSoft,
+                                                    borderWidth: 1, borderColor: C.amberRing,
+                                                    borderRadius: 14,
+                                                    paddingHorizontal: 12, paddingVertical: 10,
+                                                    marginTop: 16,
+                                                }}
+                                            >
+                                                <Ionicons name="warning" size={14} color={C.amber} />
+                                                <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: C.textDim, lineHeight: 16 }}>
+                                                    {TEAM_LABELS.TIE_BREAK_LOCK_WARNING}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <View style={{ padding: 16, paddingTop: 0, flexDirection: 'row', gap: 10 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <Button
+                                                variant="outline"
+                                                onPress={() => setPendingRep(null)}
+                                                disabled={isSubmittingRep}
+                                                className="w-full"
+                                            >
+                                                {TEAM_LABELS.BACK_BUTTON}
+                                            </Button>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Button
+                                                onPress={() => handleSelectRepresentative(pendingRep.member)}
+                                                disabled={isSubmittingRep}
+                                                loading={isSubmittingRep}
+                                                className="w-full"
+                                            >
+                                                {TEAM_LABELS.CONFIRM_BUTTON}
+                                            </Button>
+                                        </View>
+                                    </View>
+                                </>
+                            );
+                        })() : (
+                        <>
                             <View style={{ padding: 22, borderBottomWidth: 1, borderBottomColor: C.border }}>
                                 <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 4 }}>
                                     Tie-Break
                                 </Text>
                                 <Text style={{ fontSize: 16, fontWeight: '900', color: C.text, textAlign: 'center' }}>
-                                    {TEAM_LABELS.SELECT_REPRESENTATIVE}
+                                    {isManagerPicker
+                                        ? TEAM_LABELS.SELECT_REPRESENTATIVES
+                                        : TEAM_LABELS.SELECT_REPRESENTATIVE}
                                 </Text>
+                                {isManagerPicker && (
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, textAlign: 'center', marginTop: 6 }}>
+                                        {TEAM_LABELS.MANAGER_PICK_HINT}
+                                    </Text>
+                                )}
                             </View>
-                            <ScrollView style={{ maxHeight: 320 }}>
-                                {myTeamMembers.map((member) => (
-                                    <Pressable
-                                        key={member.userId}
-                                        onPress={() => handleSelectRepresentative(member)}
-                                        disabled={isSubmittingRep}
-                                        style={{
-                                            flexDirection: 'row', alignItems: 'center', gap: 12,
-                                            paddingHorizontal: 18, paddingVertical: 14,
-                                            borderBottomWidth: 1, borderBottomColor: C.border,
-                                        }}
-                                    >
-                                        <PlayerAvatar src={member.avatarUrl} name={member.username} size="md" />
-                                        <Text style={{ flex: 1, color: C.text, fontWeight: '800', fontSize: 14 }}>
-                                            {member.username}
-                                        </Text>
-                                        {member.isCaptain && (
-                                            <Ionicons name="shield" size={14} color={C.amber} />
-                                        )}
-                                        {isSubmittingRep ? (
-                                            <ActivityIndicator size="small" color={C.emerald} />
-                                        ) : (
-                                            <Ionicons name="chevron-forward" size={18} color={C.textGhost} />
-                                        )}
-                                    </Pressable>
+                            <ScrollView style={{ maxHeight: 380 }}>
+                                {repSections.map((section) => (
+                                    <View key={section.side}>
+                                        {/* Team header — only a manager sees more than one roster, but keeping
+                                            it for captains too labels whose team they are picking from. */}
+                                        <View
+                                            style={{
+                                                flexDirection: 'row', alignItems: 'center', gap: 8,
+                                                paddingHorizontal: 18, paddingVertical: 10,
+                                                backgroundColor: 'rgba(255,255,255,0.03)',
+                                                borderBottomWidth: 1, borderBottomColor: C.border,
+                                            }}
+                                        >
+                                            <Text style={{ flex: 1, fontSize: 9, fontWeight: '900', color: C.textDim, letterSpacing: 1.6, textTransform: 'uppercase' }} numberOfLines={1}>
+                                                {section.teamName}
+                                            </Text>
+                                            <Text style={{ fontSize: 9, fontWeight: '900', color: section.currentRepId ? C.emerald : C.textFaint, letterSpacing: 1 }}>
+                                                {section.side === 'home' ? 'HOME' : 'AWAY'}
+                                            </Text>
+                                        </View>
+
+                                        {section.members.map((member) => {
+                                            const isCurrentRep = !!section.currentRepId &&
+                                                section.currentRepId.toLowerCase() === member.userId.toLowerCase();
+                                            return (
+                                                <Pressable
+                                                    key={`${section.side}-${member.userId}`}
+                                                    onPress={() => setPendingRep({ member, teamName: section.teamName, side: section.side })}
+                                                    disabled={isSubmittingRep}
+                                                    style={{
+                                                        flexDirection: 'row', alignItems: 'center', gap: 12,
+                                                        paddingHorizontal: 18, paddingVertical: 14,
+                                                        borderBottomWidth: 1, borderBottomColor: C.border,
+                                                        backgroundColor: isCurrentRep ? C.emeraldSoft : 'transparent',
+                                                    }}
+                                                >
+                                                    <PlayerAvatar src={member.avatarUrl} name={member.username} size="md" />
+                                                    <Text style={{ flex: 1, color: C.text, fontWeight: '800', fontSize: 14 }}>
+                                                        {member.username}
+                                                    </Text>
+                                                    {member.isCaptain && (
+                                                        <Ionicons name="shield" size={14} color={C.amber} />
+                                                    )}
+                                                    {isSubmittingRep ? (
+                                                        <ActivityIndicator size="small" color={C.emerald} />
+                                                    ) : isCurrentRep ? (
+                                                        <Ionicons name="checkmark-circle" size={18} color={C.emerald} />
+                                                    ) : (
+                                                        <Ionicons name="chevron-forward" size={18} color={C.textGhost} />
+                                                    )}
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
                                 ))}
                             </ScrollView>
                             <View style={{ padding: 16 }}>
@@ -1335,6 +1481,8 @@ export function TeamMatchDetailModal({
                                     {TEAM_LABELS.CANCEL_BUTTON}
                                 </Button>
                             </View>
+                        </>
+                        )}
                         </View>
                     </View>
                 </Modal>

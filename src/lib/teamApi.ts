@@ -161,6 +161,19 @@ export async function getMatchDetails(
 
 // --- Tie-Break ---
 
+// Both tie-break endpoints answer with the team-match Status string and no IsRequired flag,
+// while the UI keys its tie-break banner off isRequired — so derive it here. Without this a
+// single poll tick (or a submitted nomination) blanks the banner out mid-flow.
+function normalizeTieBreakStatus(raw: any): TieBreakStatusDto {
+    const status = raw?.status ?? raw?.Status;
+    return {
+        ...raw,
+        isRequired: raw?.isRequired ?? raw?.IsRequired ?? status === 'TieBreakRequired',
+        homeRepresentative: raw?.homeRepresentative ?? raw?.HomeRepresentative ?? null,
+        awayRepresentative: raw?.awayRepresentative ?? raw?.AwayRepresentative ?? null,
+    };
+}
+
 export async function submitTieBreakRepresentative(
     teamMatchId: string,
     userId: string
@@ -169,7 +182,7 @@ export async function submitTieBreakRepresentative(
         `/api/team-matches/${teamMatchId}/tiebreak/representative`,
         { userId }
     );
-    return response.data;
+    return normalizeTieBreakStatus(response.data);
 }
 
 export async function getTieBreakStatus(
@@ -178,5 +191,5 @@ export async function getTieBreakStatus(
     const response = await apiClient.get<TieBreakStatusDto>(
         `/api/team-matches/${teamMatchId}/tiebreak/status`
     );
-    return response.data;
+    return normalizeTieBreakStatus(response.data);
 }

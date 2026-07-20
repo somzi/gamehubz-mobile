@@ -40,6 +40,7 @@ export const TEAM_LABELS = {
     CONFIRM_DELETE_MESSAGE: 'Are you sure you want to delete this team? This action cannot be undone.',
     CONFIRM_BUTTON: 'Confirm',
     CANCEL_BUTTON: 'Cancel',
+    BACK_BUTTON: 'Back',
 
     // Team Match Detail Modal
     MATCH_DETAIL_TITLE: 'Team Match Details',
@@ -49,6 +50,12 @@ export const TEAM_LABELS = {
     TIE_BREAK_BANNER: 'Match Tied! A tie-break match is required.',
     TIE_BREAK_IN_PROGRESS: 'Tie-break match in progress',
     SELECT_REPRESENTATIVE: 'Select Your Representative',
+    // Manager (hub owner / admin) variant — they nominate for both teams, not "their" team.
+    SELECT_REPRESENTATIVES: 'Select Representatives',
+    MANAGER_PICK_HINT: 'Pick one player per team',
+    CONFIRM_REPRESENTATIVE: 'Confirm Representative',
+    WILL_PLAY_TIE_BREAK_FOR: 'will play the tie-break match for',
+    TIE_BREAK_LOCK_WARNING: 'This fills the last spot and creates the tie-break match — it cannot be changed afterwards.',
     WAITING_FOR_OPPONENT: 'Waiting for opponent captain...',
     WAITING_LABEL: 'Waiting...',
     SUBMIT_SCORE: 'Submit',
