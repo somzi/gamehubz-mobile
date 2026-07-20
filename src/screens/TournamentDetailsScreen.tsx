@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { File as FSFile, Paths } from 'expo-file-system';
@@ -11,7 +11,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
-import { BracketMatch } from '../components/bracket/BracketMatch';
+import { BracketMatch, teamProgressFrom } from '../components/bracket/BracketMatch';
 
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -109,6 +109,7 @@ export default function TournamentDetailsScreen() {
     const [isLoadingOpenTeams, setIsLoadingOpenTeams] = useState(false);
     const [tournament, setTournament] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [stages, setStages] = useState<any[]>([]);
     const [selectedStageIndex, setSelectedStageIndex] = useState(0);
@@ -409,10 +410,15 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const fetchBracket = async () => {
+    // `silent` keeps the currently rendered bracket on screen while it refreshes underneath —
+    // used by the focus refetch and pull-to-refresh, where blanking to a spinner (or to an error
+    // screen over a transient blip) would be worse than briefly showing slightly stale cards.
+    const fetchBracket = async (silent = false) => {
         if (!id) return;
-        setLoadingBracket(true);
-        setBracketError(null);
+        if (!silent) {
+            setLoadingBracket(true);
+            setBracketError(null);
+        }
         try {
             const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE_V3(id);
             console.log('Fetching bracket from:', url);
@@ -447,9 +453,9 @@ export default function TournamentDetailsScreen() {
             setBracketRequireResultApproval(data.requireResultApproval ?? data.RequireResultApproval ?? false);
         } catch (err) {
             console.error('Bracket fetch error:', err);
-            setBracketError('Failed to load bracket structure');
+            if (!silent) setBracketError('Failed to load bracket structure');
         } finally {
-            setLoadingBracket(false);
+            if (!silent) setLoadingBracket(false);
         }
     };
 
@@ -1326,8 +1332,30 @@ export default function TournamentDetailsScreen() {
             // which don't use it. The tab-switch effect still fetches it when Players is opened.
             const tab = activeTabRef.current;
             if (tab === 'overview' || tab === 'players') fetchParticipants();
+            // The bracket is fetched by the tab-switch effect, which does NOT re-run on refocus —
+            // so without this, coming back to an already-open bracket showed whatever was loaded
+            // when the tab was first opened, including stale live team scores.
+            if (tab === 'bracket') fetchBracket(true);
         }, [id])
     );
+
+    // Pull-to-refresh: same set as the focus refetch, but always refreshes the data behind the
+    // tab actually on screen, and reports progress through the pull spinner instead of silently.
+    const handleRefresh = useCallback(async () => {
+        if (!id) return;
+        setIsRefreshing(true);
+        try {
+            const tab = activeTabRef.current;
+            await Promise.all([
+                fetchTournamentDetails(true),
+                tab === 'bracket' ? fetchBracket(true) : null,
+                tab === 'overview' || tab === 'players' ? fetchParticipants() : null,
+                tab === 'teams' && tournament?.isTeamTournament ? fetchTournamentTeams(id) : null,
+            ]);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [id, tournament?.isTeamTournament]);
 
     const handleMatchPress = (match: any) => {
 
@@ -1759,6 +1787,7 @@ export default function TournamentDetailsScreen() {
                                         currentUsername={user?.username}
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
+                                        teamProgress={teamProgressFrom(grandFinalMatch)}
                                     />
                                 </View>
                             </View>
@@ -1780,6 +1809,7 @@ export default function TournamentDetailsScreen() {
                                         currentUsername={user?.username}
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
+                                        teamProgress={teamProgressFrom(grandFinalResetMatch)}
                                     />
                                 </View>
                             </View>
@@ -1812,6 +1842,7 @@ export default function TournamentDetailsScreen() {
                                             currentUsername={user?.username}
                                             isAdmin={canManage}
                                             isTeamTournament={tournament?.isTeamTournament}
+                                            teamProgress={teamProgressFrom(thirdPlaceMatch)}
                                         />
                                     </View>
                                 )}
@@ -1962,7 +1993,18 @@ export default function TournamentDetailsScreen() {
                     </View>
                 }
             />
-            <ScrollView className="flex-1 bg-background">
+            <ScrollView
+                className="flex-1 bg-background"
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={handleRefresh}
+                        tintColor="#10B981"
+                        colors={['#10B981']}
+                        progressBackgroundColor="#111827"
+                    />
+                }
+            >
                 <View className="animate-slide-up">
                     {/* Hero Section */}
                     <View className="px-4 py-6 bg-background">

@@ -16,6 +16,31 @@ interface Participant {
     seed: number;
 }
 
+/** Running state of a team fixture while its individual games are still being played. */
+export interface TeamProgress {
+    total: number;
+    decided: number;
+    homeWins: number;
+    awayWins: number;
+}
+
+/**
+ * Pulls the team-progress block off a bracket match payload (dual-cased, and absent on solo
+ * cards or against an older backend). Returns null when there is nothing to show, so callers
+ * can hand the result straight to <BracketMatch teamProgress={...} />.
+ */
+export function teamProgressFrom(match: any): TeamProgress | null {
+    const total = match?.teamGamesTotal ?? match?.TeamGamesTotal;
+    if (!total) return null;
+
+    return {
+        total,
+        decided: match?.teamGamesDecided ?? match?.TeamGamesDecided ?? 0,
+        homeWins: match?.teamLiveHomeScore ?? match?.TeamLiveHomeScore ?? 0,
+        awayWins: match?.teamLiveAwayScore ?? match?.TeamLiveAwayScore ?? 0,
+    };
+}
+
 interface BracketMatchProps {
     home: Participant | null;
     away: Participant | null;
@@ -29,12 +54,22 @@ interface BracketMatchProps {
     isTeamTournament?: boolean;
     // Pending proposal — when set, the match is in "awaiting approval" state regardless of its raw status.
     proposedByUserId?: string | null;
+    // Team fixtures only: lets the card show the running score mid-fixture instead of a dash.
+    teamProgress?: TeamProgress | null;
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId }: BracketMatchProps) {
+export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress }: BracketMatchProps) {
     const navigation = useNavigation<NavigationProp>();
+
+    // A team fixture with at least one game decided but no settled result yet. The final Score
+    // stays null until the fixture settles, so this is the only way the card knows it is under way.
+    // Deliberately NOT "decided < total": a 1-1 fixture waiting on tie-break representatives has
+    // every game played and still no result — that is exactly when the running score matters most.
+    const isTeamInProgress = !!teamProgress
+        && teamProgress.decided > 0
+        && status !== 3 && status !== 4;
 
     const handlePlayerClick = (userId: string) => {
         if (onPress) {
@@ -73,6 +108,10 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
 
         const isWinner = participant.isWinner;
         const hasMatchScore = participant.score !== null && participant.score !== undefined;
+        // Mid-fixture stand-in for the final score: games won so far by this side.
+        const liveScore = !hasMatchScore && isTeamInProgress
+            ? (isTop ? teamProgress!.homeWins : teamProgress!.awayWins)
+            : null;
 
         return (
             <Pressable
@@ -115,7 +154,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                 {/* Score chip */}
                 <View className={cn(
                     "min-w-[32px] h-8 px-2 rounded-xl items-center justify-center ml-2",
-                    isWinner ? "bg-emerald-500/20" : "bg-white/[0.04]"
+                    isWinner ? "bg-emerald-500/20" : liveScore !== null ? "bg-white/[0.07]" : "bg-white/[0.04]"
                 )}>
                     {hasMatchScore ? (
                         <Text className={cn(
@@ -123,6 +162,12 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             isWinner ? "text-emerald-300" : "text-slate-500"
                         )}>
                             {participant.score}
+                        </Text>
+                    ) : liveScore !== null ? (
+                        // Brighter than a settled loser's score, dimmer than a winner's: this is a
+                        // running number, not a result.
+                        <Text className="text-sm font-black text-slate-200">
+                            {liveScore}
                         </Text>
                     ) : (
                         <Text className="text-xs text-slate-700 font-bold">—</Text>
@@ -204,14 +249,14 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             )}
 
             {/* Status / action header */}
-            {(canReport || isAwaitingApproval || isLive || isCompleted || isNoShow) && (
+            {(canReport || isAwaitingApproval || isLive || isCompleted || isNoShow || isTeamInProgress) && (
                 <View className={cn(
                     "flex-row items-center justify-between px-4 py-2",
                     canReport
                         ? "bg-emerald-500/[0.08]"
                         : isAwaitingApproval || isNoShow
                             ? "bg-warning/[0.10]"
-                            : isLive
+                            : isLive || isTeamInProgress
                                 ? "bg-emerald-500/[0.06]"
                                 : "bg-white/[0.02]"
                 )}>
@@ -223,7 +268,30 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                                     Report Result
                                 </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={11} color="#34D399" />
+                            <View className="flex-row items-center gap-1.5">
+                                {/* Progress rides along with the CTA — an admin reporting game 2 of 2
+                                    wants to see that game 1 is already in. */}
+                                {isTeamInProgress && (
+                                    <Text className="text-[10px] font-black text-emerald-300/70 tracking-[0.5px]">
+                                        {teamProgress!.decided}/{teamProgress!.total}
+                                    </Text>
+                                )}
+                                <Ionicons name="chevron-forward" size={11} color="#34D399" />
+                            </View>
+                        </>
+                    )}
+                    {/* Everyone without a report affordance still gets the live state. */}
+                    {!canReport && !isAwaitingApproval && isTeamInProgress && (
+                        <>
+                            <View className="flex-row items-center gap-1.5">
+                                <View className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
+                                    Live
+                                </Text>
+                            </View>
+                            <Text className="text-[10px] font-black text-emerald-300/70 tracking-[0.5px]">
+                                {teamProgress!.decided}/{teamProgress!.total} Done
+                            </Text>
                         </>
                     )}
                     {!canReport && isAwaitingApproval && (
@@ -237,7 +305,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             <Ionicons name="chevron-forward" size={11} color="#F59E0B" />
                         </>
                     )}
-                    {!canReport && !isAwaitingApproval && isLive && (
+                    {!canReport && !isAwaitingApproval && !isTeamInProgress && isLive && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="time-outline" size={11} color="#34D399" />
                             <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">

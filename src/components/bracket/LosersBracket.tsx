@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { BracketMatch } from './BracketMatch';
+import { BracketMatch, teamProgressFrom } from './BracketMatch';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -373,6 +373,7 @@ export function LosersBracket({
                                                     (match as any).ProposedByUserId ??
                                                     null
                                                 }
+                                                teamProgress={teamProgressFrom(match)}
                                                 className={myPathIds.has(match.id) ? 'border-indigo-500/30' : undefined}
                                             />
                                         </View>
