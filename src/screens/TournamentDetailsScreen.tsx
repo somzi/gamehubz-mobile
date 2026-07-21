@@ -3108,6 +3108,13 @@ export default function TournamentDetailsScreen() {
                                     ) : (
                                         pendingRegistrations.map((reg) => {
                                             const regId = reg.id || reg.registrationId || reg.Id;
+                                            // Registration id ≠ user id — TournamentRegistrationOverview carries both.
+                                            // The repo projects UserId with a `?? Guid.Empty` fallback, and the empty
+                                            // guid is a truthy string, so screen it out the same way TournamentGroups does.
+                                            const regUserIdRaw = reg.userId || reg.UserId;
+                                            const regUserId = regUserIdRaw && regUserIdRaw !== '00000000-0000-0000-0000-000000000000'
+                                                ? regUserIdRaw
+                                                : null;
                                             return (
                                                 <View key={regId || Math.random().toString()} className="rounded-[22px] overflow-hidden" style={{ backgroundColor: '#131B2E', shadowColor: '#F59E0B', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}>
                                                     <LinearGradient
@@ -3129,24 +3136,35 @@ export default function TournamentDetailsScreen() {
                                                         }}
                                                     />
                                                     <View className="flex-row items-center p-3.5 pl-4">
-                                                        <View style={{ shadowColor: '#F59E0B', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
-                                                            <View style={{ borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.5)', borderRadius: 999, padding: 2 }}>
-                                                                <PlayerAvatar src={reg.avatarUrl || reg.AvatarUrl} name={reg.username || reg.Username || 'Unknown'} size="md" />
+                                                        {/* Avatar + name open the profile so the organizer can vet the player
+                                                            before approving. The approve/reject buttons stay outside it. */}
+                                                        <Pressable
+                                                            onPress={() => { if (regUserId) navigation.navigate('PlayerProfile', { id: regUserId }); }}
+                                                            disabled={!regUserId}
+                                                            className="flex-1 flex-row items-center active:opacity-70"
+                                                        >
+                                                            <View style={{ shadowColor: '#F59E0B', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
+                                                                <View style={{ borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.5)', borderRadius: 999, padding: 2 }}>
+                                                                    <PlayerAvatar src={reg.avatarUrl || reg.AvatarUrl} name={reg.username || reg.Username || 'Unknown'} size="md" />
+                                                                </View>
+                                                                <View
+                                                                    className="absolute items-center justify-center"
+                                                                    style={{ bottom: -2, right: -2, width: 18, height: 18, borderRadius: 999, backgroundColor: '#F59E0B', borderWidth: 2, borderColor: '#131B2E' }}
+                                                                >
+                                                                    <Ionicons name="hourglass" size={9} color="#0F172A" />
+                                                                </View>
                                                             </View>
-                                                            <View
-                                                                className="absolute items-center justify-center"
-                                                                style={{ bottom: -2, right: -2, width: 18, height: 18, borderRadius: 999, backgroundColor: '#F59E0B', borderWidth: 2, borderColor: '#131B2E' }}
-                                                            >
-                                                                <Ionicons name="hourglass" size={9} color="#0F172A" />
+                                                            <View className="flex-1 ml-3 justify-center">
+                                                                <View className="flex-row items-center gap-1">
+                                                                    <Text className="font-black text-base text-white flex-shrink" numberOfLines={1}>{reg.username || reg.Username}</Text>
+                                                                    {!!regUserId && <Ionicons name="chevron-forward" size={13} color="#64748B" />}
+                                                                </View>
+                                                                <View className="flex-row items-center gap-1 mt-1">
+                                                                    <Ionicons name="person-add" size={11} color="#FBBF24" />
+                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1px]" style={{ color: '#FCD34D' }}>Wants to join</Text>
+                                                                </View>
                                                             </View>
-                                                        </View>
-                                                        <View className="flex-1 ml-3 justify-center">
-                                                            <Text className="font-black text-base text-white" numberOfLines={1}>{reg.username || reg.Username}</Text>
-                                                            <View className="flex-row items-center gap-1 mt-1">
-                                                                <Ionicons name="person-add" size={11} color="#FBBF24" />
-                                                                <Text className="text-[10px] font-bold uppercase tracking-[1px]" style={{ color: '#FCD34D' }}>Wants to join</Text>
-                                                            </View>
-                                                        </View>
+                                                        </Pressable>
                                                         <View className="flex-row gap-2 items-center">
                                                             <Pressable
                                                                 onPress={() => handleReject(regId)}
