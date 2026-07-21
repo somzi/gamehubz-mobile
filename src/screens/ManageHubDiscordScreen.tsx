@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -174,10 +175,7 @@ export default function ManageHubDiscordScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title="Discord Integration" showBack />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                className="flex-1"
-            >
+            <KeyboardAvoider>
                 <ScrollView
                     className="flex-1 px-6"
                     keyboardShouldPersistTaps="handled"
@@ -269,7 +267,7 @@ export default function ManageHubDiscordScreen() {
                         Save Changes
                     </Button>
                 </ScrollView>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
 
             <StatusModal
                 visible={showStatusModal}

@@ -6,11 +6,11 @@ import {
     Pressable,
     FlatList,
     ActivityIndicator,
-    KeyboardAvoidingView,
     Platform,
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -363,13 +363,7 @@ export default function DirectChatScreen() {
                 onAvatarPress={() => navigation.navigate('PlayerProfile', { id: chat.otherUserId })}
             />
 
-            {/* Android: adjustResize already shrinks the window for the keyboard — 'height'
-                on top of it double-compensates (jumpy composer), so KAV is iOS-only. */}
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}
-            >
+            <KeyboardAvoider keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}>
                 <FlatList
                     ref={listRef}
                     data={messages}
@@ -491,7 +485,7 @@ export default function DirectChatScreen() {
                         </Pressable>
                     </View>
                 </View>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
         </SafeAreaView>
     );
 }

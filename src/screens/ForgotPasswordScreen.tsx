@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -106,10 +107,7 @@ export default function ForgotPasswordScreen() {
                 </TouchableOpacity>
             </View>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                className="flex-1"
-            >
+            <KeyboardAvoider>
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1, paddingTop: 40 }}
                     className="px-6"
@@ -150,7 +148,7 @@ export default function ForgotPasswordScreen() {
                         </Button>
                     </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
 
             <StatusModal
                 visible={showStatusModal}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../lib/theme';
@@ -144,10 +145,7 @@ export default function RegisterScreen() {
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 280 }}
                 pointerEvents="none"
             />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                className="flex-1"
-            >
+            <KeyboardAvoider>
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
                     className="px-6"
@@ -314,7 +312,7 @@ export default function RegisterScreen() {
                         </View>
                     </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
 
             <StatusModal
                 visible={showStatusModal}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -180,10 +181,7 @@ export default function UpdateProfileScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title="Edit Profile Info" showBack />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                className="flex-1"
-            >
+            <KeyboardAvoider>
                 <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
                     {/* Avatar Section */}
                     <View className="items-center mb-8">
@@ -257,7 +255,7 @@ export default function UpdateProfileScreen() {
                         </View>
                     </Button>
                 </View>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
 
             <StatusModal
                 visible={showStatusModal}

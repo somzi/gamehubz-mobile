@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, ScrollView, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
@@ -62,10 +63,7 @@ export default function LoginScreen() {
                 pointerEvents="none"
             />
             <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={{ flex: 1 }}
-                >
+                <KeyboardAvoider>
                     <ScrollView
                         contentContainerStyle={{
                             flexGrow: 1,
@@ -156,7 +154,7 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                         </View>
                     </ScrollView>
-                </KeyboardAvoidingView>
+                </KeyboardAvoider>
             </TouchableWithoutFeedback>
 
             <StatusModal

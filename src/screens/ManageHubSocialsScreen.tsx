@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -216,10 +217,7 @@ export default function ManageHubSocialsScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title="Manage Hub Socials" showBack />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                className="flex-1"
-            >
+            <KeyboardAvoider>
                 <ScrollView className="flex-1 px-4 py-6" keyboardShouldPersistTaps="handled">
                     <View className="mb-6">
                         <SectionLabel icon="share-social" title="Social Accounts" color={COLORS.warning} />
@@ -298,7 +296,7 @@ export default function ManageHubSocialsScreen() {
                         </View>
                     </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
 
             <StatusModal
                 visible={showStatusModal}

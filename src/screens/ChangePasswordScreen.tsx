@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -116,10 +117,7 @@ export default function ChangePasswordScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title="Change Password" showBack />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                className="flex-1"
-            >
+            <KeyboardAvoider>
                 <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
                     <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
                         <SectionLabel icon="lock-closed" title="Security" />
@@ -176,7 +174,7 @@ export default function ChangePasswordScreen() {
                         </View>
                     </Button>
                 </View>
-            </KeyboardAvoidingView>
+            </KeyboardAvoider>
 
             <StatusModal
                 visible={showStatusModal}
