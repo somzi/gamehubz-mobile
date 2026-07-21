@@ -175,7 +175,8 @@ export default function ManageHubDiscordScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title="Discord Integration" showBack />
-            <KeyboardAvoider>
+            {/* Screen is edges={['top']}, so the nav-bar strip is ours to add. */}
+            <KeyboardAvoider bottomInset="none">
                 <ScrollView
                     className="flex-1 px-6"
                     keyboardShouldPersistTaps="handled"

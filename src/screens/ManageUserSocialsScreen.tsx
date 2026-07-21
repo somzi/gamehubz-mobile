@@ -245,7 +245,8 @@ export default function ManageUserSocialsScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title="Manage Socials" showBack />
-            <KeyboardAvoider>
+            {/* Screen is edges={['top']}, so the nav-bar strip is ours to add. */}
+            <KeyboardAvoider bottomInset="none">
                 <ScrollView className="flex-1 px-4 py-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                     {/* Discord bot link — DM notifications; separate from the public social links below */}
                     <View className="mb-6">
