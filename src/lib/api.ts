@@ -123,7 +123,10 @@ export const ENDPOINTS = {
     FORGOT_PASSWORD_V2: `${API_BASE_URL}/api/Auth/v2/forgotPassword`,
     RESET_PASSWORD: `${API_BASE_URL}/api/Auth/resetPassword`,
     GET_ALL_HUB_ACTIVITY: (pageNumber: number) => `${API_BASE_URL}/api/hubActivity/all?pageNumber=${pageNumber}`,
-    EXPORT_BRACKET_PDF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/export/pdf`,
+    // includeSchedule=true adds round-by-round fixture/result pages for group-stage & league
+    // tournaments. Omitted by default so the URL stays identical to the legacy call.
+    EXPORT_BRACKET_PDF: (id: string, includeSchedule = false) =>
+        `${API_BASE_URL}/api/tournament/${id}/export/pdf${includeSchedule ? '?includeSchedule=true' : ''}`,
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
 

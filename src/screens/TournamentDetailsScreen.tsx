@@ -32,6 +32,7 @@ import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
+import { ExportBracketModal } from '../components/modals/ExportBracketModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
 import { TeamMatchDetailModal } from '../components/modals/TeamMatchDetailModal';
 import { SwapBracketModal, SwapTeam } from '../components/modals/SwapBracketModal';
@@ -184,6 +185,7 @@ export default function TournamentDetailsScreen() {
     const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<'match' | 'chat'>('match');
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
     const [shareCardVisible, setShareCardVisible] = useState(false);
 
     // Team tournament states
@@ -279,7 +281,7 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const handleExportBracketPdf = async () => {
+    const handleExportBracketPdf = async (includeSchedule = false) => {
         if (!id) return;
         setIsExportingPdf(true);
         try {
@@ -287,13 +289,14 @@ export default function TournamentDetailsScreen() {
             const safeName = (tournament?.name ?? id)
                 .replace(/\s+/g, '_')
                 .replace(/[^a-zA-Z0-9_\-]/g, '');
-            const destFile = new FSFile(Paths.cache, `${safeName}_bracket.pdf`);
+            const suffix = includeSchedule ? '_schedule' : '';
+            const destFile = new FSFile(Paths.cache, `${safeName}_bracket${suffix}.pdf`);
             // Remove stale cache file so downloadFileAsync never hits "Destination already exists"
             if (destFile.exists) {
                 destFile.delete();
             }
             const downloaded = await FSFile.downloadFileAsync(
-                ENDPOINTS.EXPORT_BRACKET_PDF(id),
+                ENDPOINTS.EXPORT_BRACKET_PDF(id, includeSchedule),
                 destFile,
                 token ? { headers: { Authorization: `Bearer ${token}` } } : {}
             );
@@ -312,6 +315,19 @@ export default function TournamentDetailsScreen() {
         } finally {
             setIsExportingPdf(false);
         }
+    };
+
+    // The schedule option only changes the PDF for group-stage / league tournaments (it adds
+    // round-by-round fixture pages there); a pure bracket would export an identical file either
+    // way. So only offer the chooser when it actually matters — otherwise export directly.
+    const scheduleAffectsExport = stages.some((s: any) => {
+        const t = s.type ?? s.Type;
+        return t === 1 || t === 2; // StageType.GroupStage, StageType.League
+    });
+
+    const handleExportPress = () => {
+        if (scheduleAffectsExport) setShowExportModal(true);
+        else handleExportBracketPdf(false);
     };
 
     const handleShare = () => {
@@ -1964,7 +1980,7 @@ export default function TournamentDetailsScreen() {
                     <View className="flex-row items-center gap-2">
                         {activeTab === 'bracket' && stages.length > 0 && (
                             <Pressable
-                                onPress={handleExportBracketPdf}
+                                onPress={handleExportPress}
                                 disabled={isExportingPdf}
                                 className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
                             >
@@ -3375,6 +3391,12 @@ export default function TournamentDetailsScreen() {
                 teams={showSwapModal ? getSwappableBracketTeams() : []}
                 onConfirm={handleSwapBracket}
                 busy={isSwapping}
+            />
+
+            <ExportBracketModal
+                visible={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                onSelect={handleExportBracketPdf}
             />
 
             {tournament && (
