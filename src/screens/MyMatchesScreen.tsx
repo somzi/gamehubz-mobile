@@ -10,6 +10,7 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
+import { parseUtcDate } from '../lib/utils';
 
 interface MatchOverviewDto {
     id: string;
@@ -17,6 +18,7 @@ interface MatchOverviewDto {
     tournamentName: string;
     hubName: string;
     scheduledTime: string | null;
+    roundDeadline?: string | null;
     opponentName: string;
     opponentAvatarUrl?: string;
     status: number;
@@ -113,7 +115,11 @@ export default function MyMatchesScreen() {
                                 opponentName={match.opponentName}
                                 opponentAvatarUrl={match.opponentAvatarUrl}
                                 status={!match.scheduledTime ? 'pending_availability' : match.status === 3 ? 'completed' : 'scheduled'}
-                                scheduledTime={match.scheduledTime ? new Date(match.scheduledTime).toLocaleString() : undefined}
+                                // parseUtcDate, not new Date(): backend timestamps carry no Z, so
+                                // raw parsing read the UTC clock as local and showed a shifted time.
+                                scheduledTime={match.scheduledTime ? parseUtcDate(match.scheduledTime).toLocaleString() : undefined}
+                                scheduledTimeIso={match.scheduledTime}
+                                deadline={match.roundDeadline ?? undefined}
                                 onMatchUpdate={fetchMatches}
                                 isRoundLocked={match.isRoundLocked}
                                 unreadMessages={match.unreadMessages}

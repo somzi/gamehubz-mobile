@@ -28,6 +28,7 @@ interface MatchOverviewDto {
     tournamentName: string;
     hubName: string;
     scheduledTime: string | null;
+    roundDeadline?: string | null;
     opponentName: string;
     opponentAvatarUrl?: string;
     opponentNickname?: string;
@@ -273,6 +274,7 @@ export default function HomeScreen() {
                                         opponentNickname={match.opponentNickname}
                                         userNickname={match.userNickname}
                                         status="pending_availability"
+                                        deadline={match.roundDeadline ?? undefined}
                                         onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
                                     />
@@ -325,6 +327,8 @@ export default function HomeScreen() {
                                                 })
                                                 : 'TBD'
                                         }
+                                        scheduledTimeIso={match.scheduledTime}
+                                        deadline={match.roundDeadline ?? undefined}
                                         onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
                                     />

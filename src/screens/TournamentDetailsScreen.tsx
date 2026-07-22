@@ -16,7 +16,7 @@ import { BracketMatch, teamProgressFrom } from '../components/bracket/BracketMat
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
-import { cn, getCurrencyLabel } from '../lib/utils';
+import { cn, getCurrencyLabel, parseUtcDate } from '../lib/utils';
 import { ShareTournamentCardModal } from '../components/modals/ShareTournamentCardModal';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
@@ -3243,13 +3243,18 @@ export default function TournamentDetailsScreen() {
                 tournamentName={tournament?.name}
                 roundName={selectedMatch?.roundName || 'Match Details'}
                 opponentName={selectedMatch?.away?.username}
-                scheduledTime={selectedMatch?.startTime ? new Date(selectedMatch.startTime).toLocaleString(undefined, {
+                // parseUtcDate, not new Date(): backend timestamps carry no Z suffix, so raw
+                // parsing reads the UTC clock as local and shows a shifted kick-off time.
+                scheduledTime={selectedMatch?.startTime ? parseUtcDate(selectedMatch.startTime).toLocaleString(undefined, {
                     day: 'numeric',
                     month: 'short',
                     year: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit'
                 }) : undefined}
+                // Bracket matches already carry their round deadline, so the modal can show it
+                // immediately instead of waiting for the details round-trip to fill it in.
+                deadline={selectedMatch?.roundDeadline ?? selectedMatch?.RoundDeadline ?? undefined}
                 status={
                     selectedMatch?.status === 3 || selectedMatch?.status === 4 ? 'completed' :
                         selectedMatch?.status === 2 ? 'ready_phase' :

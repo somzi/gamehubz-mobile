@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
+import { MatchTimingStrip } from './MatchTimingStrip';
+import { EvidenceSection } from './EvidenceSection';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { cn, formatLocalDateTime } from '../../lib/utils';
+import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
@@ -34,8 +36,12 @@ interface MatchScheduleCardProps {
     opponentNickname?: string;
     userNickname?: string;
     status: MatchStatus;
+    /** Round deadline as a raw backend timestamp (MatchOverviewDto.roundDeadline). */
     deadline?: string;
     scheduledTime?: string;
+    /** Raw backend timestamp behind `scheduledTime` — lets the timing strip render the
+     *  kick-off as clock + date instead of one pre-localized blob. */
+    scheduledTimeIso?: string | null;
     opponentAvailability?: string[];
     onMatchUpdate?: () => void;
     onPress?: () => void;
@@ -57,6 +63,7 @@ export function MatchScheduleCard({
     status: initialStatus,
     deadline = 'TBD',
     scheduledTime: initialScheduledTime,
+    scheduledTimeIso,
     opponentAvailability: initialOpponentAvailability = [],
     onMatchUpdate,
     onPress,
@@ -92,6 +99,7 @@ export function MatchScheduleCard({
     const [modalVisible, setModalVisible] = useState(false);
     const [currentStatus, setCurrentStatus] = useState<MatchStatus>(initialStatus);
     const [matchTime, setMatchTime] = useState(initialScheduledTime);
+    const [matchTimeIso, setMatchTimeIso] = useState<string | undefined>(scheduledTimeIso ?? undefined);
     const [localDeadline, setLocalDeadline] = useState<string>(deadline);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,8 +139,9 @@ export function MatchScheduleCard({
     const connectionRef = useRef<HubConnection | null>(null);
     const commentInputRef = useRef<TextInput>(null);
 
-    // Collapsible sections state
-    const [isEvidenceExpanded, setIsEvidenceExpanded] = useState(true);
+    // Collapsible sections state. Evidence starts closed: it's the tallest block on the screen,
+    // empty most of the time, and open it pushed "Need Help?" below the fold.
+    const [isEvidenceExpanded, setIsEvidenceExpanded] = useState(false);
     const [isChatExpanded, setIsChatExpanded] = useState(true);
     const [isAvailabilityExpanded, setIsAvailabilityExpanded] = useState(true);
     const [activeModalTab, setActiveModalTab] = useState<'match' | 'chat' | 'stream'>('match');
@@ -144,6 +153,12 @@ export function MatchScheduleCard({
         (!!dbHomeUserId && dbHomeUserId.toLowerCase() === user.id.toLowerCase()) ||
         (!!dbAwayUserId && dbAwayUserId.toLowerCase() === user.id.toLowerCase())
     );
+
+    // The card outlives a list refetch (same key), so pick up a deadline the admin moved
+    // instead of showing the one this card mounted with.
+    useEffect(() => {
+        setLocalDeadline(deadline);
+    }, [deadline]);
 
     const fetchAvailability = async () => {
         if (!user?.id || !matchId) return;
@@ -158,8 +173,11 @@ export function MatchScheduleCard({
                     setLocalDeadline(data.matchDeadline);
                 }
                 if (data.confirmedTime) {
-                    const confirmedDate = new Date(data.confirmedTime);
+                    // parseUtcDate, not new Date(): the backend serializes without a Z suffix,
+                    // so raw parsing reads the UTC clock as local and shifts the time.
+                    const confirmedDate = parseUtcDate(data.confirmedTime);
                     setMatchTime(confirmedDate.toLocaleString());
+                    setMatchTimeIso(data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
             }
@@ -489,8 +507,9 @@ export function MatchScheduleCard({
 
                 // Check if match was scheduled
                 if (result.data?.confirmedTime) {
-                    const confirmedDate = new Date(result.data.confirmedTime);
+                    const confirmedDate = parseUtcDate(result.data.confirmedTime);
                     setMatchTime(confirmedDate.toLocaleString());
+                    setMatchTimeIso(result.data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
 
@@ -518,6 +537,8 @@ export function MatchScheduleCard({
             if (response.ok) {
                 setCurrentStatus('scheduled');
                 setMatchTime('Agreed outside app');
+                // No agreed timestamp in this path — clear the raw one so the strip shows the text.
+                setMatchTimeIso(undefined);
                 
                 if (onMatchUpdate) {
                     onMatchUpdate();
@@ -1165,6 +1186,14 @@ export function MatchScheduleCard({
 
                                             return (
                                             <View className={cn("gap-3", !isPremium && "space-y-3")}>
+                                                {/* Kick-off + round deadline — the modal used to show neither, so
+                                                    players had no way to see how long they had left to play. */}
+                                                <MatchTimingStrip
+                                                    matchTimeIso={matchTimeIso}
+                                                    matchTimeText={matchTime}
+                                                    deadline={localDeadline}
+                                                />
+
                                                 {/* Pending Proposal Card — hidden while editing so the edit form gets the full stage. */}
                                                 {hasPendingProposal && !isEditingProposal && (
                                                     <View className={cn(
@@ -1448,27 +1477,13 @@ export function MatchScheduleCard({
 
                                                 {/* Evidence — visible to both sides at all times so the proposer can keep
                                                     adding screenshots and the opponent can verify before approving. */}
-                                                <View className={cn(
-                                                    "rounded-[20px] p-4",
-                                                    isPremium ? "bg-card/60 border border-white/[0.04]" : "bg-muted/5"
-                                                )}>
-                                                    <View className="flex-row items-center justify-between mb-4">
-                                                        <View className="flex-row items-center gap-2">
-                                                            <View className={cn(
-                                                                "w-8 h-8 rounded-xl items-center justify-center",
-                                                                isPremium ? "bg-primary/10" : "bg-primary/10"
-                                                            )}>
-                                                                <Ionicons name="images-outline" size={16} color="#10B981" />
-                                                            </View>
-                                                            <Text className={cn("font-black uppercase tracking-wider text-xs", isPremium ? "text-white" : "text-foreground")}>Evidence</Text>
-                                                            {existingEvidences.length > 0 && (
-                                                                <View className="bg-white/5 px-2 py-0.5 rounded-full">
-                                                                    <Text className="text-[9px] font-bold text-slate-400">{existingEvidences.length}</Text>
-                                                                </View>
-                                                            )}
-                                                        </View>
-                                                    </View>
-
+                                                <EvidenceSection
+                                                    uploadedCount={existingEvidences.length}
+                                                    pendingCount={selectedImages.length}
+                                                    onAdd={pickImages}
+                                                    open={isEvidenceExpanded}
+                                                    onToggle={setIsEvidenceExpanded}
+                                                >
                                                     {/* Already-uploaded evidence (read-only carousel) — visible to both proposer and opponent. */}
                                                     {existingEvidences.length > 0 && (
                                                         <View className="mb-3">
@@ -1488,25 +1503,17 @@ export function MatchScheduleCard({
                                                         </View>
                                                     )}
 
-                                                    <View className="flex-row items-center gap-2 mb-3">
-                                                        <Pressable onPress={pickImages} className={cn(
-                                                            "flex-row items-center px-3.5 py-2 rounded-xl border",
-                                                            isPremium ? "bg-primary/10 border-primary/20" : "bg-primary/10 border-primary/20"
-                                                        )}
-                                                            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                                                        >
-                                                            <Ionicons name="add" size={16} color="#10B981" />
-                                                            <Text className="font-black uppercase ml-1 text-[10px] text-primary">Add</Text>
-                                                        </Pressable>
-                                                        {selectedImages.length > 0 && (
+                                                    {/* Add lives in the section header now — only Clear needs a spot here. */}
+                                                    {selectedImages.length > 0 && (
+                                                        <View className="flex-row items-center gap-2 mb-3">
                                                             <Pressable onPress={() => setSelectedImages([])} className={cn("flex-row items-center px-3.5 py-2 rounded-xl border", isPremium ? "bg-white/[0.03] border-white/[0.06]" : "bg-muted/20 border-border/10")}
                                                                 style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                                                             >
                                                                 <Ionicons name="trash-outline" size={14} color={isPremium ? "#64748B" : "#71717A"} />
                                                                 <Text className="font-bold uppercase ml-1 text-[10px] text-slate-500">Clear</Text>
                                                             </Pressable>
-                                                        )}
-                                                    </View>
+                                                        </View>
+                                                    )}
 
                                                     {selectedImages.length > 0 ? (
                                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
@@ -1565,7 +1572,7 @@ export function MatchScheduleCard({
                                                             )}
                                                         </Pressable>
                                                     )}
-                                                </View>
+                                                </EvidenceSection>
                                             </View>
                                             );
                                         })()}

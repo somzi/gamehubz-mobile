@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
+import { MatchTimingStrip } from '../match/MatchTimingStrip';
+import { EvidenceSection } from '../match/EvidenceSection';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
@@ -130,6 +132,9 @@ export function MatchDetailsModal({
     const [opponentSlots, setOpponentSlots] = useState<string[]>(opponentAvailability);
     const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
     const [confirmedTime, setConfirmedTime] = useState<string | undefined>(scheduledTime);
+    // Raw backend timestamp behind confirmedTime — the timing strip formats it itself
+    // (clock + date on separate lines), which a pre-localized string can't be split back into.
+    const [confirmedTimeIso, setConfirmedTimeIso] = useState<string | undefined>(undefined);
     const [currentStatus, setCurrentStatus] = useState<MatchStatus>(status);
     const [localDeadline, setLocalDeadline] = useState<string>(deadline);
 
@@ -208,7 +213,11 @@ export function MatchDetailsModal({
         setError(null);
         setIsEditMode(false);
         setIsEditingProposal(false);
-    }, [matchId]);
+        // Timing is per-match too — without this the previous match's deadline stayed on
+        // screen until (and unless) the new one's details came back with its own.
+        setLocalDeadline(deadline);
+        setConfirmedTimeIso(undefined);
+    }, [matchId, deadline]);
 
     // Apply the host-requested starting tab whenever the modal opens or the match
     // changes — covers reopens on the same matchId (e.g. admin closes from chat,
@@ -280,6 +289,7 @@ export function MatchDetailsModal({
                     if (inlineAvailability.confirmedTime) {
                         const confirmedDate = parseUtcDate(inlineAvailability.confirmedTime);
                         setConfirmedTime(confirmedDate.toLocaleString());
+                        setConfirmedTimeIso(inlineAvailability.confirmedTime);
                         setCurrentStatus('scheduled');
                     }
                 }
@@ -313,6 +323,7 @@ export function MatchDetailsModal({
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
                     const date = parseUtcDate(normalizedData.scheduledTime);
+                    setConfirmedTimeIso(normalizedData.scheduledTime);
                     setConfirmedTime(date.toLocaleString(undefined, {
                         day: 'numeric',
                         month: 'short',
@@ -348,6 +359,7 @@ export function MatchDetailsModal({
                 if (data.confirmedTime) {
                     const confirmedDate = parseUtcDate(data.confirmedTime);
                     setConfirmedTime(confirmedDate.toLocaleString());
+                    setConfirmedTimeIso(data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
             }
@@ -962,64 +974,41 @@ export function MatchDetailsModal({
                     </View>
                 </View>
 
-                {/* Evidence Gallery — collapsible */}
-                <View className="mx-5 mb-5">
-                    <Pressable
-                        onPress={() => setIsEvidenceOpen(prev => !prev)}
-                        className="flex-row items-center justify-between py-1 active:opacity-70"
-                    >
-                        <View className="flex-row items-center gap-2.5">
-                            <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
-                                <Ionicons name="images-outline" size={14} color="#818CF8" />
-                            </View>
-                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Evidence</Text>
-                            {matchDetails.evidences && matchDetails.evidences.length > 0 && (
-                                <View className="bg-white/5 px-2 py-0.5 rounded-full">
-                                    <Text className="text-[9px] font-bold text-slate-500">{matchDetails.evidences.length}</Text>
-                                </View>
-                            )}
-                        </View>
-                        <View className="w-7 h-7 rounded-full bg-white/5 items-center justify-center">
-                            <Ionicons
-                                name={isEvidenceOpen ? 'chevron-up' : 'chevron-down'}
-                                size={14}
-                                color="#475569"
-                            />
-                        </View>
-                    </Pressable>
-
-                    {isEvidenceOpen && (
-                        <View className="mt-3">
-                            {matchDetails.evidences && matchDetails.evidences.length > 0 ? (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    {matchDetails.evidences.map((url, idx) => (
-                                        <Pressable
-                                            key={idx}
-                                            className="mr-3"
-                                            onPress={() => setPreviewImage(url)}
-                                        >
-                                            <View className="rounded-2xl overflow-hidden border border-white/5">
-                                                <Image
-                                                    source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                                    style={{ width: 144, height: 192, backgroundColor: '#1E293B' }}
-                                                    contentFit="cover"
-                                                    cachePolicy="memory-disk"
-                                                />
-                                            </View>
-                                        </Pressable>
-                                    ))}
-                                </ScrollView>
-                            ) : (
-                                <View className="bg-white/5 rounded-2xl py-6 items-center justify-center border border-white/10 border-dashed">
-                                    <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
-                                        <Ionicons name="images-outline" size={18} color="#818CF8" />
+                {/* Evidence Gallery — same collapsed row as the reporting view. */}
+                <EvidenceSection
+                    className="mx-5 mb-5"
+                    uploadedCount={matchDetails.evidences?.length ?? 0}
+                    open={isEvidenceOpen}
+                    onToggle={setIsEvidenceOpen}
+                >
+                    {matchDetails.evidences && matchDetails.evidences.length > 0 ? (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            {matchDetails.evidences.map((url, idx) => (
+                                <Pressable
+                                    key={idx}
+                                    className="mr-3"
+                                    onPress={() => setPreviewImage(url)}
+                                >
+                                    <View className="rounded-2xl overflow-hidden border border-white/5">
+                                        <Image
+                                            source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
+                                            style={{ width: 144, height: 192, backgroundColor: '#1E293B' }}
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
+                                        />
                                     </View>
-                                    <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>No Evidence Attached</Text>
-                                </View>
-                            )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <View className="bg-white/5 rounded-2xl py-6 items-center justify-center border border-white/10 border-dashed">
+                            <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
+                                <Ionicons name="images-outline" size={18} color="#818CF8" />
+                            </View>
+                            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>No Evidence Attached</Text>
                         </View>
                     )}
-                </View>
+                </EvidenceSection>
 
                 {/* Edit / Delete Result Buttons */}
                 {canEditResult && (
@@ -1296,6 +1285,10 @@ export function MatchDetailsModal({
         const homeAvatar = matchDetails?.homeUserAvatarUrl || matchDetails?.HomeUserAvatarUrl || '';
         const awayAvatar = matchDetails?.awayUserAvatarUrl || matchDetails?.AwayUserAvatarUrl || '';
 
+        // Spectators still get the evidence section (read-only) — only the pickers are gated.
+        const canAttachEvidence = isParticipant || isPrivileged;
+        const uploadedEvidenceCount = matchDetails?.evidences?.length ?? 0;
+
         // While a proposal is pending we hide the manual submit form so the proposal card alone
         // drives the decision. Anyone with the right to act (proposer, opponent, admin/owner)
         // can open the form via the "Edit" button on the card.
@@ -1303,6 +1296,18 @@ export function MatchDetailsModal({
 
         return (
             <View className="mx-5 mt-4">
+                {/* Kick-off + round deadline. Outside the submit form on purpose — a pending
+                    proposal hides the form, but "when is this due" still has to be readable. */}
+                <MatchTimingStrip
+                    className="mb-5"
+                    matchTimeIso={confirmedTimeIso || matchDetails?.scheduledTime}
+                    matchTimeText={confirmedTime || scheduledTime}
+                    deadline={localDeadline}
+                    // Until the details land we genuinely don't know the deadline — say so
+                    // instead of flashing "Not set" on every open.
+                    isLoading={isLoadingDetails || !matchDetails}
+                />
+
                 {/* Pending proposal card — hidden while the user is editing so the edit form gets the full stage. */}
                 {hasPendingProposal && !isEditingProposal && renderPendingProposalCard()}
 
@@ -1329,18 +1334,8 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {/* Scheduled Time */}
+                {/* Score reporting */}
                 <View className="bg-[#111827]/60 rounded-[28px] border border-white/[0.06] p-5 mb-5">
-                    <View className="items-center mb-5">
-                        <View className="flex-row items-center gap-2 bg-blue-500/10 px-4 py-1.5 rounded-full border border-blue-500/20">
-                            <Ionicons name="time-outline" size={12} color="#3B82F6" />
-                            <Text className="text-[9px] font-black text-blue-500 uppercase tracking-[3px]">Match Time</Text>
-                        </View>
-                        <Text className="text-base font-black text-primary mt-3">
-                            {confirmedTime || scheduledTime || 'TBD'}
-                        </Text>
-                    </View>
-
                     {error && !hasPendingProposal && (
                         <View className="bg-red-500/10 p-3 rounded-2xl mb-4 border border-red-500/20">
                             <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
@@ -1467,55 +1462,39 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {/* Previously Uploaded Evidence — always visible so both sides can verify the proposal */}
-                {matchDetails?.evidences && matchDetails.evidences.length > 0 && (
-                    <View className="mb-5">
-                        <View className="flex-row items-center gap-2.5 mb-3.5 ml-1">
-                            <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
-                                <Ionicons name="images-outline" size={14} color="#818CF8" />
+                {/* Evidence — one collapsed row holding both what's already attached (either side can
+                    verify a proposal from it) and the picker. Open it costs ~200px, which used to
+                    push the admin-help card off screen. */}
+                {(canAttachEvidence || uploadedEvidenceCount > 0) && (
+                    <EvidenceSection
+                        className="mb-5"
+                        uploadedCount={uploadedEvidenceCount}
+                        pendingCount={selectedImages.length}
+                        onAdd={canAttachEvidence ? pickImages : undefined}
+                        open={isEvidenceOpen}
+                        onToggle={setIsEvidenceOpen}
+                    >
+                        {uploadedEvidenceCount > 0 && (
+                            <View className={cn(canAttachEvidence && "mb-4")}>
+                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Uploaded</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                    {matchDetails!.evidences.map((url, idx) => (
+                                        <Pressable key={idx} className="mr-3" onPress={() => setPreviewImage(url)}>
+                                            <View className="rounded-2xl overflow-hidden border border-white/5">
+                                                <Image
+                                                    source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
+                                                    style={{ width: 112, height: 160, backgroundColor: '#1E293B' }}
+                                                    contentFit="cover"
+                                                    cachePolicy="memory-disk"
+                                                />
+                                            </View>
+                                        </Pressable>
+                                    ))}
+                                </ScrollView>
                             </View>
-                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Uploaded Evidence</Text>
-                            <View className="bg-white/5 px-2 py-0.5 rounded-full">
-                                <Text className="text-[9px] font-bold text-slate-400">{matchDetails.evidences.length}</Text>
-                            </View>
-                        </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {matchDetails.evidences.map((url, idx) => (
-                                <Pressable key={idx} className="mr-3" onPress={() => setPreviewImage(url)}>
-                                    <View className="rounded-2xl overflow-hidden border border-white/5">
-                                        <Image
-                                            source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                            style={{ width: 112, height: 160, backgroundColor: '#1E293B' }}
-                                            contentFit="cover"
-                                            cachePolicy="memory-disk"
-                                        />
-                                    </View>
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
+                        )}
 
-                {/* Evidence Upload — always visible so the proposer can keep adding screenshots
-                    even while a proposal is pending */}
-                {(isParticipant || isPrivileged) && (
-                    <View className="mb-5">
-                        <View className="flex-row items-center justify-between mb-3">
-                            <View className="flex-row items-center gap-2">
-                                <View className="w-7 h-7 rounded-xl bg-primary/10 items-center justify-center">
-                                    <Ionicons name="camera-outline" size={14} color="#10B981" />
-                                </View>
-                                <View>
-                                    <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Add Evidence</Text>
-                                    <Text className="text-[9px] text-slate-500 mt-0.5 font-medium">Match result screenshots</Text>
-                                </View>
-                            </View>
-                            <Pressable onPress={pickImages} className="flex-row items-center bg-primary/10 px-3 py-2 rounded-xl border border-primary/20 active:opacity-70">
-                                <Ionicons name="add" size={14} color="#10B981" />
-                                <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider" numberOfLines={1}>Add</Text>
-                            </Pressable>
-                        </View>
-                        {selectedImages.length > 0 ? (
+                        {canAttachEvidence && (selectedImages.length > 0 ? (
                             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                 {selectedImages.map((img, index) => (
                                     <View key={img.uri + index} className="mr-3 mb-2">
@@ -1531,11 +1510,11 @@ export function MatchDetailsModal({
                         ) : (
                             <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                                 <Ionicons name="images-outline" size={22} color="#334155" />
-                                <Text className="text-[10px] text-slate-600 mt-1 font-bold">No photos selected</Text>
+                                <Text className="text-[10px] text-slate-600 mt-1 font-bold">Tap to add result screenshots</Text>
                             </Pressable>
-                        )}
+                        ))}
 
-                        {selectedImages.length > 0 && submitFormSuppressed && (
+                        {canAttachEvidence && selectedImages.length > 0 && submitFormSuppressed && (
                             <Pressable
                                 onPress={handleUploadOnly}
                                 className="mt-3 bg-indigo-500/10 rounded-2xl py-3 items-center border border-indigo-500/20 flex-row justify-center gap-2 active:opacity-70"
@@ -1550,7 +1529,7 @@ export function MatchDetailsModal({
                                 )}
                             </Pressable>
                         )}
-                    </View>
+                    </EvidenceSection>
                 )}
             </View>
         );
@@ -1729,8 +1708,11 @@ export function MatchDetailsModal({
                                                 if (response.ok) {
                                                     const result = await response.json();
                                                     if (result.data?.confirmedTime) {
-                                                        const confirmedDate = new Date(result.data.confirmedTime);
+                                                        // parseUtcDate, not new Date(): the backend serializes without a
+                                                        // Z suffix, so raw parsing reads UTC as local and shifts the time.
+                                                        const confirmedDate = parseUtcDate(result.data.confirmedTime);
                                                         setConfirmedTime(confirmedDate.toLocaleString());
+                                                        setConfirmedTimeIso(result.data.confirmedTime);
                                                         setCurrentStatus('scheduled');
                                                     }
                                                     if (onMatchUpdate) onMatchUpdate();
