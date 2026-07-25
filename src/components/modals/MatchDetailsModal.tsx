@@ -26,8 +26,8 @@ export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' |
 
 export interface MatchResultDetailDto {
     /** Backend MatchStatus (1 Pending / 2 Scheduled / 3 Live / 4 Completed / 5 NoShow).
-     *  Optional — older backends don't send it; used to detect a completed match when the
-     *  modal was opened from a deep link with no bracket context. */
+     *  Optional — older backends don't send it; used to detect a settled match (Completed or
+     *  NoShow) when the modal was opened from a deep link with no bracket context. */
     status?: number;
     homeUser: string;
     homeUserId: string;
@@ -147,6 +147,11 @@ export function MatchDetailsModal({
     // Details for completed matches
     const [matchDetails, setMatchDetails] = useState<MatchResultDetailDto | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+    // Backend MatchStatus.NoShow (5): a fixture an admin closed as a double walkover. Terminal
+    // like Completed — and reversible — so it shares the completed rendering path, with its own
+    // framing (no score, no winner) and relabelled actions.
+    const isNoShow = matchDetails?.status === 5;
 
     // Image preview state
     const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -569,8 +574,10 @@ export function MatchDetailsModal({
 
     const handleEditResult = () => {
         if (!matchDetails) return;
-        setHomeScore(matchDetails.homeUserScore.toString());
-        setAwayScore(matchDetails.awayUserScore.toString());
+        // A no-show carries no score (the DTO reports 0:0 for its nulls) — start the inputs empty
+        // so the admin types the real result rather than editing a phantom 0:0.
+        setHomeScore(isNoShow ? '' : matchDetails.homeUserScore.toString());
+        setAwayScore(isNoShow ? '' : matchDetails.awayUserScore.toString());
         setIsEditMode(true);
     };
 
@@ -634,18 +641,24 @@ export function MatchDetailsModal({
 
         if (count === 0) {
             if (mode === 'delete') {
+                // Undoing a no-show isn't deleting a played result — it just reopens a fixture
+                // nobody played, so it gets its own, non-alarming copy.
                 Alert.alert(
-                    'Delete result?',
-                    'This clears the score and winner and reopens the match. You can report the result again afterwards.',
+                    isNoShow ? 'Undo no-show?' : 'Delete result?',
+                    isNoShow
+                        ? 'This reopens the match so it can be played or reported normally. Standings are unaffected — a no-show never counted.'
+                        : 'This clears the score and winner and reopens the match. You can report the result again afterwards.',
                     [
                         { text: 'Cancel', style: 'cancel' },
-                        { text: 'Delete', style: 'destructive', onPress: () => onConfirm(false) },
+                        { text: isNoShow ? 'Undo' : 'Delete', style: 'destructive', onPress: () => onConfirm(false) },
                     ],
                 );
             } else {
                 Alert.alert(
                     'Save changes?',
-                    'This changes the winner and re-advances the bracket.',
+                    isNoShow
+                        ? 'This replaces the no-show with a real result and counts it towards the standings.'
+                        : 'This changes the winner and re-advances the bracket.',
                     [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'Save', onPress: () => onConfirm(false) },
@@ -778,10 +791,10 @@ export function MatchDetailsModal({
 
     // Deep links (push notifications) open this modal with only a matchId — the parent passes a
     // bare { id } shell, so the status/home/away props are missing. The /details/full payload is
-    // then the only source of truth: trust its Status when it says Completed (4) so a played
-    // match never renders the empty submit form, and fall back to its pairing for the names the
-    // shell can't provide. Props win when present — bracket taps keep today's behavior.
-    const effectiveStatus: MatchStatus = matchDetails?.status === 4 ? 'completed' : status;
+    // then the only source of truth: trust its Status when it says Completed (4) or NoShow (5) so
+    // a settled match never renders the empty submit form, and fall back to its pairing for the
+    // names the shell can't provide. Props win when present — bracket taps keep today's behavior.
+    const effectiveStatus: MatchStatus = matchDetails?.status === 4 || isNoShow ? 'completed' : status;
     const effectiveHome = home ?? (matchDetails?.homeUser
         ? { userId: matchDetails.homeUserId, username: matchDetails.homeUser, score: null }
         : undefined);
@@ -817,10 +830,9 @@ export function MatchDetailsModal({
         && stage !== undefined && stage !== null && Number(stage) !== MatchStage.GroupStage;
     const hasDownstream = !!nextMatchId || !!nextMatchLoserBracketId;
     const bothPlayersSet = !!(home?.username || matchDetails?.homeUserId) && !!(away?.username || matchDetails?.awayUserId);
-    // Backend MatchStatus.NoShow (5) — an already-closed no-show must not offer the action again.
-    const isNoShowClosed = matchDetails?.status === 5;
+    // An already-closed no-show must not offer the action again.
     const canDoubleWalkover = isPrivileged && effectiveStatus !== 'completed' && effectiveStatus !== 'pending_availability'
-        && !isNoShowClosed && bothPlayersSet
+        && !isNoShow && bothPlayersSet
         && (!isEliminationMatch || hasDownstream);
 
     const adminHelpRequested = !!matchDetails?.adminHelpRequested;
@@ -836,8 +848,10 @@ export function MatchDetailsModal({
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
     const showStreamTab = effectiveStatus !== 'pending_availability';
     const hasLiveStream = streams.some(s => s.status === MatchStreamStatus.Live);
-    // Completed matches keep the conversation visible but block new messages.
-    const isChatReadOnly = effectiveStatus === 'completed';
+    // Completed matches keep the conversation visible but block new messages. A no-show stays
+    // writable: it's the state players contest ("I was there, they weren't") and the admin can
+    // still reopen it, so the chat has to stay usable.
+    const isChatReadOnly = effectiveStatus === 'completed' && !isNoShow;
     const adminHelpRequestedByMe = !!user?.id &&
         matchDetails?.adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase();
 
@@ -845,9 +859,10 @@ export function MatchDetailsModal({
     if (matchDetails?.homeUserId) chatAvatars[matchDetails.homeUserId.toLowerCase()] = matchDetails.homeUserAvatarUrl || undefined;
     if (matchDetails?.awayUserId) chatAvatars[matchDetails.awayUserId.toLowerCase()] = matchDetails.awayUserAvatarUrl || undefined;
 
-    // Determine winner for completed matches
+    // Determine winner for completed matches. A no-show has no winner at all — its scores come
+    // back as 0:0 (the DTO coalesces the nulls), which would otherwise read as a legitimate draw.
     const getWinnerSide = () => {
-        if (!matchDetails) return null;
+        if (!matchDetails || isNoShow) return null;
         if (matchDetails.homeUserScore > matchDetails.awayUserScore) return 'home';
         if (matchDetails.awayUserScore > matchDetails.homeUserScore) return 'away';
         return 'draw';
@@ -887,9 +902,22 @@ export function MatchDetailsModal({
                     <View className="bg-[#111827]/60 rounded-[32px] border border-white/[0.06] p-6 overflow-hidden">
                         {/* Status Badge */}
                         <View className="items-center mb-5">
-                            <View className="bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20">
-                                <Text className="text-[9px] font-black text-primary uppercase tracking-[3px]">Final Score</Text>
+                            <View className={cn(
+                                "px-4 py-1.5 rounded-full border",
+                                isNoShow ? "bg-warning/10 border-warning/20" : "bg-primary/10 border-primary/20"
+                            )}>
+                                <Text className={cn(
+                                    "text-[9px] font-black uppercase tracking-[3px]",
+                                    isNoShow ? "text-warning" : "text-primary"
+                                )}>
+                                    {isNoShow ? 'No-Show' : 'Final Score'}
+                                </Text>
                             </View>
+                            {isNoShow && (
+                                <Text className="text-[10px] text-slate-500 mt-2 font-bold text-center px-6">
+                                    Nobody played — no points for either side
+                                </Text>
+                            )}
                         </View>
 
                         {/* Players & Score - fixed alignment */}
@@ -927,15 +955,16 @@ export function MatchDetailsModal({
                                 </View>
                             </Pressable>
 
-                            {/* Score Center */}
+                            {/* Score Center — a no-show has no score to show, so dashes stand in
+                                for the 0:0 the DTO reports (see getWinnerSide). */}
                             <View className="items-center px-2 pt-1">
                                 <View className="flex-row items-baseline">
                                     <Text className={`text-5xl font-black ${winner === 'home' ? 'text-primary' : 'text-white/20'}`}>
-                                        {matchDetails.homeUserScore}
+                                        {isNoShow ? '—' : matchDetails.homeUserScore}
                                     </Text>
                                     <Text className="text-2xl font-black text-white/10 mx-2">:</Text>
                                     <Text className={`text-5xl font-black ${winner === 'away' ? 'text-primary' : 'text-white/20'}`}>
-                                        {matchDetails.awayUserScore}
+                                        {isNoShow ? '—' : matchDetails.awayUserScore}
                                     </Text>
                                 </View>
                             </View>
@@ -1025,7 +1054,9 @@ export function MatchDetailsModal({
                             <View className="w-8 h-8 rounded-xl bg-primary/10 items-center justify-center">
                                 <Ionicons name="create-outline" size={16} color="#10B981" />
                             </View>
-                            <Text className="text-sm font-black text-primary uppercase tracking-widest" numberOfLines={1}>Edit Result</Text>
+                            <Text className="text-sm font-black text-primary uppercase tracking-widest" numberOfLines={1}>
+                                {isNoShow ? 'Enter Result' : 'Edit Result'}
+                            </Text>
                         </Pressable>
                         <Pressable
                             onPress={handleDeleteResult}
@@ -1039,7 +1070,9 @@ export function MatchDetailsModal({
                                     <View className="w-8 h-8 rounded-xl bg-red-500/10 items-center justify-center">
                                         <Ionicons name="trash-outline" size={16} color="#F87171" />
                                     </View>
-                                    <Text className="text-sm font-black text-red-400 uppercase tracking-widest" numberOfLines={1}>Delete Result</Text>
+                                    <Text className="text-sm font-black text-red-400 uppercase tracking-widest" numberOfLines={1}>
+                                        {isNoShow ? 'Undo No-Show' : 'Delete Result'}
+                                    </Text>
                                 </>
                             )}
                         </Pressable>
@@ -1060,9 +1093,13 @@ export function MatchDetailsModal({
                 {/* Edit Header */}
                 <View className="items-center mb-5">
                     <View className="bg-warning/10 px-4 py-1.5 rounded-full border border-warning/20">
-                        <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">Editing Result</Text>
+                        <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">
+                            {isNoShow ? 'Entering Result' : 'Editing Result'}
+                        </Text>
                     </View>
-                    <Text className="text-[10px] text-slate-500 mt-2 font-bold">{isHubOwner ? 'Hub Owner Privileges' : 'Fix Your Score'}</Text>
+                    <Text className="text-[10px] text-slate-500 mt-2 font-bold">
+                        {isNoShow ? 'Replaces The No-Show' : isHubOwner ? 'Hub Owner Privileges' : 'Fix Your Score'}
+                    </Text>
                 </View>
 
                 {error && (

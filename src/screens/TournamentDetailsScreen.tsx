@@ -1378,8 +1378,10 @@ export default function TournamentDetailsScreen() {
         // Only allow if match has participants
         if (!match.home || !match.away) return;
 
-        // Allow Pending (1), Live (2) and Completed (3, 4) matches
-        if (match.status !== 1 && match.status !== 2 && match.status !== 3 && match.status !== 4) return;
+        // Allow Pending (1), Live (2), Completed (3, 4) and NoShow (5) matches. A no-show is
+        // terminal but reversible — the modal is where an admin undoes the double walkover or
+        // enters the real result the players played late, so it must stay openable.
+        if (match.status !== 1 && match.status !== 2 && match.status !== 3 && match.status !== 4 && match.status !== 5) return;
 
         const isCreator = canManage;
 
@@ -1580,8 +1582,11 @@ export default function TournamentDetailsScreen() {
         const groupStage = stages.find((s: any) => norm(s) === 1);
         const groupMatches = (groupStage?.groups ?? groupStage?.Groups ?? [])
             .flatMap((g: any) => g.matches ?? g.Matches ?? []);
+        // NoShow (5) counts as played-out here: nobody is ever going to play that fixture, so it
+        // must not hold the group stage open and hide the Draw Bracket button (the backend's own
+        // round-completion check treats NoShow as terminal).
         const groupComplete = groupMatches.length > 0
-            && groupMatches.every((m: any) => { const st = m.status ?? m.Status; return st === 3 || st === 4; });
+            && groupMatches.every((m: any) => { const st = m.status ?? m.Status; return st === 3 || st === 4 || st === 5; });
 
         const showReset = knockoutDrawn && !anyKnockoutPlayed;
         const showDraw = !knockoutDrawn && groupComplete;
@@ -3256,7 +3261,10 @@ export default function TournamentDetailsScreen() {
                 // immediately instead of waiting for the details round-trip to fill it in.
                 deadline={selectedMatch?.roundDeadline ?? selectedMatch?.RoundDeadline ?? undefined}
                 status={
-                    selectedMatch?.status === 3 || selectedMatch?.status === 4 ? 'completed' :
+                    // NoShow (5) maps to 'completed' too: it's a terminal, admin-set outcome, so the
+                    // modal shows the result view (with its no-show framing) and its Edit / Delete
+                    // actions instead of an empty "report your score" form.
+                    selectedMatch?.status === 3 || selectedMatch?.status === 4 || selectedMatch?.status === 5 ? 'completed' :
                         selectedMatch?.status === 2 ? 'ready_phase' :
                             selectedMatch?.status === 1 ? 'scheduled' :
                                 selectedMatch?.status === 0 ? 'pending_availability' : 'ready_phase'
