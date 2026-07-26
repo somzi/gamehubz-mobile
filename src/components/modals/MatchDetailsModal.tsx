@@ -9,6 +9,7 @@ import { EvidenceSection } from '../match/EvidenceSection';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
+import { ConfirmationModal } from './ConfirmationModal';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -173,6 +174,13 @@ export function MatchDetailsModal({
     // Double-walkover state — admin closes an unplayed match with no winner so the opponent advances.
     const [isApplyingWalkover, setIsApplyingWalkover] = useState(false);
 
+    // Follow-up prompt shown to an admin who just settled a match that still has an open help
+    // request — entering the result is usually the answer to it, so we offer to close it too.
+    const [showResolveHelpPrompt, setShowResolveHelpPrompt] = useState(false);
+    const [isResolvingHelp, setIsResolvingHelp] = useState(false);
+    // What the admin just did, so the prompt opens with an accurate confirmation of it.
+    const [settleSummary, setSettleSummary] = useState('Result saved.');
+
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
     // same matchId still honors the host's intent.
@@ -218,6 +226,7 @@ export function MatchDetailsModal({
         setError(null);
         setIsEditMode(false);
         setIsEditingProposal(false);
+        setShowResolveHelpPrompt(false);
         // Timing is per-match too — without this the previous match's deadline stayed on
         // screen until (and unless) the new one's details came back with its own.
         setLocalDeadline(deadline);
@@ -455,6 +464,56 @@ export function MatchDetailsModal({
         }
     };
 
+    // Closing move for an admin action that settles the match (report / edit result, double
+    // walkover). When a help request is still open, that request is almost always what the
+    // result answers — so instead of closing straight away we ask whether to mark it resolved
+    // too, saving the admin a second trip through the bracket or the help inbox. Declining is a
+    // valid answer: the score can be in while the dispute behind it is still being sorted out.
+    const finishAfterSettle = (summary: string) => {
+        if (isPrivileged && adminHelpRequested) {
+            setSettleSummary(summary);
+            setShowResolveHelpPrompt(true);
+            return;
+        }
+        onClose();
+    };
+
+    // Hide the nested confirm first and close the match modal a beat later — dismissing a parent
+    // Modal while its child is still presented glitches on iOS (same reason ActionSheetModal defers).
+    const closeAfterPrompt = () => {
+        setShowResolveHelpPrompt(false);
+        setTimeout(onClose, 250);
+    };
+
+    const confirmResolveHelp = async () => {
+        if (!matchId) {
+            closeAfterPrompt();
+            return;
+        }
+        setIsResolvingHelp(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.RESOLVE_MATCH_ADMIN_HELP(matchId), {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                throw new Error(text || 'Failed to resolve the help request');
+            }
+            if (onMatchUpdate) onMatchUpdate();
+            closeAfterPrompt();
+        } catch (err: any) {
+            console.error('Resolve admin help error:', err);
+            // The result itself is already saved, so don't lose it behind an error toast — keep the
+            // modal open with the message and the AdminHelpSection's "Mark Resolved" button for a retry.
+            // Refetch first: fetchMatchDetails clears `error` on entry and would wipe the message.
+            setShowResolveHelpPrompt(false);
+            await fetchMatchDetails();
+            setError(`${settleSummary} The help request could not be closed — use "Mark Resolved" below to try again.`);
+        } finally {
+            setIsResolvingHelp(false);
+        }
+    };
+
     const handleSubmitResult = async (cascade: boolean = false) => {
         if (!matchId || !tournamentId) return;
         if (homeScore === '' || awayScore === '') {
@@ -510,7 +569,7 @@ export function MatchDetailsModal({
                 setSelectedImages([]);
                 await fetchMatchDetails();
             } else {
-                onClose();
+                finishAfterSettle(isEditMode ? 'Result updated.' : 'Result saved.');
             }
         } catch (err: any) {
             console.error('Report result error:', err);
@@ -534,7 +593,7 @@ export function MatchDetailsModal({
                 throw new Error(text || 'Failed to approve result');
             }
             if (onMatchUpdate) onMatchUpdate();
-            onClose();
+            finishAfterSettle('Result approved.');
         } catch (err: any) {
             console.error('Approve result error:', err);
             setError(err.message || 'An error occurred while approving the result');
@@ -741,7 +800,7 @@ export function MatchDetailsModal({
                 throw new Error(text || 'Failed to apply double walkover');
             }
             if (onMatchUpdate) onMatchUpdate();
-            onClose();
+            finishAfterSettle('Double walkover applied.');
         } catch (err: any) {
             console.error('Double walkover error:', err);
             setError(err.message || 'An error occurred while applying the double walkover');
@@ -854,6 +913,18 @@ export function MatchDetailsModal({
     const isChatReadOnly = effectiveStatus === 'completed' && !isNoShow;
     const adminHelpRequestedByMe = !!user?.id &&
         matchDetails?.adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase();
+
+    // Who raised the open request — names the player in the "close it too?" prompt so the admin
+    // knows whose problem they're about to sign off on. Falls back to neutral copy when the
+    // requester isn't one of the two listed players (older payloads, reshaped team sub-matches).
+    const adminHelpRequesterId = matchDetails?.adminHelpRequestedByUserId?.toLowerCase() || null;
+    const adminHelpRequesterName = !adminHelpRequesterId
+        ? null
+        : matchDetails?.homeUserId?.toLowerCase() === adminHelpRequesterId
+            ? matchDetails?.homeUser || null
+            : matchDetails?.awayUserId?.toLowerCase() === adminHelpRequesterId
+                ? matchDetails?.awayUser || null
+                : null;
 
     const chatAvatars: Record<string, string | undefined> = {};
     if (matchDetails?.homeUserId) chatAvatars[matchDetails.homeUserId.toLowerCase()] = matchDetails.homeUserAvatarUrl || undefined;
@@ -1789,6 +1860,19 @@ export function MatchDetailsModal({
                 </ScrollView>
                 )}
             </View>
+
+            {/* Admin just settled a match with an open help request — offer to close it in one go. */}
+            <ConfirmationModal
+                visible={showResolveHelpPrompt}
+                onClose={closeAfterPrompt}
+                onConfirm={confirmResolveHelp}
+                title="Close the help request?"
+                message={`${settleSummary} ${adminHelpRequesterName ? `${adminHelpRequesterName} asked` : 'A player asked'} for admin help on this match — mark that request resolved too? They'll get a notification and it clears from your admin inbox.\n\nKeep it open if the issue isn't sorted yet.`}
+                confirmText="Mark Resolved"
+                cancelText="Keep Open"
+                isDestructive={false}
+                isLoading={isResolvingHelp}
+            />
 
             {/* Fullscreen Image Preview */}
             <Modal
