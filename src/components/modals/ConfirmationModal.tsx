@@ -14,6 +14,10 @@ export interface ConfirmationModalProps {
     cancelText?: string;
     isDestructive?: boolean;
     isLoading?: boolean;
+    /** Stack the actions full-width (primary on top) instead of side by side. The row layout
+     *  gives each button half the width and Button truncates its label to one line, so any
+     *  label longer than ~10 characters needs this. */
+    stacked?: boolean;
 }
 
 export function ConfirmationModal({
@@ -26,6 +30,7 @@ export function ConfirmationModal({
     cancelText = TEAM_LABELS.CANCEL_BUTTON,
     isDestructive = true,
     isLoading = false,
+    stacked = false,
 }: ConfirmationModalProps) {
     return (
         <Modal
@@ -58,8 +63,18 @@ export function ConfirmationModal({
                             {message}
                         </Text>
 
-                        <View className="flex-row gap-3 w-full">
-                            <View className="flex-1">
+                        {stacked ? (
+                            // Primary first: the affirmative answer is the one the prompt is asking for,
+                            // and full width leaves room for a label the row layout would clip.
+                            <View className="w-full gap-3">
+                                <Button
+                                    variant={isDestructive ? 'destructive' : 'default'}
+                                    onPress={onConfirm}
+                                    loading={isLoading}
+                                    className="w-full h-14 rounded-2xl"
+                                >
+                                    {confirmText}
+                                </Button>
                                 <Button
                                     variant="outline"
                                     onPress={onClose}
@@ -69,17 +84,30 @@ export function ConfirmationModal({
                                     {cancelText}
                                 </Button>
                             </View>
-                            <View className="flex-1">
-                                <Button
-                                    variant={isDestructive ? 'destructive' : 'default'}
-                                    onPress={onConfirm}
-                                    loading={isLoading}
-                                    className="w-full h-14 rounded-2xl"
-                                >
-                                    {confirmText}
-                                </Button>
+                        ) : (
+                            <View className="flex-row gap-3 w-full">
+                                <View className="flex-1">
+                                    <Button
+                                        variant="outline"
+                                        onPress={onClose}
+                                        disabled={isLoading}
+                                        className="w-full h-14 rounded-2xl"
+                                    >
+                                        {cancelText}
+                                    </Button>
+                                </View>
+                                <View className="flex-1">
+                                    <Button
+                                        variant={isDestructive ? 'destructive' : 'default'}
+                                        onPress={onConfirm}
+                                        loading={isLoading}
+                                        className="w-full h-14 rounded-2xl"
+                                    >
+                                        {confirmText}
+                                    </Button>
+                                </View>
                             </View>
-                        </View>
+                        )}
                     </View>
                 </View>
             </View>

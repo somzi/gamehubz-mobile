@@ -179,7 +179,8 @@ export function MatchDetailsModal({
     const [showResolveHelpPrompt, setShowResolveHelpPrompt] = useState(false);
     const [isResolvingHelp, setIsResolvingHelp] = useState(false);
     // What the admin just did, so the prompt opens with an accurate confirmation of it.
-    const [settleSummary, setSettleSummary] = useState('Result saved.');
+    // Stored without trailing punctuation — the copy below supplies it.
+    const [settleSummary, setSettleSummary] = useState('Result saved');
 
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
@@ -508,7 +509,7 @@ export function MatchDetailsModal({
             // Refetch first: fetchMatchDetails clears `error` on entry and would wipe the message.
             setShowResolveHelpPrompt(false);
             await fetchMatchDetails();
-            setError(`${settleSummary} The help request could not be closed — use "Mark Resolved" below to try again.`);
+            setError(`${settleSummary}, but the help request could not be closed — use "Mark Resolved" below to try again.`);
         } finally {
             setIsResolvingHelp(false);
         }
@@ -569,7 +570,7 @@ export function MatchDetailsModal({
                 setSelectedImages([]);
                 await fetchMatchDetails();
             } else {
-                finishAfterSettle(isEditMode ? 'Result updated.' : 'Result saved.');
+                finishAfterSettle(isEditMode ? 'Result updated' : 'Result saved');
             }
         } catch (err: any) {
             console.error('Report result error:', err);
@@ -593,7 +594,7 @@ export function MatchDetailsModal({
                 throw new Error(text || 'Failed to approve result');
             }
             if (onMatchUpdate) onMatchUpdate();
-            finishAfterSettle('Result approved.');
+            finishAfterSettle('Result approved');
         } catch (err: any) {
             console.error('Approve result error:', err);
             setError(err.message || 'An error occurred while approving the result');
@@ -800,7 +801,7 @@ export function MatchDetailsModal({
                 throw new Error(text || 'Failed to apply double walkover');
             }
             if (onMatchUpdate) onMatchUpdate();
-            finishAfterSettle('Double walkover applied.');
+            finishAfterSettle('Double walkover applied');
         } catch (err: any) {
             console.error('Double walkover error:', err);
             setError(err.message || 'An error occurred while applying the double walkover');
@@ -1867,11 +1868,12 @@ export function MatchDetailsModal({
                 onClose={closeAfterPrompt}
                 onConfirm={confirmResolveHelp}
                 title="Close the help request?"
-                message={`${settleSummary} ${adminHelpRequesterName ? `${adminHelpRequesterName} asked` : 'A player asked'} for admin help on this match — mark that request resolved too? They'll get a notification and it clears from your admin inbox.\n\nKeep it open if the issue isn't sorted yet.`}
+                message={`${settleSummary} — ${adminHelpRequesterName || 'a player'} asked for help here.`}
                 confirmText="Mark Resolved"
-                cancelText="Keep Open"
+                cancelText="Keep It Open"
                 isDestructive={false}
                 isLoading={isResolvingHelp}
+                stacked
             />
 
             {/* Fullscreen Image Preview */}
