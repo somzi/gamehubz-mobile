@@ -49,6 +49,9 @@ export const ENDPOINTS = {
     GET_TOURNAMENT_PARTICIPANTS: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}`,
     REMOVE_PARTICIPANT: (tournamentId: string, userId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/user/${userId}`,
     CREATE_BRACKET: `${API_BASE_URL}/api/tournament/createBracket`,
+    // Manager-only: what the bracket draw has to fill (modes, bracket size / byes, groups, pots)
+    // plus the entrants to place. Read before opening the draw picker.
+    BRACKET_DRAW_OPTIONS: (id: string) => `${API_BASE_URL}/api/tournament/${id}/draw/options`,
     // Admin-only: tear the knockout bracket back down (group results kept) so a mistake can be fixed,
     // then re-draw it from the standings on demand.
     RESET_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/reset`,

@@ -55,6 +55,88 @@ export function getTournamentFormatLabel(format?: number | null) {
     }
 }
 
+// Mirrors GameHubz.DataModels.Enums.BracketSeedingMode — how a tournament's opening fixtures
+// were decided. Null on tournaments generated before the draw picker shipped; those were random.
+export enum BracketSeedingMode {
+    Random = 1,
+    Manual = 2,
+    Seeded = 3,
+    Pots = 4,
+}
+
+export function getBracketSeedingModeLabel(mode?: number | null) {
+    switch (mode) {
+        case BracketSeedingMode.Manual:
+            return 'Manual draw';
+        case BracketSeedingMode.Seeded:
+            return 'Seeded draw';
+        case BracketSeedingMode.Pots:
+            return 'Pot draw';
+        case BracketSeedingMode.Random:
+        default:
+            return 'Random draw';
+    }
+}
+
+/** One placeable entrant — a player in a solo tournament, a team in a team tournament. */
+export interface BracketDrawEntrant {
+    participantId: string;
+    userId?: string | null;
+    teamId?: string | null;
+    displayName: string;
+    avatarUrl?: string | null;
+    seed?: number | null;
+}
+
+/** Payload of GET /api/tournament/{id}/draw/options — the shape the draw has to fill. */
+export interface BracketDrawOptions {
+    tournamentId: string;
+    format: number;
+    isTeamTournament: boolean;
+    entrantCount: number;
+    /** Elimination formats: entrant count rounded up to a power of two. */
+    bracketSize?: number | null;
+    byeCount?: number | null;
+    groupsCount?: number | null;
+    qualifiersPerGroup?: number | null;
+    /** Group formats: how many pots a pot draw uses — ceil(entrants / groups). */
+    potCount?: number | null;
+    supportedModes: BracketSeedingMode[];
+    entrants: BracketDrawEntrant[];
+}
+
+/** The organiser's arrangement, sent with createBracket. Exactly one shape is used per mode. */
+export interface BracketDrawPlan {
+    /** Elimination + Manual: one entry per bracket slot in bracket order; null = bye. */
+    slots?: (string | null)[];
+    /** Groups + Manual: group index (0 = Group A) → participant ids. */
+    groups?: string[][];
+    /** Groups + Pots: pot index (0 = pot 1) → participant ids. */
+    pots?: string[][];
+}
+
+/**
+ * Seed order of a standard bracket: index = slot, value = the seed that belongs there
+ * (1 v N, 2 v N-1 …). Mirrors BracketService.GetStandardSeedOrder so the app can work out
+ * which slots the byes belong in without a round-trip.
+ */
+export function getStandardSeedOrder(bracketSize: number): number[] {
+    let order = [1];
+    let count = 1;
+
+    while (count < bracketSize) {
+        const next: number[] = [];
+        for (let i = 0; i < count; i++) {
+            next.push(order[i]);
+            next.push(count * 2 + 1 - order[i]);
+        }
+        order = next;
+        count *= 2;
+    }
+
+    return order;
+}
+
 // Mirrors GameHubz.DataModels.Enums.MatchStage (backend). Only ThirdPlace is consumed by the app today.
 export enum MatchStage {
     GroupStage = 1,

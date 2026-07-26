@@ -27,7 +27,17 @@ import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/Collapsib
 import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
 import { PendingApprovalsModal, PendingApprovalItem } from '../components/modals/PendingApprovalsModal';
-import { getTournamentFormatLabel, TournamentRegion, MatchStage } from '../types/tournament';
+import {
+    getTournamentFormatLabel,
+    getBracketSeedingModeLabel,
+    TournamentRegion,
+    MatchStage,
+    TournamentFormat,
+    BracketSeedingMode,
+    type BracketDrawOptions,
+    type BracketDrawPlan,
+} from '../types/tournament';
+import { BracketDrawModal } from '../components/modals/BracketDrawModal';
 import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
@@ -54,6 +64,15 @@ const isMatchDecided = (m: any) => {
     const status = Number(m?.status ?? m?.Status);
     return status === 4 || status === 5;
 };
+
+// Formats where the organiser actually has an opening arrangement to choose (mirrors
+// BracketService.SupportedSeedingModes). League and Swiss only ever draw at random, so they skip
+// the picker and generate straight away.
+const SEEDING_CHOICE_FORMATS = [
+    TournamentFormat.SingleElimination,
+    TournamentFormat.DoubleElimination,
+    TournamentFormat.GroupStageWithKnockout,
+];
 
 const stageMatches = (stage: any): any[] => [
     ...(stage?.rounds ?? []).flatMap((r: any) => r?.matches ?? []),
@@ -134,6 +153,13 @@ export default function TournamentDetailsScreen() {
     const [isResettingBracket, setIsResettingBracket] = useState(false);
     const [showSwapModal, setShowSwapModal] = useState(false);
     const [isSwapping, setIsSwapping] = useState(false);
+    // Bracket draw picker (random / manual / seeded / pots) shown before generation.
+    const [showDrawModal, setShowDrawModal] = useState(false);
+    const [drawOptions, setDrawOptions] = useState<BracketDrawOptions | null>(null);
+    const [isLoadingDrawOptions, setIsLoadingDrawOptions] = useState(false);
+    const [drawOptionsError, setDrawOptionsError] = useState<string | null>(null);
+    // Formats with no draw choice (League, Swiss) skip the picker, so their confirmation lives here.
+    const [showStartConfirm, setShowStartConfirm] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
     const [isUserRegistered, setIsUserRegistered] = useState(false);
@@ -379,6 +405,9 @@ export default function TournamentDetailsScreen() {
                 canManage: rawData.canManage ?? rawData.CanManage ?? false,
                 groupsCount: rawData.groupsCount || rawData.GroupsCount,
                 qualifiersPerGroup: rawData.qualifiersPerGroup || rawData.QualifiersPerGroup,
+                // How the bracket was drawn. Null on tournaments generated before the draw picker
+                // shipped (all of those were random) and on ones not yet generated.
+                bracketSeedingMode: rawData.bracketSeedingMode ?? rawData.BracketSeedingMode ?? null,
                 prize: rawData.prize || rawData.Prize,
                 prizeCurrency: rawData.prizeCurrency || rawData.PrizeCurrency,
                 startDate: rawData.startDate || rawData.StartDate,
@@ -725,30 +754,81 @@ export default function TournamentDetailsScreen() {
         setJoinPrompt(null);
     };
 
-    const handleCreateBracket = async () => {
+    // Guards the entrant count before we bother the organiser with the draw picker (or the server)
+    // — Double Elimination can't build a losers bracket with fewer than 4.
+    const entrantCountTooLowMessage = (): string | null => {
+        const entrantCount = Number(tournament?.numberOfParticipants ?? 0);
+        if (tournament?.format === TournamentFormat.DoubleElimination && entrantCount > 0 && entrantCount < 4) {
+            return `Double Elimination requires at least 4 participants (currently ${entrantCount}).`;
+        }
+        return null;
+    };
+
+    const fetchDrawOptions = async () => {
+        if (!id) return;
+        setIsLoadingDrawOptions(true);
+        setDrawOptionsError(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.BRACKET_DRAW_OPTIONS(id));
+            if (!response.ok) {
+                const text = await response.text().catch(() => 'No response body');
+                throw new Error(text);
+            }
+            const data = await response.json();
+            setDrawOptions(data?.result || data);
+        } catch (err: any) {
+            console.error('Draw options fetch error:', err);
+            setDrawOptions(null);
+            setDrawOptionsError(getErrorMessage(err));
+        } finally {
+            setIsLoadingDrawOptions(false);
+        }
+    };
+
+    // Formats with a real choice open the picker; the rest (League, Swiss) generate straight away
+    // with the random draw they've always used.
+    const handleStartBracket = () => {
+        const tooLow = entrantCountTooLowMessage();
+        if (tooLow) {
+            setStatusModalConfig({ type: 'error', title: 'Cannot Create Bracket', message: tooLow });
+            setShowStatusModal(true);
+            return;
+        }
+
+        if (!SEEDING_CHOICE_FORMATS.includes(Number(tournament?.format))) {
+            // No draw to set up — but starting the tournament still notifies everyone, so confirm.
+            setShowStartConfirm(true);
+            return;
+        }
+
+        setDrawOptions(null);
+        setShowDrawModal(true);
+        fetchDrawOptions();
+    };
+
+    const handleCreateBracket = async (
+        seedingMode: BracketSeedingMode = BracketSeedingMode.Random,
+        drawPlan: BracketDrawPlan | null = null,
+    ) => {
         if (!id) return;
 
-        // Double Elimination needs at least 4 entrants — fail fast with a clear message
-        // instead of letting the backend reject the generation mid-request.
-        const entrantCount = Number(tournament?.numberOfParticipants ?? 0);
-        if (tournament?.format === 4 && entrantCount > 0 && entrantCount < 4) {
-            setStatusModalConfig({
-                type: 'error',
-                title: 'Cannot Create Bracket',
-                message: `Double Elimination requires at least 4 participants (currently ${entrantCount}).`
-            });
+        const tooLow = entrantCountTooLowMessage();
+        if (tooLow) {
+            setStatusModalConfig({ type: 'error', title: 'Cannot Create Bracket', message: tooLow });
             setShowStatusModal(true);
             return;
         }
 
         setIsCreatingBracket(true);
         try {
-            const isGroupStage = tournament?.format === 5;
+            const isGroupStage = tournament?.format === TournamentFormat.GroupStageWithKnockout;
 
             const payload: any = {
                 TournamentId: id,
                 GroupsCount: isGroupStage ? (tournament.groupsCount || null) : null,
-                QualifiersPerGroup: isGroupStage ? (tournament.qualifiersPerGroup || null) : null
+                QualifiersPerGroup: isGroupStage ? (tournament.qualifiersPerGroup || null) : null,
+                SeedingMode: seedingMode,
+                DrawPlan: drawPlan,
             };
 
             const response = await authenticatedFetch(ENDPOINTS.CREATE_BRACKET, {
@@ -761,6 +841,7 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
 
+            setShowDrawModal(false);
             setStatusModalConfig({
                 type: 'success',
                 title: 'Success',
@@ -771,6 +852,7 @@ export default function TournamentDetailsScreen() {
             fetchTournamentDetails(); // Refresh details to update status if needed
         } catch (err: any) {
             console.error('Create bracket error:', err);
+            // The picker stays open on failure so a rejected plan can be corrected in place.
             setStatusModalConfig({
                 type: 'error',
                 title: 'Error',
@@ -1649,7 +1731,7 @@ export default function TournamentDetailsScreen() {
                     {isCreator && isRegClosed && (
                         <Button
                             className="mt-6 w-full"
-                            onPress={handleCreateBracket}
+                            onPress={handleStartBracket}
                             loading={isCreatingBracket}
                         >
                             Create Bracket
@@ -2275,6 +2357,17 @@ export default function TournamentDetailsScreen() {
                                     label="Format"
                                     value={getTournamentFormatLabel(Number(tournament.format))}
                                 />
+                                {/* Only once the bracket exists (InProgress / Completed). A started
+                                    tournament with no recorded mode predates the draw picker, and
+                                    every one of those was drawn at random. */}
+                                {(Number(tournament.status) === 3 || Number(tournament.status) === 4) && (
+                                    <InfoRow
+                                        icon="git-network"
+                                        iconColor="#22D3EE"
+                                        label="Bracket Draw"
+                                        value={getBracketSeedingModeLabel(tournament.bracketSeedingMode)}
+                                    />
+                                )}
                                 <InfoRow
                                     icon="game-controller"
                                     iconColor="#34D399"
@@ -3397,6 +3490,28 @@ export default function TournamentDetailsScreen() {
                     }}
                 />
             )}
+
+            <ConfirmationModal
+                visible={showStartConfirm}
+                onClose={() => setShowStartConfirm(false)}
+                onConfirm={() => { setShowStartConfirm(false); handleCreateBracket(); }}
+                title="Start the tournament?"
+                message={`The ${getTournamentFormatLabel(Number(tournament?.format))} schedule is generated from a random draw.\n\nEveryone registered gets a notification and the tournament goes live.`}
+                confirmText="Generate bracket"
+                isDestructive={false}
+                stacked
+            />
+
+            <BracketDrawModal
+                visible={showDrawModal}
+                onClose={() => setShowDrawModal(false)}
+                options={drawOptions}
+                loading={isLoadingDrawOptions}
+                error={drawOptionsError}
+                busy={isCreatingBracket}
+                onRetry={fetchDrawOptions}
+                onConfirm={(mode, plan) => handleCreateBracket(mode, plan)}
+            />
 
             <SwapBracketModal
                 visible={showSwapModal}
