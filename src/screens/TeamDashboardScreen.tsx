@@ -29,7 +29,9 @@ import {
     getTeamJoinRequests,
     approveJoinRequest,
     rejectJoinRequest,
+    swapLineupMember,
 } from '../lib/teamApi';
+import { LineupSwapModal, type LineupPlayer } from '../components/modals/LineupSwapModal';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage, API_BASE_URL } from '../lib/api';
 import { shareTeam } from '../lib/share';
 import type { TeamDto, TeamJoinRequestDto } from '../types/team';
@@ -83,6 +85,11 @@ export default function TeamDashboardScreen() {
     }>({ type: 'success', title: '', message: '' });
 
     const [isRegistering, setIsRegistering] = useState(false);
+
+    // Substitution sheet: the bench player being brought in (null = closed).
+    const [subTarget, setSubTarget] = useState<LineupPlayer | null>(null);
+    const [isSwappingLineup, setIsSwappingLineup] = useState(false);
+    const [lineupSwapError, setLineupSwapError] = useState<string | null>(null);
 
     const fetchTeam = useCallback(async () => {
         setIsLoading(true);
@@ -141,6 +148,33 @@ export default function TeamDashboardScreen() {
     const isRegistrationAccepted = team?.isRegistrationAccepted || team?.IsRegistrationAccepted;
     const captainId = team?.captainUserId || team?.CaptainUserId;
     const isCaptain = !!user?.id && !!captainId && user.id.toLowerCase() === captainId.toLowerCase();
+
+    // ── Lineup / bench ──────────────────────────────────────────────────────────────────────
+    // TeamSize is the LINEUP size, so with reserves on the roster can legitimately be larger.
+    // Every readiness check below keys off the lineup, never the roster count: a squad of 3
+    // starters + 2 reserves is ready to play, 2 starters + 3 reserves is not.
+    const allowReserves = Boolean(team?.allowReserves ?? team?.AllowReserves);
+    const maxReserves = Number(team?.maxReserves ?? team?.MaxReserves ?? 0);
+    const allMembers = team?.members || team?.Members || [];
+    const isMemberReserve = (m: any) => Boolean(m?.isReserve ?? m?.IsReserve);
+    const starterMembers = allMembers.filter((m: any) => !isMemberReserve(m));
+    const reserveMembers = allMembers.filter((m: any) => isMemberReserve(m));
+    const starterCount = starterMembers.length;
+    const isLineupFull = starterCount >= actualTeamSize;
+
+    const toLineupPlayer = (m: any): LineupPlayer => {
+        const id = m.userId || m.UserId;
+        return {
+            userId: id,
+            username: m.username || m.Username || 'Player',
+            avatarUrl: m.avatarUrl || m.AvatarUrl,
+            isCaptain: m.isCaptain || m.IsCaptain || id?.toLowerCase() === captainId?.toLowerCase(),
+        };
+    };
+
+    // Substitutions stay open while the tournament is running — that's the point of a bench.
+    // Only a closed tournament (Completed 4 / Cancelled 5 / Deleted 6) locks the lineup.
+    const canSubstitute = isCaptain && allowReserves && Number(tournamentStatus ?? 0) <= 3;
 
     // Hide Requests tab if team is registered or accepted
     const showRequestsTab = isCaptain && !isAlreadyRegistered && !isRegistrationAccepted;
@@ -213,6 +247,24 @@ export default function TeamDashboardScreen() {
         });
     };
 
+    const handleConfirmSubstitution = async (starterUserId: string) => {
+        if (!team || !subTarget) return;
+        setIsSwappingLineup(true);
+        setLineupSwapError(null);
+        try {
+            const updated = await swapLineupMember(team.teamId, starterUserId, subTarget.userId);
+            setTeam(updated);
+            setSubTarget(null);
+            // The response carries the new roster, but the fixtures it repointed live elsewhere —
+            // re-read so the lineup shown here can't drift from what the bracket now holds.
+            fetchTeam();
+        } catch (err: unknown) {
+            setLineupSwapError(getErrorMessage(err));
+        } finally {
+            setIsSwappingLineup(false);
+        }
+    };
+
     const handleDeleteTeam = () => {
         setConfirmModal({
             visible: true,
@@ -268,27 +320,56 @@ export default function TeamDashboardScreen() {
         }
     };
 
-    const handleApproveRequest = async (requestId: string) => {
-        try {
-            await approveJoinRequest(requestId);
-            setStatusModalConfig({ type: 'success', title: 'Success', message: 'Player approved and added to the team!' });
-            setShowStatusModal(true);
-            fetchTeam();
-            if (team?.teamId) fetchRequests(team.teamId);
-        } catch (err: unknown) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
-            setShowStatusModal(true);
-        }
+    // Approving changes the roster — and with a bench, where the new player lands depends on whether
+    // the lineup is already complete — so say which it will be before committing.
+    const handleApproveRequest = (requestId: string, username: string) => {
+        const landsOnBench = allowReserves && isLineupFull;
+        setConfirmModal({
+            visible: true,
+            title: 'Add this player?',
+            message: `${username} joins the team${allowReserves
+                ? landsOnBench ? ' on the bench — the lineup is already full.' : ' in the lineup.'
+                : '.'}`,
+            isDestructive: false,
+            isLoading: false,
+            onConfirm: async () => {
+                setConfirmModal(prev => ({ ...prev, isLoading: true }));
+                try {
+                    await approveJoinRequest(requestId);
+                    setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
+                    setStatusModalConfig({ type: 'success', title: 'Success', message: 'Player approved and added to the team!' });
+                    setShowStatusModal(true);
+                    fetchTeam();
+                    if (team?.teamId) fetchRequests(team.teamId);
+                } catch (err: unknown) {
+                    setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
+                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setShowStatusModal(true);
+                }
+            },
+        });
     };
 
-    const handleRejectRequest = async (requestId: string) => {
-        try {
-            await rejectJoinRequest(requestId);
-            if (team?.teamId) fetchRequests(team.teamId);
-        } catch (err: unknown) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
-            setShowStatusModal(true);
-        }
+    const handleRejectRequest = (requestId: string, username: string) => {
+        setConfirmModal({
+            visible: true,
+            title: 'Decline this request?',
+            message: `${username} won't join the team. They can ask again later.`,
+            isDestructive: true,
+            isLoading: false,
+            onConfirm: async () => {
+                setConfirmModal(prev => ({ ...prev, isLoading: true }));
+                try {
+                    await rejectJoinRequest(requestId);
+                    setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
+                    if (team?.teamId) fetchRequests(team.teamId);
+                } catch (err: unknown) {
+                    setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
+                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setShowStatusModal(true);
+                }
+            },
+        });
     };
 
     // --- Loading / Error States ---
@@ -318,7 +399,8 @@ export default function TeamDashboardScreen() {
         );
     }
 
-    const isRosterFull = actualMemberCount >= actualTeamSize;
+    // "Full" = the lineup is complete. The bench is optional, so an empty bench never blocks play.
+    const isRosterFull = isLineupFull;
     const teamInitials = (() => {
         const words = (team.teamName || '').trim().split(/\s+/).filter(Boolean);
         if (words.length === 0) return 'T';
@@ -432,11 +514,11 @@ export default function TeamDashboardScreen() {
                                         <View className="flex-row items-center gap-1.5">
                                             <Ionicons name="people" size={13} color="#64748B" />
                                             <Text className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                Roster
+                                                {allowReserves ? 'Lineup' : 'Roster'}
                                             </Text>
                                         </View>
                                         <Text className="text-[13px] font-black">
-                                            <Text style={{ color: isRosterFull ? '#00E5A0' : '#F59E0B' }}>{actualMemberCount}</Text>
+                                            <Text style={{ color: isLineupFull ? '#00E5A0' : '#F59E0B' }}>{starterCount}</Text>
                                             <Text className="text-slate-500"> / {actualTeamSize}</Text>
                                         </Text>
                                     </View>
@@ -446,13 +528,49 @@ export default function TeamDashboardScreen() {
                                                 key={i}
                                                 className="flex-1 h-2 rounded-full"
                                                 style={{
-                                                    backgroundColor: i < actualMemberCount
-                                                        ? (isRosterFull ? '#00E5A0' : '#F59E0B')
+                                                    backgroundColor: i < starterCount
+                                                        ? (isLineupFull ? '#00E5A0' : '#F59E0B')
                                                         : 'rgba(255,255,255,0.07)',
                                                 }}
                                             />
                                         ))}
                                     </View>
+
+                                    {/* Bench is optional — shown so the captain can see the slots, never gating play. */}
+                                    {allowReserves && maxReserves > 0 && (
+                                        <View className="mt-3.5">
+                                            <View className="flex-row items-center justify-between mb-2">
+                                                <View className="flex-row items-center gap-1.5">
+                                                    <Ionicons name="reorder-four-outline" size={13} color="#64748B" />
+                                                    <Text className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                                        Bench
+                                                    </Text>
+                                                    <View className="px-1.5 py-[1px] rounded-full bg-white/[0.06]">
+                                                        <Text className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                                                            Optional
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <Text className="text-[13px] font-black">
+                                                    <Text style={{ color: '#818CF8' }}>{reserveMembers.length}</Text>
+                                                    <Text className="text-slate-500"> / {maxReserves}</Text>
+                                                </Text>
+                                            </View>
+                                            <View className="flex-row gap-1.5">
+                                                {Array.from({ length: maxReserves }).map((_, i) => (
+                                                    <View
+                                                        key={`bench-${i}`}
+                                                        className="flex-1 h-2 rounded-full"
+                                                        style={{
+                                                            backgroundColor: i < reserveMembers.length
+                                                                ? 'rgba(129,140,248,0.75)'
+                                                                : 'rgba(255,255,255,0.07)',
+                                                        }}
+                                                    />
+                                                ))}
+                                            </View>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>
@@ -460,7 +578,9 @@ export default function TeamDashboardScreen() {
                 </View>
 
                 {/* ── Registration Status Banner ── */}
-                {isCaptain && actualMemberCount === actualTeamSize && (
+                {/* Gated on a complete LINEUP, not the roster count: with a bench the roster can be
+                    bigger than TeamSize, and the old equality check would never fire. */}
+                {isCaptain && isLineupFull && (
                     <View className="px-5 pb-4">
                         {isRegistrationAccepted ? (
                             <View className="w-full bg-primary/10 p-4 rounded-2xl border border-primary/20 flex-row justify-center gap-2 items-center">
@@ -525,7 +645,8 @@ export default function TeamDashboardScreen() {
                 {activeTab === 'members' && (
                     <View className="px-5 gap-2">
                         {(() => {
-                            const sortedMembers = [...(team.members || team.Members || [])].sort((a: any, b: any) => {
+                            // Captain floats to the top of whichever group they're in.
+                            const captainFirst = (list: any[]) => [...list].sort((a: any, b: any) => {
                                 const aId = a.userId || a.UserId;
                                 const bId = b.userId || b.UserId;
                                 const aIsCap = a.isCaptain || a.IsCaptain || aId?.toLowerCase() === captainId?.toLowerCase();
@@ -535,7 +656,7 @@ export default function TeamDashboardScreen() {
                                 return 0;
                             });
 
-                            if (sortedMembers.length === 0) {
+                            if (allMembers.length === 0) {
                                 return (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={40} color="#71717A" />
@@ -544,19 +665,28 @@ export default function TeamDashboardScreen() {
                                 );
                             }
 
-                            const memberCards = sortedMembers.map((member: any) => {
+                            const renderMemberCard = (member: any, onBench: boolean) => {
                                 const memberId = member.userId || member.UserId;
                                 const memberUsername = member.username || member.Username;
                                 const memberAvatar = member.avatarUrl || member.AvatarUrl;
                                 const memIsCaptain = member.isCaptain || member.IsCaptain || memberId?.toLowerCase() === captainId?.toLowerCase();
                                 const isCurrentUser = user?.id?.toLowerCase() === memberId?.toLowerCase();
 
+                                const cardClass = onBench
+                                    ? 'bg-white/[0.02] border-white/[0.07]'
+                                    : memIsCaptain
+                                        ? 'bg-warning/[0.06] border-warning/20'
+                                        : 'bg-card/70 border-white/[0.06]';
+
                                 return (
                                     <View
                                         key={memberId}
-                                        className={`p-3.5 rounded-[20px] border flex-row items-center gap-3.5 ${memIsCaptain ? 'bg-warning/[0.06] border-warning/20' : 'bg-card/70 border-white/[0.06]'}`}
+                                        className={`p-3.5 rounded-[20px] border flex-row items-center gap-3.5 ${cardClass}`}
                                     >
-                                        <View className={`rounded-full p-[3px] ${memIsCaptain ? 'border-2 border-warning/50' : 'border border-white/10'}`}>
+                                        <View
+                                            className={`rounded-full p-[3px] ${memIsCaptain && !onBench ? 'border-2 border-warning/50' : 'border border-white/10'}`}
+                                            style={onBench ? { opacity: 0.75 } : undefined}
+                                        >
                                             <PlayerAvatar
                                                 name={memberUsername}
                                                 src={memberAvatar}
@@ -571,6 +701,16 @@ export default function TeamDashboardScreen() {
                                                         <Text className="text-[9px] text-slate-300 font-black uppercase tracking-wider">You</Text>
                                                     </View>
                                                 )}
+                                                {onBench && (
+                                                    <View
+                                                        className="px-2 py-0.5 rounded-full"
+                                                        style={{ backgroundColor: 'rgba(129,140,248,0.14)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)' }}
+                                                    >
+                                                        <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#A5B4FC' }}>
+                                                            Reserve
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </View>
                                             {memIsCaptain ? (
                                                 <View className="flex-row items-center gap-1 mt-1">
@@ -580,9 +720,28 @@ export default function TeamDashboardScreen() {
                                                     </Text>
                                                 </View>
                                             ) : (
-                                                <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">Player</Text>
+                                                <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                                    {onBench ? 'Not playing' : allowReserves ? 'In the lineup' : 'Player'}
+                                                </Text>
                                             )}
                                         </View>
+
+                                        {/* Bring a reserve in — the sub takes the outgoing player's exact game. */}
+                                        {onBench && canSubstitute && (
+                                            <Pressable
+                                                onPress={() => {
+                                                    setLineupSwapError(null);
+                                                    setSubTarget(toLineupPlayer(member));
+                                                }}
+                                                className="h-9 px-3 rounded-xl flex-row items-center gap-1.5 active:opacity-60"
+                                                style={{ backgroundColor: 'rgba(0,229,160,0.10)', borderWidth: 1, borderColor: 'rgba(0,229,160,0.26)' }}
+                                            >
+                                                <Ionicons name="repeat" size={15} color="#00E5A0" />
+                                                <Text className="text-[11px] font-black uppercase tracking-wider" style={{ color: '#00E5A0' }}>
+                                                    Sub in
+                                                </Text>
+                                            </Pressable>
+                                        )}
 
                                         {/* Captain can kick non-captain members while registration open */}
                                         {isCaptain && !memIsCaptain && Number(tournamentStatus) === 1 && !isAlreadyRegistered && !isRegistrationAccepted && (
@@ -595,26 +754,60 @@ export default function TeamDashboardScreen() {
                                         )}
                                     </View>
                                 );
-                            });
+                            };
 
-                            const emptyCount = Math.max(0, actualTeamSize - sortedMembers.length);
-                            const emptySlots = Array.from({ length: emptyCount }).map((_, i) => (
-                                <View
-                                    key={`empty-${i}`}
-                                    className="p-3.5 rounded-[20px] border border-white/10 bg-white/[0.02] flex-row items-center gap-3.5"
-                                    style={{ borderStyle: 'dashed' }}
-                                >
+                            const renderOpenSlots = (count: number, keyPrefix: string, label: string) =>
+                                Array.from({ length: Math.max(0, count) }).map((_, i) => (
                                     <View
-                                        className="w-10 h-10 rounded-full border border-white/15 items-center justify-center"
+                                        key={`${keyPrefix}-${i}`}
+                                        className="p-3.5 rounded-[20px] border border-white/10 bg-white/[0.02] flex-row items-center gap-3.5"
                                         style={{ borderStyle: 'dashed' }}
                                     >
-                                        <Ionicons name="person-add-outline" size={16} color="#475569" />
+                                        <View
+                                            className="w-10 h-10 rounded-full border border-white/15 items-center justify-center"
+                                            style={{ borderStyle: 'dashed' }}
+                                        >
+                                            <Ionicons name="person-add-outline" size={16} color="#475569" />
+                                        </View>
+                                        <Text className="text-slate-600 text-sm font-semibold">{label}</Text>
                                     </View>
-                                    <Text className="text-slate-600 text-sm font-semibold">Open slot</Text>
-                                </View>
-                            ));
+                                ));
 
-                            return [...memberCards, ...emptySlots];
+                            const sectionHeader = (icon: keyof typeof Ionicons.glyphMap, title: string, accent: string, note?: string) => (
+                                <View key={`hdr-${title}`} className="flex-row items-center gap-2 mt-1 mb-0.5">
+                                    <Ionicons name={icon} size={13} color={accent} />
+                                    <Text className="text-[11px] font-black uppercase tracking-widest" style={{ color: accent }}>
+                                        {title}
+                                    </Text>
+                                    {note ? (
+                                        <Text className="text-[10px] font-semibold text-slate-600">{note}</Text>
+                                    ) : null}
+                                </View>
+                            );
+
+                            // Without reserves the roster IS the lineup, so keep the flat list the
+                            // screen has always shown rather than adding an empty second section.
+                            if (!allowReserves) {
+                                return [
+                                    ...captainFirst(allMembers).map((m: any) => renderMemberCard(m, false)),
+                                    ...renderOpenSlots(actualTeamSize - allMembers.length, 'empty', 'Open slot'),
+                                ];
+                            }
+
+                            return [
+                                sectionHeader('football-outline', 'Lineup', '#00E5A0', `${starterCount}/${actualTeamSize}`),
+                                ...captainFirst(starterMembers).map((m: any) => renderMemberCard(m, false)),
+                                ...renderOpenSlots(actualTeamSize - starterCount, 'empty-starter', 'Open lineup slot'),
+
+                                sectionHeader(
+                                    'reorder-four-outline',
+                                    'Bench',
+                                    '#818CF8',
+                                    maxReserves > 0 ? `${reserveMembers.length}/${maxReserves}` : undefined,
+                                ),
+                                ...captainFirst(reserveMembers).map((m: any) => renderMemberCard(m, true)),
+                                ...renderOpenSlots(maxReserves - reserveMembers.length, 'empty-bench', 'Open bench slot'),
+                            ];
                         })()}
                     </View>
                 )}
@@ -650,13 +843,13 @@ export default function TeamDashboardScreen() {
                                         </View>
                                         <View className="flex-row items-center gap-2">
                                             <Pressable
-                                                onPress={() => handleRejectRequest(requestId)}
+                                                onPress={() => handleRejectRequest(requestId, reqUsername)}
                                                 className="w-10 h-10 rounded-xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
                                             >
                                                 <Ionicons name="close" size={18} color="#EF4444" />
                                             </Pressable>
                                             <Pressable
-                                                onPress={() => handleApproveRequest(requestId)}
+                                                onPress={() => handleApproveRequest(requestId, reqUsername)}
                                                 className="w-10 h-10 rounded-xl bg-primary/10 items-center justify-center border border-primary/20 active:opacity-60"
                                             >
                                                 <Ionicons name="checkmark" size={18} color="#10B981" />
@@ -706,6 +899,16 @@ export default function TeamDashboardScreen() {
                 message={confirmModal.message}
                 isDestructive={confirmModal.isDestructive}
                 isLoading={confirmModal.isLoading}
+            />
+
+            <LineupSwapModal
+                visible={!!subTarget}
+                onClose={() => { setSubTarget(null); setLineupSwapError(null); }}
+                reserve={subTarget}
+                starters={starterMembers.map(toLineupPlayer)}
+                busy={isSwappingLineup}
+                error={lineupSwapError}
+                onConfirm={handleConfirmSubstitution}
             />
 
             {showStatusModal && (

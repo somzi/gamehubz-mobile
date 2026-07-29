@@ -339,6 +339,9 @@ export function TeamMatchDetailModal({
                         userId: m.userId || m.UserId || '',
                         username: m.username || m.Username || '',
                         isCaptain: m.isCaptain || m.IsCaptain || false,
+                        // Bench players stay eligible as a tie-break representative — it's the
+                        // captain's call — but the picker labels them so the choice is informed.
+                        isReserve: m.isReserve || m.IsReserve || false,
                         avatarUrl: formatAvatarUrl(m.avatarUrl || m.AvatarUrl),
                     })),
                     captainUserId: home.captainUserId || home.CaptainUserId || '',
@@ -351,6 +354,9 @@ export function TeamMatchDetailModal({
                         userId: m.userId || m.UserId || '',
                         username: m.username || m.Username || '',
                         isCaptain: m.isCaptain || m.IsCaptain || false,
+                        // Bench players stay eligible as a tie-break representative — it's the
+                        // captain's call — but the picker labels them so the choice is informed.
+                        isReserve: m.isReserve || m.IsReserve || false,
                         avatarUrl: formatAvatarUrl(m.avatarUrl || m.AvatarUrl),
                     })),
                     captainUserId: away.captainUserId || away.CaptainUserId || '',
@@ -1453,9 +1459,24 @@ export function TeamMatchDetailModal({
                                                     }}
                                                 >
                                                     <PlayerAvatar src={member.avatarUrl} name={member.username} size="md" />
-                                                    <Text style={{ flex: 1, color: C.text, fontWeight: '800', fontSize: 14 }}>
-                                                        {member.username}
-                                                    </Text>
+                                                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                        <Text style={{ color: C.text, fontWeight: '800', fontSize: 14 }} numberOfLines={1}>
+                                                            {member.username}
+                                                        </Text>
+                                                        {member.isReserve && (
+                                                            <View
+                                                                style={{
+                                                                    paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999,
+                                                                    backgroundColor: 'rgba(129,140,248,0.14)',
+                                                                    borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)',
+                                                                }}
+                                                            >
+                                                                <Text style={{ color: '#A5B4FC', fontSize: 8, fontWeight: '900', letterSpacing: 0.6 }}>
+                                                                    RESERVE
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
                                                     {member.isCaptain && (
                                                         <Ionicons name="shield" size={14} color={C.amber} />
                                                     )}

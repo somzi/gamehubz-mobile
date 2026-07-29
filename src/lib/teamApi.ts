@@ -109,6 +109,23 @@ export async function kickMember(teamId: string, userId: string): Promise<void> 
     }
 }
 
+/**
+ * Captain-only lineup change: the reserve takes the starter's exact game, so a substitution can
+ * never rearrange the randomly-drawn match-ups. Games already played keep the player who played
+ * them; only fixtures still to come move across.
+ */
+export async function swapLineupMember(
+    teamId: string,
+    starterUserId: string,
+    reserveUserId: string,
+): Promise<TeamDto> {
+    const response = await apiClient.put<TeamDto>(`/api/teams/${teamId}/lineup`, {
+        starterUserId,
+        reserveUserId,
+    });
+    return response.data;
+}
+
 export async function leaveTeam(teamId: string): Promise<void> {
     const response = await authenticatedFetch(`/api/teams/${teamId}/leave`, {
         method: 'DELETE'

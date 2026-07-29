@@ -7,6 +7,9 @@ export interface TeamMemberDto {
     IsCaptain?: boolean;
     avatarUrl?: string;
     AvatarUrl?: string;
+    /** On the roster but out of the lineup — plays no sub-match. Absent/false without reserves. */
+    isReserve?: boolean;
+    IsReserve?: boolean;
 }
 
 export interface TeamMatchTeamInfoDto {
@@ -115,8 +118,21 @@ export interface TeamDto {
     CaptainUserId?: string;
     memberCount: number;
     MemberCount?: number;
+    /** The lineup size — how many players the team fields. Reserves sit on top of this. */
     teamSize: number;
     TeamSize?: number;
+    /** Whether the tournament lets rosters carry bench players at all. */
+    allowReserves?: boolean;
+    AllowReserves?: boolean;
+    /** Bench slots granted per team; a team may fill 0..N of them. */
+    maxReserves?: number | null;
+    MaxReserves?: number | null;
+    /** Members currently in the lineup. */
+    starterCount?: number;
+    StarterCount?: number;
+    /** Members currently on the bench. */
+    reserveCount?: number;
+    ReserveCount?: number;
     members: TeamMemberDto[];
     Members?: TeamMemberDto[];
     isAlreadyRegistered?: boolean;

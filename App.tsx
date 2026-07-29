@@ -204,10 +204,22 @@ function routeFromNotification(
         return;
       }
       break;
-    // Team join lifecycle — open the tournament where teams are managed.
+    // The organizer handed someone's spot to another member — open the tournament so the
+    // incoming player sees their fixtures and the outgoing one sees they're no longer in it.
+    case 'participantswappedin':
+    case 'participantswappedout':
+      if (tournamentId) {
+        nav.navigate('TournamentDetails', { id: tournamentId });
+        return;
+      }
+      break;
+    // Team join / lineup lifecycle — open the tournament where the roster is managed. A lineup
+    // change means the player either picked up the outgoing starter's fixtures or lost their own.
     case 'teamjoinrequest':
     case 'teamjoinapproved':
     case 'teamjoinrejected':
+    case 'teamlineupin':
+    case 'teamlineupout':
       if (tournamentId) {
         nav.navigate('TournamentDetails', { id: tournamentId });
         return;

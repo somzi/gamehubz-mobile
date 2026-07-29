@@ -127,6 +127,9 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
     const [doubleRoundRobin, setDoubleRoundRobin] = useState(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
     const [teamSize, setTeamSize] = useState(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
+    // Bench slots on top of the lineup — structural, so only editable before the tournament starts.
+    const [allowReserves, setAllowReserves] = useState(Boolean(tournament?.allowReserves ?? tournament?.AllowReserves));
+    const [maxReserves, setMaxReserves] = useState(String(tournament?.maxReserves ?? tournament?.MaxReserves ?? ''));
     const [teamWinCondition, setTeamWinCondition] = useState(
         String((tournament?.teamWinCondition ?? tournament?.TeamWinCondition) ?? '0')
     );
@@ -268,6 +271,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
         setTeamSize(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
+        setAllowReserves(Boolean(tournament?.allowReserves ?? tournament?.AllowReserves));
+        setMaxReserves(String(tournament?.maxReserves ?? tournament?.MaxReserves ?? ''));
         setTeamWinCondition(String((tournament?.teamWinCondition ?? tournament?.TeamWinCondition) ?? '0'));
         const refreshedCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
             ? (tournament?.countries ?? tournament?.Countries)
@@ -336,6 +341,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 if (mp < ts * 2) {
                     setError(`Max Players must be at least ${ts * 2} (Team Size × 2) to allow a minimum of 2 teams`);
                     return;
+                }
+                if (allowReserves) {
+                    const mr = parseInt(maxReserves);
+                    if (!maxReserves || isNaN(mr) || mr < 1 || mr > 11) {
+                        setError('Reserves per team must be between 1 and 11');
+                        return;
+                    }
                 }
             }
         }
@@ -434,6 +446,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 // what we send. IsTeamTournament is locked forever — sent for completeness only.
                 IsTeamTournament: isTeamTournament,
                 TeamSize: isTeamTournament ? (parseInt(teamSize) || null) : null,
+                AllowReserves: isTeamTournament ? allowReserves : false,
+                MaxReserves: isTeamTournament && allowReserves ? (parseInt(maxReserves) || null) : null,
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
                 IsExclusive: isExclusive,
                 DoubleRoundRobin: isLeagueOrGroup ? doubleRoundRobin : false,
@@ -530,6 +544,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const detailsSummary = (String(description).trim() || String(rules).trim()) ? 'Added' : 'Optional';
     const accessSummary = [
         isTeamTournament ? TEAM_LABELS.MODE_TEAM : TEAM_LABELS.MODE_SOLO,
+        isTeamTournament && allowReserves && maxReserves ? `+${maxReserves} reserves` : null,
         scopeMode === 'region' ? getRegionLabel() : `${selectedCountries.length} ${selectedCountries.length === 1 ? 'country' : 'countries'}`,
         isExclusive ? 'Exclusive' : null,
     ].filter(Boolean).join(' · ');
@@ -760,6 +775,43 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                 teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select',
                                                 () => { if (canEditAll) setShowTeamWinConditionPicker(true); },
                                                 !canEditAll
+                                            )}
+                                        </View>
+                                    )}
+
+                                    {/* Reserves — structural, so locked once the bracket exists (rosters are
+                                        already split into lineup/bench by then). */}
+                                    {isTeamTournament && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Allow Reserves</Text>
+                                            <SegmentedToggle
+                                                options={[...YES_NO_OPTIONS]}
+                                                value={allowReserves ? 'yes' : 'no'}
+                                                onChange={(v) => setAllowReserves(v === 'yes')}
+                                                disabled={!canEditAll}
+                                            />
+                                            {allowReserves ? (
+                                                <View className="mt-3">
+                                                    <Text className={FIELD_LABEL}>Reserves Per Team *</Text>
+                                                    <TextInput
+                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
+                                                        placeholder="e.g. 2"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={maxReserves}
+                                                        onChangeText={setMaxReserves}
+                                                        editable={canEditAll}
+                                                    />
+                                                    <Text className={FIELD_HINT}>
+                                                        Extra squad slots on top of the {teamSize || 'lineup'} players who
+                                                        play. Teams fill 0 up to this many, and captains swap a reserve in
+                                                        for a starter between rounds — always into that player's exact game.
+                                                    </Text>
+                                                </View>
+                                            ) : (
+                                                <Text className={FIELD_HINT}>
+                                                    When OFF, the roster is the lineup — every member plays.
+                                                </Text>
                                             )}
                                         </View>
                                     )}

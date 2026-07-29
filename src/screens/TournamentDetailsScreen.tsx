@@ -46,6 +46,7 @@ import { ExportBracketModal } from '../components/modals/ExportBracketModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
 import { TeamMatchDetailModal } from '../components/modals/TeamMatchDetailModal';
 import { SwapBracketModal, SwapTeam } from '../components/modals/SwapBracketModal';
+import { SwapParticipantModal } from '../components/modals/SwapParticipantModal';
 import {
     getPendingTournamentTeams,
     getTournamentTeams,
@@ -63,6 +64,50 @@ type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetai
 const isMatchDecided = (m: any) => {
     const status = Number(m?.status ?? m?.Status);
     return status === 4 || status === 5;
+};
+
+const isMemberOnBench = (m: any) => Boolean(m?.isReserve ?? m?.IsReserve);
+
+/**
+ * Splits a team payload into the lineup (the TeamSize players who actually get a fixture) and the
+ * optional bench. Once reserves exist, `memberCount >= teamSize` stops being a usable "is this team
+ * ready / can I still join" test — a squad of 3 starters + 2 reserves has 5 members for a lineup of
+ * 3 — so every team card derives both numbers here instead. Falls back to "everyone is a starter"
+ * when the payload predates reserves, which keeps a no-reserves tournament reading exactly as before.
+ */
+const rosterInfo = (t: any, fallback?: any) => {
+    const members: any[] = t?.members || t?.Members || [];
+    // Some team endpoints answer without the tournament's roster shape (or with teamSize 0), so fall
+    // back to the tournament we already hold rather than silently reading the bench as absent.
+    const teamSize = Number(t?.teamSize || t?.TeamSize || fallback?.teamSize || fallback?.TeamSize || 0);
+    const allowReserves = Boolean(
+        t?.allowReserves ?? t?.AllowReserves ?? fallback?.allowReserves ?? fallback?.AllowReserves
+    );
+    const maxReserves = allowReserves
+        ? Number(t?.maxReserves ?? t?.MaxReserves ?? fallback?.maxReserves ?? fallback?.MaxReserves ?? 0)
+        : 0;
+    const memberCount = Number(t?.memberCount ?? t?.MemberCount ?? members.length ?? 0);
+
+    const starterCount = Number(
+        t?.starterCount ?? t?.StarterCount ?? (members.length > 0 ? members.filter((m) => !isMemberOnBench(m)).length : memberCount)
+    );
+    const reserveCount = Number(t?.reserveCount ?? t?.ReserveCount ?? members.filter(isMemberOnBench).length);
+    const rosterCapacity = teamSize + maxReserves;
+
+    return {
+        members,
+        teamSize,
+        allowReserves,
+        maxReserves,
+        memberCount,
+        starterCount,
+        reserveCount,
+        rosterCapacity,
+        /** The team can field a side — what registration and bracket generation actually require. */
+        isLineupFull: teamSize > 0 && starterCount >= teamSize,
+        /** A free slot is left anywhere on the roster, lineup or bench. */
+        hasRoom: teamSize > 0 && memberCount < rosterCapacity,
+    };
 };
 
 // Formats where the organiser actually has an opening arrangement to choose (mirrors
@@ -153,6 +198,18 @@ export default function TournamentDetailsScreen() {
     const [isResettingBracket, setIsResettingBracket] = useState(false);
     const [showSwapModal, setShowSwapModal] = useState(false);
     const [isSwapping, setIsSwapping] = useState(false);
+    // Participant hand-over (a member takes an entrant's spot). Distinct from showSwapModal above,
+    // which re-seeds two teams already in the bracket. Non-null target = sheet open.
+    const [participantSwapTarget, setParticipantSwapTarget] = useState<{
+        userId: string;
+        username: string;
+        avatarUrl?: string | null;
+    } | null>(null);
+    // Ejecting a participant wipes their entry and any results with it, so it asks first.
+    const [removeParticipantTarget, setRemoveParticipantTarget] = useState<{
+        userId: string;
+        username: string;
+    } | null>(null);
     // Bracket draw picker (random / manual / seeded / pots) shown before generation.
     const [showDrawModal, setShowDrawModal] = useState(false);
     const [drawOptions, setDrawOptions] = useState<BracketDrawOptions | null>(null);
@@ -422,6 +479,10 @@ export default function TournamentDetailsScreen() {
                 hubName: rawData.hubName || rawData.HubName,
                 isTeamTournament: rawData.isTeamTournament ?? rawData.IsTeamTournament ?? false,
                 teamSize: rawData.teamSize ?? rawData.TeamSize ?? null,
+                // Bench slots on top of the lineup. False/null on every tournament created before
+                // reserves shipped, which reads as "the roster is the lineup".
+                allowReserves: rawData.allowReserves ?? rawData.AllowReserves ?? false,
+                maxReserves: rawData.maxReserves ?? rawData.MaxReserves ?? null,
                 // TeamWinCondition enum: MatchWins=0, AggregateScore=1 (null when omitted).
                 teamWinCondition: rawData.teamWinCondition ?? rawData.TeamWinCondition ?? null,
                 isExclusive: rawData.isExclusive ?? rawData.IsExclusive ?? false,
@@ -1139,6 +1200,8 @@ export default function TournamentDetailsScreen() {
 
     const handleRemoveParticipant = async (participantUserId: string) => {
         if (!id) return;
+        // The confirmation stays up with a spinner and is dismissed in the finally, so the sheet
+        // can't be tapped twice while the request is in flight.
         setProcessingId(participantUserId);
         try {
             console.log(`[RemoveParticipant] Removing User ID: ${participantUserId} from Tournament ID: ${id}`);
@@ -1169,7 +1232,24 @@ export default function TournamentDetailsScreen() {
             setShowStatusModal(true);
         } finally {
             setProcessingId(null);
+            setRemoveParticipantTarget(null);
         }
+    };
+
+    // A swap rewrites the roster label on every match the outgoing player was in, so the bracket /
+    // standings have to be re-read too — the participant list alone would still show the old name
+    // inside the fixtures.
+    const handleParticipantSwapped = (incomingUsername: string) => {
+        setParticipantSwapTarget(null);
+        setStatusModalConfig({
+            type: 'success',
+            title: 'Player replaced',
+            message: `${incomingUsername} has taken over the spot, with every result so far.`
+        });
+        setShowStatusModal(true);
+        fetchParticipants();
+        fetchTournamentDetails(true);
+        fetchBracket(true);
     };
 
     const handleReject = async (registrationId: string) => {
@@ -1214,8 +1294,9 @@ export default function TournamentDetailsScreen() {
             .filter((reg: any) => {
                 const isTeam = reg.isTeamRegistration || reg.IsTeamRegistration;
                 if (isTeam && tournament?.teamSize) {
-                    const currentMembers = reg.memberCount || reg.MemberCount || 1;
-                    return currentMembers >= tournament.teamSize;
+                    // A complete LINEUP is what makes a team approvable — reserves are optional, so
+                    // counting the whole roster would let a squad with a short side through.
+                    return rosterInfo(reg, tournament).isLineupFull;
                 }
                 return true;
             })
@@ -2531,11 +2612,11 @@ export default function TournamentDetailsScreen() {
                                     tournamentTeams.map((t, index) => {
                                         const teamId = t.teamId || t.TeamId;
                                         const teamName = t.teamName || t.TeamName;
-                                        const memberCount = t.memberCount || t.MemberCount || 0;
-                                        const teamSize = t.teamSize || t.TeamSize || tournament?.teamSize || 0;
+                                        const roster = rosterInfo(t, tournament);
+                                        const { memberCount, teamSize } = roster;
                                         const captainUserId = t.captainUserId || t.CaptainUserId;
 
-                                        const membersList = t.members || t.Members || [];
+                                        const membersList = roster.members;
                                         const captain = membersList.find((m: any) =>
                                             m.userId?.toLowerCase() === captainUserId?.toLowerCase() ||
                                             m.UserId?.toLowerCase() === captainUserId?.toLowerCase()
@@ -2564,7 +2645,9 @@ export default function TournamentDetailsScreen() {
                                                                 {teamName || 'Unknown Team'}
                                                             </Text>
                                                             <View className="flex-row items-center gap-2 mt-1">
-                                                                {(memberCount >= teamSize && teamSize > 0) ? (
+                                                                {/* "Full" now means the whole roster is taken. Without reserves the
+                                                                    capacity IS the lineup, so this reads exactly as it always did. */}
+                                                                {(memberCount >= roster.rosterCapacity && teamSize > 0) ? (
                                                                     <View className="bg-team/10 px-2 py-0.5 rounded-full border border-team/20 flex-shrink-0">
                                                                         <Text className="text-[9px] font-black text-team uppercase">
                                                                             {TEAM_LABELS.TEAM_FULL}
@@ -2572,8 +2655,18 @@ export default function TournamentDetailsScreen() {
                                                                     </View>
                                                                 ) : (
                                                                     <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
-                                                                        {memberCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                        {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
                                                                     </Text>
+                                                                )}
+                                                                {roster.allowReserves && roster.reserveCount > 0 && (
+                                                                    <View
+                                                                        className="px-2 py-0.5 rounded-full flex-shrink-0"
+                                                                        style={{ backgroundColor: 'rgba(129,140,248,0.12)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.26)' }}
+                                                                    >
+                                                                        <Text className="text-[9px] font-black uppercase" style={{ color: '#A5B4FC' }}>
+                                                                            +{roster.reserveCount} bench
+                                                                        </Text>
+                                                                    </View>
                                                                 )}
                                                                 {captain && (
                                                                     <View className="flex-row items-center gap-1 bg-warning/10 px-2 rounded-full py-0.5 border border-warning/20 flex-shrink">
@@ -2606,14 +2699,28 @@ export default function TournamentDetailsScreen() {
                                                                                 <PlayerAvatar name={m.username || m.Username} src={m.avatarUrl || m.AvatarUrl} size="sm" />
                                                                             </View>
                                                                             <View className="flex-1">
-                                                                                <Text className="text-white font-bold text-sm" numberOfLines={1}>{m.username || m.Username}</Text>
+                                                                                <View className="flex-row items-center gap-2">
+                                                                                    <Text className="text-white font-bold text-sm" numberOfLines={1}>{m.username || m.Username}</Text>
+                                                                                    {isMemberOnBench(m) && (
+                                                                                        <View
+                                                                                            className="px-1.5 py-[1px] rounded-full"
+                                                                                            style={{ backgroundColor: 'rgba(129,140,248,0.14)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)' }}
+                                                                                        >
+                                                                                            <Text className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#A5B4FC' }}>
+                                                                                                Reserve
+                                                                                            </Text>
+                                                                                        </View>
+                                                                                    )}
+                                                                                </View>
                                                                                 {isMemberCaptain ? (
                                                                                     <View className="flex-row items-center gap-1 mt-0.5">
                                                                                         <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
                                                                                         <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
                                                                                     </View>
                                                                                 ) : (
-                                                                                    <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
+                                                                                    <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                                                                                        {isMemberOnBench(m) ? 'Not playing' : 'Player'}
+                                                                                    </Text>
                                                                                 )}
                                                                             </View>
                                                                             <Ionicons name="chevron-forward" size={14} color="#475569" />
@@ -2624,7 +2731,7 @@ export default function TournamentDetailsScreen() {
                                                                 <Text className="text-slate-500 text-center text-xs py-2 italic">No members found</Text>
                                                             )}
 
-                                                            {teamSize > 0 && Array.from({ length: Math.max(0, teamSize - membersList.length) }).map((_, si) => (
+                                                            {teamSize > 0 && Array.from({ length: Math.max(0, roster.rosterCapacity - membersList.length) }).map((_, si) => (
                                                                 <View
                                                                     key={`empty-${si}`}
                                                                     className="flex-row items-center gap-3 p-3 rounded-2xl border border-white/10 bg-white/[0.02]"
@@ -2641,7 +2748,9 @@ export default function TournamentDetailsScreen() {
                                                             ))}
 
                                                             {/* Join Button inside Expanded View */}
-                                                            {(!userTeam && !isUserRegistered && memberCount < teamSize && teamSize > 0) && (
+                                                            {/* Room anywhere on the roster counts — a full lineup can still take
+                                                                bench players, so gate on capacity, not on the lineup. */}
+                                                            {(!userTeam && !isUserRegistered && roster.hasRoom) && (
                                                                 <Button
                                                                     className={t.requiresApproval || t.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
                                                                     onPress={() => handleJoinTeam(teamId as string, t.requiresApproval || t.RequiresApproval)}
@@ -2696,10 +2805,10 @@ export default function TournamentDetailsScreen() {
                                     openTeams.map((t, index) => {
                                         const teamId = t.teamId || t.TeamId;
                                         const teamName = t.teamName || t.TeamName;
-                                        const memberCount = t.memberCount || t.MemberCount || 0;
-                                        const teamSize = t.teamSize || t.TeamSize || tournament?.teamSize || 0;
+                                        const roster = rosterInfo(t, tournament);
+                                        const { memberCount, teamSize } = roster;
                                         const captainUserId = t.captainUserId || t.CaptainUserId;
-                                        const membersList = t.members || t.Members || [];
+                                        const membersList = roster.members;
                                         const captain = membersList.find((m: any) =>
                                             m.userId?.toLowerCase() === captainUserId?.toLowerCase() ||
                                             m.UserId?.toLowerCase() === captainUserId?.toLowerCase()
@@ -2728,7 +2837,7 @@ export default function TournamentDetailsScreen() {
                                                                 {teamName || 'Unknown Team'}
                                                             </Text>
                                                             <View className="flex-row items-center gap-2 mt-1">
-                                                                {(memberCount >= teamSize && teamSize > 0) ? (
+                                                                {(memberCount >= roster.rosterCapacity && teamSize > 0) ? (
                                                                     <View className="bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 flex-shrink-0">
                                                                         <Text className="text-[9px] font-black text-blue-500 uppercase">
                                                                             {TEAM_LABELS.TEAM_FULL}
@@ -2736,8 +2845,18 @@ export default function TournamentDetailsScreen() {
                                                                     </View>
                                                                 ) : (
                                                                     <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
-                                                                        {memberCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                        {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
                                                                     </Text>
+                                                                )}
+                                                                {roster.allowReserves && roster.reserveCount > 0 && (
+                                                                    <View
+                                                                        className="px-2 py-0.5 rounded-full flex-shrink-0"
+                                                                        style={{ backgroundColor: 'rgba(129,140,248,0.12)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.26)' }}
+                                                                    >
+                                                                        <Text className="text-[9px] font-black uppercase" style={{ color: '#A5B4FC' }}>
+                                                                            +{roster.reserveCount} bench
+                                                                        </Text>
+                                                                    </View>
                                                                 )}
                                                                 {captain && (
                                                                     <View className="flex-row items-center gap-1 bg-warning/10 px-2 rounded-full py-0.5 border border-warning/20 flex-shrink">
@@ -2770,14 +2889,28 @@ export default function TournamentDetailsScreen() {
                                                                                 <PlayerAvatar name={m.username || m.Username} src={m.avatarUrl || m.AvatarUrl} size="sm" />
                                                                             </View>
                                                                             <View className="flex-1">
-                                                                                <Text className="text-white font-bold text-sm" numberOfLines={1}>{m.username || m.Username}</Text>
+                                                                                <View className="flex-row items-center gap-2">
+                                                                                    <Text className="text-white font-bold text-sm" numberOfLines={1}>{m.username || m.Username}</Text>
+                                                                                    {isMemberOnBench(m) && (
+                                                                                        <View
+                                                                                            className="px-1.5 py-[1px] rounded-full"
+                                                                                            style={{ backgroundColor: 'rgba(129,140,248,0.14)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)' }}
+                                                                                        >
+                                                                                            <Text className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#A5B4FC' }}>
+                                                                                                Reserve
+                                                                                            </Text>
+                                                                                        </View>
+                                                                                    )}
+                                                                                </View>
                                                                                 {isMemberCaptain ? (
                                                                                     <View className="flex-row items-center gap-1 mt-0.5">
                                                                                         <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
                                                                                         <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
                                                                                     </View>
                                                                                 ) : (
-                                                                                    <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
+                                                                                    <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                                                                                        {isMemberOnBench(m) ? 'Not playing' : 'Player'}
+                                                                                    </Text>
                                                                                 )}
                                                                             </View>
                                                                             <Ionicons name="chevron-forward" size={14} color="#475569" />
@@ -2788,7 +2921,7 @@ export default function TournamentDetailsScreen() {
                                                                 <Text className="text-slate-500 text-center text-xs py-2 italic">No members found</Text>
                                                             )}
 
-                                                            {teamSize > 0 && Array.from({ length: Math.max(0, teamSize - membersList.length) }).map((_, si) => (
+                                                            {teamSize > 0 && Array.from({ length: Math.max(0, roster.rosterCapacity - membersList.length) }).map((_, si) => (
                                                                 <View
                                                                     key={`empty-${si}`}
                                                                     className="flex-row items-center gap-3 p-3 rounded-2xl border border-white/10 bg-white/[0.02]"
@@ -2810,7 +2943,8 @@ export default function TournamentDetailsScreen() {
                                                                 const isPending = t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending' || (t.userRequestStatus as any) === 0 || (t.UserRequestStatus as any) === 0;
                                                                 // If the user has no team (they may have been kicked), trust userTeam state.
                                                                 // Per-team isApproved prevents rejoining a team they're already "approved" in.
-                                                                const showButton = !userTeam && !isUserRegistered && !isApproved && memberCount < teamSize && teamSize > 0;
+                                                                // Capacity, not lineup: a full side can still take bench players.
+                                                                const showButton = !userTeam && !isUserRegistered && !isApproved && roster.hasRoom;
 
                                                                 if (!showButton) return null;
 
@@ -2894,10 +3028,10 @@ export default function TournamentDetailsScreen() {
                                             const regId = reg.id || reg.registrationId || reg.Id;
                                             const teamId = reg.teamId || reg.TeamId;
                                             const teamName = reg.teamName || reg.TeamName;
-                                            const teamSize = reg.teamSize || reg.TeamSize || tournament?.teamSize || 0;
+                                            const roster = rosterInfo(reg, tournament);
+                                            const { teamSize, memberCount } = roster;
                                             const captainUserId = reg.captainUserId || reg.CaptainUserId;
-                                            const membersList = reg.members || reg.Members || [];
-                                            const memberCount = reg.memberCount || reg.MemberCount || membersList.length || 0;
+                                            const membersList = roster.members;
                                             const captain = membersList.find((m: any) =>
                                                 m.userId?.toLowerCase() === captainUserId?.toLowerCase() ||
                                                 m.UserId?.toLowerCase() === captainUserId?.toLowerCase()
@@ -2926,7 +3060,7 @@ export default function TournamentDetailsScreen() {
                                                                     {teamName || 'Unknown Team'}
                                                                 </Text>
                                                                 <View className="flex-row items-center gap-2 mt-1">
-                                                                    {(memberCount >= teamSize && teamSize > 0) ? (
+                                                                    {(memberCount >= roster.rosterCapacity && teamSize > 0) ? (
                                                                         <View className="bg-warning/10 px-2 py-0.5 rounded-full border border-warning/20 flex-shrink-0">
                                                                             <Text className="text-[9px] font-black text-warning uppercase">
                                                                                 {TEAM_LABELS.TEAM_FULL}
@@ -2934,8 +3068,18 @@ export default function TournamentDetailsScreen() {
                                                                         </View>
                                                                     ) : (
                                                                         <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
-                                                                            {memberCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                            {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
                                                                         </Text>
+                                                                    )}
+                                                                    {roster.allowReserves && roster.reserveCount > 0 && (
+                                                                        <View
+                                                                            className="px-2 py-0.5 rounded-full flex-shrink-0"
+                                                                            style={{ backgroundColor: 'rgba(129,140,248,0.12)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.26)' }}
+                                                                        >
+                                                                            <Text className="text-[9px] font-black uppercase" style={{ color: '#A5B4FC' }}>
+                                                                                +{roster.reserveCount} bench
+                                                                            </Text>
+                                                                        </View>
                                                                     )}
                                                                     {captain && (
                                                                         <View className="flex-row items-center gap-1 bg-warning/10 px-2 rounded-full py-0.5 border border-warning/20 flex-shrink">
@@ -3093,6 +3237,12 @@ export default function TournamentDetailsScreen() {
                                         const pUserId = p.userId || p.UserId || p.id;
                                         const isCreator = canManage;
                                         const canRemove = isCreator && (tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2);
+                                        // Swapping stays available once the tournament is LIVE (3) — that's the whole
+                                        // point of it. Whether this particular player has played too much to still be
+                                        // replaced is the backend's call, shown inside the sheet.
+                                        const canSwapPlayer = isCreator
+                                            && !tournament?.isTeamTournament
+                                            && (tournament?.status ?? 99) <= 3;
                                         const isCurrentUser = user?.id?.toLowerCase() === pUserId?.toLowerCase();
 
                                         return (
@@ -3177,9 +3327,30 @@ export default function TournamentDetailsScreen() {
                                                         </View>
                                                     </View>
                                                 </Pressable>
+                                                {canSwapPlayer && (
+                                                    <Pressable
+                                                        onPress={() => setParticipantSwapTarget({
+                                                            userId: pUserId,
+                                                            username: p.username || p.Username || 'Player',
+                                                            avatarUrl: p.avatarUrl || p.AvatarUrl,
+                                                        })}
+                                                        disabled={processingId !== null}
+                                                        className="w-11 h-11 rounded-2xl items-center justify-center active:opacity-60"
+                                                        style={{
+                                                            backgroundColor: 'rgba(129,140,248,0.10)',
+                                                            borderWidth: 1,
+                                                            borderColor: 'rgba(129,140,248,0.22)',
+                                                        }}
+                                                    >
+                                                        <Ionicons name="swap-horizontal" size={18} color="#818CF8" />
+                                                    </Pressable>
+                                                )}
                                                 {canRemove && (
                                                     <Pressable
-                                                        onPress={() => handleRemoveParticipant(pUserId)}
+                                                        onPress={() => setRemoveParticipantTarget({
+                                                            userId: pUserId,
+                                                            username: p.username || p.Username || 'this player',
+                                                        })}
                                                         disabled={processingId !== null}
                                                         className="w-11 h-11 rounded-2xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
                                                     >
@@ -3519,6 +3690,26 @@ export default function TournamentDetailsScreen() {
                 teams={showSwapModal ? getSwappableBracketTeams() : []}
                 onConfirm={handleSwapBracket}
                 busy={isSwapping}
+            />
+
+            <SwapParticipantModal
+                visible={!!participantSwapTarget}
+                onClose={() => setParticipantSwapTarget(null)}
+                tournamentId={id}
+                outgoing={participantSwapTarget}
+                onSwapped={handleParticipantSwapped}
+            />
+
+            {/* Removing an entrant deletes their spot outright — unlike a swap, nothing inherits it. */}
+            <ConfirmationModal
+                visible={!!removeParticipantTarget}
+                onClose={() => setRemoveParticipantTarget(null)}
+                onConfirm={() => removeParticipantTarget && handleRemoveParticipant(removeParticipantTarget.userId)}
+                title="Remove this player?"
+                message={`${removeParticipantTarget?.username} is taken out of the tournament along with their registration.\n\nTo hand their spot to someone else instead — keeping the seed and any results — use the swap button.`}
+                confirmText="Remove player"
+                isLoading={processingId === removeParticipantTarget?.userId}
+                stacked
             />
 
             <ExportBracketModal

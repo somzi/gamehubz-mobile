@@ -48,6 +48,15 @@ export const ENDPOINTS = {
     REJECT_REGISTRATION: `${API_BASE_URL}/api/tournamentRegistration/reject`,
     GET_TOURNAMENT_PARTICIPANTS: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}`,
     REMOVE_PARTICIPANT: (tournamentId: string, userId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/user/${userId}`,
+    // Manager-only participant swap: hand one entrant's spot (seed, group, standings and every
+    // played match) to another hub member. Eligibility depends on the format — knockout/Swiss allow
+    // it only before the player's first match, league/group formats until a configured share of
+    // their fixtures is played, which is why the client asks the backend instead of guessing.
+    PARTICIPANT_SWAP_ELIGIBILITY: (tournamentId: string, userId: string) =>
+        `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/user/${userId}/swap-eligibility`,
+    PARTICIPANT_SWAP_CANDIDATES: (tournamentId: string, search: string = '', pageNumber: number = 0) =>
+        `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/swap-candidates?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+    SWAP_PARTICIPANT: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/swap`,
     CREATE_BRACKET: `${API_BASE_URL}/api/tournament/createBracket`,
     // Manager-only: what the bracket draw has to fill (modes, bracket size / byes, groups, pots)
     // plus the entrants to place. Read before opening the draw picker.

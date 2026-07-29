@@ -132,6 +132,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Team mode
     const [isTeamTournament, setIsTeamTournament] = useState(false);
     const [teamSize, setTeamSize] = useState('');
+    // Bench players on top of the lineup. When on, MaxReserves is how many slots each team gets —
+    // a team may fill 0..N of them, so the bench is an option, never a requirement.
+    const [allowReserves, setAllowReserves] = useState(false);
+    const [maxReserves, setMaxReserves] = useState('');
     const [teamWinCondition, setTeamWinCondition] = useState('0');
 
     // Third place play-off (any format that ends in a single-elimination bracket)
@@ -355,6 +359,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 return;
             }
 
+            if (allowReserves) {
+                const mr = parseInt(maxReserves);
+                if (!maxReserves || isNaN(mr) || mr < 1 || mr > 11) {
+                    setError('Reserves per team must be between 1 and 11');
+                    return;
+                }
+            }
+
             const selectedFormatValue = Number(selectedFormat);
             const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
             if (!isAllowedTeamFormat) {
@@ -465,6 +477,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 RoundDurationMinutes: roundDurationMinutes,
                 IsTeamTournament: isTeamTournament,
                 TeamSize: isTeamTournament ? parseInt(teamSize) : null,
+                // Bench slots on top of the lineup. Null when the option is off so the backend
+                // treats the roster as the lineup, exactly as before reserves existed.
+                AllowReserves: isTeamTournament ? allowReserves : false,
+                MaxReserves: isTeamTournament && allowReserves ? parseInt(maxReserves) : null,
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
@@ -595,6 +611,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const detailsSummary = (description.trim() || rules.trim()) ? 'Added' : 'Optional';
     const accessSummary = [
         isTeamTournament ? TEAM_LABELS.MODE_TEAM : TEAM_LABELS.MODE_SOLO,
+        isTeamTournament && allowReserves && maxReserves ? `+${maxReserves} reserves` : null,
         scopeMode === 'region' ? getRegionLabel() : `${selectedCountries.length} ${selectedCountries.length === 1 ? 'country' : 'countries'}`,
         isExclusive ? 'Exclusive' : null,
     ].filter(Boolean).join(' · ');
@@ -838,6 +855,42 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 'Win Condition',
                                                 teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select',
                                                 () => setShowTeamWinConditionPicker(true)
+                                            )}
+                                        </View>
+                                    )}
+
+                                    {/* Reserves: bench slots on top of the lineup, with the captain free
+                                        to trade a starter for a reserve between rounds. */}
+                                    {isTeamTournament && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>Allow Reserves</Text>
+                                            <SegmentedToggle
+                                                options={[...YES_NO_OPTIONS]}
+                                                value={allowReserves ? 'yes' : 'no'}
+                                                onChange={(v) => setAllowReserves(v === 'yes')}
+                                            />
+                                            {allowReserves ? (
+                                                <View className="mt-3">
+                                                    <Text className={FIELD_LABEL}>Reserves Per Team *</Text>
+                                                    <TextInput
+                                                        className={FIELD_INPUT}
+                                                        placeholder="e.g. 2"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={maxReserves}
+                                                        onChangeText={setMaxReserves}
+                                                    />
+                                                    <Text className={FIELD_HINT}>
+                                                        Extra squad slots on top of the {teamSize || 'lineup'} players who
+                                                        play. Teams can fill anywhere from 0 up to this many — the bench is
+                                                        optional. Captains swap a reserve in for a starter between rounds,
+                                                        and the reserve always takes that player's exact game.
+                                                    </Text>
+                                                </View>
+                                            ) : (
+                                                <Text className={FIELD_HINT}>
+                                                    When OFF, the roster is the lineup — every member plays.
+                                                </Text>
                                             )}
                                         </View>
                                     )}
