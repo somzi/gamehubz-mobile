@@ -243,7 +243,10 @@ export function SwapParticipantModal({
                 <KeyboardAvoider bottomInset="none" style={{ maxHeight: '92%' }}>
                     <View
                         className="bg-card rounded-t-[32px] border-t border-x border-white/[0.07] overflow-hidden"
-                        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+                        // flexShrink lets the sheet obey the parent's maxHeight instead of growing to
+                        // its content: without it a full page of candidates pushed the confirm button
+                        // out of the clipped area, so the swap could not be confirmed at all.
+                        style={{ paddingBottom: Math.max(insets.bottom, 12), flexShrink: 1 }}
                     >
                         {/* Grab handle */}
                         <View className="self-center w-10 h-1 rounded-full bg-white/15 mt-3 mb-3" />
@@ -281,6 +284,11 @@ export function SwapParticipantModal({
                             keyboardShouldPersistTaps="handled"
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={{ paddingBottom: 8 }}
+                            // Without flexShrink the list grows to its content height, pushes the
+                            // confirm button past the sheet's maxHeight and the parent clips it —
+                            // in a hub with a full page of candidates the swap became impossible to
+                            // confirm unless the search narrowed the list first.
+                            style={{ flexShrink: 1 }}
                         >
                             {/* ── Outgoing player + verdict ───────────────────────────────── */}
                             <View className="px-5 pt-4">

@@ -103,7 +103,9 @@ export function LineupSwapModal({
                         </Pressable>
                     </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+                    {/* flexShrink keeps the confirm button inside the sheet: without it a long roster
+                        grows the list past maxHeight and the clipped footer takes the button with it. */}
+                    <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
                         {/* ── Coming in ──────────────────────────────────────────────────── */}
                         {reserve && (
                             <View className="px-5 pt-4">
