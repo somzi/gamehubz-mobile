@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchTimingStrip } from '../match/MatchTimingStrip';
+import { PlayerIdentity, hasDistinctNickname } from '../match/PlayerIdentity';
 import { EvidenceSection } from '../match/EvidenceSection';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
@@ -30,10 +31,17 @@ export interface MatchResultDetailDto {
      *  Optional — older backends don't send it; used to detect a settled match (Completed or
      *  NoShow) when the modal was opened from a deep link with no bracket context. */
     status?: number;
+    /** Collapsed display name (nickname when set, username otherwise) — what older backends send. */
     homeUser: string;
     homeUserId: string;
     awayUser: string;
     awayUserId: string;
+    /** Username and in-game nickname kept apart so both can be shown and told apart.
+     *  Absent on older backends — the render falls back to homeUser/awayUser. */
+    homeUsername?: string;
+    awayUsername?: string;
+    homeNickname?: string | null;
+    awayNickname?: string | null;
     homeUserScore: number;
     awayUserScore: number;
     evidences: string[];
@@ -265,6 +273,11 @@ export function MatchDetailsModal({
             homeUserId: hp?.userId || hp?.UserId || '',
             awayUser: ap?.username || ap?.Username || '',
             awayUserId: ap?.userId || ap?.UserId || '',
+            // TeamMemberDto already carries the username plainly; the nickname rides alongside it.
+            homeUsername: hp?.username || hp?.Username || '',
+            awayUsername: ap?.username || ap?.Username || '',
+            homeNickname: hp?.nickname ?? hp?.Nickname ?? null,
+            awayNickname: ap?.nickname ?? ap?.Nickname ?? null,
             homeUserScore: sub?.homeScore ?? sub?.HomeScore ?? 0,
             awayUserScore: sub?.awayScore ?? sub?.AwayScore ?? 0,
             evidences: sub?.evidences || sub?.Evidences || [],
@@ -322,6 +335,10 @@ export function MatchDetailsModal({
                         homeUserId: data.homeUserId || data.HomeUserId || '',
                         awayUser: data.awayUser || data.AwayUser || '',
                         awayUserId: data.awayUserId || data.AwayUserId || '',
+                        homeUsername: data.homeUsername || data.HomeUsername || '',
+                        awayUsername: data.awayUsername || data.AwayUsername || '',
+                        homeNickname: data.homeNickname ?? data.HomeNickname ?? null,
+                        awayNickname: data.awayNickname ?? data.AwayNickname ?? null,
                         homeUserScore: data.homeUserScore ?? data.HomeUserScore ?? 0,
                         awayUserScore: data.awayUserScore ?? data.AwayUserScore ?? 0,
                         evidences: data.evidences || data.Evidences || [],
@@ -862,6 +879,23 @@ export function MatchDetailsModal({
         ? { userId: matchDetails.awayUserId, username: matchDetails.awayUser, score: null }
         : undefined);
 
+    // What PlayerIdentity prints for each side: the account username on the main line, the in-game
+    // nickname on the gamepad line below it. Older backends only send the collapsed `homeUser`
+    // (nickname-or-username) and no `homeNickname` — those fall back to exactly today's single line.
+    const homeIdentity = {
+        username: matchDetails?.homeUsername || matchDetails?.homeUser || '',
+        nickname: matchDetails?.homeNickname || null,
+    };
+    const awayIdentity = {
+        username: matchDetails?.awayUsername || matchDetails?.awayUser || '',
+        nickname: matchDetails?.awayNickname || null,
+    };
+    // One player having a nickname makes their column taller — reserve the line on both sides so
+    // the pairing (and the winner chip under it) stays level.
+    const pairingHasNickname =
+        hasDistinctNickname(homeIdentity.username, homeIdentity.nickname) ||
+        hasDistinctNickname(awayIdentity.username, awayIdentity.nickname);
+
     // Participants only get Edit/Delete when the result is cleanly revertable (canRevert). Owners/admins
     // also get them when the bracket has progressed downstream — they can cascade-reopen the collateral
     // (handled with a listing confirmation). Byes (a missing side) carry no result to edit.
@@ -1009,14 +1043,18 @@ export function MatchDetailsModal({
                                 >
                                     <PlayerAvatar
                                         src={homeAvatar}
-                                        name={matchDetails.homeUser}
+                                        name={homeIdentity.username}
                                         size="lg"
                                         className="rounded-2xl border-0"
                                     />
                                 </View>
-                                <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
-                                    {matchDetails.homeUser}
-                                </Text>
+                                <PlayerIdentity
+                                    className="mt-2.5"
+                                    username={homeIdentity.username}
+                                    nickname={homeIdentity.nickname}
+                                    tone="home"
+                                    reserveNicknameSpace={pairingHasNickname}
+                                />
                                 {/* Always render winner space to keep names at same height */}
                                 <View className="mt-1.5 h-5 items-center justify-center">
                                     {winner === 'home' && (
@@ -1055,14 +1093,18 @@ export function MatchDetailsModal({
                                 >
                                     <PlayerAvatar
                                         src={awayAvatar}
-                                        name={matchDetails.awayUser}
+                                        name={awayIdentity.username}
                                         size="lg"
                                         className="rounded-2xl border-0"
                                     />
                                 </View>
-                                <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
-                                    {matchDetails.awayUser}
-                                </Text>
+                                <PlayerIdentity
+                                    className="mt-2.5"
+                                    username={awayIdentity.username}
+                                    nickname={awayIdentity.nickname}
+                                    tone="away"
+                                    reserveNicknameSpace={pairingHasNickname}
+                                />
                                 <View className="mt-1.5 h-5 items-center justify-center">
                                     {winner === 'away' && (
                                         <View className="bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
@@ -1184,10 +1226,13 @@ export function MatchDetailsModal({
                 <View className="bg-[#111827]/60 rounded-[28px] border border-white/[0.06] p-5 mb-5">
                     <View className="flex-row items-center justify-center gap-4">
                         <View className="flex-1 items-center gap-3">
-                            <PlayerAvatar src={homeAvatar} name={matchDetails.homeUser} size="lg" className="rounded-2xl border-0" />
-                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
-                                {matchDetails.homeUser}
-                            </Text>
+                            <PlayerAvatar src={homeAvatar} name={homeIdentity.username} size="lg" className="rounded-2xl border-0" />
+                            <PlayerIdentity
+                                username={homeIdentity.username}
+                                nickname={homeIdentity.nickname}
+                                tone="home"
+                                reserveNicknameSpace={pairingHasNickname}
+                            />
                             <TextInput
                                 className="bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10"
                                 placeholder="0"
@@ -1206,10 +1251,13 @@ export function MatchDetailsModal({
                             </View>
                         </View>
                         <View className="flex-1 items-center gap-3">
-                            <PlayerAvatar src={awayAvatar} name={matchDetails.awayUser} size="lg" className="rounded-2xl border-0" />
-                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
-                                {matchDetails.awayUser}
-                            </Text>
+                            <PlayerAvatar src={awayAvatar} name={awayIdentity.username} size="lg" className="rounded-2xl border-0" />
+                            <PlayerIdentity
+                                username={awayIdentity.username}
+                                nickname={awayIdentity.nickname}
+                                tone="away"
+                                reserveNicknameSpace={pairingHasNickname}
+                            />
                             <TextInput
                                 className="bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10"
                                 placeholder="0"
@@ -1290,9 +1338,10 @@ export function MatchDetailsModal({
         // Whose name to display as "reported by" — fall back to the side label so the screen
         // is never blank if the proposer profile didn't load.
         const proposerIsHome = proposedByUserId?.toLowerCase() === matchDetails.homeUserId?.toLowerCase();
+        // Username, matching the primary line of the pairing right below this sentence.
         const proposerName = proposerIsHome
-            ? matchDetails.homeUser
-            : matchDetails.awayUser;
+            ? homeIdentity.username
+            : awayIdentity.username;
 
         return (
             <View className="mx-5 mt-4 mb-3">
@@ -1318,10 +1367,14 @@ export function MatchDetailsModal({
 
                     <View className="flex-row items-start justify-between">
                         <Pressable onPress={() => navigateToProfile(matchDetails.homeUserId)} className="flex-1 items-center">
-                            <PlayerAvatar src={homeAvatar} name={matchDetails.homeUser} size="lg" className="rounded-2xl border-0" />
-                            <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
-                                {matchDetails.homeUser}
-                            </Text>
+                            <PlayerAvatar src={homeAvatar} name={homeIdentity.username} size="lg" className="rounded-2xl border-0" />
+                            <PlayerIdentity
+                                className="mt-2.5"
+                                username={homeIdentity.username}
+                                nickname={homeIdentity.nickname}
+                                tone="home"
+                                reserveNicknameSpace={pairingHasNickname}
+                            />
                         </Pressable>
 
                         <View className="items-center px-2 pt-1">
@@ -1333,10 +1386,14 @@ export function MatchDetailsModal({
                         </View>
 
                         <Pressable onPress={() => navigateToProfile(matchDetails.awayUserId)} className="flex-1 items-center">
-                            <PlayerAvatar src={awayAvatar} name={matchDetails.awayUser} size="lg" className="rounded-2xl border-0" />
-                            <Text className="text-xs font-bold text-slate-300 text-center mt-2.5 px-1" numberOfLines={1}>
-                                {matchDetails.awayUser}
-                            </Text>
+                            <PlayerAvatar src={awayAvatar} name={awayIdentity.username} size="lg" className="rounded-2xl border-0" />
+                            <PlayerIdentity
+                                className="mt-2.5"
+                                username={awayIdentity.username}
+                                nickname={awayIdentity.nickname}
+                                tone="away"
+                                reserveNicknameSpace={pairingHasNickname}
+                            />
                         </Pressable>
                     </View>
 
@@ -1455,9 +1512,12 @@ export function MatchDetailsModal({
                     <View className="flex-row items-center justify-center gap-4">
                         <View className="flex-1 items-center gap-3">
                             <PlayerAvatar src={homeAvatar} name={effectiveHome?.username || 'Home'} size="lg" className="rounded-2xl border-0" />
-                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
-                                {effectiveHome?.username || 'Home'}
-                            </Text>
+                            <PlayerIdentity
+                                username={effectiveHome?.username || 'Home'}
+                                nickname={homeIdentity.nickname}
+                                tone="home"
+                                reserveNicknameSpace={pairingHasNickname}
+                            />
                             <TextInput
                                 className={cn("bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10", !canSubmit && "opacity-40")}
                                 placeholder="0"
@@ -1478,9 +1538,12 @@ export function MatchDetailsModal({
                         </View>
                         <View className="flex-1 items-center gap-3">
                             <PlayerAvatar src={awayAvatar} name={effectiveAway?.username || opponentName || 'Away'} size="lg" className="rounded-2xl border-0" />
-                            <Text className="text-xs font-bold text-slate-300 text-center" numberOfLines={1}>
-                                {effectiveAway?.username || opponentName || 'Away'}
-                            </Text>
+                            <PlayerIdentity
+                                username={effectiveAway?.username || opponentName || 'Away'}
+                                nickname={awayIdentity.nickname}
+                                tone="away"
+                                reserveNicknameSpace={pairingHasNickname}
+                            />
                             <TextInput
                                 className={cn("bg-white/5 w-20 h-14 rounded-2xl text-center text-2xl font-black text-white border border-white/10", !canSubmit && "opacity-40")}
                                 placeholder="0"

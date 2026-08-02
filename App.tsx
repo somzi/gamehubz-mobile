@@ -184,6 +184,14 @@ function routeFromNotification(
         return;
       }
       break;
+    // Admin promo blast ("this tournament is open, come register") — open the tournament so the
+    // register button is one tap away.
+    case 'promo':
+      if (tournamentId) {
+        nav.navigate('TournamentDetails', { id: tournamentId });
+        return;
+      }
+      break;
     // Registration closing soon — open the tournament so the user can still register.
     case 'registrationdeadline':
       if (tournamentId) {
