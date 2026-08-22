@@ -102,12 +102,23 @@ const linking: LinkingOptions<RootStackParamList> = {
     getStateFromPath(path.replace(/^\/*user\//, 'player/'), options),
 };
 
+// Dispatches the deep link for a notification payload and returns the top-level stack
+// route it navigated to (`null` when the payload carries nothing routable). The caller
+// uses that name to confirm the navigation actually took — see NotificationRouter.
 function routeFromNotification(
   nav: NavigationContainerRef<RootStackParamList>,
   rawData: unknown,
-) {
-  if (!rawData || typeof rawData !== 'object') return;
+): string | null {
+  if (!rawData || typeof rawData !== 'object') return null;
   const data = rawData as Record<string, any>;
+
+  const go = (name: string, params?: object): string => {
+    // The union of every screen's params is too wide for navigate()'s overloads to narrow
+    // behind this indirection; each call site below still mirrors the shape
+    // RootStackParamList declares for the screen it targets.
+    (nav.navigate as (screen: string, params?: object) => void)(name, params);
+    return name;
+  };
 
   const type = typeof data.type === 'string' ? data.type.toLowerCase() : undefined;
   const chatId = data.chatId ? String(data.chatId) : undefined;
@@ -123,20 +134,17 @@ function routeFromNotification(
   switch (type) {
     case 'direct_message':
       if (chatId) {
-        nav.navigate('DirectChat', { chatId });
-        return;
+        return go('DirectChat', { chatId });
       }
       break;
     case 'friend_request':
-      nav.navigate('MainTabs' as any, {
+      return go('MainTabs' as any, {
         screen: 'Social',
         params: { initialTab: 'requests' },
       });
-      return;
     case 'friend_accepted':
       if (userId) {
-        nav.navigate('PlayerProfile', { id: userId });
-        return;
+        return go('PlayerProfile', { id: userId });
       }
       break;
     // A player requested admin help in their match — drop the admin into the
@@ -144,72 +152,64 @@ function routeFromNotification(
     // tap away (and the requesting match's chat from there).
     case 'adminhelp':
       if (tournamentId) {
-        nav.navigate('TournamentDetails', { id: tournamentId, openAdminHelp: true });
-        return;
+        return go('TournamentDetails', { id: tournamentId, openAdminHelp: true });
       }
       break;
     // A new match-chat message — open the tournament and jump straight into that
     // match's chat tab.
     case 'matchmessage':
       if (tournamentId && matchId) {
-        nav.navigate('TournamentDetails', {
+        return go('TournamentDetails', {
           id: tournamentId,
           focusMatchId: matchId,
           focusTeamMatchId: teamMatchId,
           focusMatchTab: 'chat',
         });
-        return;
       }
       break;
     // A result was reported and is waiting for this user to confirm/dispute it.
     case 'resultproposed':
-      nav.navigate('MyMatches' as any);
-      return;
+      return go('MyMatches' as any);
     // A team tie ended level — this captain must pick a tie-break representative.
     // focusTeamMatchId (without focusMatchId) opens the team-match modal, where the
     // "Choose Representative" picker lives.
     case 'teamtiebreak':
       if (tournamentId && teamMatchId) {
-        nav.navigate('TournamentDetails', {
+        return go('TournamentDetails', {
           id: tournamentId,
           focusTeamMatchId: teamMatchId,
         });
-        return;
       }
       break;
     // Tournament finished — open it so the winner / final standings are visible.
     case 'tournamentwon':
       if (tournamentId) {
-        nav.navigate('TournamentDetails', { id: tournamentId });
-        return;
+        return go('TournamentDetails', { id: tournamentId });
       }
       break;
     // Admin promo blast ("this tournament is open, come register") — open the tournament so the
     // register button is one tap away.
     case 'promo':
       if (tournamentId) {
-        nav.navigate('TournamentDetails', { id: tournamentId });
-        return;
+        return go('TournamentDetails', { id: tournamentId });
       }
       break;
     // Registration closing soon — open the tournament so the user can still register.
     case 'registrationdeadline':
       if (tournamentId) {
-        nav.navigate('TournamentDetails', { id: tournamentId });
-        return;
+        return go('TournamentDetails', { id: tournamentId });
       }
       break;
     // A match's deadline is approaching — open the tournament and land straight on the
     // match modal's 'match' tab, where the result is reported.
     case 'rounddeadline':
       if (tournamentId && matchId) {
-        nav.navigate('TournamentDetails', {
+        return go('TournamentDetails', {
           id: tournamentId,
           focusMatchId: matchId,
           focusTeamMatchId: teamMatchId,
           focusMatchTab: 'match',
         });
-        return;
       }
       break;
     // The organizer handed someone's spot to another member — open the tournament so the
@@ -217,8 +217,7 @@ function routeFromNotification(
     case 'participantswappedin':
     case 'participantswappedout':
       if (tournamentId) {
-        nav.navigate('TournamentDetails', { id: tournamentId });
-        return;
+        return go('TournamentDetails', { id: tournamentId });
       }
       break;
     // Team join / lineup lifecycle — open the tournament where the roster is managed. A lineup
@@ -229,8 +228,7 @@ function routeFromNotification(
     case 'teamlineupin':
     case 'teamlineupout':
       if (tournamentId) {
-        nav.navigate('TournamentDetails', { id: tournamentId });
-        return;
+        return go('TournamentDetails', { id: tournamentId });
       }
       break;
     // Hub join lifecycle — open the hub (managers review requests there).
@@ -238,30 +236,39 @@ function routeFromNotification(
     case 'hubjoinapproved':
     case 'hubjoinrejected':
       if (hubId) {
-        nav.navigate('HubProfile', { id: hubId });
-        return;
+        return go('HubProfile', { id: hubId });
       }
       break;
   }
 
   // Fallback by id field (backend tournament/match pushes omit `type`)
   if (chatId) {
-    nav.navigate('DirectChat', { chatId });
-    return;
+    return go('DirectChat', { chatId });
   }
   if (matchId) {
-    nav.navigate('MyMatches' as any);
-    return;
+    return go('MyMatches' as any);
   }
   if (tournamentId) {
-    nav.navigate('TournamentDetails', { id: tournamentId });
-    return;
+    return go('TournamentDetails', { id: tournamentId });
   }
   if (hubId) {
-    nav.navigate('HubProfile', { id: hubId });
-    return;
+    return go('HubProfile', { id: hubId });
   }
+
+  return null;
 }
+
+// A cold start (app killed, user taps the push) is the hard case for a notification deep
+// link: the tap is delivered before the stored session has been read back off disk, so at
+// that moment the root stack still holds the logged-out screen set. React Navigation swaps
+// the screen set — and resets to the home tab — as `isAuthenticated` flips, and a navigate()
+// that races that swap is silently dropped, which is how an admin-help tap ended up on Home.
+// So we don't fire and forget: we wait for the authenticated stack to actually be mounted,
+// dispatch, then confirm the focused route is the one the payload asked for and re-dispatch
+// if it isn't. The response is only marked handled once it lands, so a dropped action gets
+// another chance instead of being lost for the rest of the session.
+const DEEP_LINK_RETRY_INTERVAL = 150;
+const DEEP_LINK_RETRY_TIMEOUT = 5_000;
 
 function NotificationRouter({
   navigationRef,
@@ -279,14 +286,55 @@ function NotificationRouter({
     if (!isAuthenticated) return;
     if (!navReady) return;
 
-    const nav = navigationRef.current;
-    if (!nav?.isReady()) return;
-
     const reqId = lastResponse.notification.request.identifier;
     if (handledRef.current === reqId) return;
-    handledRef.current = reqId;
 
-    routeFromNotification(nav, lastResponse.notification.request.content.data);
+    const data = lastResponse.notification.request.content.data;
+    const startedAt = Date.now();
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const attempt = () => {
+      if (cancelled) return;
+
+      const nav = navigationRef.current;
+      const rootState = nav?.isReady() ? nav.getRootState() : undefined;
+
+      // `routeNames` only lists MainTabs once the logged-in screen set is mounted — until
+      // then every deep-link target is an unknown route and the action would be discarded.
+      if (rootState?.routeNames?.includes('MainTabs')) {
+        const target = routeFromNotification(nav!, data);
+
+        // Nothing routable in the payload — treat it as handled so we stop retrying.
+        if (target === null) {
+          handledRef.current = reqId;
+          return;
+        }
+
+        // navigate() commits synchronously, so the new top-level route is readable right
+        // away. Anything else means the action was swallowed mid screen-set swap.
+        const state = nav!.getRootState();
+        if (state?.routes?.[state.index]?.name === target) {
+          handledRef.current = reqId;
+          return;
+        }
+      }
+
+      if (Date.now() - startedAt > DEEP_LINK_RETRY_TIMEOUT) {
+        console.warn('[NotificationRouter] could not route notification', reqId, data);
+        return;
+      }
+
+      timer = setTimeout(attempt, DEEP_LINK_RETRY_INTERVAL);
+    };
+
+    attempt();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [lastResponse, isAuthenticated, navReady, navigationRef]);
 
   return null;
