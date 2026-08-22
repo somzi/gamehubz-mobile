@@ -14,6 +14,7 @@ import './global.css';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { BadgesProvider } from './src/context/BadgesContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { useOtaUpdates } from './src/hooks/useOtaUpdates';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -355,6 +356,15 @@ function NotificationRouter({
   return null;
 }
 
+// Applies OTA updates when restarting the app is free — see useOtaUpdates for the reasoning.
+// Kept a component rather than a hook call in App() so it sits under AuthProvider and can
+// tell the hook whether there's a session to authenticate the emergency-launch report with.
+function OtaUpdater() {
+  const { isAuthenticated } = useAuth();
+  useOtaUpdates(isAuthenticated);
+  return null;
+}
+
 export default function App() {
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList> | null>(null);
   const [navReady, setNavReady] = useState(false);
@@ -388,6 +398,7 @@ export default function App() {
                 <RootNavigator />
               </NavigationContainer>
               <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
+              <OtaUpdater />
             </BadgesProvider>
           </AuthProvider>
           <StatusBar style="light" />

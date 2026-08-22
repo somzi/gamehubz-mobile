@@ -187,6 +187,9 @@ export const ENDPOINTS = {
     GET_BADGES: `${API_BASE_URL}/api/v2/badges`,
     GET_BADGE_APPROVALS: `${API_BASE_URL}/api/v2/badges/approvals`,
 
+    // ─── Client diagnostics ─────────────────────────────────────────────
+    REPORT_EMERGENCY_LAUNCH: `${API_BASE_URL}/api/v2/diagnostics/emergency-launch`,
+
     // ─── SignalR hub URLs ───────────────────────────────────────────────
     SIGNALR_DM_HUB: `${API_BASE_URL}/hubs/dm`,
     SIGNALR_USER_HUB: `${API_BASE_URL}/hubs/user`,
