@@ -269,6 +269,7 @@ function routeFromNotification(
 // another chance instead of being lost for the rest of the session.
 const DEEP_LINK_RETRY_INTERVAL = 150;
 const DEEP_LINK_RETRY_TIMEOUT = 5_000;
+const NOT_HANDLED = Symbol('notification/not-handled');
 
 function NotificationRouter({
   navigationRef,
@@ -279,15 +280,25 @@ function NotificationRouter({
 }) {
   const { isAuthenticated } = useAuth();
   const lastResponse = Notifications.useLastNotificationResponse();
-  const handledRef = useRef<string | null>(null);
+  // NOT a plain `null` start value: on Android the identifier can itself BE null, and the
+  // old `useRef<string | null>(null)` made the very first dedupe check `null === null` —
+  // true — so the tap was discarded as "already handled" before anything was routed. A
+  // sentinel no identifier can equal is the only safe initial value here.
+  const handledRef = useRef<string | typeof NOT_HANDLED>(NOT_HANDLED);
 
   useEffect(() => {
     if (!lastResponse) return;
     if (!isAuthenticated) return;
     if (!navReady) return;
 
-    const reqId = lastResponse.notification.request.identifier;
-    if (handledRef.current === reqId) return;
+    // Android taps that arrive through the launch/`onNewIntent` extras (expo-notifications'
+    // `toResponseBundleFromExtras`) take the identifier from the FCM `google.message_id`
+    // extra, which is absent for notifications the system didn't stamp — iOS always has a
+    // real UNNotificationRequest identifier, which is why this only ever bit Android. Fall
+    // back to the notification's own date so dedupe still has something stable to compare.
+    const reqId = lastResponse.notification.request.identifier
+      ?? `date:${lastResponse.notification.date}`;
+    if (handledRef.current !== NOT_HANDLED && handledRef.current === reqId) return;
 
     const data = lastResponse.notification.request.content.data;
     const startedAt = Date.now();
@@ -306,8 +317,12 @@ function NotificationRouter({
       if (rootState?.routeNames?.includes('MainTabs')) {
         const target = routeFromNotification(nav!, data);
 
-        // Nothing routable in the payload — treat it as handled so we stop retrying.
+        // Nothing routable in the payload — treat it as handled so we stop retrying. Worth a
+        // warn: on Android expo-notifications can synthesise a response out of raw launch
+        // intent extras, and that payload carries none of our fields. If taps still land on
+        // Home, this line in logcat is the proof.
         if (target === null) {
+          console.warn('[NotificationRouter] notification had nothing to route', reqId, data);
           handledRef.current = reqId;
           return;
         }
