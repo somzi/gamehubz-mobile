@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { DateTimePickerModal } from './DateTimePickerModal';
+import { ScheduleField } from '../ui/ScheduleField';
 import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
@@ -1013,28 +1014,22 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             {/* ── Schedule ── */}
                             <CollapsibleSection icon="calendar" title="Schedule" defaultOpen summary={scheduleSummary}>
                                 <View className="flex-row gap-3">
-                                    <View className="flex-1">
-                                        <Text className={FIELD_LABEL}>Reg. Deadline *</Text>
-                                        <TouchableOpacity
-                                            onPress={() => setShowRegDeadlinePicker(true)}
-                                            className="bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center"
-                                        >
-                                            <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                                {registrationDeadline || 'Select Deadline'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className={FIELD_LABEL}>Start Date *</Text>
-                                        <TouchableOpacity
-                                            onPress={() => setShowStartDatePicker(true)}
-                                            className="bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center"
-                                        >
-                                            <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                                {startDate || 'Select Start Date'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    <ScheduleField
+                                        label="Reg. Deadline *"
+                                        value={registrationDeadline}
+                                        placeholder="Select"
+                                        iconName="time-outline"
+                                        iconColor={COLORS.warning}
+                                        onPress={() => setShowRegDeadlinePicker(true)}
+                                    />
+                                    <ScheduleField
+                                        label="Start Date *"
+                                        value={startDate}
+                                        placeholder="Select"
+                                        iconName="calendar-outline"
+                                        iconColor={COLORS.primary}
+                                        onPress={() => setShowStartDatePicker(true)}
+                                    />
                                 </View>
                             </CollapsibleSection>
 

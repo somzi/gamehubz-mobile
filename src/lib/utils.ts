@@ -23,6 +23,22 @@ export function formatLocalDateTime(dateStr?: string | null): string {
     return isToday ? time : `${d.toLocaleDateString()} ${time}`;
 }
 
+// Schedule picker values are dual-format: the backend sends UTC ISO ("…Z"), while the
+// in-app DateTimePickerModal emits a local wall-clock string ("YYYY-MM-DD HH:mm", no
+// zone). Both must render as the local wall-clock time the user picked, so we parse
+// directly (NOT via parseUtcDate, which would wrongly force the picker's local string to
+// UTC) and read with local getters. Splits into date + time so the UI can lay them out;
+// time is HH:mm only — the picker has hour granularity, minutes are always :00.
+export function formatSchedulePickerValue(value?: string | null): { date: string; time: string } | null {
+    if (!value) return null;
+    const d = new Date(String(value).replace(' ', 'T'));
+    if (isNaN(d.getTime())) return null;
+    return {
+        date: d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
+        time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+    };
+}
+
 // Safely format a backend date string for display. Returns the fallback if the
 // input is missing or unparseable — avoids "Invalid Date" leaking into UI.
 export function formatDateSafe(dateStr: string | null | undefined, fallback: string = 'TBD'): string {

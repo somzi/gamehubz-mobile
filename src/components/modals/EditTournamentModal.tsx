@@ -17,6 +17,7 @@ import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTI
 import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
 import { DateTimePickerModal } from './DateTimePickerModal';
+import { ScheduleField } from '../ui/ScheduleField';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
 import { COLORS } from '../../lib/theme';
@@ -937,30 +938,24 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                             {/* ── Schedule ── */}
                             <CollapsibleSection icon="calendar" title="Schedule" defaultOpen summary={scheduleSummary}>
                                 <View className="flex-row gap-3">
-                                    <View className="flex-1">
-                                        <Text className={FIELD_LABEL}>Reg. Deadline</Text>
-                                        <TouchableOpacity
-                                            onPress={() => setShowRegDeadlinePicker(true)}
-                                            disabled={!canEditDeadline}
-                                            className={`bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center ${!canEditDeadline ? 'opacity-50' : ''}`}
-                                        >
-                                            <Text className={`${registrationDeadline ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                                {registrationDeadline ? new Date(registrationDeadline).toLocaleString() : 'Select Deadline'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className={FIELD_LABEL}>Start Date</Text>
-                                        <TouchableOpacity
-                                            onPress={() => setShowStartDatePicker(true)}
-                                            disabled={!canEditAll}
-                                            className={`bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] justify-center ${!canEditAll ? 'opacity-50' : ''}`}
-                                        >
-                                            <Text className={`${startDate ? 'text-white' : 'text-slate-500'} text-sm`} numberOfLines={1}>
-                                                {startDate ? new Date(startDate).toLocaleString() : 'Select Start Date'}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    <ScheduleField
+                                        label="Reg. Deadline"
+                                        value={registrationDeadline}
+                                        placeholder="Select"
+                                        iconName="time-outline"
+                                        iconColor={COLORS.warning}
+                                        onPress={() => setShowRegDeadlinePicker(true)}
+                                        disabled={!canEditDeadline}
+                                    />
+                                    <ScheduleField
+                                        label="Start Date"
+                                        value={startDate}
+                                        placeholder="Select"
+                                        iconName="calendar-outline"
+                                        iconColor={COLORS.primary}
+                                        onPress={() => setShowStartDatePicker(true)}
+                                        disabled={!canEditAll}
+                                    />
                                 </View>
                             </CollapsibleSection>
 
