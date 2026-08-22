@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
-    Modal,
     TouchableOpacity,
     Pressable,
     ScrollView,
@@ -26,6 +25,10 @@ const months = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// Hour strip metrics: pill width + gap = the horizontal snap/scroll pitch.
+const HOUR_PILL = 56;
+const HOUR_GAP = 8;
+
 export function DateTimePickerModal({ visible, onClose, onConfirm, title, initialValue, onClear, clearText, minDate }: DateTimePickerModalProps) {
     const now = new Date();
 
@@ -48,6 +51,14 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
     const [viewMonth, setViewMonth] = useState(initialDate.getMonth());
     const [viewYear, setViewYear] = useState(initialDate.getFullYear());
 
+    const hourScrollRef = useRef<ScrollView>(null);
+
+    // Bring an hour into view in the strip (one pill of lead-in). Imperative on the ref, so
+    // it works right after a setHour without waiting for a re-render.
+    const scrollToHour = (h: number, animated: boolean) => {
+        hourScrollRef.current?.scrollTo({ x: Math.max(0, (h - 1) * (HOUR_PILL + HOUR_GAP)), animated });
+    };
+
     // Re-sync state when the modal is opened or initialValue changes.
     // Parent keeps the modal mounted between opens, so without this the picker
     // would show whatever date the user last selected on a previous match/field.
@@ -63,12 +74,23 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible, initialValue]);
 
+    // Bring the pre-selected hour into view when the picker opens. Derived from
+    // initialValue (not the `hour` state, which the sync effect above hasn't flushed
+    // yet on this render) so the strip lands on the right hour with one pill of lead-in.
+    useEffect(() => {
+        if (!visible) return;
+        const h = parseInitial().getHours();
+        const t = setTimeout(() => scrollToHour(h, false), 60);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visible, initialValue]);
+
     const years = Array.from({ length: 10 }, (_, i) => now.getFullYear() + i);
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     const handleConfirm = () => {
         const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hour).padStart(2, '0')}:00`;
-        
+
         if (minDate) {
             const selectedTime = new Date(formattedDate.replace(' ', 'T')).getTime();
             const minTime = new Date(minDate).getTime();
@@ -168,49 +190,34 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
         );
     };
 
-    // Hours render as a full wrap-grid (not a horizontal strip). A horizontal ScrollView
-    // nested inside the modal's vertical ScrollView can't be panned right on Android — the
-    // parent steals the gesture — so we drop horizontal scrolling entirely. All 24 hours stay
-    // visible at once (6 per row), which reads better and behaves identically on iOS.
-    const renderTimeGrid = (items: number[], current: number, onSelect: (val: number) => void, label: string) => (
-        <View className="mt-6">
-            <Text className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest">{label}</Text>
-            <View className="flex-row flex-wrap">
-                {items.map((item) => {
-                    const active = item === current;
-                    return (
-                        <View key={item} className="w-[16.66%] p-1">
-                            <TouchableOpacity
-                                onPress={() => onSelect(item)}
-                                className={`h-11 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-card border-white/5'
-                                    }`}
-                            >
-                                <Text className={`font-bold ${active ? 'text-background' : 'text-white'}`}>
-                                    {String(item).padStart(2, '0')}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    );
-                })}
-            </View>
-        </View>
-    );
-
     if (!visible) return null;
 
     return (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
             <View className="flex-1 bg-black/80 justify-center px-4">
-                {/* Backdrop sits BEHIND the content as an absolute sibling so it
-                    doesn't claim touch responder over the inner ScrollViews.
-                    Previously, wrapping content in <Pressable> blocked the
-                    horizontal hour scroll on Android — taps inside the picker
-                    would race with Pressable's gesture and the scroll lost. */}
+                {/* Backdrop sits BEHIND the content as an absolute sibling so it doesn't claim
+                    touch responder over the hour strip. */}
                 <Pressable
                     onPress={onClose}
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                 />
-                <View className="bg-background rounded-[40px] border border-white/10 overflow-hidden shadow-2xl">
+
+                {/* Card is a bounded flex column: header / scrollable calendar / hour strip /
+                    footer. Only the CALENDAR scrolls (and only on short screens); the hour
+                    strip and Confirm footer are fixed siblings, always reachable — this is what
+                    fixes "can't scroll down to Confirm".
+
+                    Crucially the horizontal hour strip is a SIBLING of the calendar's vertical
+                    ScrollView, never nested inside it: a horizontal ScrollView nested in a
+                    vertical one can't be panned on Android (parent steals the gesture), which is
+                    why the old design didn't scroll right. As a top-level sibling it scrolls with
+                    plain RN ScrollView on both platforms — no gesture-handler / RootView needed
+                    (this modal renders inside a RN Modal, outside any GestureHandlerRootView). */}
+                <View
+                    className="bg-background rounded-[40px] border border-white/10 overflow-hidden shadow-2xl"
+                    style={{ maxHeight: '88%' }}
+                >
+                    {/* Header */}
                     <View className="p-6 border-b border-white/5 bg-card flex-row justify-between items-center">
                         <Text className="text-xl font-bold text-white">{title}</Text>
                         <TouchableOpacity onPress={onClose} className="p-2 bg-white/5 rounded-full">
@@ -218,39 +225,75 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView className="max-h-[550px]" showsVerticalScrollIndicator={false}>
-                        <View className="p-6">
-                            {renderCalendar()}
-
-                            <View className="mt-8 pt-6 border-t border-white/5">
-                                <View className="flex-row items-center mb-2">
-                                    <Ionicons name="time-outline" size={18} color="#10B981" style={{ marginRight: 8 }} />
-                                    <Text className="text-white font-bold text-lg">Select Time</Text>
-                                </View>
-
-                                {renderTimeGrid(hours, hour, setHour, 'Hour')}
-
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        const now = new Date();
-                                        setHour(now.getHours());
-                                    }}
-                                    className="mt-6 py-3 bg-white/5 rounded-xl items-center border border-white/5"
-                                >
-                                    <Text className="text-primary font-semibold text-sm">Set to Current Hour</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
+                    {/* Calendar — the only vertically-scrolling region */}
+                    <ScrollView
+                        className="px-6 pt-6"
+                        style={{ flexShrink: 1 }}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 8 }}
+                    >
+                        {renderCalendar()}
                     </ScrollView>
 
-                    <View className="p-6 bg-card border-t border-white/5 space-y-3">
+                    {/* Hour strip — single row, horizontal, sibling of the ScrollView above */}
+                    <View className="px-6 pt-5 pb-4 border-t border-white/5">
+                        <View className="flex-row items-center justify-between mb-3">
+                            <View className="flex-row items-center">
+                                <Ionicons name="time-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
+                                <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                    Hour
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    const h = new Date().getHours();
+                                    setHour(h);
+                                    scrollToHour(h, true);
+                                }}
+                                className="flex-row items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/5"
+                            >
+                                <Ionicons name="flash-outline" size={12} color="#10B981" style={{ marginRight: 4 }} />
+                                <Text className="text-primary font-semibold text-xs">Now</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView
+                            ref={hourScrollRef}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            snapToInterval={HOUR_PILL + HOUR_GAP}
+                            decelerationRate="fast"
+                            contentContainerStyle={{ paddingRight: 12 }}
+                        >
+                            {hours.map((item) => {
+                                const active = item === hour;
+                                return (
+                                    <TouchableOpacity
+                                        key={item}
+                                        onPress={() => setHour(item)}
+                                        activeOpacity={0.7}
+                                        className={`rounded-2xl items-center justify-center border mr-2 ${active ? 'bg-primary border-primary' : 'bg-card border-white/5'
+                                            }`}
+                                        style={{ width: HOUR_PILL, height: HOUR_PILL }}
+                                    >
+                                        <Text className={`text-xl font-black ${active ? 'text-background' : 'text-white'}`}>
+                                            {String(item).padStart(2, '0')}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+
+                    {/* Footer (fixed) */}
+                    <View className="p-6 bg-card border-t border-white/5">
                         <TouchableOpacity
                             onPress={handleConfirm}
                             className="w-full py-4 rounded-2xl bg-primary items-center shadow-lg shadow-primary/30"
                         >
                             <Text className="text-background font-bold text-lg">Confirm Schedule</Text>
                         </TouchableOpacity>
-                        
+
                         {onClear && (
                             <TouchableOpacity
                                 onPress={() => {
