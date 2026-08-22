@@ -20,6 +20,8 @@ import { TEAM_LABELS } from '../../lib/teamConstants';
 import { CountryPicker } from '../ui/CountryPicker';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { MatchFormatPicker } from '../match/MatchFormatPicker';
+import { SeriesWinConditionValue } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
 
 const YES_NO_OPTIONS = [
@@ -143,6 +145,13 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
     // Result approval — when on, reported scores need opponent (or admin) confirmation.
     const [requireResultApproval, setRequireResultApproval] = useState(false);
+
+    // Series format: how many games a single match is played over, how those games decide the
+    // match, and what settles a level knockout series. 1 = one game, the pre-series default.
+    const [bestOf, setBestOf] = useState(1);
+    const [seriesWinCondition, setSeriesWinCondition] = useState<SeriesWinConditionValue>(0);
+    // Null = a level knockout series is replayed under the match's own Best-of.
+    const [tiebreakBestOf, setTiebreakBestOf] = useState<number | null>(null);
 
     // Exclusive — when on, only Exclusive-or-higher hub members can see/join the tournament.
     const [isExclusive, setIsExclusive] = useState(false);
@@ -271,6 +280,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         return mp || 0;
     })();
     const isSwiss = selectedFormat === String(TournamentFormat.Swiss);
+
+    // Does this tournament ever play a knockout match? That is the only place a level series has to
+    // be replayed — League records it as a draw, and Swiss only knocks out when a bracket follows.
+    const hasKnockoutPhase = formatGroup === 'bracket'
+        || formatGroup === 'groups-bracket'
+        || (formatGroup === 'swiss' && swissKnockout !== '0');
     const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
     // Empty direct input = every knockout slot is a direct berth (no play-in).
     const swissDirectCount = swissKnockout !== '0' && swissDirect !== ''
@@ -482,6 +497,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 AllowReserves: isTeamTournament ? allowReserves : false,
                 MaxReserves: isTeamTournament && allowReserves ? parseInt(maxReserves) : null,
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
+                // Series format. BestOf 1 is the pre-series default, in which case the criterion is
+                // irrelevant (a single game always reports its own score) and the tiebreak format is
+                // only meaningful where a knockout match can actually end level.
+                BestOf: bestOf,
+                SeriesWinCondition: seriesWinCondition,
+                TiebreakBestOf: hasKnockoutPhase ? tiebreakBestOf : null,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
                 IsExclusive: isExclusive,
@@ -616,6 +637,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         isExclusive ? 'Exclusive' : null,
     ].filter(Boolean).join(' · ');
     const matchSettingsSummary = [
+        bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? 'Total score' : 'Games won'}` : 'Single game',
         requireResultApproval ? 'Result approval' : null,
         canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
@@ -653,7 +675,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     >
                         <View className="gap-4">
                             {/* ── Basics: hub, name, size, format ── */}
-                            <CollapsibleSection icon="trophy" title="Basics" defaultOpen summary={basicsSummary}>
+                            <CollapsibleSection icon="trophy" title="Basic info" defaultOpen summary={basicsSummary}>
                                 <View className="gap-4">
                                     {renderSelectField(
                                         'Hub',
@@ -938,6 +960,19 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             {/* ── Match Settings ── */}
                             <CollapsibleSection icon="options" title="Match Settings" color="#38BDF8" summary={matchSettingsSummary}>
                                 <View className="gap-4">
+                                    {/* How a single match is played — the format everything else in
+                                        this section builds on, so it comes first. */}
+                                    <MatchFormatPicker
+                                        bestOf={bestOf}
+                                        onBestOfChange={setBestOf}
+                                        winCondition={seriesWinCondition}
+                                        onWinConditionChange={setSeriesWinCondition}
+                                        tiebreakBestOf={tiebreakBestOf}
+                                        onTiebreakBestOfChange={setTiebreakBestOf}
+                                        hasKnockout={hasKnockoutPhase}
+                                        isTeamTournament={isTeamTournament}
+                                    />
+
                                     <View>
                                         <Text className={FIELD_LABEL}>Require Result Approval</Text>
                                         <SegmentedToggle

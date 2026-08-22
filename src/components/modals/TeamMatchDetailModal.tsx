@@ -25,6 +25,7 @@ import {
     submitTieBreakRepresentative,
 } from '../../lib/teamApi';
 import { getErrorMessage, API_BASE_URL } from '../../lib/api';
+import { groupBySeries, normalizeBestOf, seriesBlockLabel, seriesGamesFrom } from '../../lib/series';
 import type {
     TeamMatchDetailsDto,
     SubMatchDto,
@@ -398,6 +399,10 @@ export function TeamMatchDetailModal({
                         proposedByUserId: sm.proposedByUserId ?? sm.ProposedByUserId ?? null,
                         proposedHomeScore: sm.proposedHomeScore ?? sm.ProposedHomeScore ?? null,
                         proposedAwayScore: sm.proposedAwayScore ?? sm.ProposedAwayScore ?? null,
+                        // Each individual game of the tie is its own best-of series. Carried through
+                        // so the row can break "2 : 1" down into the games behind it.
+                        bestOf: normalizeBestOf(sm.bestOf ?? sm.BestOf),
+                        games: seriesGamesFrom(sm),
                     } as SubMatchDto;
                 }),
                 aggregateScore: agg ? {
@@ -1029,6 +1034,11 @@ export function TeamMatchDetailModal({
                                 const phs = (sm as any).proposedHomeScore ?? (sm as any).ProposedHomeScore ?? 0;
                                 const pas = (sm as any).proposedAwayScore ?? (sm as any).ProposedAwayScore ?? 0;
 
+                                // A best-of sub-match shows "2 : 1" for games won, which is meaningless
+                                // without the games behind it — list them under the row.
+                                const subBestOf = normalizeBestOf((sm as any).bestOf);
+                                const subGames = seriesGamesFrom(sm);
+
                                 return (
                                     <View
                                         key={sm.matchId}
@@ -1092,6 +1102,7 @@ export function TeamMatchDetailModal({
                                             <View style={{ width: 60, alignItems: 'center', paddingHorizontal: 2 }}>
                                                 <Text style={{ fontSize: 7.5, fontWeight: '900', color: sm.isTieBreakMatch ? C.amber : C.textFaint, letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 2 }}>
                                                     {sm.isTieBreakMatch ? TEAM_LABELS.TIE_BREAK_LABEL : `Game ${idx + 1}`}
+                                                    {subBestOf > 1 ? ` · BO${subBestOf}` : ''}
                                                 </Text>
                                                 {hasScore ? (
                                                     <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
@@ -1131,6 +1142,36 @@ export function TeamMatchDetailModal({
                                                 </Pressable>
                                             </View>
                                         </Pressable>
+
+                                        {/* Per-game breakdown of a series sub-match. Without it the row's
+                                            "2 : 1" is indistinguishable from a single game's score. */}
+                                        {subGames.length > 0 && subBestOf > 1 && (
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    flexWrap: 'wrap',
+                                                    alignItems: 'center',
+                                                    gap: 8,
+                                                    paddingHorizontal: 14,
+                                                    paddingBottom: 8,
+                                                }}
+                                            >
+                                                {groupBySeries(subGames).map(block => (
+                                                    <View key={block.seriesNumber} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                                        {block.seriesNumber > 1 && (
+                                                            <Text style={{ fontSize: 8, fontWeight: '900', color: C.amber, letterSpacing: 1, textTransform: 'uppercase' }}>
+                                                                {seriesBlockLabel(block.seriesNumber)}
+                                                            </Text>
+                                                        )}
+                                                        {block.games.map((g, gi) => (
+                                                            <Text key={gi} style={{ fontSize: 10, fontWeight: '800', color: C.textFaint }}>
+                                                                {g.homeScore}:{g.awayScore}
+                                                            </Text>
+                                                        ))}
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
 
                                         {/* See Details — opens the match page where result reporting, edit / delete,
                                             evidence, chat & stream all live now. */}

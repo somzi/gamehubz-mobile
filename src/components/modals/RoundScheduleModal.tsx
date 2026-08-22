@@ -8,15 +8,31 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DateTimePickerModal } from './DateTimePickerModal';
+import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { BestOfInput } from '../match/BestOfInput';
+import { normalizeBestOf } from '../../lib/series';
 
 interface RoundScheduleModalProps {
     visible: boolean;
     onClose: () => void;
-    onSave: (openAt: string | null, deadline: string | null) => void;
+    onSave: (
+        openAt: string | null,
+        deadline: string | null,
+        format: { bestOf: number | null; tiebreakBestOf: number | null; changed: boolean },
+    ) => void;
     roundNumber: number;
     initialOpenAt?: string | null;
     initialDeadline?: string | null;
+    /** Round's own Best-of override. Null = the round follows the tournament default. */
+    initialBestOf?: number | null;
+    initialTiebreakBestOf?: number | null;
+    /** Tournament default, shown on the "Default" chip so the organizer knows what it inherits. */
+    tournamentBestOf?: number;
+    /** Hides the tiebreak row outside knockout, where a level series is simply a draw. */
+    hasKnockout?: boolean;
 }
+
+
 
 // Values arrive either as backend UTC ISO ("2026-07-07T02:00:00.000Z") or as the
 // picker's local "YYYY-MM-DD HH:mm" — the space→T swap makes both parseable, with
@@ -110,9 +126,62 @@ function ScheduleField({ label, value, accent, emptyIcon, emptyLabel, lockedSent
     );
 }
 
-export function RoundScheduleModal({ visible, onClose, onSave, roundNumber, initialOpenAt, initialDeadline }: RoundScheduleModalProps) {
+/**
+ * One round's Best-of override, as the same number grid the tournament form uses.
+ *
+ * The leading tile is the inherit case — "Tournament default" for the format, "Same format" for the
+ * tiebreak — so clearing an override is one tap and never needs a separate control.
+ */
+function BestOfField({ label, value, onChange, inheritLabel, inheritFallback, hint }: {
+    label: string;
+    /** Null = inherit (tournament default, or "same as the round" for a tiebreak). */
+    value: number | null;
+    onChange: (v: number | null) => void;
+    inheritLabel: string;
+    /** Length the field starts on when the organizer switches away from inherit. */
+    inheritFallback: number;
+    hint: string;
+}) {
+    return (
+        <View>
+            <Text className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">{label}</Text>
+
+            <SegmentedToggle
+                options={[
+                    { value: 'inherit', label: inheritLabel },
+                    { value: 'custom', label: 'Override' },
+                ]}
+                value={value == null ? 'inherit' : 'custom'}
+                onChange={v => onChange(v === 'inherit' ? null : normalizeBestOf(inheritFallback))}
+            />
+
+            {value != null && (
+                <View className="mt-3">
+                    <BestOfInput value={normalizeBestOf(value)} onChange={onChange} />
+                </View>
+            )}
+
+            <Text className="text-[11px] text-slate-500 mt-2 leading-4">{hint}</Text>
+        </View>
+    );
+}
+
+export function RoundScheduleModal({
+    visible,
+    onClose,
+    onSave,
+    roundNumber,
+    initialOpenAt,
+    initialDeadline,
+    initialBestOf = null,
+    initialTiebreakBestOf = null,
+    tournamentBestOf = 1,
+    hasKnockout = false,
+}: RoundScheduleModalProps) {
     const [openAt, setOpenAt] = useState<string | null>(initialOpenAt || null);
     const [deadline, setDeadline] = useState<string | null>(initialDeadline || null);
+    const [bestOf, setBestOf] = useState<number | null>(initialBestOf ?? null);
+    const [tiebreakBestOf, setTiebreakBestOf] = useState<number | null>(initialTiebreakBestOf ?? null);
 
     const [pickerType, setPickerType] = useState<'openAt' | 'deadline' | null>(null);
 
@@ -120,8 +189,10 @@ export function RoundScheduleModal({ visible, onClose, onSave, roundNumber, init
         if (visible) {
             setOpenAt(initialOpenAt || null);
             setDeadline(initialDeadline || null);
+            setBestOf(initialBestOf ?? null);
+            setTiebreakBestOf(initialTiebreakBestOf ?? null);
         }
-    }, [visible, initialOpenAt, initialDeadline]);
+    }, [visible, initialOpenAt, initialDeadline, initialBestOf, initialTiebreakBestOf]);
 
     const openDate = parseValue(openAt);
     const deadlineDate = parseValue(deadline);
@@ -133,9 +204,14 @@ export function RoundScheduleModal({ visible, onClose, onSave, roundNumber, init
         : null;
     const isInvalid = windowMs !== null && windowMs <= 0;
 
+    // Only send the format when it actually moved — the round-format endpoint refuses a round whose
+    // matches are all reported, and an untouched format shouldn't turn a schedule edit into an error.
+    const formatChanged = bestOf !== (initialBestOf ?? null)
+        || tiebreakBestOf !== (initialTiebreakBestOf ?? null);
+
     const handleSave = () => {
         if (isInvalid) return;
-        onSave(openAt, deadline);
+        onSave(openAt, deadline, { bestOf, tiebreakBestOf, changed: formatChanged });
     };
 
     if (!visible) return null;
@@ -180,6 +256,32 @@ export function RoundScheduleModal({ visible, onClose, onSave, roundNumber, init
                             onPress={() => setPickerType('deadline')}
                             onClear={() => setDeadline(null)}
                         />
+
+                        {/* Round format — the same round-level control as the schedule above, so an
+                            organizer can make one round a Bo3 without touching the whole tournament. */}
+                        <View className="mt-5 pt-5 border-t border-white/5">
+                            <BestOfField
+                                label="Match Format"
+                                value={bestOf}
+                                onChange={setBestOf}
+                                inheritLabel={`Default · Bo${tournamentBestOf}`}
+                                inheritFallback={tournamentBestOf}
+                                hint="Applies to matches in this round that have not been reported yet. Anything already played keeps the format it was played under."
+                            />
+
+                            {hasKnockout && (
+                                <View className="mt-4">
+                                    <BestOfField
+                                        label="Tiebreak Format"
+                                        value={tiebreakBestOf}
+                                        onChange={setTiebreakBestOf}
+                                        inheritLabel="Same"
+                                        inheritFallback={normalizeBestOf(bestOf ?? tournamentBestOf)}
+                                        hint={`Played when a knockout match in this round ends level. "Same" replays another Bo${normalizeBestOf(bestOf ?? tournamentBestOf)}.`}
+                                    />
+                                </View>
+                            )}
+                        </View>
 
                         <View className="mt-5 mb-5">
                             {windowMs !== null && !isInvalid && (

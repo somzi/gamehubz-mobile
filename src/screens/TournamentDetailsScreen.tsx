@@ -11,12 +11,13 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
-import { BracketMatch, teamProgressFrom } from '../components/bracket/BracketMatch';
+import { BracketMatch, teamProgressFrom, seriesInfoFrom } from '../components/bracket/BracketMatch';
 
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, getCurrencyLabel, parseUtcDate } from '../lib/utils';
+import { normalizeBestOf } from '../lib/series';
 import { ShareTournamentCardModal } from '../components/modals/ShareTournamentCardModal';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
@@ -177,6 +178,10 @@ export default function TournamentDetailsScreen() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [stages, setStages] = useState<any[]>([]);
+    // Tournament-wide series settings from the structure payload. Drives the "Default (BoN)" chip in
+    // the round-format editor and tells it whether a level series can go to a tiebreak at all.
+    const [tournamentBestOf, setTournamentBestOf] = useState(1);
+    const [tournamentHasKnockout, setTournamentHasKnockout] = useState(false);
     const [selectedStageIndex, setSelectedStageIndex] = useState(0);
     // Which tournament we've already auto-selected a stage for. The default only applies to the
     // first structure load per tournament — later refetches (focus, result submit, SignalR) must
@@ -252,7 +257,7 @@ export default function TournamentDetailsScreen() {
     );
 
     const [showDeadlineModal, setShowDeadlineModal] = useState(false);
-    const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null, stageId?: string | null } | null>(null);
+    const [selectedRoundForDeadline, setSelectedRoundForDeadline] = useState<{ roundNumber: number, currentDeadline?: string | null, roundOpenAt?: string | null, stageId?: string | null, bestOf?: number | null, tiebreakBestOf?: number | null } | null>(null);
 
     // Admin-help requests (problematic matches) — admins only
     const [adminHelpRequests, setAdminHelpRequests] = useState<AdminHelpRequestItem[]>([]);
@@ -535,6 +540,13 @@ export default function TournamentDetailsScreen() {
             const data = await response.json();
             const nextStages = data.stages || [];
             setStages(nextStages);
+            setTournamentBestOf(normalizeBestOf(data.bestOf ?? data.BestOf));
+            // Any elimination-shaped stage (3 = single-elim, 4/5 = DE brackets, 6 = play-in) means a
+            // level series has to be replayed somewhere in this tournament.
+            setTournamentHasKnockout(nextStages.some((s: any) => {
+                const type = s?.type ?? s?.Type;
+                return type === 3 || type === 4 || type === 5 || type === 6;
+            }));
 
             // Open on the stage that's actually being played (see pickDefaultStageIndex).
             if (autoSelectedStageForId.current !== id && nextStages.length > 0) {
@@ -1357,11 +1369,30 @@ export default function TournamentDetailsScreen() {
         // the backend would apply the deadline to both brackets' round N.
         const stageId = stages[selectedStageIndex]?.stageId ?? null;
 
-        setSelectedRoundForDeadline({ roundNumber, currentDeadline, roundOpenAt, stageId });
+        // Round format lives on the matches, so read it off the first one. They are stamped
+        // together, and an unstamped match reports the tournament default rather than an override.
+        const firstMatch = typeof roundOrMatchday === 'object' ? roundOrMatchday.matches?.[0] : null;
+        const roundBestOf = firstMatch ? (firstMatch.bestOf ?? firstMatch.BestOf ?? null) : null;
+        const roundTiebreakBestOf = firstMatch ? (firstMatch.tiebreakBestOf ?? firstMatch.TiebreakBestOf ?? null) : null;
+
+        setSelectedRoundForDeadline({
+            roundNumber,
+            currentDeadline,
+            roundOpenAt,
+            stageId,
+            // A match echoes the tournament default when it has no override of its own, so treat a
+            // value equal to the default as "inherit" — otherwise every round would look pinned.
+            bestOf: roundBestOf === tournamentBestOf ? null : roundBestOf,
+            tiebreakBestOf: roundTiebreakBestOf,
+        });
         setShowDeadlineModal(true);
     };
 
-    const handleSaveSchedule = async (openAtStr: string | null, deadlineStr: string | null) => {
+    const handleSaveSchedule = async (
+        openAtStr: string | null,
+        deadlineStr: string | null,
+        format?: { bestOf: number | null; tiebreakBestOf: number | null; changed: boolean },
+    ) => {
         if (!id || !selectedRoundForDeadline) return;
 
         setShowDeadlineModal(false);
@@ -1389,10 +1420,40 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
 
+            // Format is a separate endpoint (it has its own "already reported" rules), and only
+            // called when the organizer actually changed it.
+            let formatNote = '';
+            if (format?.changed) {
+                const formatResponse = await authenticatedFetch(ENDPOINTS.SET_ROUND_BEST_OF(id), {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        RoundNumber: selectedRoundForDeadline.roundNumber,
+                        StageId: selectedRoundForDeadline.stageId ?? null,
+                        BestOf: format.bestOf,
+                        TiebreakBestOf: format.tiebreakBestOf,
+                        // Null Best-of means "drop the override and follow the tournament default".
+                        ClearBestOf: format.bestOf == null,
+                    }),
+                });
+
+                if (!formatResponse.ok) {
+                    const text = await formatResponse.text().catch(() => 'No response body');
+                    throw new Error(text);
+                }
+
+                // Matches already reported keep their format — say so rather than implying the
+                // whole round changed.
+                const result = await formatResponse.json().catch(() => null);
+                const skipped = result?.skippedLockedMatches ?? result?.SkippedLockedMatches ?? 0;
+                if (skipped > 0) {
+                    formatNote = ` ${skipped} already-reported ${skipped === 1 ? 'match keeps its' : 'matches keep their'} format.`;
+                }
+            }
+
             setStatusModalConfig({
                 type: 'success',
                 title: 'Success',
-                message: 'Round schedule updated successfully!'
+                message: `Round schedule updated successfully!${formatNote}`
             });
             setShowStatusModal(true);
 
@@ -1972,6 +2033,7 @@ export default function TournamentDetailsScreen() {
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                         teamProgress={teamProgressFrom(grandFinalMatch)}
+                                        series={seriesInfoFrom(grandFinalMatch)}
                                     />
                                 </View>
                             </View>
@@ -1994,6 +2056,7 @@ export default function TournamentDetailsScreen() {
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                         teamProgress={teamProgressFrom(grandFinalResetMatch)}
+                                        series={seriesInfoFrom(grandFinalResetMatch)}
                                     />
                                 </View>
                             </View>
@@ -2027,6 +2090,7 @@ export default function TournamentDetailsScreen() {
                                             isAdmin={canManage}
                                             isTeamTournament={tournament?.isTeamTournament}
                                             teamProgress={teamProgressFrom(thirdPlaceMatch)}
+                                            series={seriesInfoFrom(thirdPlaceMatch)}
                                         />
                                     </View>
                                 )}
@@ -3623,6 +3687,10 @@ export default function TournamentDetailsScreen() {
                 roundNumber={selectedRoundForDeadline?.roundNumber || 0}
                 initialOpenAt={selectedRoundForDeadline?.roundOpenAt || undefined}
                 initialDeadline={selectedRoundForDeadline?.currentDeadline || undefined}
+                initialBestOf={selectedRoundForDeadline?.bestOf ?? null}
+                initialTiebreakBestOf={selectedRoundForDeadline?.tiebreakBestOf ?? null}
+                tournamentBestOf={tournamentBestOf}
+                hasKnockout={tournamentHasKnockout}
             />
 
             {/* Team Registration Modal */}

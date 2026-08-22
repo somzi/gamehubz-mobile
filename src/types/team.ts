@@ -51,6 +51,14 @@ export interface SubMatchDto {
     ProposedAwayScore?: number | null;
     proposedByUserId?: string | null;
     ProposedByUserId?: string | null;
+    /** Games this individual match is played over — its own best-of series inside the tie. */
+    bestOf?: number;
+    BestOf?: number;
+    tiebreakBestOf?: number | null;
+    TiebreakBestOf?: number | null;
+    /** The games played, main series first then any tiebreak. Empty on a match with no result. */
+    games?: { homeScore: number; awayScore: number; seriesNumber: number }[];
+    Games?: { homeScore: number; awayScore: number; seriesNumber: number }[];
 }
 
 export interface AggregateScoreDto {

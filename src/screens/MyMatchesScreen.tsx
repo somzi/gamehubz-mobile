@@ -24,6 +24,8 @@ interface MatchOverviewDto {
     status: number;
     isRoundLocked?: boolean;
     unreadMessages?: number;
+    /** Games this match is played over — 1 (or absent) is a plain single game. */
+    bestOf?: number;
 }
 
 export default function MyMatchesScreen() {
@@ -50,7 +52,8 @@ export default function MyMatchesScreen() {
                     opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
                     status: m.status !== undefined ? m.status : m.Status,
                     isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
-                    unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages
+                    unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
+                    bestOf: m.bestOf ?? m.BestOf ?? 1
                 }));
                 // Optionally filter them out completely if the user expects them gone from here too.
                 // The user explicitly requested filtering in "Home panel", but keeping them here with locks is better UI.
@@ -123,6 +126,7 @@ export default function MyMatchesScreen() {
                                 onMatchUpdate={fetchMatches}
                                 isRoundLocked={match.isRoundLocked}
                                 unreadMessages={match.unreadMessages}
+                                bestOf={match.bestOf}
                             />
                         ))
                     ) : (

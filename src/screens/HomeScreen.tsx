@@ -36,6 +36,8 @@ interface MatchOverviewDto {
     status: number;
     isRoundLocked?: boolean;
     unreadMessages?: number;
+    /** Games this match is played over — 1 (or absent) is a plain single game. */
+    bestOf?: number;
 }
 
 const SECTION_GAP = 28;
@@ -277,6 +279,7 @@ export default function HomeScreen() {
                                         deadline={match.roundDeadline ?? undefined}
                                         onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
+                                        bestOf={match.bestOf}
                                     />
                                 ))}
                             </Animated.View>
@@ -331,6 +334,7 @@ export default function HomeScreen() {
                                         deadline={match.roundDeadline ?? undefined}
                                         onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
+                                        bestOf={match.bestOf}
                                     />
                                 ))}
                             </View>

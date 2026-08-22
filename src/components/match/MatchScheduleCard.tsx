@@ -22,6 +22,15 @@ import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { mergeMessagesById } from '../../lib/mergeMessages';
 import { AdminHelpSection } from './AdminHelpSection';
 import { MatchStreamPanel } from './MatchStreamPanel';
+import { SeriesScoreEntry } from './SeriesScoreEntry';
+import {
+    SeriesFormat,
+    SeriesGame,
+    SeriesOutcome,
+    normalizeBestOf,
+    normalizeCondition,
+    seriesGamesFrom,
+} from '../../lib/series';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
@@ -49,6 +58,8 @@ interface MatchScheduleCardProps {
     isRoundLocked?: boolean;
     /** Unread chat messages for the current user — drives the per-match chat badge. */
     unreadMessages?: number;
+    /** Series format from the match list, so the collapsed card can show "BO3" before it is opened. */
+    bestOf?: number;
 }
 
 export function MatchScheduleCard({
@@ -70,6 +81,7 @@ export function MatchScheduleCard({
     variant = 'default',
     isRoundLocked = false,
     unreadMessages = 0,
+    bestOf: bestOfProp,
 }: MatchScheduleCardProps) {
     const { user } = useAuth();
     const { refresh: refreshBadges } = useBadges();
@@ -127,6 +139,39 @@ export function MatchScheduleCard({
     const [isRejecting, setIsRejecting] = useState(false);
     const [isEditingProposal, setIsEditingProposal] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Series state. Format is resolved server-side (match override, else tournament default) and
+    // arrives with the match details; a backend that predates the feature simply reports Bo1, which
+    // keeps the old single-score form. `seriesGames` is held in VISUAL order (logged-in user on the
+    // left) and mapped to the DB's home/away roles at submit time, exactly like the single scores.
+    const [seriesFormat, setSeriesFormat] = useState<SeriesFormat>({ bestOf: 1, tiebreakBestOf: null, condition: 0 });
+    const [reportedGames, setReportedGames] = useState<SeriesGame[]>([]);
+    const [seriesGames, setSeriesGames] = useState<SeriesGame[]>([]);
+    const [seriesOutcome, setSeriesOutcome] = useState<SeriesOutcome | null>(null);
+    const [isSeriesComplete, setIsSeriesComplete] = useState(false);
+    // Solo knockout is the only place a level series waits for a tiebreak; everywhere else it is
+    // either a draw (league / group / Swiss) or settled by the team tie one level up.
+    const [allowsTiebreak, setAllowsTiebreak] = useState(false);
+
+    const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0;
+
+    // The card face renders before the modal has fetched details, so it falls back to the Best-of
+    // the match list already carries; once details are in, they win (a match override beats the list).
+    const cardBestOf = seriesFormat.bestOf > 1 ? seriesFormat.bestOf : normalizeBestOf(bestOfProp);
+
+    // Reported games arrive in DB home/away order; the form shows the logged-in player on the left.
+    // Flip once here so the entry component only ever deals in visual order (the submit path flips
+    // back). Until the DB home id is known, leaving them unflipped is the same assumption the
+    // single-score path makes.
+    const isUserDbHomeSide = !!dbHomeUserId && !!user?.id
+        && dbHomeUserId.toLowerCase() === user.id.toLowerCase();
+
+    const visualReportedGames = React.useMemo(
+        () => (isUserDbHomeSide
+            ? reportedGames
+            : reportedGames.map(g => ({ ...g, homeScore: g.awayScore, awayScore: g.homeScore }))),
+        [reportedGames, isUserDbHomeSide],
+    );
     const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
     // Comments state
@@ -292,6 +337,15 @@ export function MatchScheduleCard({
                 let proposedBy = data.proposedByUserId ?? data.ProposedByUserId ?? null;
                 let evidences = data.evidences || data.Evidences || [];
 
+                // Series format + games. On a team sub-match these live on the sub-match row, and
+                // the win condition on the parent DTO, so both are re-read in the sub-match branch.
+                let bestOf = data.bestOf ?? data.BestOf ?? 1;
+                let tiebreakBestOf = data.tiebreakBestOf ?? data.TiebreakBestOf ?? null;
+                const condition = normalizeCondition(data.seriesWinCondition ?? data.SeriesWinCondition);
+                let games = seriesGamesFrom(data);
+                // Only a solo knockout match can park in a tiebreak; the server says which.
+                let allowsTie = Boolean(data.allowsTieBreak ?? data.AllowsTieBreak ?? false);
+
                 if (!homeUserId) {
                     const subs = data.subMatches || data.SubMatches || [];
                     const sub = subs.find(
@@ -308,8 +362,24 @@ export function MatchScheduleCard({
                         proposedAway = sub.proposedAwayScore ?? sub.ProposedAwayScore ?? proposedAway;
                         proposedBy = sub.proposedByUserId ?? sub.ProposedByUserId ?? proposedBy;
                         evidences = sub.evidences || sub.Evidences || evidences;
+                        // Each individual game of a tie is its own series, reported on the sub-match.
+                        bestOf = sub.bestOf ?? sub.BestOf ?? bestOf;
+                        tiebreakBestOf = sub.tiebreakBestOf ?? sub.TiebreakBestOf ?? tiebreakBestOf;
+                        games = seriesGamesFrom(sub);
+                        // A level sub-match is never replayed — the tie resolves it one level up.
+                        allowsTie = false;
                     }
                 }
+
+                setSeriesFormat({
+                    bestOf: normalizeBestOf(bestOf),
+                    tiebreakBestOf: tiebreakBestOf == null ? null : normalizeBestOf(tiebreakBestOf),
+                    // A team sub-match takes the win condition from the parent team-match DTO,
+                    // where it is reported as seriesWinCondition alongside the tie's own condition.
+                    condition: normalizeCondition(data.seriesWinCondition ?? data.SeriesWinCondition ?? condition),
+                });
+                setReportedGames(games);
+                setAllowsTiebreak(allowsTie);
 
                 setDbHomeUserId(homeUserId);
                 setDbAwayUserId(awayUserId);
@@ -608,7 +678,17 @@ export function MatchScheduleCard({
             console.log('[MatchScheduleCard] Missing matchId or tournamentId');
             return;
         }
-        if (homeScore === '' || awayScore === '') {
+
+        if (isSeriesMatch) {
+            if (seriesGames.length === 0) {
+                setError('Enter the score for at least one game');
+                return;
+            }
+            if (!isSeriesComplete) {
+                setError('Enter the remaining games before submitting');
+                return;
+            }
+        } else if (homeScore === '' || awayScore === '') {
             console.log('[MatchScheduleCard] Missing scores');
             setError('Please enter scores for both players');
             return;
@@ -633,20 +713,31 @@ export function MatchScheduleCard({
                 user?.id != null &&
                 resolvedHomeUserId.toLowerCase() === user.id.toLowerCase();
 
-            const visualLeftScore = parseInt(homeScore, 10);  // logged-in user's score
-            const visualRightScore = parseInt(awayScore, 10); // opponent's score
+            // The entry form works in visual order (logged-in user on the left); both payloads
+            // below flip into the DB's home/away roles here, in one place.
+            const endpoint = isSeriesMatch ? ENDPOINTS.REPORT_MATCH_SERIES_RESULT : ENDPOINTS.REPORT_MATCH_RESULT;
 
-            const payload = {
-                MatchId: matchId,
-                HomeScore: isUserDbHome ? visualLeftScore : visualRightScore,
-                AwayScore: isUserDbHome ? visualRightScore : visualLeftScore,
-                TournamentId: tournamentId
-            };
+            const payload = isSeriesMatch
+                ? {
+                    MatchId: matchId,
+                    TournamentId: tournamentId,
+                    Games: seriesGames.map(g => ({
+                        HomeScore: isUserDbHome ? g.homeScore : g.awayScore,
+                        AwayScore: isUserDbHome ? g.awayScore : g.homeScore,
+                        SeriesNumber: g.seriesNumber,
+                    })),
+                }
+                : {
+                    MatchId: matchId,
+                    HomeScore: isUserDbHome ? parseInt(homeScore, 10) : parseInt(awayScore, 10),
+                    AwayScore: isUserDbHome ? parseInt(awayScore, 10) : parseInt(homeScore, 10),
+                    TournamentId: tournamentId
+                };
 
             console.log('[MatchScheduleCard] Payload:', JSON.stringify(payload));
-            console.log('[MatchScheduleCard] Calling API:', ENDPOINTS.REPORT_MATCH_RESULT);
+            console.log('[MatchScheduleCard] Calling API:', endpoint);
 
-            const response = await authenticatedFetch(ENDPOINTS.REPORT_MATCH_RESULT, {
+            const response = await authenticatedFetch(endpoint, {
                 method: 'POST',
                 body: JSON.stringify(payload),
             });
@@ -677,10 +768,14 @@ export function MatchScheduleCard({
                 onMatchUpdate();
             }
 
-            // In approval-required mode the submission becomes a pending proposal — keep the
-            // modal open and refresh the details so the proposer immediately sees the
-            // "Awaiting approval" state instead of getting bounced back.
-            if (requireResultApproval) {
+            // Two cases keep the modal open and refetch instead of closing:
+            //  - approval mode, where the submission is a proposal and the proposer should see the
+            //    "Awaiting approval" state rather than being bounced back;
+            //  - a level knockout series, which the server records and parks awaiting a tiebreak —
+            //    the refetch seeds the form with the games so far so the replay can be added.
+            const awaitingTiebreak = Boolean(isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel);
+
+            if (requireResultApproval || awaitingTiebreak) {
                 setHomeScore('');
                 setAwayScore('');
                 setSelectedImages([]);
@@ -782,9 +877,17 @@ export function MatchScheduleCard({
                         </View>
                     </View>
 
-                    <Text className="text-xl font-black text-white leading-tight" numberOfLines={1}>
-                        vs {opponentName}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <Text className="text-xl font-black text-white leading-tight flex-1" numberOfLines={1}>
+                            vs {opponentName}
+                        </Text>
+                        {/* Format on the card face: players should know it's a Bo3 before they open it. */}
+                        {cardBestOf > 1 && (
+                            <View className="px-2 py-0.5 rounded-lg bg-white/[0.06] border border-white/[0.06]">
+                                <Text className="text-[9px] font-black text-slate-400 tracking-[1px]">BO{cardBestOf}</Text>
+                            </View>
+                        )}
+                    </View>
 
                     <View className="mt-4 pt-4 border-t border-white/5">
                         {isSetAvailability ? (
@@ -1316,6 +1419,25 @@ export function MatchScheduleCard({
                                                         </View>
                                                     </View>
                                                 )}
+                                                {/* Best-of series: one game at a time, never a wall of blank
+                                                    inputs. Falls back to the single-score form for Bo1. */}
+                                                {isSeriesMatch ? (
+                                                    <SeriesScoreEntry
+                                                        key={`${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
+                                                        leftName={user?.username || 'You'}
+                                                        rightName={opponentName}
+                                                        format={seriesFormat}
+                                                        allowTiebreak={allowsTiebreak}
+                                                        initialGames={visualReportedGames}
+                                                        onChange={(games, outcome, complete) => {
+                                                            setSeriesGames(games);
+                                                            setSeriesOutcome(outcome);
+                                                            setIsSeriesComplete(complete);
+                                                        }}
+                                                        onFocusInput={scrollToBottom}
+                                                    />
+                                                ) : (
+                                                <>
                                                 {/* Players VS Section */}
                                                 <View className={cn(
                                                     "rounded-[20px] p-4 pt-6",
@@ -1420,6 +1542,8 @@ export function MatchScheduleCard({
                                                         </View>
                                                     </View>
                                                 </View>
+                                                </>
+                                                )}
 
                                                 {/* Submit Button */}
                                                 <View className="mt-1 flex-row gap-3">
@@ -1466,7 +1590,12 @@ export function MatchScheduleCard({
                                                                             ? "Round not open yet"
                                                                             : isEditingProposal
                                                                                 ? "Update Report"
-                                                                                : (requireResultApproval ? "Report Result" : "Submit Result")}
+                                                                                // A level knockout series is reported now and decided by a
+                                                                                // tiebreak later — say so on the button rather than letting
+                                                                                // "Submit Result" imply the match is settled.
+                                                                                : (isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel)
+                                                                                    ? "Report — Tiebreak Needed"
+                                                                                    : (requireResultApproval ? "Report Result" : "Submit Result")}
                                                                     </Text>
                                                                 </View>
                                                             )}

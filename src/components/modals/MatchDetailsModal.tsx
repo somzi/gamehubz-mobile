@@ -23,6 +23,17 @@ import { RootStackParamList } from '../../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { MatchStage } from '../../types/tournament';
+import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
+import {
+    SeriesFormat,
+    SeriesGame,
+    SeriesOutcome,
+    groupBySeries,
+    normalizeBestOf,
+    normalizeCondition,
+    seriesBlockLabel,
+    seriesGamesFrom,
+} from '../../lib/series';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -57,6 +68,15 @@ export interface MatchResultDetailDto {
     proposedByUserId?: string | null;
     adminHelpRequested?: boolean;
     adminHelpRequestedByUserId?: string | null;
+    /** Series format for this match, already resolved server-side against the tournament default. */
+    bestOf?: number;
+    tiebreakBestOf?: number | null;
+    seriesWinCondition?: number | string | null;
+    /** Games played, main series first then any tiebreak replay. */
+    games?: SeriesGame[] | null;
+    proposedGames?: SeriesGame[] | null;
+    /** True only for solo knockout, where a level series is replayed rather than standing as a draw. */
+    allowsTieBreak?: boolean;
     /** True when this match is one game of a team tie (resolved out of the parent team-match DTO).
      *  Drives the team-aware double-walkover copy — a voided game only counts for neither team;
      *  the tie itself is voided only if NO game ends up played. */
@@ -150,6 +170,12 @@ export function MatchDetailsModal({
     // Reporting state
     const [homeScore, setHomeScore] = useState('');
     const [awayScore, setAwayScore] = useState('');
+
+    // Series entry state. This modal renders in DB home/away order (unlike MatchScheduleCard,
+    // which centres the logged-in player), so no side-flipping is needed here.
+    const [seriesGames, setSeriesGames] = useState<SeriesGame[]>([]);
+    const [seriesOutcome, setSeriesOutcome] = useState<SeriesOutcome | null>(null);
+    const [isSeriesComplete, setIsSeriesComplete] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
@@ -161,6 +187,20 @@ export function MatchDetailsModal({
     // like Completed — and reversible — so it shares the completed rendering path, with its own
     // framing (no score, no winner) and relabelled actions.
     const isNoShow = matchDetails?.status === 5;
+
+    // MatchStatus.TieBreakRequired (6): the series was reported but finished level, so the match is
+    // played-but-undecided and still owes a tiebreak. Not terminal — it stays reportable.
+    const isTieBreakPending = matchDetails?.status === 6;
+
+    // Series format for this match, resolved server-side. A backend without the feature (or a plain
+    // single-game match) reports Bo1 with no games, which keeps the original two-input form.
+    const seriesFormat: SeriesFormat = {
+        bestOf: normalizeBestOf(matchDetails?.bestOf),
+        tiebreakBestOf: matchDetails?.tiebreakBestOf ?? null,
+        condition: normalizeCondition(matchDetails?.seriesWinCondition),
+    };
+    const reportedGames = matchDetails?.games ?? [];
+    const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0;
 
     // Image preview state
     const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -290,6 +330,14 @@ export function MatchDetailsModal({
             proposedByUserId: sub?.proposedByUserId ?? sub?.ProposedByUserId ?? null,
             adminHelpRequested: sub?.adminHelpRequested ?? sub?.AdminHelpRequested ?? false,
             adminHelpRequestedByUserId: sub?.adminHelpRequestedByUserId ?? sub?.AdminHelpRequestedByUserId ?? null,
+            // Series format lives on the sub-match; the criterion is tournament-wide and sits on
+            // the parent DTO. A level sub-match is never replayed — the tie decides it.
+            bestOf: normalizeBestOf(sub?.bestOf ?? sub?.BestOf),
+            tiebreakBestOf: sub?.tiebreakBestOf ?? sub?.TiebreakBestOf ?? null,
+            seriesWinCondition: data.seriesWinCondition ?? data.SeriesWinCondition ?? 0,
+            games: seriesGamesFrom(sub),
+            proposedGames: null,
+            allowsTieBreak: false,
             isTeamSub: true,
         };
     };
@@ -351,6 +399,12 @@ export function MatchDetailsModal({
                         proposedByUserId: data.proposedByUserId ?? data.ProposedByUserId ?? null,
                         adminHelpRequested: data.adminHelpRequested ?? data.AdminHelpRequested ?? false,
                         adminHelpRequestedByUserId: data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null,
+                        bestOf: normalizeBestOf(data.bestOf ?? data.BestOf),
+                        tiebreakBestOf: data.tiebreakBestOf ?? data.TiebreakBestOf ?? null,
+                        seriesWinCondition: data.seriesWinCondition ?? data.SeriesWinCondition ?? 0,
+                        games: seriesGamesFrom(data),
+                        proposedGames: seriesGamesFrom({ games: data.proposedGames ?? data.ProposedGames }),
+                        allowsTieBreak: Boolean(data.allowsTieBreak ?? data.AllowsTieBreak ?? false),
                     };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
@@ -534,7 +588,17 @@ export function MatchDetailsModal({
 
     const handleSubmitResult = async (cascade: boolean = false) => {
         if (!matchId || !tournamentId) return;
-        if (homeScore === '' || awayScore === '') {
+
+        if (isSeriesMatch) {
+            if (seriesGames.length === 0) {
+                setError('Enter the score for at least one game');
+                return;
+            }
+            if (!isSeriesComplete) {
+                setError('Enter the remaining games before submitting');
+                return;
+            }
+        } else if (homeScore === '' || awayScore === '') {
             setError('Please enter scores for both players');
             return;
         }
@@ -543,15 +607,30 @@ export function MatchDetailsModal({
         setError(null);
 
         try {
-            const payload = {
-                MatchId: matchId,
-                HomeScore: parseInt(homeScore, 10),
-                AwayScore: parseInt(awayScore, 10),
-                TournamentId: tournamentId,
-                Cascade: cascade
-            };
+            // A series goes through v2, which takes the games and derives the result; v1 can only
+            // carry one score line and cannot express a tiebreak-pending match.
+            const endpoint = isSeriesMatch ? ENDPOINTS.REPORT_MATCH_SERIES_RESULT : ENDPOINTS.REPORT_MATCH_RESULT;
 
-            const response = await authenticatedFetch(ENDPOINTS.REPORT_MATCH_RESULT, {
+            const payload = isSeriesMatch
+                ? {
+                    MatchId: matchId,
+                    TournamentId: tournamentId,
+                    Cascade: cascade,
+                    Games: seriesGames.map(g => ({
+                        HomeScore: g.homeScore,
+                        AwayScore: g.awayScore,
+                        SeriesNumber: g.seriesNumber,
+                    })),
+                }
+                : {
+                    MatchId: matchId,
+                    HomeScore: parseInt(homeScore, 10),
+                    AwayScore: parseInt(awayScore, 10),
+                    TournamentId: tournamentId,
+                    Cascade: cascade
+                };
+
+            const response = await authenticatedFetch(endpoint, {
                 method: 'POST',
                 body: JSON.stringify(payload),
             });
@@ -579,12 +658,19 @@ export function MatchDetailsModal({
             // "Awaiting approval" state instead of getting bounced back to the bracket.
             const willCreateProposal = approvalRequired && !(isHubOwner || canManage) && status !== 'completed';
 
+            // A level knockout series is recorded but undecided — stay put and refetch so the
+            // reporter lands on the tiebreak state instead of being bounced back to the bracket.
+            const awaitingTiebreak = isSeriesMatch
+                && !!matchDetails?.allowsTieBreak
+                && !!seriesOutcome?.isLevel;
+
             if (onMatchUpdate) onMatchUpdate(freshStructure);
 
-            if (willCreateProposal) {
+            if (willCreateProposal || awaitingTiebreak) {
                 setHomeScore('');
                 setAwayScore('');
                 setSelectedImages([]);
+                setIsEditMode(false);
                 await fetchMatchDetails();
             } else {
                 finishAfterSettle(isEditMode ? 'Result updated' : 'Result saved');
@@ -772,12 +858,20 @@ export function MatchDetailsModal({
     // winner stays the same the bracket is untouched (backend applies it in place); when the winner
     // flips we may need to reopen downstream matches, so route through the cascade confirmation.
     const handleSubmitEdit = () => {
-        if (homeScore === '' || awayScore === '') {
+        if (isSeriesMatch) {
+            if (!isSeriesComplete) {
+                setError('Enter the remaining games before submitting');
+                return;
+            }
+        } else if (homeScore === '' || awayScore === '') {
             setError('Please enter scores for both players');
             return;
         }
-        const newHome = parseInt(homeScore, 10);
-        const newAway = parseInt(awayScore, 10);
+
+        // For a series the headline score is the deciding series' tally, which is exactly what the
+        // outcome reports — so the winner-change check below reads the same numbers either way.
+        const newHome = isSeriesMatch ? (seriesOutcome?.homeHeadline ?? 0) : parseInt(homeScore, 10);
+        const newAway = isSeriesMatch ? (seriesOutcome?.awayHeadline ?? 0) : parseInt(awayScore, 10);
         const oldHome = matchDetails?.homeUserScore ?? 0;
         const oldAway = matchDetails?.awayUserScore ?? 0;
 
@@ -1114,6 +1208,47 @@ export function MatchDetailsModal({
                                 </View>
                             </Pressable>
                         </View>
+
+                        {/* Series breakdown. The big number above is the deciding series' tally —
+                            without the games behind it, "2 : 1" says nothing about what was played. */}
+                        {isSeriesMatch && reportedGames.length > 0 && (
+                            <View className="mt-5 pt-4 border-t border-white/[0.06]">
+                                <Text className="text-[9px] font-black text-slate-500 uppercase tracking-[2px] text-center mb-3">
+                                    Best of {seriesFormat.bestOf} · {seriesFormat.condition === 1 ? 'Total score' : 'Games won'}
+                                </Text>
+
+                                {groupBySeries(reportedGames).map(block => (
+                                    <View key={block.seriesNumber} className="mb-1.5">
+                                        {block.seriesNumber > 1 && (
+                                            <Text className="text-[9px] font-black text-warning uppercase tracking-[1.5px] text-center mb-1">
+                                                {seriesBlockLabel(block.seriesNumber)}
+                                            </Text>
+                                        )}
+                                        {block.games.map((g, gi) => (
+                                            <View key={gi} className="flex-row items-center justify-center gap-3 py-0.5">
+                                                <Text className="text-[10px] font-bold text-slate-600 uppercase tracking-wider w-16 text-right">
+                                                    Game {gi + 1}
+                                                </Text>
+                                                <Text className={cn(
+                                                    'text-sm font-black w-8 text-right',
+                                                    g.homeScore > g.awayScore ? 'text-primary' : 'text-slate-400',
+                                                )}>
+                                                    {g.homeScore}
+                                                </Text>
+                                                <Text className="text-[10px] font-black text-slate-700">:</Text>
+                                                <Text className={cn(
+                                                    'text-sm font-black w-8',
+                                                    g.awayScore > g.homeScore ? 'text-primary' : 'text-slate-400',
+                                                )}>
+                                                    {g.awayScore}
+                                                </Text>
+                                                <View className="w-16" />
+                                            </View>
+                                        ))}
+                                    </View>
+                                ))}
+                            </View>
+                        )}
                     </View>
                 </View>
 
@@ -1222,7 +1357,25 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {/* Score Input Card */}
+                {/* Score Input Card — a series is entered game by game, a single game keeps the
+                    original two-input layout. */}
+                {isSeriesMatch ? (
+                    <View className="mb-5">
+                        <SeriesScoreEntry
+                            key={`edit-${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
+                            leftName={homeIdentity.username}
+                            rightName={awayIdentity.username}
+                            format={seriesFormat}
+                            allowTiebreak={!!matchDetails.allowsTieBreak}
+                            initialGames={reportedGames}
+                            onChange={(games, outcome, complete) => {
+                                setSeriesGames(games);
+                                setSeriesOutcome(outcome);
+                                setIsSeriesComplete(complete);
+                            }}
+                        />
+                    </View>
+                ) : (
                 <View className="bg-[#111827]/60 rounded-[28px] border border-white/[0.06] p-5 mb-5">
                     <View className="flex-row items-center justify-center gap-4">
                         <View className="flex-1 items-center gap-3">
@@ -1269,6 +1422,7 @@ export function MatchDetailsModal({
                         </View>
                     </View>
                 </View>
+                )}
 
                 {/* Evidence Section */}
                 <View className="mb-5">
@@ -1508,7 +1662,37 @@ export function MatchDetailsModal({
                         </View>
                     )}
 
-                    {/* Players & Score Input */}
+                    {/* A tiebreak-pending match already has its main series in — say why more games
+                        are being asked for before the form does. */}
+                    {isTieBreakPending && (
+                        <View className="flex-row items-center gap-3 mb-4 p-3.5 rounded-2xl bg-warning/[0.08] border border-warning/20">
+                            <Ionicons name="flash" size={16} color="#F59E0B" />
+                            <View className="flex-1">
+                                <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">Tiebreak Needed</Text>
+                                <Text className="text-[11px] text-slate-400 mt-0.5">
+                                    The series finished level. Add the tiebreak games to decide the match.
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Players & Score Input — game by game for a series, one line for a single game. */}
+                    {isSeriesMatch ? (
+                        <SeriesScoreEntry
+                            key={`report-${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
+                            leftName={effectiveHome?.username || 'Home'}
+                            rightName={effectiveAway?.username || opponentName || 'Away'}
+                            format={seriesFormat}
+                            allowTiebreak={!!matchDetails?.allowsTieBreak}
+                            initialGames={reportedGames}
+                            editable={canSubmit}
+                            onChange={(games, outcome, complete) => {
+                                setSeriesGames(games);
+                                setSeriesOutcome(outcome);
+                                setIsSeriesComplete(complete);
+                            }}
+                        />
+                    ) : (
                     <View className="flex-row items-center justify-center gap-4">
                         <View className="flex-1 items-center gap-3">
                             <PlayerAvatar src={homeAvatar} name={effectiveHome?.username || 'Home'} size="lg" className="rounded-2xl border-0" />
@@ -1555,6 +1739,7 @@ export function MatchDetailsModal({
                             />
                         </View>
                     </View>
+                    )}
                 </View>
 
                 {/* Action Buttons */}

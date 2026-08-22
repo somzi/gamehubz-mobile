@@ -19,6 +19,8 @@ import { CountryPicker } from '../ui/CountryPicker';
 import { DateTimePickerModal } from './DateTimePickerModal';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { MatchFormatPicker } from '../match/MatchFormatPicker';
+import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
 
 const YES_NO_OPTIONS = [
@@ -134,6 +136,17 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         String((tournament?.teamWinCondition ?? tournament?.TeamWinCondition) ?? '0')
     );
 
+    // Series format. Unlike the structural fields below, this stays editable for the whole life of
+    // the tournament: a match freezes its own format the moment a result lands on it, so a change
+    // here only ever reaches fixtures still to be played.
+    const [bestOf, setBestOf] = useState(normalizeBestOf(tournament?.bestOf ?? tournament?.BestOf));
+    const [seriesWinCondition, setSeriesWinCondition] = useState<SeriesWinConditionValue>(
+        normalizeCondition(tournament?.seriesWinCondition ?? tournament?.SeriesWinCondition)
+    );
+    const [tiebreakBestOf, setTiebreakBestOf] = useState<number | null>(
+        (tournament?.tiebreakBestOf ?? tournament?.TiebreakBestOf) ?? null
+    );
+
     // Scope: country list overrides region. Pre-fill the scope toggle from the persisted Countries.
     const initialCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
         ? (tournament?.countries ?? tournament?.Countries)
@@ -235,6 +248,14 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const canShowThirdPlace =
         selectedFormat !== String(TournamentFormat.League) && !usesDoubleElimBracket && thirdPlaceEntrants > 2;
 
+    // Does this tournament ever play a knockout match? The only place a level series has to be
+    // replayed — League records it as a draw, and Swiss only knocks out when a bracket follows.
+    const hasKnockoutPhase =
+        selectedFormat === String(TournamentFormat.SingleElimination) ||
+        selectedFormat === String(TournamentFormat.DoubleElimination) ||
+        selectedFormat === String(TournamentFormat.GroupStageWithKnockout) ||
+        (isSwiss && swissKnockoutSize > 0);
+
     useEffect(() => {
         if (!isTeamTournament) {
             return;
@@ -274,6 +295,9 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setAllowReserves(Boolean(tournament?.allowReserves ?? tournament?.AllowReserves));
         setMaxReserves(String(tournament?.maxReserves ?? tournament?.MaxReserves ?? ''));
         setTeamWinCondition(String((tournament?.teamWinCondition ?? tournament?.TeamWinCondition) ?? '0'));
+        setBestOf(normalizeBestOf(tournament?.bestOf ?? tournament?.BestOf));
+        setSeriesWinCondition(normalizeCondition(tournament?.seriesWinCondition ?? tournament?.SeriesWinCondition));
+        setTiebreakBestOf((tournament?.tiebreakBestOf ?? tournament?.TiebreakBestOf) ?? null);
         const refreshedCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
             ? (tournament?.countries ?? tournament?.Countries)
             : [];
@@ -441,6 +465,12 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 // pure Swiss) so a format switch clears a stale flag.
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
+                // Series format — applied whenever AllowStructuralEdits is set, with no start-date
+                // gate: already-played matches carry their own frozen format, so this can only
+                // change fixtures that have yet to be reported.
+                BestOf: bestOf,
+                SeriesWinCondition: seriesWinCondition,
+                TiebreakBestOf: hasKnockoutPhase ? tiebreakBestOf : null,
                 // Structural fields the backend will only honour when AllowStructuralEdits=true and the
                 // tournament hasn't started; otherwise it preserves the persisted values regardless of
                 // what we send. IsTeamTournament is locked forever — sent for completeness only.
@@ -549,6 +579,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         isExclusive ? 'Exclusive' : null,
     ].filter(Boolean).join(' · ');
     const matchSettingsSummary = [
+        bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? 'Total score' : 'Games won'}` : 'Single game',
         requireResultApproval ? 'Result approval' : null,
         canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
@@ -599,7 +630,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                             )}
 
                             {/* ── Basics: name, size, format ── */}
-                            <CollapsibleSection icon="trophy" title="Basics" defaultOpen summary={basicsSummary}>
+                            <CollapsibleSection icon="trophy" title="Basic info" defaultOpen summary={basicsSummary}>
                                 <View className="gap-4">
                                     <View>
                                         <Text className={FIELD_LABEL}>Tournament Name *</Text>
@@ -861,6 +892,20 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                             {/* ── Match Settings ── */}
                             <CollapsibleSection icon="options" title="Match Settings" color="#38BDF8" summary={matchSettingsSummary}>
                                 <View className="gap-4">
+                                    {/* Editable at any point in the tournament: matches already reported
+                                        keep the format they were played under, so this only reaches
+                                        fixtures still to come. */}
+                                    <MatchFormatPicker
+                                        bestOf={bestOf}
+                                        onBestOfChange={setBestOf}
+                                        winCondition={seriesWinCondition}
+                                        onWinConditionChange={setSeriesWinCondition}
+                                        tiebreakBestOf={tiebreakBestOf}
+                                        onTiebreakBestOfChange={setTiebreakBestOf}
+                                        hasKnockout={hasKnockoutPhase}
+                                        isTeamTournament={isTeamTournament}
+                                    />
+
                                     <View>
                                         <Text className={FIELD_LABEL}>Require Result Approval</Text>
                                         {/* Approval can be toggled any time — even mid-tournament — since it only

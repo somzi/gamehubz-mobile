@@ -2,7 +2,7 @@
 const IS_PROD = !__DEV__;
 const PROD_URL = 'https://codespheresolutions.dev';
 // For local development on physical devices, use your computer's local IP
-const LOCAL_IP = '192.168.1.2';
+const LOCAL_IP = '192.168.1.39';
 const LOCAL_PORT = '5057';
 const LOCAL_URL = `http://${LOCAL_IP}:${LOCAL_PORT}`;
 
@@ -68,6 +68,10 @@ export const ENDPOINTS = {
     // Admin-only: manually swap two first-round teams' bracket positions (re-seed).
     SWAP_BRACKET: (id: string) => `${API_BASE_URL}/api/tournament/${id}/bracket/swap`,
     REPORT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult`,
+    // v2 reports the whole best-of series game by game. The server derives the headline score and
+    // the winner from the games, and can park a level knockout series in TieBreakRequired — neither
+    // of which v1 can express, so every series match goes through here.
+    REPORT_MATCH_SERIES_RESULT: `${API_BASE_URL}/api/tournament/v2/matchResult`,
     APPROVE_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/approve`,
     REJECT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/reject`,
     REVERT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/revert`,
@@ -91,6 +95,9 @@ export const ENDPOINTS = {
     DELETE_HUB_SOCIAL: (id: string) => `${API_BASE_URL}/api/HubSocial/${id}`,
     UPDATE_TOURNAMENT: `${API_BASE_URL}/api/tournament/update`,
     SET_ROUND_SCHEDULE: (id: string) => `${API_BASE_URL}/api/tournament/${id}/roundSchedule`,
+    // Per-round best-of, the format sibling of SET_ROUND_SCHEDULE. Matches already reported keep
+    // the format they were played under; the response says how many were skipped for that reason.
+    SET_ROUND_BEST_OF: (id: string) => `${API_BASE_URL}/api/tournament/${id}/roundBestOf`,
     CANCEL_TOURNAMENT: (id: string) => `${API_BASE_URL}/api/tournament/${id}/cancel`,
     HARD_DELETE_TOURNAMENT: (id: string) => `${API_BASE_URL}/api/tournament/${id}/hardDelete`,
     OPEN_REGISTRATION: (id: string) => `${API_BASE_URL}/api/tournament/${id}/openRegistration`,

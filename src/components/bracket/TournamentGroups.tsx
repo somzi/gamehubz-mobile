@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
-import { BracketMatch, teamProgressFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom, seriesInfoFrom } from './BracketMatch';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -318,6 +318,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 isTeamTournament={isTeamTournament}
                                                 proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                 teamProgress={teamProgressFrom(match)}
+                                                series={seriesInfoFrom(match)}
                                             />
                                         ))}
                                     </View>
