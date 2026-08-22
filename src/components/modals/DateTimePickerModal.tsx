@@ -168,31 +168,31 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
         );
     };
 
+    // Hours render as a full wrap-grid (not a horizontal strip). A horizontal ScrollView
+    // nested inside the modal's vertical ScrollView can't be panned right on Android — the
+    // parent steals the gesture — so we drop horizontal scrolling entirely. All 24 hours stay
+    // visible at once (6 per row), which reads better and behaves identically on iOS.
     const renderTimeGrid = (items: number[], current: number, onSelect: (val: number) => void, label: string) => (
         <View className="mt-6">
             <Text className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest">{label}</Text>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingBottom: 8 }}
-            >
+            <View className="flex-row flex-wrap">
                 {items.map((item) => {
                     const active = item === current;
                     return (
-                        <TouchableOpacity
-                            key={item}
-                            onPress={() => onSelect(item)}
-                            className={`w-12 h-12 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-card border-white/5'
-                                }`}
-                        >
-                            <Text className={`font-bold ${active ? 'text-background' : 'text-white'}`}>
-                                {String(item).padStart(2, '0')}
-                            </Text>
-                        </TouchableOpacity>
+                        <View key={item} className="w-[16.66%] p-1">
+                            <TouchableOpacity
+                                onPress={() => onSelect(item)}
+                                className={`h-11 rounded-xl justify-center items-center border ${active ? 'bg-primary border-primary' : 'bg-card border-white/5'
+                                    }`}
+                            >
+                                <Text className={`font-bold ${active ? 'text-background' : 'text-white'}`}>
+                                    {String(item).padStart(2, '0')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     );
                 })}
-            </ScrollView>
+            </View>
         </View>
     );
 
