@@ -2479,6 +2479,17 @@ export default function TournamentDetailsScreen() {
                                     label="Start Date"
                                     value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD'}
                                 />
+                                {tournament.registrationDeadline && (
+                                    <InfoRow
+                                        icon="time-outline"
+                                        iconColor="#EF4444"
+                                        label="Reg. Deadline"
+                                        value={(() => {
+                                            const d = new Date(tournament.registrationDeadline);
+                                            return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                                        })()}
+                                    />
+                                )}
                                 {(tournament.countries && tournament.countries.length > 0) ? (
                                     tournament.countries.length === 1 ? (
                                         <InfoRow

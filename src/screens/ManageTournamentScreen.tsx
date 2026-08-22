@@ -50,6 +50,11 @@ export default function ManageTournamentScreen() {
                     status: rawData.status !== undefined ? rawData.status : rawData.Status,
                     name: rawData.name || rawData.Name,
                     createdBy: rawData.createdBy || rawData.createdby || rawData.CreatedBy,
+                    // Backend serializes this as `registrationDeadLine` (capital L — a DTO typo that
+                    // shipped wide). EditTournamentModal reads `registrationDeadline`, so normalize
+                    // every spelling here or the deadline field opens blank even though it's set.
+                    // Mirrors the details-screen and web normalizers.
+                    registrationDeadline: rawData.registrationDeadline || rawData.RegistrationDeadLine || rawData.registrationDeadLine,
                 });
             } else if (response.status === 404) {
                 setTournament(null);
