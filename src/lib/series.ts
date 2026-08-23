@@ -30,7 +30,7 @@ export interface SeriesFormat {
 }
 
 export interface SeriesOutcome {
-    /** Score of the deciding (last) series — what the card shows. */
+    /** Every series added together — what the card shows, and what the listed games add up to. */
     homeHeadline: number;
     awayHeadline: number;
     /** Real goals across every game of every series. */
@@ -50,7 +50,7 @@ export interface SeriesOutcome {
 export const MAX_BEST_OF = 15;
 
 /** Wins needed to settle a Best-of under MatchWins, assuming no drawn games. */
-function winsNeeded(bestOf: number): number {
+export function winsNeeded(bestOf: number): number {
     return Math.floor(normalizeBestOf(bestOf) / 2) + 1;
 }
 
@@ -111,6 +111,25 @@ function scoreSeries(
     return { home: homeWins, away: awayWins, over: clinched || remaining === 0 };
 }
 
+/**
+ * How many games of a series must be played no matter how it goes — the rows the entry form can
+ * unlock up front. Under MatchWins that is the win target (a Bo5 always plays at least 3); under
+ * AggregateScore every game is played, because totals can be overturned to the very last one.
+ */
+export function minimumGamesRequired(bestOf: number, condition: SeriesWinConditionValue): number {
+    const n = normalizeBestOf(bestOf);
+    return condition === SeriesWinCondition.AggregateScore ? n : winsNeeded(n);
+}
+
+/** Whether one series, judged on its own games and best-of, can still take another game. */
+export function isSeriesOver(
+    games: SeriesGame[],
+    bestOf: number,
+    condition: SeriesWinConditionValue,
+): boolean {
+    return scoreSeries(games, condition, bestOf).over;
+}
+
 /** Reads a game list into an outcome. An empty list describes a match that has not started. */
 export function evaluateSeries(games: SeriesGame[], format: SeriesFormat): SeriesOutcome {
     let homeGoals = 0;
@@ -128,9 +147,21 @@ export function evaluateSeries(games: SeriesGame[], format: SeriesFormat): Serie
     const bestOf = bestOfForSeries(currentSeriesNumber, format);
     const { home, away, over } = scoreSeries(currentGames, format.condition, bestOf);
 
+    // The headline counts every series, not just the deciding one, so it always matches what a
+    // reader can add up from the games listed. Safe for the winner: a tiebreak only exists because
+    // the series before it finished level, so each adds the same amount to both sides.
+    let homeHeadline = 0;
+    let awayHeadline = 0;
+    for (const number of [...new Set(games.map(g => g.seriesNumber))]) {
+        const slice = games.filter(g => g.seriesNumber === number);
+        const scored = scoreSeries(slice, format.condition, bestOfForSeries(number, format));
+        homeHeadline += scored.home;
+        awayHeadline += scored.away;
+    }
+
     return {
-        homeHeadline: home,
-        awayHeadline: away,
+        homeHeadline,
+        awayHeadline,
         homeGoals,
         awayGoals,
         currentSeriesNumber,
@@ -140,6 +171,27 @@ export function evaluateSeries(games: SeriesGame[], format: SeriesFormat): Serie
         isLevel: over && home === away,
         canAddGame: !over,
     };
+}
+
+/**
+ * The games of one series that could actually have been played: everything up to and including the
+ * one that decided it.
+ *
+ * A decided series takes no further games — a Bo3 won 2–0 has no third — and the server refuses a
+ * submission carrying one. Stored lists never contain them (the entry form locks those rows), but
+ * hand-made or pre-rule data can, and loading it straight into the form would produce an edit that
+ * can never be saved. Trimming here keeps the form and the server telling the same story.
+ * Aggregate series never clinch early, so this only ever bites MatchWins.
+ */
+export function playableGames(
+    games: SeriesGame[],
+    bestOf: number,
+    condition: SeriesWinConditionValue,
+): SeriesGame[] {
+    for (let count = 1; count < games.length; count++) {
+        if (isSeriesOver(games.slice(0, count), bestOf, condition)) return games.slice(0, count);
+    }
+    return games;
 }
 
 /** Groups games into their series, in order, for the "Main series / Tiebreak 1 / …" blocks. */

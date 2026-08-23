@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchTimingStrip } from '../match/MatchTimingStrip';
-import { PlayerIdentity, hasDistinctNickname } from '../match/PlayerIdentity';
+import { PlayerIdentity, hasNickname } from '../match/PlayerIdentity';
 import { EvidenceSection } from '../match/EvidenceSection';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
@@ -21,9 +21,10 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { cn, parseUtcDate } from '../../lib/utils';
+import { cn, parseUtcDate, formatDateTimeShort } from '../../lib/utils';
 import { MatchStage } from '../../types/tournament';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
+import { scrollRowIntoView } from '../../lib/scrollIntoView';
 import {
     SeriesFormat,
     SeriesGame,
@@ -181,7 +182,14 @@ export function MatchDetailsModal({
 
     // Details for completed matches
     const [matchDetails, setMatchDetails] = useState<MatchResultDetailDto | null>(null);
-    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    // Starts true: the details fetch is kicked off by an effect, which runs after the first render.
+    // Defaulting to false let that first frame draw with no details at all — which for a best-of
+    // match meant the single-score form appeared and was then replaced.
+    const mainScrollViewRef = useRef<ScrollView>(null);
+    // Live scroll offset, kept in a ref so tracking it costs no re-renders.
+    const mainScrollY = useRef(0);
+
+    const [isLoadingDetails, setIsLoadingDetails] = useState(true);
 
     // Backend MatchStatus.NoShow (5): a fixture an admin closed as a double walkover. Terminal
     // like Completed — and reversible — so it shares the completed rendering path, with its own
@@ -194,12 +202,15 @@ export function MatchDetailsModal({
 
     // Series format for this match, resolved server-side. A backend without the feature (or a plain
     // single-game match) reports Bo1 with no games, which keeps the original two-input form.
-    const seriesFormat: SeriesFormat = {
+    // Memoised because it is handed straight to SeriesScoreEntry: a fresh object every render made
+    // the entry form's derived state churn, and the state it pushes back up re-rendered this
+    // component, which produced the next fresh object.
+    const seriesFormat: SeriesFormat = React.useMemo(() => ({
         bestOf: normalizeBestOf(matchDetails?.bestOf),
         tiebreakBestOf: matchDetails?.tiebreakBestOf ?? null,
         condition: normalizeCondition(matchDetails?.seriesWinCondition),
-    };
-    const reportedGames = matchDetails?.games ?? [];
+    }), [matchDetails?.bestOf, matchDetails?.tiebreakBestOf, matchDetails?.seriesWinCondition]);
+    const reportedGames = React.useMemo(() => matchDetails?.games ?? [], [matchDetails?.games]);
     const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0;
 
     // Image preview state
@@ -295,6 +306,12 @@ export function MatchDetailsModal({
             // availability in a single round-trip. It handles setting all three; the legacy
             // fetchAvailability / streams effect only runs as a fallback.
             fetchMatchDetails();
+        } else {
+            // Closed: re-arm for the next open. matchDetails deliberately survives the close
+            // (reopening the same match is instant), but it must not be rendered as if it were
+            // already refreshed. Open with no matchId is the opposite case — nothing will ever
+            // arrive, so the form must not sit behind the loading gate forever.
+            setIsLoadingDetails(!visible);
         }
     }, [visible, status, matchId, evidences, home, away]);
 
@@ -408,15 +425,9 @@ export function MatchDetailsModal({
                     };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
-                    const date = parseUtcDate(normalizedData.scheduledTime);
                     setConfirmedTimeIso(normalizedData.scheduledTime);
-                    setConfirmedTime(date.toLocaleString(undefined, {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }));
+                    // Clock stacked under the date — the tile is too narrow for one line.
+                    setConfirmedTime(formatDateTimeShort(normalizedData.scheduledTime, '\n'));
                 }
             } else {
                 setError('Failed to load match results');
@@ -987,8 +998,7 @@ export function MatchDetailsModal({
     // One player having a nickname makes their column taller — reserve the line on both sides so
     // the pairing (and the winner chip under it) stays level.
     const pairingHasNickname =
-        hasDistinctNickname(homeIdentity.username, homeIdentity.nickname) ||
-        hasDistinctNickname(awayIdentity.username, awayIdentity.nickname);
+        hasNickname(homeIdentity.nickname) || hasNickname(awayIdentity.nickname);
 
     // Participants only get Edit/Delete when the result is cleanly revertable (canRevert). Owners/admins
     // also get them when the bracket has progressed downstream — they can cascade-reopen the collateral
@@ -1364,10 +1374,15 @@ export function MatchDetailsModal({
                         <SeriesScoreEntry
                             key={`edit-${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
                             leftName={homeIdentity.username}
+                            leftNickname={homeIdentity.nickname}
+                            leftAvatarUrl={homeAvatar}
                             rightName={awayIdentity.username}
+                            rightNickname={awayIdentity.nickname}
+                            rightAvatarUrl={awayAvatar}
                             format={seriesFormat}
                             allowTiebreak={!!matchDetails.allowsTieBreak}
                             initialGames={reportedGames}
+                            onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                             onChange={(games, outcome, complete) => {
                                 setSeriesGames(games);
                                 setSeriesOutcome(outcome);
@@ -1676,16 +1691,28 @@ export function MatchDetailsModal({
                         </View>
                     )}
 
-                    {/* Players & Score Input — game by game for a series, one line for a single game. */}
-                    {isSeriesMatch ? (
+                    {/* Players & Score Input — game by game for a series, one line for a single game.
+                        Held back until the details arrive: the format is what decides which of the
+                        two forms is correct, and swapping one for the other mid-view reads as the
+                        modal reopening itself. */}
+                    {isLoadingDetails ? (
+                        <View className="py-10 items-center justify-center">
+                            <ActivityIndicator size="small" color="#10B981" />
+                        </View>
+                    ) : isSeriesMatch ? (
                         <SeriesScoreEntry
                             key={`report-${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
                             leftName={effectiveHome?.username || 'Home'}
+                            leftNickname={homeIdentity.nickname}
+                            leftAvatarUrl={homeAvatar}
                             rightName={effectiveAway?.username || opponentName || 'Away'}
+                            rightNickname={awayIdentity.nickname}
+                            rightAvatarUrl={awayAvatar}
                             format={seriesFormat}
                             allowTiebreak={!!matchDetails?.allowsTieBreak}
                             initialGames={reportedGames}
                             editable={canSubmit}
+                            onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                             onChange={(games, outcome, complete) => {
                                 setSeriesGames(games);
                                 setSeriesOutcome(outcome);
@@ -2033,6 +2060,9 @@ export function MatchDetailsModal({
                     })()
                 ) : (
                 <ScrollView
+                    ref={mainScrollViewRef}
+                    onScroll={e => { mainScrollY.current = e.nativeEvent.contentOffset.y; }}
+                    scrollEventThrottle={16}
                     className="flex-1"
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 40 }}

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { BracketMatch, teamProgressFrom, seriesInfoFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom } from './BracketMatch';
+import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,6 +12,11 @@ const UNIT = MATCH_H + BASE_GAP; // 146 px per R1 slot
 const MATCH_W = 220;            // fixed card width
 const CONNECTOR_W = 40;         // width of connector column between rounds
 const HEADER_H = 64;            // height of round header row
+const FORMAT_ROW_H = 18;        // extra header height when the round shows its best-of caption
+// A card with a status header ("Report Result", "Completed", …) stands ~16px taller than its
+// MATCH_H slot, and drops a shadow below that. The canvas is clipped to its computed height, so
+// without this reserve the bottom card of a column comes out visibly sliced off.
+const CARD_OVERHANG = 24;
 const STROKE = 1.5;
 const LINE_DEFAULT = 'rgba(255,255,255,0.06)';
 const LINE_MY_PATH = 'rgba(99,102,241,0.25)';
@@ -98,11 +104,17 @@ export function TournamentBracket({
 
     /* Total height of the match area — driven by the first (largest) round */
     const maxR1 = rounds[0].matches.length || 1;
-    const totalH = maxR1 * UNIT - BASE_GAP;
+    const totalH = maxR1 * UNIT - BASE_GAP + CARD_OVERHANG;
+
+    /* Best-of caption per round. It lives in the header, not on the cards: the cards sit in fixed
+       MATCH_H slots, so a strip on them would overflow into the next slot. */
+    const roundFormats = useMemo(() => rounds.map(r => roundSeriesFormat(r.matches)), [rounds]);
+    /* One height for every column, so the cards of all rounds stay on the same baseline. */
+    const headerH = HEADER_H + (roundFormats.some(Boolean) ? FORMAT_ROW_H : 0);
 
     /* Exact pixel dimensions of the bracket canvas */
     const contentWidth = rounds.length * MATCH_W + (rounds.length - 1) * CONNECTOR_W;
-    const contentHeight = HEADER_H + totalH;
+    const contentHeight = headerH + totalH;
 
     /* Match id → Match lookup */
     const matchById = useMemo(() => {
@@ -153,7 +165,7 @@ export function TournamentBracket({
                             <View style={{ width: MATCH_W }}>
 
                                 {/* Header pill */}
-                                <View style={{ height: HEADER_H, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 10 }}>
+                                <View style={{ height: headerH, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 10 }}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                         <View style={{
                                             flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -210,6 +222,13 @@ export function TournamentBracket({
                                             </Text>
                                         </View>
                                     )}
+                                    {roundFormats[roundIdx] && (
+                                        <SeriesFormatChip
+                                            format={roundFormats[roundIdx]!}
+                                            isTeamTournament={isTeamTournament}
+                                            style={{ marginTop: 4 }}
+                                        />
+                                    )}
                                 </View>
 
                                 {/* Match cards — absolutely positioned within the match area */}
@@ -234,7 +253,6 @@ export function TournamentBracket({
                                                     isTeamTournament={isTeamTournament}
                                                     proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                     teamProgress={teamProgressFrom(match)}
-                                                    series={seriesInfoFrom(match)}
                                                     className={isHighlighted ? 'border-indigo-500/30' : undefined}
                                                 />
                                             </View>
@@ -245,14 +263,14 @@ export function TournamentBracket({
 
                             {/* ── Connector column ──────────────────────────── */}
                             {!isLastRound && (
-                                <View style={{ width: CONNECTOR_W, height: HEADER_H + totalH, position: 'relative' }}>
+                                <View style={{ width: CONNECTOR_W, height: headerH + totalH, position: 'relative' }}>
                                     {Array.from({ length: Math.floor(round.matches.length / 2) }, (_, j) => {
                                         const topMatch = round.matches[2 * j];
                                         const botMatch = round.matches[2 * j + 1];
                                         if (!topMatch || !botMatch) return null;
 
-                                        const topCenter = HEADER_H + computeMatchTop(roundIdx, 2 * j) + MATCH_H / 2;
-                                        const botCenter = HEADER_H + computeMatchTop(roundIdx, 2 * j + 1) + MATCH_H / 2;
+                                        const topCenter = headerH + computeMatchTop(roundIdx, 2 * j) + MATCH_H / 2;
+                                        const botCenter = headerH + computeMatchTop(roundIdx, 2 * j + 1) + MATCH_H / 2;
                                         const midCenter = (topCenter + botCenter) / 2;
                                         const halfW = CONNECTOR_W / 2;
 

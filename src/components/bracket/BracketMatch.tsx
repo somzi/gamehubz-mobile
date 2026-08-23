@@ -6,15 +6,6 @@ import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import {
-    SeriesGame,
-    SeriesWinCondition,
-    SeriesWinConditionValue,
-    seriesFormatFrom,
-    seriesGamesFrom,
-    groupBySeries,
-    seriesBlockLabel,
-} from '../../lib/series';
 
 interface Participant {
     participantId: string;
@@ -50,26 +41,6 @@ export function teamProgressFrom(match: any): TeamProgress | null {
     };
 }
 
-/** Series format and games for a card, so it can say how the match is played, not just the score. */
-export interface SeriesInfo {
-    bestOf: number;
-    condition: SeriesWinConditionValue;
-    games: SeriesGame[];
-}
-
-/**
- * Pulls the series block off a bracket match payload. A backend without the series feature (or a
- * plain single-game match) reports Bo1 with no games, which returns null — those cards keep their
- * original, unlabelled look.
- */
-export function seriesInfoFrom(match: any): SeriesInfo | null {
-    const format = seriesFormatFrom(match);
-    const games = seriesGamesFrom(match);
-    if (format.bestOf <= 1 && games.length === 0) return null;
-
-    return { bestOf: format.bestOf, condition: format.condition, games };
-}
-
 interface BracketMatchProps {
     home: Participant | null;
     away: Participant | null;
@@ -85,13 +56,11 @@ interface BracketMatchProps {
     proposedByUserId?: string | null;
     // Team fixtures only: lets the card show the running score mid-fixture instead of a dash.
     teamProgress?: TeamProgress | null;
-    // Best-of format and the games played, so the card can label the format and break the score down.
-    series?: SeriesInfo | null;
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, series }: BracketMatchProps) {
+export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress }: BracketMatchProps) {
     const navigation = useNavigation<NavigationProp>();
 
     // A team fixture with at least one game decided but no settled result yet. The final Score
@@ -392,44 +361,6 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             {renderParticipant(home, 'top')}
             <View className="h-px mx-4" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
             {renderParticipant(away, 'bottom')}
-
-            {/* Format strip: what the score on this card actually means. Without it "2–1" could be
-                a single game, a series, or an aggregate — the number alone is ambiguous. */}
-            {series && <SeriesStrip series={series} isTeamTournament={!!isTeamTournament} />}
         </Pressable>
-    );
-}
-
-function SeriesStrip({ series, isTeamTournament }: { series: SeriesInfo; isTeamTournament: boolean }) {
-    const { bestOf, condition, games } = series;
-    const blocks = groupBySeries(games);
-
-    return (
-        <View className="px-4 py-2 border-t border-white/[0.04] gap-1">
-            <View className="flex-row items-center gap-1.5">
-                <View className="px-1.5 py-0.5 rounded-md bg-white/[0.06]">
-                    <Text className="text-[9px] font-black text-slate-400 tracking-[1px]">BO{bestOf}</Text>
-                </View>
-                <Text className="text-[9px] font-bold text-slate-600 uppercase tracking-[1px]">
-                    {condition === SeriesWinCondition.AggregateScore ? 'Total score' : 'Games won'}
-                    {isTeamTournament ? ' · per game' : ''}
-                </Text>
-            </View>
-
-            {blocks.map(block => (
-                <View key={block.seriesNumber} className="flex-row items-center flex-wrap gap-x-2 gap-y-0.5">
-                    {block.seriesNumber > 1 && (
-                        <Text className="text-[9px] font-black text-warning uppercase tracking-[1px]">
-                            {seriesBlockLabel(block.seriesNumber)}
-                        </Text>
-                    )}
-                    {block.games.map((g, i) => (
-                        <Text key={i} className="text-[10px] font-bold text-slate-500">
-                            {g.homeScore}:{g.awayScore}
-                        </Text>
-                    ))}
-                </View>
-            ))}
-        </View>
     );
 }

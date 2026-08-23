@@ -11,12 +11,13 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
-import { BracketMatch, teamProgressFrom, seriesInfoFrom } from '../components/bracket/BracketMatch';
+import { BracketMatch, teamProgressFrom } from '../components/bracket/BracketMatch';
+import { SeriesFormatChip, matchSeriesFormat } from '../components/bracket/SeriesFormatChip';
 
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
-import { cn, getCurrencyLabel, parseUtcDate } from '../lib/utils';
+import { cn, getCurrencyLabel, parseUtcDate, formatDateTimeShort } from '../lib/utils';
 import { normalizeBestOf } from '../lib/series';
 import { ShareTournamentCardModal } from '../components/modals/ShareTournamentCardModal';
 import { useAuth } from '../context/AuthContext';
@@ -1446,7 +1447,10 @@ export default function TournamentDetailsScreen() {
                 const result = await formatResponse.json().catch(() => null);
                 const skipped = result?.skippedLockedMatches ?? result?.SkippedLockedMatches ?? 0;
                 if (skipped > 0) {
-                    formatNote = ` ${skipped} already-reported ${skipped === 1 ? 'match keeps its' : 'matches keep their'} format.`;
+                    // Name the way out too: deleting a result puts that match back on the round's
+                    // current format, which is otherwise impossible to discover.
+                    formatNote = ` ${skipped} already-reported ${skipped === 1 ? 'match keeps its' : 'matches keep their'} format`
+                        + ` — delete ${skipped === 1 ? 'its result' : 'their results'} to re-format ${skipped === 1 ? 'it' : 'them'}.`;
                 }
             }
 
@@ -2020,6 +2024,13 @@ export default function TournamentDetailsScreen() {
                                 <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
                                     <Ionicons name="trophy" size={16} color="#FBBF24" />
                                     <Text className="text-sm font-bold text-white">Grand Final</Text>
+                                    {matchSeriesFormat(grandFinalMatch) && (
+                                        <SeriesFormatChip
+                                            format={matchSeriesFormat(grandFinalMatch)!}
+                                            isTeamTournament={tournament?.isTeamTournament}
+                                            style={{ marginLeft: 2 }}
+                                        />
+                                    )}
                                 </View>
                                 <View style={{ maxWidth: 320 }}>
                                     <BracketMatch
@@ -2033,7 +2044,6 @@ export default function TournamentDetailsScreen() {
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                         teamProgress={teamProgressFrom(grandFinalMatch)}
-                                        series={seriesInfoFrom(grandFinalMatch)}
                                     />
                                 </View>
                             </View>
@@ -2043,6 +2053,13 @@ export default function TournamentDetailsScreen() {
                                 <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
                                     <Ionicons name="trophy" size={16} color="#FBBF24" />
                                     <Text className="text-sm font-bold text-white">Grand Final (Reset)</Text>
+                                    {matchSeriesFormat(grandFinalResetMatch) && (
+                                        <SeriesFormatChip
+                                            format={matchSeriesFormat(grandFinalResetMatch)!}
+                                            isTeamTournament={tournament?.isTeamTournament}
+                                            style={{ marginLeft: 2 }}
+                                        />
+                                    )}
                                 </View>
                                 <View style={{ maxWidth: 320 }}>
                                     <BracketMatch
@@ -2056,7 +2073,6 @@ export default function TournamentDetailsScreen() {
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                         teamProgress={teamProgressFrom(grandFinalResetMatch)}
-                                        series={seriesInfoFrom(grandFinalResetMatch)}
                                     />
                                 </View>
                             </View>
@@ -2070,6 +2086,13 @@ export default function TournamentDetailsScreen() {
                                     <View className="flex-row items-center" style={{ gap: 6 }}>
                                         <Ionicons name="medal-outline" size={16} color="#CD7F32" />
                                         <Text className="text-sm font-bold text-white">Third Place Match</Text>
+                                        {matchSeriesFormat(thirdPlaceMatch) && (
+                                            <SeriesFormatChip
+                                                format={matchSeriesFormat(thirdPlaceMatch)!}
+                                                isTeamTournament={tournament?.isTeamTournament}
+                                                style={{ marginLeft: 2 }}
+                                            />
+                                        )}
                                     </View>
                                     <Ionicons
                                         name={isThirdPlaceExpanded ? 'chevron-up' : 'chevron-down'}
@@ -2090,7 +2113,6 @@ export default function TournamentDetailsScreen() {
                                             isAdmin={canManage}
                                             isTeamTournament={tournament?.isTeamTournament}
                                             teamProgress={teamProgressFrom(thirdPlaceMatch)}
-                                            series={seriesInfoFrom(thirdPlaceMatch)}
                                         />
                                     </View>
                                 )}
@@ -3587,15 +3609,10 @@ export default function TournamentDetailsScreen() {
                 tournamentName={tournament?.name}
                 roundName={selectedMatch?.roundName || 'Match Details'}
                 opponentName={selectedMatch?.away?.username}
-                // parseUtcDate, not new Date(): backend timestamps carry no Z suffix, so raw
-                // parsing reads the UTC clock as local and shows a shifted kick-off time.
-                scheduledTime={selectedMatch?.startTime ? parseUtcDate(selectedMatch.startTime).toLocaleString(undefined, {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }) : undefined}
+                // formatDateTimeShort parses as UTC (backend timestamps carry no Z suffix, so raw
+                // parsing reads the UTC clock as local and shows a shifted kick-off time) and
+                // stacks the clock under the date for the narrow Match Time tile.
+                scheduledTime={selectedMatch?.startTime ? formatDateTimeShort(selectedMatch.startTime, '\n') : undefined}
                 // Bracket matches already carry their round deadline, so the modal can show it
                 // immediately instead of waiting for the details round-trip to fill it in.
                 deadline={selectedMatch?.roundDeadline ?? selectedMatch?.RoundDeadline ?? undefined}

@@ -3,7 +3,8 @@ import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
-import { BracketMatch, teamProgressFrom, seriesInfoFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom } from './BracketMatch';
+import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -114,6 +115,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                 const rounds = Object.keys(groupedMatches).map(Number).sort((a, b) => a - b);
                 const activeRound = selectedRounds[group.groupId] || (rounds.length > 0 ? rounds[0] : 1);
                 const currentRoundMatches = groupedMatches[activeRound] || [];
+                const roundFormat = roundSeriesFormat(currentRoundMatches);
 
                 // Buchholz column visible when at least one row carries it — i.e. on Swiss groups.
                 // Sits between Pts and W/D/L since it ranks tied players right after Pts.
@@ -278,6 +280,15 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                             {/* Active Round Content */}
                             {currentRoundMatches.length > 0 && (
                                 <View className="mb-4">
+                                    {/* Best-of caption for the round — one line above the cards instead of a strip on
+                                        each of them, matching the bracket columns. */}
+                                    {roundFormat && (
+                                        <SeriesFormatChip
+                                            format={roundFormat}
+                                            isTeamTournament={isTeamTournament}
+                                            style={{ paddingHorizontal: 4, marginBottom: 12 }}
+                                        />
+                                    )}
                                     {/* Deadline + Edit Schedule row (only if deadline exists or admin) */}
                                     {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4 || m.status === 5)))) && (
                                         <View className="flex-row items-center justify-between px-1 mb-4">
@@ -318,7 +329,6 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 isTeamTournament={isTeamTournament}
                                                 proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                 teamProgress={teamProgressFrom(match)}
-                                                series={seriesInfoFrom(match)}
                                             />
                                         ))}
                                     </View>

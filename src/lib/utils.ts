@@ -11,6 +11,18 @@ export function parseUtcDate(dateStr: string): Date {
     return new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
 }
 
+// "23 Aug 2026, 10:01" — full date plus a 24h clock for a backend UTC timestamp. Assembled from
+// the two parts on purpose: toLocaleString() joins them with the locale's own connector
+// ("23 Aug 2026 at 10:01"). Pass a newline separator to stack the clock under the date.
+export function formatDateTimeShort(dateStr?: string | null, separator = ', '): string {
+    if (!dateStr) return '';
+    const d = parseUtcDate(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const day = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${day}${separator}${time}`;
+}
+
 // Exact local (device-timezone) time for a backend UTC timestamp — never "x ago".
 // Shows just the clock time for today's items and prefixes the date for older ones,
 // so the same instant reads e.g. 15:00 in RS and 18:30 in IN.

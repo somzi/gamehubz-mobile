@@ -5,21 +5,20 @@ import { cn } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
 
 /**
- * Whether a nickname is worth printing next to the username: it exists and actually says
- * something the username doesn't. Older payloads collapse both names into one, and some
- * endpoints fall the nickname back to the username — printing a name twice tells nobody anything.
+ * Whether a nickname line should be printed. A nickname is shown whenever the player has one —
+ * including when it matches the username. It is the name opponents actually recognise in-game, so
+ * its absence reads as "this player has no in-game name", which is a different (and wrong) message
+ * from "their two names happen to be the same".
  * Exported so a caller can reserve the same vertical space on the opposite side of a pairing.
  */
-export function hasDistinctNickname(username?: string | null, nickname?: string | null): boolean {
-    const name = username?.trim() || '';
-    const nick = nickname?.trim() || '';
-    return !!nick && nick.toLowerCase() !== name.toLowerCase();
+export function hasNickname(nickname?: string | null): boolean {
+    return !!nickname?.trim();
 }
 
 interface PlayerIdentityProps {
     /** Account username — the always-visible primary line. */
     username?: string | null;
-    /** In-game nickname. Rendered on its own gamepad line, skipped when absent or redundant. */
+    /** In-game nickname. Rendered on its own gamepad line whenever the player has one. */
     nickname?: string | null;
     /** Which side of the pairing this is — only tints the gamepad icon, matching the home card. */
     tone?: 'home' | 'away';
@@ -43,7 +42,7 @@ export function PlayerIdentity({
 }: PlayerIdentityProps) {
     const name = username?.trim() || '';
     const nick = nickname?.trim() || '';
-    const showNickname = hasDistinctNickname(name, nick);
+    const showNickname = hasNickname(nick);
 
     return (
         <View className={cn('items-center w-full', className)}>

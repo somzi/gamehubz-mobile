@@ -32,6 +32,7 @@ import {
     seriesGamesFrom,
 } from '../../lib/series';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
+import { scrollRowIntoView } from '../../lib/scrollIntoView';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -152,6 +153,10 @@ export function MatchScheduleCard({
     // Solo knockout is the only place a level series waits for a tiebreak; everywhere else it is
     // either a draw (league / group / Swiss) or settled by the team tie one level up.
     const [allowsTiebreak, setAllowsTiebreak] = useState(false);
+    // The series format arrives with the match details, which are fetched after the modal opens.
+    // Until they land, the format is unknown — rendering anyway would draw the single-score form
+    // for a best-of match and then swap it out, which reads as the modal reopening itself.
+    const [detailsLoaded, setDetailsLoaded] = useState(false);
 
     const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0;
 
@@ -181,6 +186,8 @@ export function MatchScheduleCard({
     const [isSendingComment, setIsSendingComment] = useState(false);
     const commentsScrollRef = useRef<ScrollView>(null);
     const mainScrollViewRef = useRef<ScrollView>(null);
+    // Live scroll offset, kept in a ref so tracking it costs no re-renders.
+    const mainScrollY = useRef(0);
     const connectionRef = useRef<HubConnection | null>(null);
     const commentInputRef = useRef<TextInput>(null);
 
@@ -316,7 +323,12 @@ export function MatchScheduleCard({
     const formatCommentTime = (dateString: string) => formatLocalDateTime(dateString);
 
     const fetchDbHomeUserId = async (): Promise<string | null> => {
-        if (!matchId) return null;
+        if (!matchId) {
+            // Nothing to wait for, and the gate below must not strand the form behind a spinner:
+            // callers build this id defensively (`match.id || match.matchId || ''`).
+            setDetailsLoaded(true);
+            return null;
+        }
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
             if (response.ok) {
@@ -397,6 +409,9 @@ export function MatchScheduleCard({
             }
         } catch (error) {
             console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
+        } finally {
+            // Settled either way: a failed fetch must not leave the form hidden behind a spinner.
+            setDetailsLoaded(true);
         }
         return null;
     };
@@ -454,7 +469,10 @@ export function MatchScheduleCard({
 
     // Fetch availability and comments when modal opens
     useEffect(() => {
-        if (!modalVisible) return;
+        if (!modalVisible) {
+            setDetailsLoaded(false);
+            return;
+        }
 
         if (currentStatus === 'pending_availability') {
             fetchAvailability();
@@ -706,6 +724,15 @@ export function MatchScheduleCard({
             let resolvedHomeUserId = dbHomeUserId;
             if (resolvedHomeUserId == null) {
                 resolvedHomeUserId = await fetchDbHomeUserId();
+            }
+
+            // Still unknown after a retry means the details fetch is failing. Reporting anyway
+            // would pick a side by assumption, and picking wrong records the match with the
+            // scores reversed — a far worse outcome than asking for another go.
+            if (resolvedHomeUserId == null) {
+                setError('Could not load this match. Check your connection and try again.');
+                setIsSubmitting(false);
+                return;
             }
 
             const isUserDbHome =
@@ -1245,6 +1272,8 @@ export function MatchScheduleCard({
                                 {activeModalTab === 'match' ? (
                                     <ScrollView
                                         ref={mainScrollViewRef}
+                                        onScroll={e => { mainScrollY.current = e.nativeEvent.contentOffset.y; }}
+                                        scrollEventThrottle={16}
                                         showsVerticalScrollIndicator={false}
                                         keyboardShouldPersistTaps="handled"
                                         contentContainerStyle={{
@@ -1420,12 +1449,22 @@ export function MatchScheduleCard({
                                                     </View>
                                                 )}
                                                 {/* Best-of series: one game at a time, never a wall of blank
-                                                    inputs. Falls back to the single-score form for Bo1. */}
-                                                {isSeriesMatch ? (
+                                                    inputs. Falls back to the single-score form for Bo1.
+                                                    Held back until the details arrive, since the format is
+                                                    what decides which of the two forms is even correct. */}
+                                                {!detailsLoaded ? (
+                                                    <View className="rounded-[20px] bg-card/60 border border-white/[0.04] py-10 items-center justify-center">
+                                                        <ActivityIndicator size="small" color="#10B981" />
+                                                    </View>
+                                                ) : isSeriesMatch ? (
                                                     <SeriesScoreEntry
                                                         key={`${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
                                                         leftName={user?.username || 'You'}
+                                                        leftNickname={userNickname || user?.nickName}
+                                                        leftAvatarUrl={user?.avatarUrl}
                                                         rightName={opponentName}
+                                                        rightNickname={opponentNickname}
+                                                        rightAvatarUrl={opponentAvatarUrl}
                                                         format={seriesFormat}
                                                         allowTiebreak={allowsTiebreak}
                                                         initialGames={visualReportedGames}
@@ -1434,7 +1473,7 @@ export function MatchScheduleCard({
                                                             setSeriesOutcome(outcome);
                                                             setIsSeriesComplete(complete);
                                                         }}
-                                                        onFocusInput={scrollToBottom}
+                                                        onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                                                     />
                                                 ) : (
                                                 <>
@@ -1557,7 +1596,9 @@ export function MatchScheduleCard({
                                                     )}
                                                     <Pressable
                                                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
-                                                        disabled={isSubmitting || isRoundLocked}
+                                                        // Also held while the details load: the format decides what a valid
+                                                        // submission even looks like.
+                                                        disabled={isSubmitting || isRoundLocked || !detailsLoaded}
                                                         className={cn("h-14 rounded-2xl overflow-hidden active:opacity-90", isEditingProposal ? "flex-1" : "w-full")}
                                                         style={{
                                                             shadowColor: isRoundLocked ? '#475569' : '#10B981',

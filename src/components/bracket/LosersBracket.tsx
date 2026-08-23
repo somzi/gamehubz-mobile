@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { BracketMatch, teamProgressFrom, seriesInfoFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom } from './BracketMatch';
+import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -17,6 +18,11 @@ const MATCH_GAP = 16;
 const MATCH_W = 220;
 const COL_GAP = 40;            // gap between round columns — also the lane the connectors live in
 const HEADER_H = 64;
+const FORMAT_ROW_H = 18;       // extra header height when the round shows its best-of caption
+// A card with a status header stands ~16px taller than its MATCH_H slot, plus its shadow. The
+// canvas is clipped to its computed height, so this reserve keeps the bottom card of a column
+// from being sliced off.
+const CARD_OVERHANG = 24;
 const STROKE = 1.5;
 const LINE_DEFAULT = 'rgba(255,255,255,0.06)';
 const LINE_MY_PATH = 'rgba(99,102,241,0.25)';
@@ -107,6 +113,12 @@ export function LosersBracket({
     const maxRoundNumber = Math.max(...rounds.map(r => r.roundNumber));
     const contentWidth = rounds.length * MATCH_W + (rounds.length - 1) * COL_GAP;
 
+    // Best-of caption per round. It belongs in the header rather than on the cards, which sit in
+    // fixed MATCH_H slots and would collide with each other if they grew.
+    const roundFormats = useMemo(() => rounds.map(r => roundSeriesFormat(r.matches)), [rounds]);
+    // One height for every column, so cards across rounds stay on the same baseline.
+    const headerH = HEADER_H + (roundFormats.some(Boolean) ? FORMAT_ROW_H : 0);
+
     // Match lookup, used by the path tracer.
     const matchById = useMemo(() => {
         const map: Record<string, Match> = {};
@@ -148,7 +160,7 @@ export function LosersBracket({
                 pos[m.id] = {
                     roundIdx,
                     top,
-                    centerY: HEADER_H + top + MATCH_H / 2,
+                    centerY: headerH + top + MATCH_H / 2,
                     rightX: roundIdx * P + MATCH_W,
                     leftX: roundIdx * P,
                 };
@@ -158,10 +170,10 @@ export function LosersBracket({
         });
 
         return { pos, areaH };
-    }, [rounds]);
+    }, [rounds, headerH]);
 
-    const totalH = layout.areaH;
-    const contentHeight = HEADER_H + totalH;
+    const totalH = layout.areaH + CARD_OVERHANG;
+    const contentHeight = headerH + totalH;
 
     // "My path" highlight — same tracer the winners bracket uses: follow each match the current
     // user wins forward via nextMatchId.
@@ -256,7 +268,7 @@ export function LosersBracket({
                         <View style={{ width: MATCH_W }}>
                             <View
                                 style={{
-                                    height: HEADER_H,
+                                    height: headerH,
                                     alignItems: 'center',
                                     justifyContent: 'flex-end',
                                     paddingBottom: 10,
@@ -348,6 +360,13 @@ export function LosersBracket({
                                         </Text>
                                     </View>
                                 )}
+                                {roundFormats[roundIdx] && (
+                                    <SeriesFormatChip
+                                        format={roundFormats[roundIdx]!}
+                                        isTeamTournament={isTeamTournament}
+                                        style={{ marginTop: 4 }}
+                                    />
+                                )}
                             </View>
 
                             <View style={{ width: MATCH_W, height: totalH, position: 'relative' }}>
@@ -374,7 +393,6 @@ export function LosersBracket({
                                                     null
                                                 }
                                                 teamProgress={teamProgressFrom(match)}
-                                                series={seriesInfoFrom(match)}
                                                 className={myPathIds.has(match.id) ? 'border-indigo-500/30' : undefined}
                                             />
                                         </View>

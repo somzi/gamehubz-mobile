@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
+import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { PlayerIdentity, hasNickname } from './PlayerIdentity';
 import {
     SeriesFormat,
     SeriesGame,
@@ -9,6 +11,9 @@ import {
     SeriesWinCondition,
     bestOfForSeries,
     evaluateSeries,
+    isSeriesOver,
+    minimumGamesRequired,
+    playableGames,
     seriesBlockLabel,
 } from '../../lib/series';
 
@@ -19,9 +24,14 @@ interface GameRow {
 }
 
 interface SeriesScoreEntryProps {
-    /** Left column label — the parent decides whose side that is (usually the logged-in player). */
+    /** Left column player — the parent decides whose side that is (usually the logged-in player). */
     leftName: string;
+    /** In-game nickname, shown on its own gamepad line under the username. */
+    leftNickname?: string | null;
+    leftAvatarUrl?: string | null;
     rightName: string;
+    rightNickname?: string | null;
+    rightAvatarUrl?: string | null;
     format: SeriesFormat;
     /**
      * Whether a level series can go to a tiebreak replay. True only for solo knockout matches:
@@ -33,36 +43,102 @@ interface SeriesScoreEntryProps {
     initialGames?: SeriesGame[];
     /** Fires on every edit. `isComplete` means the series is finished and safe to submit. */
     onChange: (games: SeriesGame[], outcome: SeriesOutcome, isComplete: boolean) => void;
-    onFocusInput?: () => void;
+    /**
+     * Called with the focused game row so the host can scroll it clear of the keyboard. The row is
+     * handed over rather than a "scroll to bottom" signal, because the games sit above the summary,
+     * the submit button and the evidence panel — scrolling to the end skips straight past them.
+     */
+    onFocusInput?: (row: View | null) => void;
     /** False for viewers who can't report this match — the games still render, read-only. */
     editable?: boolean;
 }
 
-const emptyRow = (seriesNumber: number): GameRow => ({ left: '', right: '', seriesNumber });
-
 const isFilled = (row: GameRow) => row.left !== '' && row.right !== '';
 
-const toGames = (rows: GameRow[]): SeriesGame[] =>
-    rows.filter(isFilled).map(r => ({
-        homeScore: parseInt(r.left, 10),
-        awayScore: parseInt(r.right, 10),
-        seriesNumber: r.seriesNumber,
-    }));
+/** Games recorded so far in one series: the unbroken run from the top, so a gap ends the record. */
+const contiguousFilled = (rows: GameRow[]) => {
+    let count = 0;
+    while (count < rows.length && isFilled(rows[count])) count++;
+    return count;
+};
+
+/** Groups rows into their series, in order, keeping each block's index into the flat list. */
+function groupRows(rows: GameRow[]): { seriesNumber: number; rows: GameRow[]; offset: number }[] {
+    const blocks: { seriesNumber: number; rows: GameRow[]; offset: number }[] = [];
+
+    rows.forEach((row, index) => {
+        const last = blocks[blocks.length - 1];
+        if (last && last.seriesNumber === row.seriesNumber) last.rows.push(row);
+        else blocks.push({ seriesNumber: row.seriesNumber, rows: [row], offset: index });
+    });
+
+    return blocks;
+}
+
+/** Lays every series out at full length, so a Bo5 shows five rows from the start. */
+function buildRows(initialGames: SeriesGame[] | undefined, format: SeriesFormat): GameRow[] {
+    const games = initialGames ?? [];
+    const seriesCount = games.length === 0 ? 1 : Math.max(...games.map(g => g.seriesNumber));
+    const rows: GameRow[] = [];
+
+    for (let seriesNumber = 1; seriesNumber <= seriesCount; seriesNumber++) {
+        const bestOf = bestOfForSeries(seriesNumber, format);
+        // Only what could have been played: a game recorded after the series was already decided
+        // is one the server will refuse, so it must not come back into the form as an edit.
+        const played = playableGames(
+            games.filter(g => g.seriesNumber === seriesNumber),
+            bestOf,
+            format.condition,
+        );
+
+        for (let i = 0; i < bestOf; i++) {
+            const game = played[i];
+            rows.push({
+                left: game ? String(game.homeScore) : '',
+                right: game ? String(game.awayScore) : '',
+                seriesNumber,
+            });
+        }
+    }
+
+    return rows;
+}
+
+function collectGames(rows: GameRow[]): SeriesGame[] {
+    const games: SeriesGame[] = [];
+
+    for (const block of groupRows(rows)) {
+        for (const row of block.rows) {
+            if (!isFilled(row)) break;
+            games.push({
+                homeScore: parseInt(row.left, 10),
+                awayScore: parseInt(row.right, 10),
+                seriesNumber: block.seriesNumber,
+            });
+        }
+    }
+
+    return games;
+}
 
 /**
- * Progressive best-of entry: shows the games played plus, at most, the single next one.
+ * Best-of entry: the whole series is laid out, but only the games that need playing are open.
  *
- * A best-of-7 won 4–0 asks for four games and then stops — it never puts seven blank inputs on
- * screen and never asks for games that cannot change the result. When a series ends level and a
- * tiebreak is available, the reporter starts the replay explicitly rather than the form silently
- * growing.
+ * A Bo5 shows five rows from the start with the last two dimmed, because three is the fewest that
+ * can settle it. Each further row unlocks only once the score makes it necessary, so the format's
+ * shape is visible up front while the form never asks for a game that cannot change the result —
+ * a Bo7 won 4–0 leaves its last three rows greyed and stops there.
  *
  * Everything is computed from the shared series module, the same rules the server enforces on
  * submit, so what the form calls finished is what the server accepts.
  */
 export function SeriesScoreEntry({
     leftName,
+    leftNickname,
+    leftAvatarUrl,
     rightName,
+    rightNickname,
+    rightAvatarUrl,
     format,
     allowTiebreak,
     initialGames,
@@ -70,36 +146,20 @@ export function SeriesScoreEntry({
     onFocusInput,
     editable = true,
 }: SeriesScoreEntryProps) {
-    const [rows, setRows] = useState<GameRow[]>(() => {
-        const seeded = (initialGames ?? []).map(g => ({
-            left: String(g.homeScore),
-            right: String(g.awayScore),
-            seriesNumber: g.seriesNumber,
-        }));
-        return seeded.length > 0 ? seeded : [emptyRow(1)];
-    });
+    // The raw `format` prop is fine here: the initializer runs once, so identity churn can't reach it.
+    const [rows, setRows] = useState<GameRow[]>(() => buildRows(initialGames, format));
 
-    const games = useMemo(() => toGames(rows), [rows]);
-    const outcome = useMemo(() => evaluateSeries(games, format), [games, format]);
+    // Callers build the format object inline, so a fresh identity arrives on every parent render.
+    // Rebuilding it from its primitive fields keeps everything memoised below stable: without this
+    // the outcome recomputed each render, the onChange effect fired, the parent set state from it,
+    // and that re-render produced yet another format object — an unbounded update loop.
+    const stableFormat = useMemo<SeriesFormat>(
+        () => ({ bestOf: format.bestOf, tiebreakBestOf: format.tiebreakBestOf, condition: format.condition }),
+        [format.bestOf, format.tiebreakBestOf, format.condition],
+    );
 
-    // Keep exactly one open row while the series can still take games, and none once it can't.
-    // Runs after every edit so the form grows a game at a time and collapses the moment the
-    // series is clinched — the "Bo7 won 4–0 shouldn't ask for 7 scores" rule.
-    useEffect(() => {
-        setRows(current => {
-            const filled = current.filter(isFilled);
-            const currentSeries = outcome.currentSeriesNumber;
-
-            if (outcome.canAddGame) {
-                const openRows = current.filter(r => !isFilled(r));
-                if (openRows.length === 1 && current.length === filled.length + 1) return current;
-                return [...filled, emptyRow(currentSeries)];
-            }
-
-            if (current.length === filled.length) return current;
-            return filled;
-        });
-    }, [outcome.canAddGame, outcome.currentSeriesNumber, games.length]);
+    const games = useMemo(() => collectGames(rows), [rows]);
+    const outcome = useMemo(() => evaluateSeries(games, stableFormat), [games, stableFormat]);
 
     useEffect(() => {
         // Reportable as soon as the current series is played out. A level knockout series counts:
@@ -119,39 +179,58 @@ export function SeriesScoreEntry({
     };
 
     const startTiebreak = () => {
-        setRows(current => [...current, emptyRow(outcome.currentSeriesNumber + 1)]);
+        setRows(current => {
+            const next = outcome.currentSeriesNumber + 1;
+            const length = bestOfForSeries(next, stableFormat);
+            return [
+                ...current,
+                ...Array.from({ length }, () => ({ left: '', right: '', seriesNumber: next })),
+            ];
+        });
     };
 
+    /** Clears the last recorded game rather than removing its row — the layout stays put. */
     const undoLastGame = () => {
         setRows(current => {
-            const filled = current.filter(isFilled);
-            if (filled.length === 0) return current;
-            const remaining = filled.slice(0, -1);
-            return remaining.length > 0 ? remaining : [emptyRow(1)];
+            const lastFilled = current.map(isFilled).lastIndexOf(true);
+            if (lastFilled < 0) return current;
+            return current.map((r, i) => (i === lastFilled ? { ...r, left: '', right: '' } : r));
         });
     };
 
-    const isSingleGame = format.bestOf <= 1 && outcome.currentSeriesNumber === 1;
-    const isAggregate = format.condition === SeriesWinCondition.AggregateScore;
+    // Reserve the nickname line on both sides when either player has one, so the two columns line up.
+    const pairingHasNickname =
+        hasNickname(leftNickname) || hasNickname(rightNickname);
 
-    // Rows grouped into their series so tiebreak replays read as their own blocks rather than
-    // continuing the main series' numbering.
-    const blocks = useMemo(() => {
-        const bySeries = new Map<number, { row: GameRow; index: number }[]>();
-        rows.forEach((row, index) => {
-            const list = bySeries.get(row.seriesNumber);
-            if (list) list.push({ row, index });
-            else bySeries.set(row.seriesNumber, [{ row, index }]);
-        });
-        return [...bySeries.entries()].sort((a, b) => a[0] - b[0]);
-    }, [rows]);
+    const isSingleGame = stableFormat.bestOf <= 1 && outcome.currentSeriesNumber === 1;
+    const isAggregate = stableFormat.condition === SeriesWinCondition.AggregateScore;
+
+    const rowRefs = useRef<Record<number, View | null>>({});
+
+    // How far each series is opened up: the games it must play whatever happens, then one more at a
+    // time for as long as the score leaves the outcome open. A settled series opens nothing further.
+    const blocks = useMemo(() => groupRows(rows).map(block => {
+        const bestOf = bestOfForSeries(block.seriesNumber, stableFormat);
+        const played = contiguousFilled(block.rows);
+        const settled = isSeriesOver(
+            games.filter(g => g.seriesNumber === block.seriesNumber),
+            bestOf,
+            stableFormat.condition,
+        );
+
+        const unlocked = settled
+            ? played
+            : Math.min(bestOf, Math.max(minimumGamesRequired(bestOf, stableFormat.condition), played + 1));
+
+        return { ...block, bestOf, played, unlocked };
+    }), [rows, games, stableFormat]);
 
     return (
         <View className={cn('gap-3', !editable && 'opacity-60')}>
             {!isSingleGame && (
                 <View className="flex-row items-center justify-between px-1">
                     <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[2px]">
-                        Best of {format.bestOf} · {isAggregate ? 'Aggregate score' : 'Match wins'}
+                        Best of {stableFormat.bestOf} · {isAggregate ? 'Aggregate score' : 'Match wins'}
                     </Text>
                     {games.length > 0 && editable && (
                         <Pressable onPress={undoLastGame} className="flex-row items-center gap-1 active:opacity-60">
@@ -163,41 +242,58 @@ export function SeriesScoreEntry({
             )}
 
             <View className="rounded-[20px] bg-card/60 border border-white/[0.04] overflow-hidden">
-                {/* Player headers */}
-                <View className="flex-row items-center px-4 pt-4 pb-2">
+                {/* Player headers: avatar plus both names, the same pairing block the rest of the
+                    app uses. Who is entering a score for whom matters more here than anywhere, so
+                    the in-game nickname stays visible rather than being collapsed into a username. */}
+                <View className="flex-row items-start px-4 pt-4 pb-2">
                     <View className="w-16" />
-                    <View className="flex-1 items-center">
-                        <Text className="text-[11px] font-black text-primary uppercase tracking-wider" numberOfLines={1}>
-                            {leftName}
-                        </Text>
+                    <View className="flex-1 items-center gap-1.5">
+                        <PlayerAvatar src={leftAvatarUrl ?? undefined} name={leftName} size="sm" />
+                        <PlayerIdentity
+                            username={leftName}
+                            nickname={leftNickname}
+                            tone="home"
+                            reserveNicknameSpace={pairingHasNickname}
+                        />
                     </View>
                     <View className="w-8" />
-                    <View className="flex-1 items-center">
-                        <Text className="text-[11px] font-black text-white uppercase tracking-wider" numberOfLines={1}>
-                            {rightName}
-                        </Text>
+                    <View className="flex-1 items-center gap-1.5">
+                        <PlayerAvatar src={rightAvatarUrl ?? undefined} name={rightName} size="sm" />
+                        <PlayerIdentity
+                            username={rightName}
+                            nickname={rightNickname}
+                            tone="away"
+                            reserveNicknameSpace={pairingHasNickname}
+                        />
                     </View>
                 </View>
 
-                {blocks.map(([seriesNumber, entries]) => (
-                    <View key={seriesNumber}>
-                        {seriesNumber > 1 && (
+                {blocks.map(block => (
+                    <View key={block.seriesNumber}>
+                        {block.seriesNumber > 1 && (
                             <View className="flex-row items-center gap-2 px-4 pt-3 pb-1">
                                 <Ionicons name="flash" size={12} color="#F59E0B" />
                                 <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">
-                                    {seriesBlockLabel(seriesNumber)} · Bo{bestOfForSeries(seriesNumber, format)}
+                                    {seriesBlockLabel(block.seriesNumber)} · Bo{block.bestOf}
                                 </Text>
                             </View>
                         )}
 
-                        {entries.map(({ row, index }, positionInSeries) => {
-                            const open = !isFilled(row);
+                        {block.rows.map((row, positionInSeries) => {
+                            const index = block.offset + positionInSeries;
+                            // Beyond what the score has made necessary: shown so the format's length
+                            // is visible, dimmed and closed so it can't be filled out of turn.
+                            const locked = positionInSeries >= block.unlocked;
+                            // The one row the reporter is being asked for right now.
+                            const open = !locked && !isFilled(row) && positionInSeries === block.played;
                             return (
                                 <View
                                     key={index}
+                                    ref={node => { rowRefs.current[index] = node; }}
                                     className={cn(
                                         'flex-row items-center px-4 py-2',
                                         open ? 'bg-primary/[0.04]' : '',
+                                        locked ? 'opacity-35' : '',
                                     )}
                                 >
                                     <View className="w-16">
@@ -217,13 +313,13 @@ export function SeriesScoreEntry({
                                                     ? 'bg-background-deep text-xl text-primary border-primary/30'
                                                     : 'bg-background-deep/60 text-lg text-primary border-white/[0.06]',
                                             )}
-                                            placeholder="0"
+                                            placeholder={locked ? '–' : '0'}
                                             placeholderTextColor="#1E293B"
                                             keyboardType="numeric"
                                             value={row.left}
                                             onChangeText={v => setCell(index, 'left', v)}
-                                            onFocus={onFocusInput}
-                                            editable={editable}
+                                            onFocus={() => onFocusInput?.(rowRefs.current[index])}
+                                            editable={editable && !locked}
                                         />
                                     </View>
 
@@ -239,13 +335,13 @@ export function SeriesScoreEntry({
                                                     ? 'bg-background-deep text-xl text-white border-primary/30'
                                                     : 'bg-background-deep/60 text-lg text-white border-white/[0.06]',
                                             )}
-                                            placeholder="0"
+                                            placeholder={locked ? '–' : '0'}
                                             placeholderTextColor="#1E293B"
                                             keyboardType="numeric"
                                             value={row.right}
                                             onChangeText={v => setCell(index, 'right', v)}
-                                            onFocus={onFocusInput}
-                                            editable={editable}
+                                            onFocus={() => onFocusInput?.(rowRefs.current[index])}
+                                            editable={editable && !locked}
                                         />
                                     </View>
                                 </View>
@@ -254,7 +350,7 @@ export function SeriesScoreEntry({
                     </View>
                 ))}
 
-                {!isSingleGame && <SeriesSummary outcome={outcome} format={format} leftName={leftName} rightName={rightName} />}
+                {!isSingleGame && <SeriesSummary outcome={outcome} format={stableFormat} leftName={leftName} rightName={rightName} />}
             </View>
 
             {outcome.isLevel && allowTiebreak && editable && (
@@ -268,7 +364,7 @@ export function SeriesScoreEntry({
                     <View className="flex-1">
                         <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">Match tied</Text>
                         <Text className="text-[11px] text-slate-400 mt-0.5">
-                            Tap to play a tiebreak — best of {bestOfForSeries(outcome.currentSeriesNumber + 1, format)}.
+                            Tap to play a tiebreak — best of {bestOfForSeries(outcome.currentSeriesNumber + 1, stableFormat)}.
                         </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#F59E0B" />
