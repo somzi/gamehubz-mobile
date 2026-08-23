@@ -6,7 +6,10 @@ import {
     Pressable,
     ScrollView,
     Alert,
+    Keyboard,
+    BackHandler,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 interface DateTimePickerModalProps {
@@ -52,6 +55,9 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
     const [viewYear, setViewYear] = useState(initialDate.getFullYear());
 
     const hourScrollRef = useRef<ScrollView>(null);
+    // Android runs edge-to-edge (app.json), so the gesture bar overlays the bottom of the
+    // window — without this the Confirm footer can sit under it on tall devices.
+    const insets = useSafeAreaInsets();
 
     // Bring an hour into view in the strip (one pill of lead-in). Imperative on the ref, so
     // it works right after a setHour without waiting for a re-render.
@@ -64,6 +70,10 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
     // would show whatever date the user last selected on a previous match/field.
     useEffect(() => {
         if (!visible) return;
+        // A field above may still hold focus when the picker opens. The host modal wraps us in
+        // a KeyboardAvoidingView, so a live keyboard shrinks this overlay and pushes Confirm
+        // off-screen — close it before we lay out.
+        Keyboard.dismiss();
         const d = parseInitial();
         setDay(d.getDate());
         setMonth(d.getMonth());
@@ -85,7 +95,18 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible, initialValue]);
 
-    const years = Array.from({ length: 10 }, (_, i) => now.getFullYear() + i);
+    // This picker is an overlay View, not a RN <Modal>, so Android's back gesture/button
+    // isn't routed to it — untouched, back would fall through to the HOST modal and close the
+    // whole Edit/Create form, losing the user's input. Consume it and dismiss only the picker.
+    useEffect(() => {
+        if (!visible) return;
+        const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+            onClose();
+            return true;
+        });
+        return () => sub.remove();
+    }, [visible, onClose]);
+
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     const handleConfirm = () => {
@@ -194,7 +215,10 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
 
     return (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
-            <View className="flex-1 bg-black/80 justify-center px-4">
+            <View
+                className="flex-1 bg-black/80 justify-center px-4"
+                style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }}
+            >
                 {/* Backdrop sits BEHIND the content as an absolute sibling so it doesn't claim
                     touch responder over the hour strip. */}
                 <Pressable
@@ -215,7 +239,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                     (this modal renders inside a RN Modal, outside any GestureHandlerRootView). */}
                 <View
                     className="bg-background rounded-[40px] border border-white/10 overflow-hidden shadow-2xl"
-                    style={{ maxHeight: '88%' }}
+                    style={{ maxHeight: '100%' }}
                 >
                     {/* Header */}
                     <View className="p-6 border-b border-white/5 bg-card flex-row justify-between items-center">
@@ -262,7 +286,8 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                             horizontal
                             showsHorizontalScrollIndicator={false}
                             snapToInterval={HOUR_PILL + HOUR_GAP}
-                            decelerationRate="fast"
+                            // Deliberately NOT decelerationRate="fast": on Android that plus
+                            // snapping kills long flings, so crossing 24 hours takes many swipes.
                             contentContainerStyle={{ paddingRight: 12 }}
                         >
                             {hours.map((item) => {
