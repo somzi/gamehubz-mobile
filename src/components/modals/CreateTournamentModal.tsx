@@ -153,6 +153,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [seriesWinCondition, setSeriesWinCondition] = useState<SeriesWinConditionValue>(0);
     // Null = a level knockout series is replayed under the match's own Best-of.
     const [tiebreakBestOf, setTiebreakBestOf] = useState<number | null>(null);
+    // Null = the knockout is played over the same Best-of as the phase that feeds it.
+    const [knockoutBestOf, setKnockoutBestOf] = useState<number | null>(null);
 
     // Exclusive — when on, only Exclusive-or-higher hub members can see/join the tournament.
     const [isExclusive, setIsExclusive] = useState(false);
@@ -287,6 +289,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const hasKnockoutPhase = formatGroup === 'bracket'
         || formatGroup === 'groups-bracket'
         || (formatGroup === 'swiss' && swissKnockout !== '0');
+    // A knockout that FOLLOWS another phase is the only one worth its own length: a plain bracket
+    // is a single phase, so one Best-of already describes every match it plays.
+    const hasSeparateKnockoutPhase = hasKnockoutPhase && formatGroup !== 'bracket';
+    const firstPhaseLabel = formatGroup === 'swiss' ? 'Swiss Rounds' : 'Group Stage';
     const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
     // Empty direct input = every knockout slot is a direct berth (no play-in).
     const swissDirectCount = swissKnockout !== '0' && swissDirect !== ''
@@ -504,6 +510,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 BestOf: bestOf,
                 SeriesWinCondition: seriesWinCondition,
                 TiebreakBestOf: hasKnockoutPhase ? tiebreakBestOf : null,
+                // Only meaningful when a bracket follows another phase; the server drops it
+                // otherwise, and sending null keeps "same as the phase before it".
+                KnockoutBestOf: hasSeparateKnockoutPhase ? knockoutBestOf : null,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
                 IsExclusive: isExclusive,
@@ -971,6 +980,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         tiebreakBestOf={tiebreakBestOf}
                                         onTiebreakBestOfChange={setTiebreakBestOf}
                                         hasKnockout={hasKnockoutPhase}
+                                        hasSeparateKnockoutPhase={hasSeparateKnockoutPhase}
+                                        firstPhaseLabel={firstPhaseLabel}
+                                        knockoutBestOf={knockoutBestOf}
+                                        onKnockoutBestOfChange={setKnockoutBestOf}
                                         isTeamTournament={isTeamTournament}
                                     />
 

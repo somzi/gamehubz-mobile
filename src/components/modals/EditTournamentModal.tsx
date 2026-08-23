@@ -147,6 +147,10 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [tiebreakBestOf, setTiebreakBestOf] = useState<number | null>(
         (tournament?.tiebreakBestOf ?? tournament?.TiebreakBestOf) ?? null
     );
+    // Null = the knockout keeps playing over the same Best-of as the phase that feeds it.
+    const [knockoutBestOf, setKnockoutBestOf] = useState<number | null>(
+        (tournament?.knockoutBestOf ?? tournament?.KnockoutBestOf) ?? null
+    );
 
     // Scope: country list overrides region. Pre-fill the scope toggle from the persisted Countries.
     const initialCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
@@ -256,6 +260,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         selectedFormat === String(TournamentFormat.DoubleElimination) ||
         selectedFormat === String(TournamentFormat.GroupStageWithKnockout) ||
         (isSwiss && swissKnockoutSize > 0);
+    // Only a knockout that follows another phase gets its own length — a plain bracket is one phase.
+    const hasSeparateKnockoutPhase = hasKnockoutPhase
+        && selectedFormat !== String(TournamentFormat.SingleElimination)
+        && selectedFormat !== String(TournamentFormat.DoubleElimination);
+    const firstPhaseLabel = isSwiss ? 'Swiss Rounds' : 'Group Stage';
 
     useEffect(() => {
         if (!isTeamTournament) {
@@ -299,6 +308,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setBestOf(normalizeBestOf(tournament?.bestOf ?? tournament?.BestOf));
         setSeriesWinCondition(normalizeCondition(tournament?.seriesWinCondition ?? tournament?.SeriesWinCondition));
         setTiebreakBestOf((tournament?.tiebreakBestOf ?? tournament?.TiebreakBestOf) ?? null);
+        setKnockoutBestOf((tournament?.knockoutBestOf ?? tournament?.KnockoutBestOf) ?? null);
         const refreshedCountries: string[] = Array.isArray(tournament?.countries ?? tournament?.Countries)
             ? (tournament?.countries ?? tournament?.Countries)
             : [];
@@ -472,6 +482,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 BestOf: bestOf,
                 SeriesWinCondition: seriesWinCondition,
                 TiebreakBestOf: hasKnockoutPhase ? tiebreakBestOf : null,
+                // Same freedom as BestOf above: only fixtures still to be played pick it up.
+                KnockoutBestOf: hasSeparateKnockoutPhase ? knockoutBestOf : null,
                 // Structural fields the backend will only honour when AllowStructuralEdits=true and the
                 // tournament hasn't started; otherwise it preserves the persisted values regardless of
                 // what we send. IsTeamTournament is locked forever — sent for completeness only.
@@ -903,6 +915,10 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         onWinConditionChange={setSeriesWinCondition}
                                         tiebreakBestOf={tiebreakBestOf}
                                         onTiebreakBestOfChange={setTiebreakBestOf}
+                                        hasSeparateKnockoutPhase={hasSeparateKnockoutPhase}
+                                        firstPhaseLabel={firstPhaseLabel}
+                                        knockoutBestOf={knockoutBestOf}
+                                        onKnockoutBestOfChange={setKnockoutBestOf}
                                         hasKnockout={hasKnockoutPhase}
                                         isTeamTournament={isTeamTournament}
                                     />

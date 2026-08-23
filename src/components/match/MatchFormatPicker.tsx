@@ -26,6 +26,17 @@ interface MatchFormatPickerProps {
      * League / group / Swiss record it as a draw instead, so the tiebreak control is hidden.
      */
     hasKnockout: boolean;
+    /**
+     * True when that knockout is played AFTER another phase (groups or Swiss), which is the only
+     * case where a second length means anything — a plain bracket is one phase, and its Best-of
+     * already describes every match it plays.
+     */
+    hasSeparateKnockoutPhase?: boolean;
+    /** What the phase before the knockout is called, for the labels: "Group Stage" / "Swiss Rounds". */
+    firstPhaseLabel?: string;
+    /** Null = the knockout is played over the same Best-of as the phase before it. */
+    knockoutBestOf?: number | null;
+    onKnockoutBestOfChange?: (value: number | null) => void;
     /** Team tournaments: the format applies to each individual game inside a tie. */
     isTeamTournament?: boolean;
     /** Locks the controls once the format can no longer be changed for this tournament. */
@@ -50,16 +61,25 @@ export function MatchFormatPicker({
     tiebreakBestOf,
     onTiebreakBestOfChange,
     hasKnockout,
+    hasSeparateKnockoutPhase = false,
+    firstPhaseLabel = 'Group Stage',
+    knockoutBestOf = null,
+    onKnockoutBestOfChange,
     isTeamTournament = false,
     disabled = false,
 }: MatchFormatPickerProps) {
     const isSeries = bestOf > 1;
+    // With two phases the first control no longer speaks for the whole tournament, so it says
+    // which half it governs.
+    const primaryLabel = hasSeparateKnockoutPhase ? `${firstPhaseLabel} Format` : 'Match Format';
+    // The length the knockout actually plays, whether it was chosen or inherited.
+    const effectiveKnockoutBestOf = knockoutBestOf ?? bestOf;
 
     return (
         <View className="gap-4">
             {/* ── Match format ───────────────────────────────────────────── */}
             <View>
-                <Text className={FIELD_LABEL}>Match Format</Text>
+                <Text className={FIELD_LABEL}>{primaryLabel}</Text>
 
                 <BestOfInput value={normalizeBestOf(bestOf)} onChange={onBestOfChange} disabled={disabled} />
 
@@ -94,6 +114,40 @@ export function MatchFormatPicker({
                 </View>
             )}
 
+            {/* ── Knockout format ────────────────────────────────────────── */}
+            {hasSeparateKnockoutPhase && onKnockoutBestOfChange && (
+                <View>
+                    <Text className={FIELD_LABEL}>Knockout Format</Text>
+
+                    <SegmentedToggle
+                        options={[
+                            { value: 'same', label: `Same as ${firstPhaseLabel}` },
+                            { value: 'custom', label: 'Different' },
+                        ]}
+                        value={knockoutBestOf == null ? 'same' : 'custom'}
+                        onChange={v => onKnockoutBestOfChange(v === 'same' ? null : normalizeBestOf(bestOf))}
+                        disabled={disabled}
+                    />
+
+                    {knockoutBestOf != null && (
+                        <View className="mt-3">
+                            <BestOfInput
+                                value={normalizeBestOf(knockoutBestOf)}
+                                onChange={onKnockoutBestOfChange}
+                                disabled={disabled}
+                            />
+                        </View>
+                    )}
+
+                    <Text className={FIELD_HINT}>
+                        {knockoutBestOf == null
+                            ? `Knockout matches are played over the same length as the ${firstPhaseLabel.toLowerCase()}.`
+                            : bestOfInlineDescription(effectiveKnockoutBestOf, winCondition)}
+                        {' '}Each round can still be changed on its own once the bracket exists.
+                    </Text>
+                </View>
+            )}
+
             {/* ── Tiebreak ───────────────────────────────────────────────── */}
             {hasKnockout && (
                 <View>
@@ -106,7 +160,7 @@ export function MatchFormatPicker({
                             { value: 'custom', label: 'Different' },
                         ]}
                         value={tiebreakBestOf == null ? 'same' : 'custom'}
-                        onChange={v => onTiebreakBestOfChange(v === 'same' ? null : normalizeBestOf(bestOf))}
+                        onChange={v => onTiebreakBestOfChange(v === 'same' ? null : normalizeBestOf(effectiveKnockoutBestOf))}
                         disabled={disabled}
                     />
 
@@ -120,7 +174,7 @@ export function MatchFormatPicker({
                         </View>
                     )}
 
-                    <Text className={FIELD_HINT}>{tiebreakDescription(bestOf, tiebreakBestOf)}</Text>
+                    <Text className={FIELD_HINT}>{tiebreakDescription(effectiveKnockoutBestOf, tiebreakBestOf)}</Text>
 
                     {/* Drawn games are allowed, so any Best-of can finish level — including odd ones.
                         Say so plainly instead of letting organizers assume Bo3 can't draw. */}
