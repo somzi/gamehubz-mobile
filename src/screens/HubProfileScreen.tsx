@@ -11,7 +11,7 @@ import { HubRole } from '../types/hub';
 import { Ionicons } from '@expo/vector-icons';
 
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
-import { parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
+import { parseUtcDate, formatDateSafe, formatLocalDateTime, getCurrencySymbol } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
 import { SocialLinks } from '../components/profile/SocialLinks';
@@ -382,8 +382,15 @@ export default function HubProfileScreen() {
                         <TournamentCard
                             name={tournament.name}
                             description={tournament.description}
-                            status={tournament.status === 3 ? 'live' : (tournament.status === 4 ? 'completed' : 'upcoming')}
-                            date={formatDateSafe(tournament.startDate)}
+                            // Draft + an opening time = waiting for its scheduled registration; the
+                            // card then leads with that time instead of the start date.
+                            status={tournament.status === 3 ? 'live'
+                                : tournament.status === 4 ? 'completed'
+                                : (tournament.status === 0 && tournament.registrationOpensAt) ? 'scheduled'
+                                : 'upcoming'}
+                            date={(tournament.status === 0 && tournament.registrationOpensAt)
+                                ? formatLocalDateTime(tournament.registrationOpensAt)
+                                : formatDateSafe(tournament.startDate)}
                             region={tournament.region === 1 ? 'North America' : 'Europe'}
                             prizePool={`${getCurrencySymbol(tournament.prizeCurrency)}${tournament.prize}`}
                             players={new Array(tournament.numberOfParticipants || 0).fill({})}

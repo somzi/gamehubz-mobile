@@ -112,6 +112,10 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const isTeamTournament = Boolean(tournament?.isTeamTournament ?? tournament?.IsTeamTournament);
     const canEditAll = tStatus === 0 || tStatus === 1 || tStatus === 2; // Editable while Open, Upcoming, or Reg. Closed
     const canEditDeadline = tStatus === 0 || tStatus === 1; // Deadline cannot be changed if Reg is Closed (status 2)
+    // A tournament in Draft with a stored opening time is one waiting to open — the only state in
+    // which the schedule can still be moved. Once registration is live the field is history.
+    const isScheduled = tStatus === 0
+        && !!(tournament?.registrationOpensAt || tournament?.RegistrationOpensAt);
 
     const [name, setName] = useState(tournament?.name || '');
     const [description, setDescription] = useState(tournament?.description || '');
@@ -125,6 +129,12 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [selectedRegion, setSelectedRegion] = useState(resolveRegionKey(tournament?.region));
     const [startDate, setStartDate] = useState(tournament?.startDate || '');
     const [registrationDeadline, setRegistrationDeadline] = useState(tournament?.registrationDeadline || '');
+    // Only meaningful while the tournament is still waiting to open (status 0). Present = the
+    // organiser scheduled the opening; the time can be moved but not removed, because dropping it
+    // would leave a draft nothing ever opens — "Open Registration" is the way to start early.
+    const [registrationOpensAt, setRegistrationOpensAt] = useState(
+        tournament?.registrationOpensAt || tournament?.RegistrationOpensAt || ''
+    );
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
     const [requireResultApproval, setRequireResultApproval] = useState(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
@@ -201,6 +211,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showRegDeadlinePicker, setShowRegDeadlinePicker] = useState(false);
+    const [showRegOpensPicker, setShowRegOpensPicker] = useState(false);
     const [showTeamWinConditionPicker, setShowTeamWinConditionPicker] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -297,6 +308,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setSelectedRegion(resolveRegionKey(tournament?.region));
         setStartDate(tournament?.startDate || '');
         setRegistrationDeadline(tournament?.registrationDeadline || '');
+        setRegistrationOpensAt(tournament?.registrationOpensAt || tournament?.RegistrationOpensAt || '');
         setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
         setRequireResultApproval(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
@@ -392,6 +404,17 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             return;
         }
 
+        // Moving the opening past the deadline would leave a tournament nobody can ever join.
+        if (isScheduled && registrationOpensAt && registrationDeadline) {
+            const opensAt = new Date(String(registrationOpensAt).replace(' ', 'T'));
+            const deadline = new Date(String(registrationDeadline).replace(' ', 'T'));
+
+            if (opensAt >= deadline) {
+                setError('Registration must open before the registration deadline');
+                return;
+            }
+        }
+
         if (selectedFormat === String(TournamentFormat.DoubleElimination) && participantCount > 0 && participantCount < 4) {
             setError('Double Elimination requires at least 4 players — raise Max Players');
             return;
@@ -466,6 +489,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 // Single (1) / Double (2) elimination for the Groups+Bracket / Swiss knockout phase.
                 KnockoutEliminationType: showKnockoutTypeToggle ? parseInt(knockoutType) : null,
                 RegistrationDeadline: registrationDeadline ? new Date(registrationDeadline).toISOString() : null,
+                // Server only applies this on a tournament still waiting to open; anywhere else it
+                // preserves what is stored. The flag is what tells it this client knows the field —
+                // without it a null here would silently unschedule the tournament.
+                RegistrationOpensAt: registrationOpensAt
+                    ? new Date(String(registrationOpensAt).replace(' ', 'T')).toISOString()
+                    : null,
+                AllowScheduleEdits: true,
                 Prize: parseInt(prize) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
                 Region: regionMapping[selectedRegion] ?? 0,
@@ -597,7 +627,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
     ].filter(Boolean).join(' · ') || 'Defaults';
-    const scheduleSummary = startDate ? `Starts ${new Date(startDate).toLocaleString()}` : 'Not set';
+    const scheduleSummary = startDate
+        ? (isScheduled && registrationOpensAt
+            ? `Opens ${new Date(registrationOpensAt).toLocaleString()}`
+            : `Starts ${new Date(startDate).toLocaleString()}`)
+        : 'Not set';
     const prizeSummary = prize && prize !== '0' ? `${prize} ${getCurrencyLabel()}` : 'None';
 
     return (
@@ -1018,6 +1052,22 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         disabled={!canEditAll}
                                     />
                                 </View>
+                                {isScheduled && (
+                                    <View className="mt-3">
+                                        <ScheduleField
+                                            label="Registration Opens"
+                                            value={registrationOpensAt}
+                                            placeholder="Select"
+                                            iconName="lock-open-outline"
+                                            iconColor={COLORS.info}
+                                            onPress={() => setShowRegOpensPicker(true)}
+                                        />
+                                        <Text className="text-[11px] text-slate-500 mt-2 leading-4">
+                                            Sign-ups are closed until this time. To start them now, use
+                                            Open Registration on the tournament page.
+                                        </Text>
+                                    </View>
+                                )}
                             </CollapsibleSection>
 
                             {/* ── Prize Pool ── */}
@@ -1119,6 +1169,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     onConfirm={(val) => setRegistrationDeadline(val)}
                     title="Registration Deadline"
                     initialValue={registrationDeadline}
+                />
+                <DateTimePickerModal
+                    visible={showRegOpensPicker}
+                    onClose={() => setShowRegOpensPicker(false)}
+                    onConfirm={(val) => setRegistrationOpensAt(val)}
+                    title="Registration Opens"
+                    initialValue={registrationOpensAt}
                 />
             </KeyboardAvoidingView>
         </Modal>

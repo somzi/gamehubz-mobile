@@ -113,6 +113,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [maxPlayers, setMaxPlayers] = useState('');
     const [startDate, setStartDate] = useState('');
     const [registrationDeadline, setRegistrationDeadline] = useState('');
+    // Optional scheduled opening. Empty = the old behaviour, registration is open the moment the
+    // tournament is created. Set to a future time and the backend keeps it as a draft nobody can
+    // join until then, opening and announcing it on the dot.
+    const [registrationOpensAt, setRegistrationOpensAt] = useState('');
     const [selectedFormat, setSelectedFormat] = useState('3'); // Default to Single Elimination (or choose a safer default)
     const [groupsCount, setGroupsCount] = useState('4');
     const [qualifiersPerGroup, setQualifiersPerGroup] = useState('2');
@@ -171,6 +175,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showRegDeadlinePicker, setShowRegDeadlinePicker] = useState(false);
+    const [showRegOpensPicker, setShowRegOpensPicker] = useState(false);
     const [showFormatPicker, setShowFormatPicker] = useState(false);
     const [showDurationUnitPicker, setShowDurationUnitPicker] = useState(false);
     const [showTeamWinConditionPicker, setShowTeamWinConditionPicker] = useState(false);
@@ -443,6 +448,22 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             return;
         }
 
+        // Optional field, but a schedule that has already passed (or that outlives the deadline)
+        // would either be ignored by the server or leave a tournament nobody can ever join.
+        if (registrationOpensAt) {
+            const opensAt = new Date(registrationOpensAt.replace(' ', 'T'));
+
+            if (opensAt <= now) {
+                setError('Registration opening time must be in the future');
+                return;
+            }
+
+            if (opensAt >= deadline) {
+                setError('Registration must open before the registration deadline');
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         setError(null);
 
@@ -477,6 +498,11 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 MaxPlayers: parseInt(maxPlayers) || 0,
                 StartDate: formatToISO(startDate),
                 RegistrationDeadline: formatToISO(registrationDeadline),
+                // Null = open immediately. A future value makes the server create this as a draft
+                // and open it itself at that moment (see TournamentEntity.RegistrationOpensAt).
+                RegistrationOpensAt: registrationOpensAt ? formatToISO(registrationOpensAt) : null,
+                // Tells the server this client knows the field, so a later edit is allowed to move it.
+                AllowScheduleEdits: true,
                 Prize: parseFloat(prizePool) || 0,
                 PrizeCurrency: parseInt(prizeCurrency) || 1,
                 Region: regionMapping[selectedRegions[0]] ?? 0,
@@ -652,7 +678,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
     ].filter(Boolean).join(' · ') || 'Defaults';
-    const scheduleSummary = startDate && registrationDeadline ? `Starts ${startDate}` : 'Not set yet';
+    const scheduleSummary = startDate && registrationDeadline
+        ? (registrationOpensAt ? `Opens ${registrationOpensAt} · Starts ${startDate}` : `Starts ${startDate}`)
+        : 'Not set yet';
     const prizeSummary = prizePool ? `${prizePool} ${getCurrencyLabel()}` : 'Optional';
 
     return (
@@ -1079,6 +1107,20 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         onPress={() => setShowStartDatePicker(true)}
                                     />
                                 </View>
+                                <View className="mt-3">
+                                    <ScheduleField
+                                        label="Registration Opens"
+                                        value={registrationOpensAt}
+                                        placeholder="Immediately"
+                                        iconName="lock-open-outline"
+                                        iconColor={COLORS.info}
+                                        onPress={() => setShowRegOpensPicker(true)}
+                                    />
+                                    <Text className="text-[11px] text-slate-500 mt-2 leading-4">
+                                        Leave empty and sign-ups open right away. Pick a time and the tournament
+                                        stays closed until then — everyone is notified the moment it opens.
+                                    </Text>
+                                </View>
                             </CollapsibleSection>
 
                             {/* ── Prize Pool ── */}
@@ -1179,6 +1221,15 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         onConfirm={setRegistrationDeadline}
                         title="Registration Deadline"
                         initialValue={registrationDeadline}
+                    />
+                    <DateTimePickerModal
+                        visible={showRegOpensPicker}
+                        onClose={() => setShowRegOpensPicker(false)}
+                        onConfirm={setRegistrationOpensAt}
+                        onClear={() => setRegistrationOpensAt('')}
+                        clearText="Open immediately"
+                        title="Registration Opens"
+                        initialValue={registrationOpensAt}
                     />
                 </View>
             </KeyboardAvoidingView>

@@ -9,7 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 interface TournamentCardProps {
     name: string;
     description?: string;
-    status: 'live' | 'upcoming' | 'completed';
+    /**
+     * 'scheduled' = registration hasn't opened yet (the organiser set an opening time). The card
+     * then reads `date` as that opening moment rather than the start date — for a tournament you
+     * cannot join yet, when sign-ups open is the only date that matters.
+     */
+    status: 'live' | 'upcoming' | 'completed' | 'scheduled';
     date: string;
     region: string;
     prizePool: string;
@@ -37,6 +42,12 @@ const STATUS_THEME: Record<string, { main: string; tint: string; text: string; r
         tint: 'rgba(96, 165, 250, 0.05)',
         text: '#93C5FD',
         ring: 'rgba(96, 165, 250, 0.32)',
+    },
+    scheduled: {
+        main: '#818CF8',
+        tint: 'rgba(129, 140, 248, 0.05)',
+        text: '#C7D2FE',
+        ring: 'rgba(129, 140, 248, 0.32)',
     },
     completed: {
         main: '#10B981',
@@ -226,9 +237,13 @@ export const TournamentCard = React.memo(function TournamentCard({
                                     borderColor: 'rgba(255, 255, 255, 0.05)',
                                 }}
                             >
-                                <Ionicons name="calendar-clear-outline" size={13} color="#A5B4FC" />
+                                <Ionicons
+                                    name={status === 'scheduled' ? 'lock-open-outline' : 'calendar-clear-outline'}
+                                    size={13}
+                                    color={status === 'scheduled' ? '#818CF8' : '#A5B4FC'}
+                                />
                                 <Text className="text-[11px] font-black text-slate-300 ml-1.5">
-                                    {date}
+                                    {status === 'scheduled' ? `Opens ${date}` : date}
                                 </Text>
                             </View>
                         </View>

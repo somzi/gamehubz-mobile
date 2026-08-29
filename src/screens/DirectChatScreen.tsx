@@ -23,6 +23,8 @@ import { mergeMessagesById } from '../lib/mergeMessages';
 import { useAuth } from '../context/AuthContext';
 import { useTrailingDebounce } from '../hooks/useTrailingDebounce';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { CopiedOverlay } from '../components/chat/CopiedOverlay';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { DirectChat, DirectMessage } from '../types/social';
 
 type Route = RouteProp<RootStackParamList, 'DirectChat'>;
@@ -556,6 +558,7 @@ const MessageBubble = React.memo(function MessageBubble({
     showAvatar: boolean;
 }) {
     const time = formatTime(message.sentAt);
+    const { copied, copy } = useCopyToClipboard();
     return (
         <View
             className={`flex-row items-end mb-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}
@@ -572,7 +575,11 @@ const MessageBubble = React.memo(function MessageBubble({
                     )}
                 </View>
             )}
-            <View
+            <Pressable
+                onLongPress={() => copy(message.content)}
+                delayLongPress={250}
+                accessibilityRole="text"
+                accessibilityHint="Long press to copy this message"
                 className={`max-w-[78%] rounded-[18px] px-3.5 py-2 ${
                     isMine
                         ? 'bg-emerald-500 rounded-br-md'
@@ -594,7 +601,8 @@ const MessageBubble = React.memo(function MessageBubble({
                     {time}
                     {isMine && message.isRead ? ' • Read' : ''}
                 </Text>
-            </View>
+                {copied && <CopiedOverlay />}
+            </Pressable>
         </View>
     );
 });

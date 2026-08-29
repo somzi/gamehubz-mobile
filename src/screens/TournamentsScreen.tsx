@@ -11,7 +11,7 @@ import { TournamentCard } from '../components/cards/TournamentCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { ENDPOINTS, authenticatedFetch } from '../lib/api';
-import { formatDateSafe, getCurrencySymbol } from '../lib/utils';
+import { formatDateSafe, formatLocalDateTime, getCurrencySymbol } from '../lib/utils';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
@@ -66,7 +66,7 @@ export default function TournamentsScreen() {
         queryFn: async ({ pageParam }) => {
             const page = pageParam as number;
             const status = TAB_TO_STATUS[activeTab] ?? 2;
-            const url = ENDPOINTS.GET_USER_TOURNAMENTS(user!.id, status, page, PAGE_SIZE);
+            const url = ENDPOINTS.GET_USER_TOURNAMENTS_V2(user!.id, status, page, PAGE_SIZE);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No body');
@@ -130,10 +130,16 @@ export default function TournamentsScreen() {
         }
     };
 
-    const getTournamentStatus = (status: number): 'live' | 'upcoming' | 'completed' => {
+    // A tournament the feed returns as Draft (0) with an opening time is one waiting for its
+    // scheduled registration — the card then shows that time instead of the start date.
+    const getTournamentStatus = (
+        status: number,
+        opensAt?: string | null,
+    ): 'live' | 'upcoming' | 'completed' | 'scheduled' => {
         switch (status) {
             case 3: return 'live';
             case 4: return 'completed';
+            case 0: return opensAt ? 'scheduled' : 'upcoming';
             default: return 'upcoming';
         }
     };
@@ -152,13 +158,20 @@ export default function TournamentsScreen() {
         [],
     );
 
-    const renderTournament = useCallback(({ item: tournament, index }: { item: any; index: number }) => (
+    const renderTournament = useCallback(({ item, index }: { item: any; index: number }) => {
+        const tournament = item;
+        const opensAt = tournament.RegistrationOpensAt || tournament.registrationOpensAt || null;
+        const cardStatus = getTournamentStatus(tournament.Status ?? tournament.status, opensAt);
+
+        return (
         <View className="mb-3">
             <TournamentCard
                 name={tournament.Name || tournament.name}
                 description={tournament.Description || tournament.description}
-                status={getTournamentStatus(tournament.Status ?? tournament.status)}
-                date={formatDateSafe(tournament.StartDate || tournament.startDate)}
+                status={cardStatus}
+                date={cardStatus === 'scheduled'
+                    ? formatLocalDateTime(opensAt)
+                    : formatDateSafe(tournament.StartDate || tournament.startDate)}
                 region={getRegionName(tournament.Region ?? tournament.region)}
                 prizePool={`${getCurrencySymbol(tournament.PrizeCurrency ?? tournament.prizeCurrency)}${tournament.Prize ?? tournament.prize}`}
                 players={new Array(tournament.NumberOfParticipants ?? tournament.numberOfParticipants ?? tournament.participantsCount ?? tournament.tournamentParticipants?.length ?? 0).fill({})}
@@ -171,7 +184,8 @@ export default function TournamentsScreen() {
                 hubAvatarUrl={tournament.HubAvatarUrl || tournament.hubAvatarUrl}
             />
         </View>
-    ), [navigation]);
+        );
+    }, [navigation]);
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>

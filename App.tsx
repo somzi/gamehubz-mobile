@@ -18,6 +18,7 @@ import { useOtaUpdates } from './src/hooks/useOtaUpdates';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import { Linking } from 'react-native';
 
 // Silence console.log in production builds. The codebase logs a lot of debug info
 // (auth state with usernames, navigation events, network payloads) that shouldn't
@@ -102,6 +103,25 @@ const linking: LinkingOptions<RootStackParamList> = {
   getStateFromPath: (path, options) =>
     getStateFromPath(path.replace(/^\/*user\//, 'player/'), options),
 };
+
+// Announcement pushes carry an http(s) url instead of an in-app screen: the tap belongs to
+// the OS (browser / Discord app), not to the navigator. Kept out of routeFromNotification
+// because the router verifies a *route* landed and re-dispatches until it does — running an
+// openURL through that loop would reopen the link every 150ms.
+function externalLinkFromNotification(rawData: unknown): string | null {
+  if (!rawData || typeof rawData !== 'object') return null;
+  const data = rawData as Record<string, any>;
+
+  const type = typeof data.type === 'string' ? data.type.toLowerCase() : undefined;
+  if (type !== 'link') return null;
+
+  const url = typeof data.url === 'string' ? data.url.trim() : '';
+
+  // http(s) only — the backend enforces the same. A stray custom scheme here would hand an
+  // arbitrary intent to the OS, and a payload without a usable url falls through to the
+  // normal router (which lands on the hub profile via hubId).
+  return /^https?:\/\//i.test(url) ? url : null;
+}
 
 // Dispatches the deep link for a notification payload and returns the top-level stack
 // route it navigated to (`null` when the payload carries nothing routable). The caller
@@ -195,6 +215,9 @@ function routeFromNotification(
         return go('TournamentDetails', { id: tournamentId });
       }
       break;
+    // A tournament was announced with a scheduled opening — open it so the exact local
+    // opening time (and the rules/prize) are right there.
+    case 'registrationscheduled':
     // Registration closing soon — open the tournament so the user can still register.
     case 'registrationdeadline':
       if (tournamentId) {
@@ -302,6 +325,18 @@ function NotificationRouter({
     if (handledRef.current !== NOT_HANDLED && handledRef.current === reqId) return;
 
     const data = lastResponse.notification.request.content.data;
+
+    // A link announcement ("grab the Discord role") has no in-app destination — hand it to the
+    // OS once and mark it handled, before the navigation retry loop below ever sees it.
+    const externalUrl = externalLinkFromNotification(data);
+    if (externalUrl) {
+      handledRef.current = reqId;
+      Linking.openURL(externalUrl).catch((err) =>
+        console.warn('[NotificationRouter] could not open link', externalUrl, err),
+      );
+      return;
+    }
+
     const startedAt = Date.now();
 
     let cancelled = false;

@@ -248,6 +248,13 @@ export default function TournamentDetailsScreen() {
     // the roster is locked into the bracket — no new join requests and no team removal.
     const isPreStart: boolean = (tournament?.status ?? 99) < 3;
 
+    // Scheduled registration that hasn't opened yet: status 0 plus a stored opening time. The
+    // server rejects every sign-up until the sweep flips it, so no Join button and nothing to
+    // close — the only action is the organiser's "open it now" override. An opening time on any
+    // other status is just a record of the schedule and changes nothing.
+    const isWaitingToOpen: boolean =
+        Number(tournament?.status) === 0 && !!(tournament as any)?.registrationOpensAt;
+
     // Whether this tournament was created with "results require approval" on. When it's
     // off there is nothing to approve, so the Approvals pill and the Bracket-tab badge are
     // hidden entirely. Known from the overview payload, so it resolves before the bracket loads.
@@ -481,6 +488,9 @@ export default function TournamentDetailsScreen() {
                 description: rawData.description || rawData.Description,
                 rules: rawData.rules || rawData.Rules,
                 registrationDeadline: rawData.registrationDeadline || rawData.RegistrationDeadLine || rawData.registrationDeadLine,
+                // Scheduled opening. Null on every tournament whose registration was open from the
+                // start; paired with status 0 it means "waiting to open", not "draft nobody finished".
+                registrationOpensAt: rawData.registrationOpensAt || rawData.RegistrationOpensAt || null,
                 hubId: rawData.hubId || rawData.HubId,
                 hubName: rawData.hubName || rawData.HubName,
                 isTeamTournament: rawData.isTeamTournament ?? rawData.IsTeamTournament ?? false,
@@ -2329,7 +2339,7 @@ export default function TournamentDetailsScreen() {
                             const isParticipant = participants.some(p =>
                                 (p.username || p.Username)?.toLowerCase() === user?.username?.toLowerCase()
                             );
-                            const isOpenOrUpcoming = tournament.status === 0 || tournament.status === 1;
+                            const isOpenOrUpcoming = (tournament.status === 0 || tournament.status === 1) && !isWaitingToOpen;
                             const attendeeCount = tournament?.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0);
                             const currentAttendeeCount = attendeeCount;
                             const isFull = tournament.maxPlayers > 0 && currentAttendeeCount >= tournament.maxPlayers;
@@ -2431,9 +2441,11 @@ export default function TournamentDetailsScreen() {
                     {activeTab === 'overview' && (
                         <View className="px-4 py-4 pb-12">
 
-                            {/* Hub Owner Close Registration Button */}
+                            {/* Hub Owner Close Registration Button — nothing to close while a
+                                scheduled tournament is still waiting for its opening time. */}
                             {canManage &&
-                                (tournament?.status === 0 || tournament?.status === 1) && (
+                                (tournament?.status === 0 || tournament?.status === 1) &&
+                                !isWaitingToOpen && (
                                     <Button
                                         className="w-full mb-4 bg-destructive"
                                         onPress={handleCloseRegistration}
@@ -2443,17 +2455,40 @@ export default function TournamentDetailsScreen() {
                                     </Button>
                                 )}
 
-                            {/* Hub Owner Open Registration Button */}
+                            {/* Hub Owner Open Registration Button. Also the "open early" override for
+                                a scheduled tournament (status 0 + an opening time), which the server
+                                accepts as the same transition. */}
                             {canManage &&
-                                tournament?.status === 2 && (
+                                (tournament?.status === 2 || isWaitingToOpen) && (
                                     <Button
                                         className="w-full mb-4 bg-primary"
                                         onPress={handleOpenRegistration}
                                         loading={isLoading}
                                     >
-                                        Open Registration
+                                        {tournament?.status === 2 ? 'Open Registration' : 'Open Registration Now'}
                                     </Button>
                                 )}
+
+                            {/* Waiting-to-open banner — replaces the Join button until the sweep opens it. */}
+                            {isWaitingToOpen && (
+                                <View className="w-full bg-[#101625]/80 p-4 rounded-2xl border border-indigo-400/20 flex-row items-center gap-3 mb-4">
+                                    <View className="w-10 h-10 rounded-xl bg-indigo-400/10 items-center justify-center">
+                                        <Ionicons name="lock-open-outline" size={20} color="#818CF8" />
+                                    </View>
+                                    <View className="flex-1 gap-0.5">
+                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Registration Opens</Text>
+                                        <Text className="text-base font-black text-white">
+                                            {(() => {
+                                                const d = new Date(tournament.registrationOpensAt);
+                                                return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                                            })()}
+                                        </Text>
+                                        <Text className="text-[11px] text-slate-400 mt-0.5">
+                                            You'll get a notification the moment sign-ups open.
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
 
                             {/* Registration Deadline Alert */}
                             {tournament.registrationDeadline && [0, 1, 2].includes(Number(tournament.status)) && (

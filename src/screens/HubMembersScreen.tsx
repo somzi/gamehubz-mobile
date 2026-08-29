@@ -237,6 +237,51 @@ export default function HubMembersScreen() {
         }
     };
 
+    // Hands the hub over: the target becomes Owner and the current owner drops to Admin. Confirmed
+    // in two steps because the caller cannot undo it afterwards — only the new owner can transfer back.
+    const transferOwnership = (member: MemberRow) => {
+        Alert.alert(
+            'Transfer Ownership',
+            `Make ${member.username} the owner of this hub?
+
+`
+            + 'You will stay on as an admin. Only the new owner will be able to transfer the hub, '
+            + 'edit its details or delete it.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Transfer',
+                    style: 'destructive',
+                    onPress: async () => {
+                        markProcessing(member.userId, true);
+                        try {
+                            const response = await authenticatedFetch(
+                                ENDPOINTS.TRANSFER_HUB_OWNERSHIP(hubId),
+                                {
+                                    method: 'POST',
+                                    body: JSON.stringify({ userId: member.userId }),
+                                }
+                            );
+                            if (response.ok) {
+                                // The viewer is no longer the owner, so re-read both the hub meta
+                                // (drops the owner-only controls) and the member list (new badges).
+                                await Promise.all([fetchHubMeta(), fetchMembers()]);
+                                Alert.alert('Ownership transferred', `${member.username} now owns this hub.`);
+                            } else {
+                                const text = await response.text();
+                                Alert.alert('Error', getErrorMessage(text) || 'Failed to transfer ownership.');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', getErrorMessage(error));
+                        } finally {
+                            markProcessing(member.userId, false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const removeMember = (member: MemberRow) => {
         Alert.alert(
             'Remove Member',
@@ -341,8 +386,10 @@ export default function HubMembersScreen() {
     const memberSheetActions = (member: MemberRow): ActionSheetAction[] => {
         const actions: ActionSheetAction[] = [];
 
-        // Only the Owner can grant/revoke elevated roles (admin / exclusive).
-        if (isOwner) {
+        // Only the Owner can grant/revoke elevated roles (admin / exclusive). Same test the row
+        // gate uses (canManageMember) — the `isOwner` flag alone lags behind the hub-meta fetch,
+        // which left an owner with a sheet offering nothing but "Remove from hub".
+        if (viewerIsOwner) {
             if (member.hubRole === HubRole.HubMember) {
                 actions.push({
                     label: 'Promote to admin',
@@ -377,6 +424,14 @@ export default function HubMembersScreen() {
                     onPress: () => changeRole(member, HubRole.HubMember),
                 });
             }
+
+            // Marked destructive: it is the one action here the owner cannot take back.
+            actions.push({
+                label: 'Transfer ownership',
+                icon: 'key-outline',
+                destructive: true,
+                onPress: () => transferOwnership(member),
+            });
         }
 
         actions.push({

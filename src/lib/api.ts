@@ -32,8 +32,12 @@ export const ENDPOINTS = {
     GET_PROFILE_TOURNAMENTS: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/UserProfile/${userId}/tournaments?pageNumber=${pageNumber}`,
     GET_PROFILE_MATCHES: (userId: string, pageNumber: number = 0) => `${API_BASE_URL}/api/UserProfile/${userId}/matches?pageNumber=${pageNumber}`,
     CREATE_TOURNAMENT: `${API_BASE_URL}/api/tournament`,
-    GET_USER_TOURNAMENTS: (userId: string, status: number, page: number, pageSize: number = 10) =>
-        `${API_BASE_URL}/api/User/${userId}/tournaments?Status=${status}&Page=${page}&PageSize=${pageSize}`,
+    // v2 of the tournaments feed: same payload as v1 plus tournaments waiting for a scheduled
+    // registration opening in the "open" tab. They come back as status 0 with registrationOpensAt
+    // set and are rendered as "Opens …" with no join — v1 omits them precisely so already-shipped
+    // builds can't offer a Join the server rejects, which is why it stays live on the server.
+    GET_USER_TOURNAMENTS_V2: (userId: string, status: number, page: number, pageSize: number = 10) =>
+        `${API_BASE_URL}/api/User/${userId}/tournaments/v2?Status=${status}&Page=${page}&PageSize=${pageSize}`,
     GET_TOURNAMENT: (id: string) => `${API_BASE_URL}/api/tournament/${id}`,
     GET_TOURNAMENT_OVERVIEW: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview`,
     GET_TOURNAMENT_OVERVIEW_V2: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview/v2`,
@@ -107,6 +111,9 @@ export const ENDPOINTS = {
     CHANGE_HUB_MEMBER_ROLE: (hubId: string, userId: string) => `${API_BASE_URL}/api/Hub/${hubId}/members/${userId}`,
     REMOVE_HUB_MEMBER: (hubId: string, userId: string) => `${API_BASE_URL}/api/Hub/${hubId}/members/${userId}`,
     BAN_HUB_MEMBER: (hubId: string, userId: string) => `${API_BASE_URL}/api/Hub/${hubId}/members/${userId}/ban`,
+    // Owner-only. Body: { userId }. The target becomes Owner, the caller becomes Admin — from then
+    // on only the new owner can transfer it back.
+    TRANSFER_HUB_OWNERSHIP: (hubId: string) => `${API_BASE_URL}/api/Hub/${hubId}/transferOwnership`,
     GET_HUB_BANS: (hubId: string) => `${API_BASE_URL}/api/Hub/${hubId}/bans`,
     UNBAN_HUB_MEMBER: (hubId: string, userId: string) => `${API_BASE_URL}/api/Hub/${hubId}/bans/${userId}`,
     REQUEST_HUB_VERIFICATION: (hubId: string) => `${API_BASE_URL}/api/Hub/${hubId}/verification-request`,

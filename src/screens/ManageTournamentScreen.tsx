@@ -215,7 +215,7 @@ export default function ManageTournamentScreen() {
                     </View>
                     <Text className="text-2xl font-black text-white text-center">{tournament?.name}</Text>
                     <Text className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">
-                        {tournament?.status === 0 ? 'Open' : 
+                        {tournament?.status === 0 ? (tournament?.registrationOpensAt ? 'Scheduled' : 'Open') : 
                          tournament?.status === 1 ? 'Upcoming' :
                          tournament?.status === 2 ? 'Reg. Closed' :
                          tournament?.status === 3 ? 'Live' :

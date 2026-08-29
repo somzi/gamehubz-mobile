@@ -7,7 +7,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard';
 import { translateMessage } from '../../lib/translationApi';
+import { CopiedOverlay } from './CopiedOverlay';
 import {
   Language,
   TranslateLanguageSheet,
@@ -27,6 +29,7 @@ export function MatchChatBubble({
   const [showOriginal, setShowOriginal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [sheetOpen, setSheetOpen] = useState<boolean>(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const runTranslation = useCallback(
     async (lang: Language): Promise<void> => {
@@ -76,8 +79,17 @@ export function MatchChatBubble({
   const isShowingOriginalAfterTranslation: boolean =
     !!translatedText && showOriginal && !!translatedLang;
 
+  // Long-press copies whatever the bubble currently shows (translation included).
+  const copyToClipboard = useCallback((): void => {
+    copy(displayText);
+  }, [copy, displayText]);
+
   const bubble = (
-    <View
+    <Pressable
+      onLongPress={copyToClipboard}
+      delayLongPress={250}
+      accessibilityRole="text"
+      accessibilityHint="Long press to copy this message"
       className={cn(
         'px-4 py-3 rounded-[20px]',
         isMyComment
@@ -139,7 +151,9 @@ export function MatchChatBubble({
           </Pressable>
         </View>
       )}
-    </View>
+
+      {copied && <CopiedOverlay />}
+    </Pressable>
   );
 
   if (isMyComment) {
