@@ -19,6 +19,7 @@ import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, getCurrencyLabel, parseUtcDate, formatDateTimeShort } from '../lib/utils';
 import { normalizeBestOf } from '../lib/series';
+import { compareGroupNames, groupName } from '../lib/groups';
 import { ShareTournamentCardModal } from '../components/modals/ShareTournamentCardModal';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
@@ -2135,13 +2136,11 @@ export default function TournamentDetailsScreen() {
                         {adminPills && (
                             <View className="px-4 mb-4 flex-row">{adminPills}</View>
                         )}
-                        {/* Sort groups alphabetically by name (Group A, Group B, …) */}
+                        {/* Group A, Group B, … Group Z, Group AA — see compareGroupNames */}
                         {(() => {
-                            const sortedGroups = [...currentStage.groups].sort((a: any, b: any) => {
-                                const nameA = (a.name || '').toLowerCase();
-                                const nameB = (b.name || '').toLowerCase();
-                                return nameA.localeCompare(nameB);
-                            });
+                            const sortedGroups = [...currentStage.groups].sort((a: any, b: any) =>
+                                compareGroupNames(a.name, b.name)
+                            );
                             return (
                                 <>
                                     <ScrollView
@@ -2165,7 +2164,7 @@ export default function TournamentDetailsScreen() {
                                                     "text-xs font-bold",
                                                     selectedGroupIndex === idx ? "text-accent" : "text-muted-foreground"
                                                 )}>
-                                                    {group.name || `Group ${String.fromCharCode(65 + idx)}`}
+                                                    {group.name || groupName(idx, sortedGroups.length)}
                                                 </Text>
                                             </Pressable>
                                         ))}

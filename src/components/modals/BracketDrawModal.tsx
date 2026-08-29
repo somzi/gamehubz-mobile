@@ -9,6 +9,7 @@ import { SearchInput } from '../ui/SearchInput';
 import { KeyboardAvoider } from '../ui/KeyboardAvoider';
 import { ConfirmationModal } from './ConfirmationModal';
 import { COLORS } from '../../lib/theme';
+import { groupLabel } from '../../lib/groups';
 import {
     BracketSeedingMode,
     getStandardSeedOrder,
@@ -98,9 +99,6 @@ function modeSubtitle(mode: BracketSeedingMode, options: BracketDrawOptions, isG
 
 /** Groups and pots share the same bucket editor; only the labels and the size rules differ. */
 type BucketKind = 'group' | 'pot';
-
-const groupLetter = (index: number) =>
-    index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
 
 function initialsOf(name: string) {
     return (name || '')
@@ -305,7 +303,7 @@ export function BracketDrawModal({
             if (bad >= 0) return `Pot ${bad + 1} needs exactly ${potTarget(bad)} — it has ${buckets[bad].length}.`;
         } else if (isGroups) {
             const bad = buckets.findIndex((b) => b.length < 2);
-            if (bad >= 0) return `Group ${groupLetter(bad)} needs at least 2 — a one-entrant group never plays.`;
+            if (bad >= 0) return `Group ${groupLabel(bad, groupsCount)} needs at least 2 — a one-entrant group never plays.`;
         } else {
             // Both sides empty isn't a bye, it's a match nobody can ever play — and the round it
             // feeds would wait forever for a winner. The server rejects it too.
@@ -462,11 +460,11 @@ export function BracketDrawModal({
                                     style={{ backgroundColor: accent + '1F', borderWidth: 1, borderColor: accent + '38' }}
                                 >
                                     <Text className="text-[10px] font-black" style={{ color: accent }}>
-                                        {isPot ? index + 1 : groupLetter(index)}
+                                        {isPot ? index + 1 : groupLabel(index, groupsCount)}
                                     </Text>
                                 </View>
                                 <Text className="text-[13px] font-black text-white">
-                                    {isPot ? `Pot ${index + 1}` : `Group ${groupLetter(index)}`}
+                                    {isPot ? `Pot ${index + 1}` : `Group ${groupLabel(index, groupsCount)}`}
                                 </Text>
                             </View>
 
@@ -606,7 +604,7 @@ export function BracketDrawModal({
             ? `Match ${Math.floor(picker.index / 2) + 1} · side ${(picker.index % 2) + 1}`
             : bucketKind === 'pot'
                 ? `Pot ${picker.index + 1}`
-                : `Group ${groupLetter(picker.index)}`;
+                : `Group ${groupLabel(picker.index, groupsCount)}`;
 
         // Inline styles, not className — the codebase keeps Animated.View on plain styles
         // (NativeWind's interop on it isn't relied on anywhere else).
