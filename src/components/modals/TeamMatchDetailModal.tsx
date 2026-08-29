@@ -1038,6 +1038,12 @@ export function TeamMatchDetailModal({
                                 // without the games behind it — list them under the row.
                                 const subBestOf = normalizeBestOf((sm as any).bestOf);
                                 const subGames = seriesGamesFrom(sm);
+                                // A pending proposal keeps its games in ProposedGames until it is approved —
+                                // list those instead so the amber headline can be read game by game before
+                                // anyone decides on it.
+                                const subProposedGames = seriesGamesFrom({ games: (sm as any).proposedGames ?? (sm as any).ProposedGames });
+                                const breakdownIsProposed = subGames.length === 0 && hasProposal;
+                                const breakdownGames = breakdownIsProposed ? subProposedGames : subGames;
 
                                 return (
                                     <View
@@ -1145,7 +1151,7 @@ export function TeamMatchDetailModal({
 
                                         {/* Per-game breakdown of a series sub-match. Without it the row's
                                             "2 : 1" is indistinguishable from a single game's score. */}
-                                        {subGames.length > 0 && subBestOf > 1 && (
+                                        {breakdownGames.length > 0 && subBestOf > 1 && (
                                             <View
                                                 style={{
                                                     flexDirection: 'row',
@@ -1156,7 +1162,7 @@ export function TeamMatchDetailModal({
                                                     paddingBottom: 8,
                                                 }}
                                             >
-                                                {groupBySeries(subGames).map(block => (
+                                                {groupBySeries(breakdownGames).map(block => (
                                                     <View key={block.seriesNumber} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                                         {block.seriesNumber > 1 && (
                                                             <Text style={{ fontSize: 8, fontWeight: '900', color: C.amber, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -1164,7 +1170,7 @@ export function TeamMatchDetailModal({
                                                             </Text>
                                                         )}
                                                         {block.games.map((g, gi) => (
-                                                            <Text key={gi} style={{ fontSize: 10, fontWeight: '800', color: C.textFaint }}>
+                                                            <Text key={gi} style={{ fontSize: 10, fontWeight: '800', color: breakdownIsProposed ? C.amber : C.textFaint }}>
                                                                 {g.homeScore}:{g.awayScore}
                                                             </Text>
                                                         ))}

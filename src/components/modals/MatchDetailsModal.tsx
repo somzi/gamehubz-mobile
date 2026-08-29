@@ -24,15 +24,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cn, parseUtcDate, formatDateTimeShort } from '../../lib/utils';
 import { MatchStage } from '../../types/tournament';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
+import { SeriesBreakdown } from '../match/SeriesBreakdown';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
 import {
     SeriesFormat,
     SeriesGame,
     SeriesOutcome,
-    groupBySeries,
     normalizeBestOf,
     normalizeCondition,
-    seriesBlockLabel,
     seriesGamesFrom,
 } from '../../lib/series';
 
@@ -211,7 +210,13 @@ export function MatchDetailsModal({
         condition: normalizeCondition(matchDetails?.seriesWinCondition),
     }), [matchDetails?.bestOf, matchDetails?.tiebreakBestOf, matchDetails?.seriesWinCondition]);
     const reportedGames = React.useMemo(() => matchDetails?.games ?? [], [matchDetails?.games]);
-    const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0;
+    // Games behind a result that is still awaiting approval. They live apart from `games` until the
+    // proposal is approved, so the proposal card and the edit form have to read them from here.
+    const proposedGames = React.useMemo(() => matchDetails?.proposedGames ?? [], [matchDetails?.proposedGames]);
+    const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0 || proposedGames.length > 0;
+    // What the entry form opens with. Editing a pending proposal has nothing in `games` yet — it
+    // used to open blank and silently drop every game the reporter had entered.
+    const entrySeedGames = reportedGames.length > 0 ? reportedGames : proposedGames;
 
     // Image preview state
     const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -353,7 +358,7 @@ export function MatchDetailsModal({
             tiebreakBestOf: sub?.tiebreakBestOf ?? sub?.TiebreakBestOf ?? null,
             seriesWinCondition: data.seriesWinCondition ?? data.SeriesWinCondition ?? 0,
             games: seriesGamesFrom(sub),
-            proposedGames: null,
+            proposedGames: seriesGamesFrom({ games: sub?.proposedGames ?? sub?.ProposedGames }),
             allowsTieBreak: false,
             isTeamSub: true,
         };
@@ -1221,44 +1226,7 @@ export function MatchDetailsModal({
 
                         {/* Series breakdown. The big number above is the deciding series' tally —
                             without the games behind it, "2 : 1" says nothing about what was played. */}
-                        {isSeriesMatch && reportedGames.length > 0 && (
-                            <View className="mt-5 pt-4 border-t border-white/[0.06]">
-                                <Text className="text-[9px] font-black text-slate-500 uppercase tracking-[2px] text-center mb-3">
-                                    Best of {seriesFormat.bestOf} · {seriesFormat.condition === 1 ? 'Total score' : 'Games won'}
-                                </Text>
-
-                                {groupBySeries(reportedGames).map(block => (
-                                    <View key={block.seriesNumber} className="mb-1.5">
-                                        {block.seriesNumber > 1 && (
-                                            <Text className="text-[9px] font-black text-warning uppercase tracking-[1.5px] text-center mb-1">
-                                                {seriesBlockLabel(block.seriesNumber)}
-                                            </Text>
-                                        )}
-                                        {block.games.map((g, gi) => (
-                                            <View key={gi} className="flex-row items-center justify-center gap-3 py-0.5">
-                                                <Text className="text-[10px] font-bold text-slate-600 uppercase tracking-wider w-16 text-right">
-                                                    Game {gi + 1}
-                                                </Text>
-                                                <Text className={cn(
-                                                    'text-sm font-black w-8 text-right',
-                                                    g.homeScore > g.awayScore ? 'text-primary' : 'text-slate-400',
-                                                )}>
-                                                    {g.homeScore}
-                                                </Text>
-                                                <Text className="text-[10px] font-black text-slate-700">:</Text>
-                                                <Text className={cn(
-                                                    'text-sm font-black w-8',
-                                                    g.awayScore > g.homeScore ? 'text-primary' : 'text-slate-400',
-                                                )}>
-                                                    {g.awayScore}
-                                                </Text>
-                                                <View className="w-16" />
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        )}
+                        <SeriesBreakdown className="mt-5" games={reportedGames} format={seriesFormat} />
                     </View>
                 </View>
 
@@ -1372,7 +1340,7 @@ export function MatchDetailsModal({
                 {isSeriesMatch ? (
                     <View className="mb-5">
                         <SeriesScoreEntry
-                            key={`edit-${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
+                            key={`edit-${matchId}-${entrySeedGames.length}-${seriesFormat.bestOf}`}
                             leftName={homeIdentity.username}
                             leftNickname={homeIdentity.nickname}
                             leftAvatarUrl={homeAvatar}
@@ -1381,7 +1349,7 @@ export function MatchDetailsModal({
                             rightAvatarUrl={awayAvatar}
                             format={seriesFormat}
                             allowTiebreak={!!matchDetails.allowsTieBreak}
-                            initialGames={reportedGames}
+                            initialGames={entrySeedGames}
                             onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                             onChange={(games, outcome, complete) => {
                                 setSeriesGames(games);
@@ -1566,6 +1534,11 @@ export function MatchDetailsModal({
                         </Pressable>
                     </View>
 
+                    {/* The games behind the proposed headline. Approving is a judgement on what was
+                        played, so the same breakdown the settled result gets belongs here too —
+                        otherwise the decision is made on a single number. */}
+                    <SeriesBreakdown className="mt-5" games={proposedGames} format={seriesFormat} tone="proposed" />
+
                     {(canDecideOnProposal || ((isProposer || isPrivileged) && !isEditingProposal)) && (
                         <View className="flex-row gap-2.5 mt-6">
                             {canDecideOnProposal && (
@@ -1701,7 +1674,7 @@ export function MatchDetailsModal({
                         </View>
                     ) : isSeriesMatch ? (
                         <SeriesScoreEntry
-                            key={`report-${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
+                            key={`report-${matchId}-${entrySeedGames.length}-${seriesFormat.bestOf}`}
                             leftName={effectiveHome?.username || 'Home'}
                             leftNickname={homeIdentity.nickname}
                             leftAvatarUrl={homeAvatar}
@@ -1710,7 +1683,7 @@ export function MatchDetailsModal({
                             rightAvatarUrl={awayAvatar}
                             format={seriesFormat}
                             allowTiebreak={!!matchDetails?.allowsTieBreak}
-                            initialGames={reportedGames}
+                            initialGames={entrySeedGames}
                             editable={canSubmit}
                             onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                             onChange={(games, outcome, complete) => {

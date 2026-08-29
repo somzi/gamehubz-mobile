@@ -23,6 +23,7 @@ import { mergeMessagesById } from '../../lib/mergeMessages';
 import { AdminHelpSection } from './AdminHelpSection';
 import { MatchStreamPanel } from './MatchStreamPanel';
 import { SeriesScoreEntry } from './SeriesScoreEntry';
+import { SeriesBreakdown } from './SeriesBreakdown';
 import {
     SeriesFormat,
     SeriesGame,
@@ -147,6 +148,9 @@ export function MatchScheduleCard({
     // left) and mapped to the DB's home/away roles at submit time, exactly like the single scores.
     const [seriesFormat, setSeriesFormat] = useState<SeriesFormat>({ bestOf: 1, tiebreakBestOf: null, condition: 0 });
     const [reportedGames, setReportedGames] = useState<SeriesGame[]>([]);
+    // Games behind a result that is still awaiting approval — they sit in their own list until it
+    // is approved, so both the proposal panel and the edit form have to read them from here.
+    const [proposedGames, setProposedGames] = useState<SeriesGame[]>([]);
     const [seriesGames, setSeriesGames] = useState<SeriesGame[]>([]);
     const [seriesOutcome, setSeriesOutcome] = useState<SeriesOutcome | null>(null);
     const [isSeriesComplete, setIsSeriesComplete] = useState(false);
@@ -158,7 +162,7 @@ export function MatchScheduleCard({
     // for a best-of match and then swap it out, which reads as the modal reopening itself.
     const [detailsLoaded, setDetailsLoaded] = useState(false);
 
-    const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0;
+    const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0 || proposedGames.length > 0;
 
     // The card face renders before the modal has fetched details, so it falls back to the Best-of
     // the match list already carries; once details are in, they win (a match override beats the list).
@@ -171,12 +175,18 @@ export function MatchScheduleCard({
     const isUserDbHomeSide = !!dbHomeUserId && !!user?.id
         && dbHomeUserId.toLowerCase() === user.id.toLowerCase();
 
-    const visualReportedGames = React.useMemo(
-        () => (isUserDbHomeSide
-            ? reportedGames
-            : reportedGames.map(g => ({ ...g, homeScore: g.awayScore, awayScore: g.homeScore }))),
-        [reportedGames, isUserDbHomeSide],
+    const flipToVisual = React.useCallback(
+        (games: SeriesGame[]) => (isUserDbHomeSide
+            ? games
+            : games.map(g => ({ ...g, homeScore: g.awayScore, awayScore: g.homeScore }))),
+        [isUserDbHomeSide],
     );
+
+    const visualReportedGames = React.useMemo(() => flipToVisual(reportedGames), [reportedGames, flipToVisual]);
+    const visualProposedGames = React.useMemo(() => flipToVisual(proposedGames), [proposedGames, flipToVisual]);
+    // What the entry form opens with. Editing a pending proposal has nothing in `reportedGames`
+    // yet — it used to open blank and silently drop every game the reporter had entered.
+    const visualEntrySeedGames = visualReportedGames.length > 0 ? visualReportedGames : visualProposedGames;
     const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
     // Comments state
@@ -355,6 +365,7 @@ export function MatchScheduleCard({
                 let tiebreakBestOf = data.tiebreakBestOf ?? data.TiebreakBestOf ?? null;
                 const condition = normalizeCondition(data.seriesWinCondition ?? data.SeriesWinCondition);
                 let games = seriesGamesFrom(data);
+                let proposed = seriesGamesFrom({ games: data.proposedGames ?? data.ProposedGames });
                 // Only a solo knockout match can park in a tiebreak; the server says which.
                 let allowsTie = Boolean(data.allowsTieBreak ?? data.AllowsTieBreak ?? false);
 
@@ -378,6 +389,7 @@ export function MatchScheduleCard({
                         bestOf = sub.bestOf ?? sub.BestOf ?? bestOf;
                         tiebreakBestOf = sub.tiebreakBestOf ?? sub.TiebreakBestOf ?? tiebreakBestOf;
                         games = seriesGamesFrom(sub);
+                        proposed = seriesGamesFrom({ games: sub.proposedGames ?? sub.ProposedGames });
                         // A level sub-match is never replayed — the tie resolves it one level up.
                         allowsTie = false;
                     }
@@ -391,6 +403,7 @@ export function MatchScheduleCard({
                     condition: normalizeCondition(data.seriesWinCondition ?? data.SeriesWinCondition ?? condition),
                 });
                 setReportedGames(games);
+                setProposedGames(proposed);
                 setAllowsTiebreak(allowsTie);
 
                 setDbHomeUserId(homeUserId);
@@ -1358,6 +1371,15 @@ export function MatchScheduleCard({
                                                             </Text>
                                                         </View>
 
+                                                        {/* The games behind that headline — deciding whether it is
+                                                            right is a judgement on what was played, not on one number. */}
+                                                        <SeriesBreakdown
+                                                            className="mt-4"
+                                                            games={visualProposedGames}
+                                                            format={seriesFormat}
+                                                            tone="proposed"
+                                                        />
+
                                                         {(canDecide || (canEdit && !isEditingProposal)) && (
                                                             <View className="flex-row gap-2.5 mt-4">
                                                                 {canDecide && (
@@ -1458,7 +1480,7 @@ export function MatchScheduleCard({
                                                     </View>
                                                 ) : isSeriesMatch ? (
                                                     <SeriesScoreEntry
-                                                        key={`${matchId}-${reportedGames.length}-${seriesFormat.bestOf}`}
+                                                        key={`${matchId}-${visualEntrySeedGames.length}-${seriesFormat.bestOf}`}
                                                         leftName={user?.username || 'You'}
                                                         leftNickname={userNickname || user?.nickName}
                                                         leftAvatarUrl={user?.avatarUrl}
@@ -1467,7 +1489,7 @@ export function MatchScheduleCard({
                                                         rightAvatarUrl={opponentAvatarUrl}
                                                         format={seriesFormat}
                                                         allowTiebreak={allowsTiebreak}
-                                                        initialGames={visualReportedGames}
+                                                        initialGames={visualEntrySeedGames}
                                                         onChange={(games, outcome, complete) => {
                                                             setSeriesGames(games);
                                                             setSeriesOutcome(outcome);
