@@ -291,7 +291,9 @@ export function MatchScheduleCard({
     }, [modalVisible, activeModalTab, matchId]);
 
     const handleSendComment = async () => {
-        if (!newComment.trim() || !matchId) return;
+        // isSendingComment is part of the guard, not just the disabled prop: the button now fires
+        // on touch-down, so a double-tap could otherwise post the same message twice.
+        if (!newComment.trim() || !matchId || isSendingComment) return;
 
         // Keep the keyboard up across sends (Discord-style): re-assert focus before the
         // async round-trip — a no-op when already focused, and it re-opens the keyboard
@@ -321,6 +323,23 @@ export function MatchScheduleCard({
         } finally {
             setIsSendingComment(false);
         }
+    };
+
+    // The send button fires on touch-down (see the composer in the modal); these two keep a
+    // single gesture — touch-down followed by the tap it completes into — to exactly one send.
+    const sentOnTouchDownRef = useRef(false);
+
+    const sendCommentFromTouchDown = () => {
+        sentOnTouchDownRef.current = true;
+        void handleSendComment();
+    };
+
+    const sendCommentFromTap = () => {
+        if (sentOnTouchDownRef.current) {
+            sentOnTouchDownRef.current = false;
+            return;
+        }
+        void handleSendComment();
     };
 
     const formatCommentTime = (dateString: string) => formatLocalDateTime(dateString);
@@ -1842,7 +1861,11 @@ export function MatchScheduleCard({
                                                     className={cn("mb-2 flex-1")}
                                                     nestedScrollEnabled
                                                     showsVerticalScrollIndicator={false}
-                                                    keyboardShouldPersistTaps="handled"
+                                                    // 'always', not 'handled': with 'handled' the list still blurs the
+                                                    // input when it ends up as the touch responder, which ate the first tap
+                                                    // on Send and only dropped the keyboard — two taps per message. Drag-to-
+                                                    // dismiss (below) stays, and is the only dismissal this chat needs.
+                                                    keyboardShouldPersistTaps="always"
                                                     // iOS: 'interactive' (drag down onto the keyboard to dismiss, Discord-style)
                                                     // so a small scroll while composing doesn't drop the keyboard.
                                                     // Android doesn't support 'interactive' — keep 'on-drag' there.
@@ -1953,7 +1976,13 @@ export function MatchScheduleCard({
                                             onFocus={scrollToBottom}
                                         />
                                         <Pressable
-                                            onPress={handleSendComment}
+                                            // Sends on touch-down: inside the Modal the completed tap was being
+                                            // cancelled while the keyboard was up, so the press never became a send and
+                                            // the first tap only dropped the keyboard. onPress stays for activations
+                                            // that produce no touch (VoiceOver), and the ref keeps one gesture to a
+                                            // single send.
+                                            onPressIn={sendCommentFromTouchDown}
+                                            onPress={sendCommentFromTap}
                                             disabled={!newComment.trim() || isSendingComment}
                                             // Taps that land a few px above the button hit the message list,
                                             // which dismisses the keyboard and swallows the tap — extend the

@@ -232,6 +232,23 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         }
     };
 
+    // The send button fires on touch-down (see the composer below); these two keep a single
+    // gesture — touch-down followed by the tap it completes into — to exactly one send.
+    const sentOnTouchDownRef = useRef(false);
+
+    const sendFromTouchDown = useCallback((): void => {
+        sentOnTouchDownRef.current = true;
+        void handleSend();
+    }, [handleSend]);
+
+    const sendFromTap = useCallback((): void => {
+        if (sentOnTouchDownRef.current) {
+            sentOnTouchDownRef.current = false;
+            return;
+        }
+        void handleSend();
+    }, [handleSend]);
+
     // Exact local time (device timezone) instead of "x ago". Date is prefixed only for
     // messages not sent today, so same-day chat stays compact.
     const formatCommentTime = (dateString: string) => {
@@ -253,7 +270,11 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     className="flex-1"
                     nestedScrollEnabled
                     showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+                    // 'always', not 'handled': with 'handled' the list still blurs the input when it
+                    // ends up as the touch responder, which ate the first tap on Send and only
+                    // dropped the keyboard — you had to tap twice for every message. Dismissing by
+                    // dragging (below) stays, and that is the only dismissal this chat needs.
+                    keyboardShouldPersistTaps="always"
                     // iOS: 'interactive' (drag down onto the keyboard to dismiss, Discord-style)
                     // so a small scroll while composing doesn't drop the keyboard.
                     // Android doesn't support 'interactive' — keep 'on-drag' there.
@@ -374,7 +395,12 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                         onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)}
                     />
                     <Pressable
-                        onPress={handleSend}
+                        // Sends on touch-down: inside a Modal the completed tap was being cancelled
+                        // while the keyboard was up, so the press never became a send and the first
+                        // tap only dropped the keyboard. onPress stays for activations that produce
+                        // no touch (VoiceOver), and the ref keeps one gesture to a single send.
+                        onPressIn={sendFromTouchDown}
+                        onPress={sendFromTap}
                         disabled={!newComment.trim() || isSending}
                         // Taps that land a few px above the button hit the message list,
                         // which dismisses the keyboard and swallows the tap — extend the

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, Platform } from 'react-native';
+import { Dimensions, Keyboard, Platform, type KeyboardEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+/** Breathing room between the lifted content and the top of the keyboard. */
+const GAP = 8;
 
 /**
  * Bottom padding that lifts a composer clear of the on-screen keyboard, derived
@@ -35,14 +38,40 @@ export function useKeyboardInset(consumedBottomInset = 0, enabled = true): numbe
             setHeight(0);
             return;
         }
+
+        // The keyboard can already be open when this turns on — switching from a tab with a
+        // focused input straight into the chat tab never fires a show event, and without this
+        // seed the composer would sit under a keyboard that is right there on screen.
+        setHeight(Keyboard.metrics()?.height ?? 0);
+
         // iOS fires will* ahead of the keyboard animation so the lift travels with it;
         // Android only emits the did* pair.
-        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-        const show = Keyboard.addListener(showEvent, (e) => setHeight(e.endCoordinates.height));
+        const ios = Platform.OS === 'ios';
+        const showEvent = ios ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = ios ? 'keyboardWillHide' : 'keyboardDidHide';
+        // A keyboard that changes height AFTER it is up — predictive bar toggling, switching to
+        // the emoji keyboard or another language — fires only a frame-change event. Without it the
+        // inset goes stale and the send button ends up a few px under the taller keyboard, which
+        // reads as "tapping send does nothing until I dismiss the keyboard".
+        const frameEvent = ios ? 'keyboardWillChangeFrame' : 'keyboardDidChangeFrame';
+
+        // iOS: derive the height from the keyboard's top edge rather than trusting
+        // `height` — the frame-change event also fires while the keyboard is LEAVING, and it
+        // still reports the full height then. Measuring the gap to the screen bottom reads 0
+        // for that off-screen frame, so a dismiss can never leave a stale lift behind.
+        // Android keeps `height`: under edge-to-edge its screenY is the value RN gets wrong.
+        const apply = (e: KeyboardEvent) =>
+            setHeight(
+                ios
+                    ? Math.max(Dimensions.get('window').height - e.endCoordinates.screenY, 0)
+                    : e.endCoordinates.height,
+            );
+        const show = Keyboard.addListener(showEvent, apply);
+        const frame = Keyboard.addListener(frameEvent, apply);
         const hide = Keyboard.addListener(hideEvent, () => setHeight(0));
         return () => {
             show.remove();
+            frame.remove();
             hide.remove();
         };
     }, [enabled]);
@@ -50,5 +79,8 @@ export function useKeyboardInset(consumedBottomInset = 0, enabled = true): numbe
     if (!enabled || height <= 0) return 0;
 
     const fromScreenBottom = Platform.OS === 'ios' ? height : height + insets.bottom;
-    return Math.max(fromScreenBottom - consumedBottomInset, 0);
+    // GAP keeps the composer off the keyboard's top edge instead of flush against it: any small
+    // discrepancy in the reported height would otherwise leave the bottom of the send button
+    // under the keyboard, where taps go to the keyboard and never reach the button.
+    return Math.max(fromScreenBottom - consumedBottomInset + GAP, 0);
 }
