@@ -80,6 +80,11 @@ export default function HomeScreen() {
                 tournamentName: m.tournamentName || m.TournamentName,
                 hubName: m.hubName || m.HubName,
                 scheduledTime: m.scheduledTime || m.ScheduledTime || null,
+                // Both of these are read by the cards below (deadline strip, Bo label) and were
+                // being dropped here, so every card rendered "no round deadline" no matter what
+                // the round actually had — the API has been sending it all along.
+                roundDeadline: m.roundDeadline ?? m.RoundDeadline ?? null,
+                bestOf: m.bestOf ?? m.BestOf ?? 1,
                 opponentName: m.opponentName || m.OpponentName,
                 opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
                 opponentNickname: m.opponentNickname || m.OpponentNickname,

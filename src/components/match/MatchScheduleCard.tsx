@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
 import { MatchTimingStrip } from './MatchTimingStrip';
+import { PlayerIdentity, hasNickname } from './PlayerIdentity';
 import { EvidenceSection } from './EvidenceSection';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -13,6 +14,7 @@ import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
+import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
@@ -94,23 +96,14 @@ export function MatchScheduleCard({
     const [chatRead, setChatRead] = useState(false);
     const showUnreadBadge = unreadMessages > 0 && !chatRead && initialStatus !== 'completed';
 
-    // Android-only: under Expo SDK 54 edge-to-edge, the window no longer resizes for
-    // the keyboard and KeyboardAvoidingView mis-measures inside a statusBarTranslucent
-    // Modal, so we track the real keyboard height and pad the content ourselves.
-    // iOS is left untouched and keeps using KeyboardAvoidingView below.
-    const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-    useEffect(() => {
-        if (Platform.OS !== 'android') return;
-        const showSub = Keyboard.addListener('keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height));
-        const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
-        return () => {
-            showSub.remove();
-            hideSub.remove();
-        };
-    }, []);
-
     const [modalVisible, setModalVisible] = useState(false);
+
+    // The modal root already pads the safe-area bottom, so the content only has to be
+    // lifted by the rest of the keyboard. Measured on both platforms — see the hook for
+    // why KeyboardAvoidingView cannot do this from inside a modal. Only subscribed while
+    // the modal is open: these cards render one per match in a list.
+    const keyboardInset = useKeyboardInset(insets.bottom, modalVisible);
+
     const [currentStatus, setCurrentStatus] = useState<MatchStatus>(initialStatus);
     const [matchTime, setMatchTime] = useState(initialScheduledTime);
     const [matchTimeIso, setMatchTimeIso] = useState<string | undefined>(scheduledTimeIso ?? undefined);
@@ -1126,20 +1119,6 @@ export function MatchScheduleCard({
     function renderModal() {
         const isPremium = true;
 
-        // iOS keeps the original KeyboardAvoidingView; Android uses a plain View with
-        // keyboard-height padding (see the Keyboard listener effect above).
-        const KeyboardWrapper: React.ComponentType<any> = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-        const keyboardWrapperProps: any = Platform.OS === 'ios'
-            ? { behavior: 'padding', keyboardVerticalOffset: 0, className: 'flex-1' }
-            // Android edge-to-edge: keyboardDidShow reports the IME height WITHOUT the
-            // navigation-bar inset (the keyboard visually covers the nav bar below it),
-            // so the real gap from the keyboard top to the screen bottom is
-            // keyboardHeight + insets.bottom. The modal root already pads insets.bottom,
-            // so padding the wrapper by the full keyboardHeight lands the composer right
-            // above the keyboard. (Subtracting insets.bottom here left it one nav-bar
-            // height too low, hiding the composer behind the keyboard.)
-            : { className: 'flex-1', style: { paddingBottom: keyboardHeight > 0 ? keyboardHeight : 0 } };
-
         const scrollToBottom = () => {
             setTimeout(() => {
                 if (activeModalTab === 'chat') {
@@ -1162,7 +1141,7 @@ export function MatchScheduleCard({
                     className={cn("flex-1", isPremium ? "bg-background-deep" : "bg-background")}
                     style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
                 >
-                    <KeyboardWrapper {...keyboardWrapperProps}>
+                    <View className="flex-1" style={{ paddingBottom: keyboardInset }}>
                         <View className={cn(
                             "flex-1 px-5 pt-5",
                             isPremium ? "bg-background-deep" : "bg-card"
@@ -1329,6 +1308,12 @@ export function MatchScheduleCard({
                                                 ? (dbHomeUsername || 'Opponent')
                                                 : (dbAwayUsername || 'Opponent');
 
+                                            // The scores are in visual orientation (you on the left), so the faces
+                                            // have to follow them: a bare "1 : 0" left nobody able to tell whose
+                                            // number was whose. Same pairing the bracket modal shows.
+                                            const leftNickname = userNickname || user?.nickName;
+                                            const pairingHasNickname = hasNickname(leftNickname) || hasNickname(opponentNickname);
+
                                             return (
                                             <View className={cn("gap-3", !isPremium && "space-y-3")}>
                                                 {/* Kick-off + round deadline — the modal used to show neither, so
@@ -1361,14 +1346,50 @@ export function MatchScheduleCard({
                                                             </Text>
                                                         </View>
 
-                                                        <View className="flex-row items-center justify-center gap-3">
-                                                            <Text className="text-4xl font-black text-warning">
-                                                                {visualLeftScore ?? 0}
-                                                            </Text>
-                                                            <Text className="text-xl font-black text-white/20">:</Text>
-                                                            <Text className="text-4xl font-black text-warning">
-                                                                {visualRightScore ?? 0}
-                                                            </Text>
+                                                        <View className="flex-row items-start justify-between">
+                                                            <View className="flex-1 items-center">
+                                                                <PlayerAvatar
+                                                                    src={user?.avatarUrl}
+                                                                    name={user?.username || 'You'}
+                                                                    size="lg"
+                                                                    className="rounded-2xl border-0"
+                                                                />
+                                                                <PlayerIdentity
+                                                                    className="mt-2"
+                                                                    username={user?.username || 'You'}
+                                                                    nickname={leftNickname}
+                                                                    tone="home"
+                                                                    reserveNicknameSpace={pairingHasNickname}
+                                                                />
+                                                            </View>
+
+                                                            <View className="items-center px-2 pt-3">
+                                                                <View className="flex-row items-baseline">
+                                                                    <Text className="text-4xl font-black text-warning">
+                                                                        {visualLeftScore ?? 0}
+                                                                    </Text>
+                                                                    <Text className="text-xl font-black text-white/20 mx-2">:</Text>
+                                                                    <Text className="text-4xl font-black text-warning">
+                                                                        {visualRightScore ?? 0}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+
+                                                            <View className="flex-1 items-center">
+                                                                <PlayerAvatar
+                                                                    src={opponentAvatarUrl}
+                                                                    name={opponentName}
+                                                                    size="lg"
+                                                                    className="rounded-2xl border-0"
+                                                                />
+                                                                <PlayerIdentity
+                                                                    className="mt-2"
+                                                                    username={opponentName}
+                                                                    nickname={opponentNickname}
+                                                                    tone="away"
+                                                                    reserveNicknameSpace={pairingHasNickname}
+                                                                />
+                                                            </View>
                                                         </View>
 
                                                         {/* The games behind that headline — deciding whether it is
@@ -1960,7 +1981,7 @@ export function MatchScheduleCard({
                                 </View>
                             )}
                         </View>
-                    </KeyboardWrapper>
+                    </View>
                 </View>
             </Modal>
         );

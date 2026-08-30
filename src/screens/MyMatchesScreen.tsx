@@ -48,6 +48,9 @@ export default function MyMatchesScreen() {
                     tournamentName: m.tournamentName || m.TournamentName,
                     hubName: m.hubName || m.HubName,
                     scheduledTime: m.scheduledTime || m.ScheduledTime || null,
+                    // Read by the card's deadline strip below — dropping it here is what made
+                    // every match read "no round deadline" regardless of what the API returned.
+                    roundDeadline: m.roundDeadline ?? m.RoundDeadline ?? null,
                     opponentName: m.opponentName || m.OpponentName,
                     opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
                     status: m.status !== undefined ? m.status : m.Status,

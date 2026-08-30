@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,6 +26,7 @@ import { MatchStage } from '../../types/tournament';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
 import { SeriesBreakdown } from '../match/SeriesBreakdown';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
+import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import {
     SeriesFormat,
     SeriesGame,
@@ -254,20 +255,10 @@ export function MatchDetailsModal({
     // Streams for this match — drives the Stream tab (live POVs + replays) and its LIVE dot.
     const [streams, setStreams] = useState<MatchStream[]>([]);
 
-    // Android-only: under Expo SDK 54 edge-to-edge the window no longer resizes for
-    // the keyboard, so we track the real keyboard height and pad the chat ourselves.
-    // iOS keeps using KeyboardAvoidingView below.
-    const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-    useEffect(() => {
-        if (Platform.OS !== 'android') return;
-        const showSub = Keyboard.addListener('keyboardDidShow', (e) => setKeyboardHeight(e.endCoordinates.height));
-        const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
-        return () => {
-            showSub.remove();
-            hideSub.remove();
-        };
-    }, []);
+    // The modal root already clears this much at the bottom (safe-area inset, 20px floor),
+    // so the chat composer only has to be lifted by whatever keyboard is left below it.
+    const modalBottomPadding = Math.max(insets.bottom, 20);
+    const chatKeyboardInset = useKeyboardInset(modalBottomPadding, visible && activeTab === 'chat');
 
     // Streams + availability now arrive with the details response via /details/full, so this
     // effect only handles the standalone fallback where /details/full wasn't reachable. In the
@@ -1905,7 +1896,7 @@ export function MatchDetailsModal({
                 className="flex-1 bg-background-deep"
                 style={{
                     paddingTop: Math.max(insets.top, 50),
-                    paddingBottom: Math.max(insets.bottom, 20),
+                    paddingBottom: modalBottomPadding,
                 }}
             >
                 {/* Header Bar */}
@@ -2005,32 +1996,21 @@ export function MatchDetailsModal({
                         />
                     </View>
                 ) : activeTab === 'chat' && showChatTab ? (
-                    (() => {
-                        // iOS keeps KeyboardAvoidingView; Android pads by the tracked keyboard height
-                        // (see the Keyboard listener effect above).
-                        const KeyboardWrapper: React.ComponentType<any> = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
-                        const wrapperProps: any = Platform.OS === 'ios'
-                            ? { behavior: 'padding', keyboardVerticalOffset: 0, style: { flex: 1 } }
-                            // Android edge-to-edge: keyboardDidShow reports the IME height WITHOUT the
-                            // navigation-bar inset (the keyboard visually covers the nav bar below it),
-                            // so the real gap from the keyboard top to the screen bottom is
-                            // keyboardHeight + insets.bottom. The modal root already pads insets.bottom,
-                            // so padding the wrapper by the full keyboardHeight lands the composer right
-                            // above the keyboard. (Subtracting insets.bottom here left it one nav-bar
-                            // height too low, hiding the composer behind the keyboard.)
-                            : { style: { flex: 1, paddingBottom: keyboardHeight > 0 ? keyboardHeight : 0 } };
-                        return (
-                            <KeyboardWrapper {...wrapperProps}>
-                                <MatchChatPanel
-                                    matchId={matchId}
-                                    active={visible && activeTab === 'chat'}
-                                    participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
-                                    avatarsByUserId={chatAvatars}
-                                    readOnly={isChatReadOnly}
-                                />
-                            </KeyboardWrapper>
-                        );
-                    })()
+                    // Both platforms lift the composer by the measured keyboard inset.
+                    // KeyboardAvoidingView cannot do this here: it pads from its own
+                    // parent-relative frame, so nested under the modal's top padding +
+                    // header + tab bar it under-padded by that whole offset on iOS and
+                    // left the composer sitting behind the keyboard — which is why
+                    // sending a message meant dismissing the keyboard first.
+                    <View style={{ flex: 1, paddingBottom: chatKeyboardInset }}>
+                        <MatchChatPanel
+                            matchId={matchId}
+                            active={visible && activeTab === 'chat'}
+                            participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
+                            avatarsByUserId={chatAvatars}
+                            readOnly={isChatReadOnly}
+                        />
+                    </View>
                 ) : (
                 <ScrollView
                     ref={mainScrollViewRef}
