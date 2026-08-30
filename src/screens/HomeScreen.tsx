@@ -207,6 +207,13 @@ export default function HomeScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView
                 className="flex-1"
+                // MatchScheduleCard renders its match Modal as a child of this list, and RN
+                // negotiates touches over the REACT tree, not the native one — so this ScrollView
+                // sees the taps inside that modal too. Left at the default ('never') it captured
+                // the first tap whenever the keyboard was up, blurred the input and swallowed the
+                // press: every chat message needed two taps on Send. 'handled' lets the tap reach
+                // its target, exactly like the friends DM list.
+                keyboardShouldPersistTaps="handled"
                 refreshControl={
                     <RefreshControl
                         refreshing={homeMatchesQuery.isFetching}
