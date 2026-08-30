@@ -45,7 +45,7 @@ import { CountryListModal } from '../components/ui/CountryListModal';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
-import { ExportBracketModal } from '../components/modals/ExportBracketModal';
+import { ExportBracketModal, type ExportChoice } from '../components/modals/ExportBracketModal';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
 import { TeamMatchDetailModal } from '../components/modals/TeamMatchDetailModal';
 import { SwapBracketModal, SwapTeam } from '../components/modals/SwapBracketModal';
@@ -378,22 +378,25 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const handleExportBracketPdf = async (includeSchedule = false) => {
-        if (!id) return;
+    // Shared download + native share pipeline for every export variant. Only the URL, the
+    // filename and the mime type differ between them.
+    const downloadAndShareExport = async (
+        url: string,
+        fileName: string,
+        mimeType: string,
+        dialogTitle: string,
+        uti: string,
+    ) => {
         setIsExportingPdf(true);
         try {
             const token = await SecureStore.getItemAsync('access_token');
-            const safeName = (tournament?.name ?? id)
-                .replace(/\s+/g, '_')
-                .replace(/[^a-zA-Z0-9_\-]/g, '');
-            const suffix = includeSchedule ? '_schedule' : '';
-            const destFile = new FSFile(Paths.cache, `${safeName}_bracket${suffix}.pdf`);
+            const destFile = new FSFile(Paths.cache, fileName);
             // Remove stale cache file so downloadFileAsync never hits "Destination already exists"
             if (destFile.exists) {
                 destFile.delete();
             }
             const downloaded = await FSFile.downloadFileAsync(
-                ENDPOINTS.EXPORT_BRACKET_PDF(id, includeSchedule),
+                url,
                 destFile,
                 token ? { headers: { Authorization: `Bearer ${token}` } } : {}
             );
@@ -402,30 +405,62 @@ export default function TournamentDetailsScreen() {
                 Alert.alert('Sharing not available', 'Your device does not support sharing.');
                 return;
             }
-            await Sharing.shareAsync(downloaded.uri, {
-                mimeType: 'application/pdf',
-                dialogTitle: 'Share Bracket PDF',
-                UTI: 'com.adobe.pdf',
-            });
+            await Sharing.shareAsync(downloaded.uri, { mimeType, dialogTitle, UTI: uti });
         } catch (err: any) {
-            Alert.alert('Export Failed', err.message || 'Could not export the bracket PDF.');
+            Alert.alert('Export Failed', err.message || 'Could not export the file.');
         } finally {
             setIsExportingPdf(false);
         }
     };
 
-    // The schedule option only changes the PDF for group-stage / league tournaments (it adds
-    // round-by-round fixture pages there); a pure bracket would export an identical file either
-    // way. So only offer the chooser when it actually matters — otherwise export directly.
+    const exportFileStem = () =>
+        (tournament?.name ?? id ?? 'tournament')
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_\-]/g, '');
+
+    const handleExportBracketPdf = async (includeSchedule = false) => {
+        if (!id) return;
+        const suffix = includeSchedule ? '_schedule' : '';
+        await downloadAndShareExport(
+            ENDPOINTS.EXPORT_BRACKET_PDF(id, includeSchedule),
+            `${exportFileStem()}_bracket${suffix}.pdf`,
+            'application/pdf',
+            'Share Bracket PDF',
+            'com.adobe.pdf',
+        );
+    };
+
+    const handleExportCsv = async (dataset: 'standings' | 'matches') => {
+        if (!id) return;
+        await downloadAndShareExport(
+            ENDPOINTS.EXPORT_TOURNAMENT_CSV(id, dataset),
+            `${exportFileStem()}_${dataset}.csv`,
+            'text/csv',
+            dataset === 'standings' ? 'Share Rankings CSV' : 'Share Results CSV',
+            'public.comma-separated-values-text',
+        );
+    };
+
+    const handleExportSelect = (choice: ExportChoice) => {
+        if (choice.format === 'csv') handleExportCsv(choice.dataset);
+        else handleExportBracketPdf(choice.includeSchedule);
+    };
+
+    // The PDF schedule option only changes the file for group-stage / league tournaments (it adds
+    // round-by-round fixture pages there); a pure bracket would export an identical PDF either way.
     const scheduleAffectsExport = stages.some((s: any) => {
         const t = s.type ?? s.Type;
         return t === 1 || t === 2; // StageType.GroupStage, StageType.League
     });
 
-    const handleExportPress = () => {
-        if (scheduleAffectsExport) setShowExportModal(true);
-        else handleExportBracketPdf(false);
-    };
+    // Only table-based stages produce a standings CSV — Swiss included, unlike the PDF schedule
+    // option above. A pure bracket would download a header-only file, so hide the option there.
+    const hasStandingsTables = stages.some((s: any) => {
+        const t = s.type ?? s.Type;
+        return t === 1 || t === 2 || t === 6; // GroupStage, League, Swiss
+    });
+
+    const handleExportPress = () => setShowExportModal(true);
 
     const handleShare = () => {
         if (!tournament) return;
@@ -3845,7 +3880,9 @@ export default function TournamentDetailsScreen() {
             <ExportBracketModal
                 visible={showExportModal}
                 onClose={() => setShowExportModal(false)}
-                onSelect={handleExportBracketPdf}
+                onSelect={handleExportSelect}
+                showScheduleOption={scheduleAffectsExport}
+                showStandingsOption={hasStandingsTables}
             />
 
             {tournament && (

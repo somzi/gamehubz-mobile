@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -187,7 +187,7 @@ export function MatchScheduleCard({
     const [newComment, setNewComment] = useState('');
     const [isLoadingComments, setIsLoadingComments] = useState(false);
     const [isSendingComment, setIsSendingComment] = useState(false);
-    const commentsScrollRef = useRef<ScrollView>(null);
+    const commentsListRef = useRef<FlatList<MatchComment>>(null);
     const mainScrollViewRef = useRef<ScrollView>(null);
     // Live scroll offset, kept in a ref so tracking it costs no re-renders.
     const mainScrollY = useRef(0);
@@ -315,7 +315,7 @@ export function MatchScheduleCard({
                 }
                 // Scroll to bottom after new comment
                 setTimeout(() => {
-                    commentsScrollRef.current?.scrollToEnd({ animated: true });
+                    commentsListRef.current?.scrollToEnd({ animated: true });
                 }, 100);
             }
         } catch (error) {
@@ -323,23 +323,6 @@ export function MatchScheduleCard({
         } finally {
             setIsSendingComment(false);
         }
-    };
-
-    // The send button fires on touch-down (see the composer in the modal); these two keep a
-    // single gesture — touch-down followed by the tap it completes into — to exactly one send.
-    const sentOnTouchDownRef = useRef(false);
-
-    const sendCommentFromTouchDown = () => {
-        sentOnTouchDownRef.current = true;
-        void handleSendComment();
-    };
-
-    const sendCommentFromTap = () => {
-        if (sentOnTouchDownRef.current) {
-            sentOnTouchDownRef.current = false;
-            return;
-        }
-        void handleSendComment();
     };
 
     const formatCommentTime = (dateString: string) => formatLocalDateTime(dateString);
@@ -556,7 +539,7 @@ export function MatchScheduleCard({
             });
 
             setTimeout(() => {
-                commentsScrollRef.current?.scrollToEnd({ animated: true });
+                commentsListRef.current?.scrollToEnd({ animated: true });
             }, 100);
         });
 
@@ -1141,7 +1124,7 @@ export function MatchScheduleCard({
         const scrollToBottom = () => {
             setTimeout(() => {
                 if (activeModalTab === 'chat') {
-                    commentsScrollRef.current?.scrollToEnd({ animated: true });
+                    commentsListRef.current?.scrollToEnd({ animated: true });
                 } else {
                     mainScrollViewRef.current?.scrollToEnd({ animated: true });
                 }
@@ -1854,94 +1837,93 @@ export function MatchScheduleCard({
                                             <View className="h-48 items-center justify-center">
                                                 <ActivityIndicator size="small" color="#10B981" />
                                             </View>
-                                        ) : comments.length > 0 ? (
-                                            <View className="flex-1">
-                                                <ScrollView
-                                                    ref={commentsScrollRef}
-                                                    className={cn("mb-2 flex-1")}
-                                                    nestedScrollEnabled
-                                                    showsVerticalScrollIndicator={false}
-                                                    // 'always', not 'handled': with 'handled' the list still blurs the
-                                                    // input when it ends up as the touch responder, which ate the first tap
-                                                    // on Send and only dropped the keyboard — two taps per message. Drag-to-
-                                                    // dismiss (below) stays, and is the only dismissal this chat needs.
-                                                    keyboardShouldPersistTaps="always"
-                                                    // iOS: 'interactive' (drag down onto the keyboard to dismiss, Discord-style)
-                                                    // so a small scroll while composing doesn't drop the keyboard.
-                                                    // Android doesn't support 'interactive' — keep 'on-drag' there.
-                                                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-                                                    contentContainerStyle={{ paddingVertical: 10 }}
-                                                    onContentSizeChange={() => commentsScrollRef.current?.scrollToEnd({ animated: false })}
-                                                >
-                                                    {comments.map((comment) => {
-                                                        const senderId = (comment.userId || '').toLowerCase();
-                                                        const isMyComment = !!user?.id && senderId === user.id.toLowerCase();
-                                                        // Match participants (home/away) come from the loaded match details.
-                                                        // Any sender outside that set is an admin / hub owner chiming in.
-                                                        const matchParticipantIds = [dbHomeUserId, dbAwayUserId]
-                                                            .filter(Boolean)
-                                                            .map(id => (id as string).toLowerCase());
-                                                        const isAdminMessage = !isMyComment && matchParticipantIds.length > 0 && !matchParticipantIds.includes(senderId);
-                                                        const isOpponentMessage = !isMyComment && !isAdminMessage;
-                                                        // Use the sender's own avatar; only fall back to the opponent avatar for the
-                                                        // actual opponent — never borrow it for an admin (that was the bug).
-                                                        const avatarSrc = isMyComment
-                                                            ? user?.avatarUrl
-                                                            : (comment.userAvatarUrl || (isOpponentMessage ? opponentAvatarUrl : undefined));
-                                                        return (
-                                                            <View key={comment.id} className={cn(
-                                                                "mb-4 flex-row items-end gap-2 max-w-[85%]",
-                                                                isMyComment ? "self-end" : "self-start"
-                                                            )}>
-                                                                {!isMyComment && (
-                                                                    <PlayerAvatar
-                                                                        src={avatarSrc}
-                                                                        name={comment.userNickname}
-                                                                        size="sm"
-                                                                        className="w-7 h-7 shrink-0"
-                                                                    />
-                                                                )}
-
-                                                                <View className={cn(isMyComment ? "items-end" : "items-start", "flex-1")}>
-                                                                    <View className="flex-row items-center gap-2 mb-1 px-1">
-                                                                        {!isMyComment && (
-                                                                            <Text className={cn("font-black text-[10px] uppercase tracking-tighter", isPremium ? "text-primary" : "text-primary/70")}>
-                                                                                {comment.userNickname}
-                                                                            </Text>
-                                                                        )}
-                                                                        {isAdminMessage && (
-                                                                            <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
-                                                                                <Text className="text-[8px] font-black text-warning uppercase tracking-widest">Admin</Text>
-                                                                            </View>
-                                                                        )}
-                                                                        <Text className="text-[9px] font-bold text-slate-500">
-                                                                            {formatCommentTime(comment.sentAt)}
-                                                                        </Text>
-                                                                    </View>
-                                                                    <MatchChatBubble
-                                                                        content={comment.content}
-                                                                        isMyComment={isMyComment}
-                                                                    />
-                                                                </View>
-
-                                                                {isMyComment && (
-                                                                    <PlayerAvatar
-                                                                        src={user?.avatarUrl}
-                                                                        name={user?.username || 'You'}
-                                                                        size="sm"
-                                                                        className="w-7 h-7 shrink-0"
-                                                                    />
-                                                                )}
-                                                            </View>
-                                                        );
-                                                    })}
-                                                </ScrollView>
-                                            </View>
                                         ) : (
-                                            <View className={cn("h-32 border border-dashed rounded-2xl items-center justify-center mb-4", isPremium ? "border-white/10 bg-white/[0.02]" : "border-border/20 bg-muted/5")}>
-                                                <Ionicons name="chatbubble-outline" size={isPremium ? 28 : 24} color={isPremium ? "#475569" : "#71717A"} />
-                                                <Text numberOfLines={1} className={cn("font-bold uppercase tracking-widest mt-1 w-full text-center", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>No messages yet</Text>
-                                            </View>
+                                            // Same list wiring as the friends DM (DirectChatScreen), which sends on
+                                            // the first tap with the keyboard up: a FlatList with
+                                            // keyboardShouldPersistTaps="handled", drag-to-dismiss, composer below.
+                                            <FlatList
+                                                ref={commentsListRef}
+                                                data={comments}
+                                                keyExtractor={(c) => c.id}
+                                                className="mb-2 flex-1"
+                                                showsVerticalScrollIndicator={false}
+                                                keyboardShouldPersistTaps="handled"
+                                                // iOS: drag down onto the keyboard to dismiss (Discord-style).
+                                                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                                                initialNumToRender={15}
+                                                maxToRenderPerBatch={15}
+                                                windowSize={11}
+                                                contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
+                                                onContentSizeChange={() => commentsListRef.current?.scrollToEnd({ animated: false })}
+                                                ListEmptyComponent={
+                                                    <View className={cn("h-32 border border-dashed rounded-2xl items-center justify-center mb-4", isPremium ? "border-white/10 bg-white/[0.02]" : "border-border/20 bg-muted/5")}>
+                                                        <Ionicons name="chatbubble-outline" size={isPremium ? 28 : 24} color={isPremium ? "#475569" : "#71717A"} />
+                                                        <Text numberOfLines={1} className={cn("font-bold uppercase tracking-widest mt-1 w-full text-center", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>No messages yet</Text>
+                                                    </View>
+                                                }
+                                                renderItem={({ item: comment }) => {
+                                                    const senderId = (comment.userId || '').toLowerCase();
+                                                    const isMyComment = !!user?.id && senderId === user.id.toLowerCase();
+                                                    // Match participants (home/away) come from the loaded match details.
+                                                    // Any sender outside that set is an admin / hub owner chiming in.
+                                                    const matchParticipantIds = [dbHomeUserId, dbAwayUserId]
+                                                        .filter(Boolean)
+                                                        .map(id => (id as string).toLowerCase());
+                                                    const isAdminMessage = !isMyComment && matchParticipantIds.length > 0 && !matchParticipantIds.includes(senderId);
+                                                    const isOpponentMessage = !isMyComment && !isAdminMessage;
+                                                    // Use the sender's own avatar; only fall back to the opponent avatar for the
+                                                    // actual opponent — never borrow it for an admin (that was the bug).
+                                                    const avatarSrc = isMyComment
+                                                        ? user?.avatarUrl
+                                                        : (comment.userAvatarUrl || (isOpponentMessage ? opponentAvatarUrl : undefined));
+                                                    return (
+                                                        <View className={cn(
+                                                            "mb-4 flex-row items-end gap-2 max-w-[85%]",
+                                                            isMyComment ? "self-end" : "self-start"
+                                                        )}>
+                                                            {!isMyComment && (
+                                                                <PlayerAvatar
+                                                                    src={avatarSrc}
+                                                                    name={comment.userNickname}
+                                                                    size="sm"
+                                                                    className="w-7 h-7 shrink-0"
+                                                                />
+                                                            )}
+
+                                                            <View className={cn(isMyComment ? "items-end" : "items-start", "flex-1")}>
+                                                                <View className="flex-row items-center gap-2 mb-1 px-1">
+                                                                    {!isMyComment && (
+                                                                        <Text className={cn("font-black text-[10px] uppercase tracking-tighter", isPremium ? "text-primary" : "text-primary/70")}>
+                                                                            {comment.userNickname}
+                                                                        </Text>
+                                                                    )}
+                                                                    {isAdminMessage && (
+                                                                        <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
+                                                                            <Text className="text-[8px] font-black text-warning uppercase tracking-widest">Admin</Text>
+                                                                        </View>
+                                                                    )}
+                                                                    <Text className="text-[9px] font-bold text-slate-500">
+                                                                        {formatCommentTime(comment.sentAt)}
+                                                                    </Text>
+                                                                </View>
+                                                                <MatchChatBubble
+                                                                    content={comment.content}
+                                                                    isMyComment={isMyComment}
+                                                                />
+                                                            </View>
+
+                                                            {isMyComment && (
+                                                                <PlayerAvatar
+                                                                    src={user?.avatarUrl}
+                                                                    name={user?.username || 'You'}
+                                                                    size="sm"
+                                                                    className="w-7 h-7 shrink-0"
+                                                                />
+                                                            )}
+                                                        </View>
+                                                    );
+                                                }}
+                                            />
                                         )}
                                     </View>
                                 )}
@@ -1973,16 +1955,9 @@ export function MatchScheduleCard({
                                             multiline
                                             maxLength={500}
                                             style={{ minHeight: 48, maxHeight: 120 }}
-                                            onFocus={scrollToBottom}
                                         />
                                         <Pressable
-                                            // Sends on touch-down: inside the Modal the completed tap was being
-                                            // cancelled while the keyboard was up, so the press never became a send and
-                                            // the first tap only dropped the keyboard. onPress stays for activations
-                                            // that produce no touch (VoiceOver), and the ref keeps one gesture to a
-                                            // single send.
-                                            onPressIn={sendCommentFromTouchDown}
-                                            onPress={sendCommentFromTap}
+                                            onPress={handleSendComment}
                                             disabled={!newComment.trim() || isSendingComment}
                                             // Taps that land a few px above the button hit the message list,
                                             // which dismisses the keyboard and swallows the tap — extend the

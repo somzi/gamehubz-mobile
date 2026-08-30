@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
@@ -42,7 +42,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const [isSending, setIsSending] = useState(false);
     const [hasMore, setHasMore] = useState(false);
     const [loadingEarlier, setLoadingEarlier] = useState(false);
-    const scrollRef = useRef<ScrollView>(null);
+    const listRef = useRef<FlatList<MatchComment>>(null);
     const connectionRef = useRef<HubConnection | null>(null);
     const inputRef = useRef<TextInput>(null);
     // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
@@ -171,7 +171,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             if ((mapped.userId || '').toLowerCase() !== user?.id?.toLowerCase()) {
                 markRead();
             }
-            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+            setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
         });
 
         // Group membership is per-connection and is lost when
@@ -223,7 +223,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 if (!connectionRef.current) {
                     await fetchComments(true);
                 }
-                setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
             }
         } catch (error) {
             console.error('[MatchChatPanel] Error sending comment:', error);
@@ -231,23 +231,6 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             setIsSending(false);
         }
     };
-
-    // The send button fires on touch-down (see the composer below); these two keep a single
-    // gesture — touch-down followed by the tap it completes into — to exactly one send.
-    const sentOnTouchDownRef = useRef(false);
-
-    const sendFromTouchDown = useCallback((): void => {
-        sentOnTouchDownRef.current = true;
-        void handleSend();
-    }, [handleSend]);
-
-    const sendFromTap = useCallback((): void => {
-        if (sentOnTouchDownRef.current) {
-            sentOnTouchDownRef.current = false;
-            return;
-        }
-        void handleSend();
-    }, [handleSend]);
 
     // Exact local time (device timezone) instead of "x ago". Date is prefixed only for
     // messages not sent today, so same-day chat stays compact.
@@ -264,44 +247,56 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="small" color="#10B981" />
                 </View>
-            ) : comments.length > 0 ? (
-                <ScrollView
-                    ref={scrollRef}
-                    className="flex-1"
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator={false}
-                    // 'always', not 'handled': with 'handled' the list still blurs the input when it
-                    // ends up as the touch responder, which ate the first tap on Send and only
-                    // dropped the keyboard — you had to tap twice for every message. Dismissing by
-                    // dragging (below) stays, and that is the only dismissal this chat needs.
-                    keyboardShouldPersistTaps="always"
-                    // iOS: 'interactive' (drag down onto the keyboard to dismiss, Discord-style)
-                    // so a small scroll while composing doesn't drop the keyboard.
-                    // Android doesn't support 'interactive' — keep 'on-drag' there.
+            ) : (
+                // Same list wiring as the friends DM (DirectChatScreen), which sends on the first
+                // tap with the keyboard up: a FlatList with keyboardShouldPersistTaps="handled",
+                // drag-to-dismiss, and the composer as a plain sibling underneath.
+                <FlatList
+                    ref={listRef}
+                    data={comments}
+                    keyExtractor={(c) => c.id}
+                    contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
+                    keyboardShouldPersistTaps="handled"
+                    // iOS: drag down onto the keyboard to dismiss (Discord-style).
                     keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-                    contentContainerStyle={{ paddingVertical: 10 }}
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={15}
+                    windowSize={11}
+                    showsVerticalScrollIndicator={false}
+                    // Keep the reading position stable when "Load earlier" prepends older messages.
+                    maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
                     onContentSizeChange={() => {
                         if (!didInitialScrollRef.current) {
-                            scrollRef.current?.scrollToEnd({ animated: false });
+                            listRef.current?.scrollToEnd({ animated: false });
                         }
                     }}
-                >
-                    {hasMore && (
-                        <Pressable
-                            onPress={loadEarlier}
-                            disabled={loadingEarlier}
-                            className="items-center py-2"
-                        >
-                            {loadingEarlier ? (
-                                <ActivityIndicator size="small" color="#10B981" />
-                            ) : (
-                                <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                                    Load earlier messages
-                                </Text>
-                            )}
-                        </Pressable>
-                    )}
-                    {comments.map((comment) => {
+                    ListHeaderComponent={
+                        hasMore ? (
+                            <Pressable
+                                onPress={loadEarlier}
+                                disabled={loadingEarlier}
+                                className="items-center py-2"
+                            >
+                                {loadingEarlier ? (
+                                    <ActivityIndicator size="small" color="#10B981" />
+                                ) : (
+                                    <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                                        Load earlier messages
+                                    </Text>
+                                )}
+                            </Pressable>
+                        ) : null
+                    }
+                    ListEmptyComponent={
+                        <View className="flex-1 items-center justify-center">
+                            <View className="w-14 h-14 rounded-full bg-white/[0.03] border border-white/10 items-center justify-center mb-3">
+                                <Ionicons name="chatbubble-outline" size={24} color="#475569" />
+                            </View>
+                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">No messages yet</Text>
+                            <Text className="text-[11px] text-slate-600 mt-1">Say hi to get the conversation going.</Text>
+                        </View>
+                    }
+                    renderItem={({ item: comment }) => {
                         const senderId = (comment.userId || '').toLowerCase();
                         const isMyComment = senderId === user?.id?.toLowerCase();
                         const isAdminMessage =
@@ -310,7 +305,6 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
 
                         return (
                             <View
-                                key={comment.id}
                                 className={cn(
                                     'mb-4 flex-row items-end gap-2 max-w-[85%]',
                                     isMyComment ? 'self-end' : 'self-start'
@@ -357,16 +351,8 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                                 )}
                             </View>
                         );
-                    })}
-                </ScrollView>
-            ) : (
-                <View className="flex-1 items-center justify-center">
-                    <View className="w-14 h-14 rounded-full bg-white/[0.03] border border-white/10 items-center justify-center mb-3">
-                        <Ionicons name="chatbubble-outline" size={24} color="#475569" />
-                    </View>
-                    <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">No messages yet</Text>
-                    <Text className="text-[11px] text-slate-600 mt-1">Say hi to get the conversation going.</Text>
-                </View>
+                    }}
+                />
             )}
 
             {/* Composer — hidden for completed matches (chat stays visible, read-only) */}
@@ -392,15 +378,9 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                         multiline
                         maxLength={500}
                         style={{ minHeight: 48, maxHeight: 120 }}
-                        onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150)}
                     />
                     <Pressable
-                        // Sends on touch-down: inside a Modal the completed tap was being cancelled
-                        // while the keyboard was up, so the press never became a send and the first
-                        // tap only dropped the keyboard. onPress stays for activations that produce
-                        // no touch (VoiceOver), and the ref keeps one gesture to a single send.
-                        onPressIn={sendFromTouchDown}
-                        onPress={sendFromTap}
+                        onPress={handleSend}
                         disabled={!newComment.trim() || isSending}
                         // Taps that land a few px above the button hit the message list,
                         // which dismisses the keyboard and swallows the tap — extend the

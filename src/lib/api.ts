@@ -153,6 +153,11 @@ export const ENDPOINTS = {
     // tournaments. Omitted by default so the URL stays identical to the legacy call.
     EXPORT_BRACKET_PDF: (id: string, includeSchedule = false) =>
         `${API_BASE_URL}/api/tournament/${id}/export/pdf${includeSchedule ? '?includeSchedule=true' : ''}`,
+    // Flat CSV for spreadsheets / scripted ingest. 'standings' = the rankings tables,
+    // 'matches' = every fixture with its result. One table per file, so the two are
+    // separate downloads rather than one mixed-schema file.
+    EXPORT_TOURNAMENT_CSV: (id: string, dataset: 'standings' | 'matches') =>
+        `${API_BASE_URL}/api/tournament/${id}/export/csv?dataset=${dataset}`,
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
 
