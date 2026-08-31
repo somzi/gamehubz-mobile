@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
     View,
     Text,
+    Keyboard,
     Modal,
     Pressable,
     ScrollView,
@@ -211,8 +212,16 @@ export function SwapParticipantModal({
             if (!response.ok) throw new Error(await response.text().catch(() => 'Swap failed'));
 
             const name = selected.username;
+
+            // The confirmation is an in-sheet overlay, not a window, so dropping it costs
+            // nothing and this sheet is the only window that closes here. Hand off to the
+            // screen's success modal only once it is gone - same shape as ExportBracketModal.
+            // Dismiss the keyboard first: the picker's TextInput may still hold focus, and an
+            // IME left open across a Modal teardown is the other way Android strands a window.
+            Keyboard.dismiss();
+            setConfirming(false);
             onClose();
-            onSwapped(name);
+            setTimeout(() => onSwapped(name), 350);
         } catch (err: any) {
             setSubmitError(getErrorMessage(err));
             setConfirming(false);
@@ -235,8 +244,17 @@ export function SwapParticipantModal({
     const accent = blocked ? COLORS.destructive : COLORS.primary;
 
     return (
-        <>
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="slide"
+            // The confirmation no longer has a window of its own, so back has to be routed by hand.
+            onRequestClose={() => {
+                if (submitting) return;
+                if (confirming) { setConfirming(false); return; }
+                onClose();
+            }}
+        >
             <View className="flex-1 justify-end">
                 <Pressable className="absolute inset-0 bg-black/70" onPress={submitting ? undefined : onClose} />
 
@@ -607,26 +625,27 @@ export function SwapParticipantModal({
                     </View>
                 </KeyboardAvoider>
             </View>
-        </Modal>
 
-        {/* Sits above the sheet so cancelling returns to the picker with the selection intact. */}
-        <ConfirmationModal
-            visible={confirming && !!selected}
-            onClose={() => setConfirming(false)}
-            onConfirm={handleConfirm}
-            title="Confirm the replacement"
-            message={selected
-                ? `${selected.username} takes over ${eligibility?.username || outgoing?.username || 'this player'}'s spot in the tournament.`
-                    + (eligibility && eligibility.playedMatches > 0
-                        ? `\n\nThey inherit ${eligibility.playedMatches === 1 ? '1 played match' : `${eligibility.playedMatches} played matches`}, the seed and the standings that go with them.`
-                        : '\n\nThey take the seed and the fixtures that go with the spot.')
-                    + `\n\n${eligibility?.username || 'The outgoing player'} is removed from this tournament.`
-                : ''}
-            confirmText="Swap the player"
-            isDestructive={false}
-            isLoading={submitting}
-            stacked
-        />
-        </>
+            {/* Overlay, not a nested Modal: this keeps the sheet and its confirmation in one
+                Android window, so closing them cannot strand a window over the screen. */}
+            <ConfirmationModal
+                overlay
+                visible={confirming && !!selected}
+                onClose={() => setConfirming(false)}
+                onConfirm={handleConfirm}
+                title="Confirm the replacement"
+                message={selected
+                    ? `${selected.username} takes over ${eligibility?.username || outgoing?.username || 'this player'}'s spot in the tournament.`
+                        + (eligibility && eligibility.playedMatches > 0
+                            ? `\n\nThey inherit ${eligibility.playedMatches === 1 ? '1 played match' : `${eligibility.playedMatches} played matches`}, the seed and the standings that go with them.`
+                            : '\n\nThey take the seed and the fixtures that go with the spot.')
+                        + `\n\n${eligibility?.username || 'The outgoing player'} is removed from this tournament.`
+                    : ''}
+                confirmText="Swap the player"
+                isDestructive={false}
+                isLoading={submitting}
+                stacked
+            />
+        </Modal>
     );
 }

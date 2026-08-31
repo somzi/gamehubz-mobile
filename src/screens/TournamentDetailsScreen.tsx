@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -16,6 +16,7 @@ import { SeriesFormatChip, matchSeriesFormat } from '../components/bracket/Serie
 
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { SearchInput } from '../components/ui/SearchInput';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, getCurrencyLabel, parseUtcDate, formatDateTimeShort } from '../lib/utils';
 import { normalizeBestOf } from '../lib/series';
@@ -173,6 +174,8 @@ export default function TournamentDetailsScreen() {
     activeTabRef.current = activeTab;
     const [teamsTab, setTeamsTab] = useState('confirmed');
     const [playersTab, setPlayersTab] = useState<'confirmed' | 'registrations'>('confirmed');
+    // Filters whichever Players sub-tab is open. Both lists arrive whole, so it stays local.
+    const [playerSearch, setPlayerSearch] = useState('');
     const [openTeams, setOpenTeams] = useState<TeamDto[]>([]);
     const [isLoadingOpenTeams, setIsLoadingOpenTeams] = useState(false);
     const [tournament, setTournament] = useState<any>(null);
@@ -200,6 +203,22 @@ export default function TournamentDetailsScreen() {
     const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
     const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
     const [isLoadingPending, setIsLoadingPending] = useState(false);
+
+    // The confirmed row keeps the seed it was served with: that number is the entrant's position
+    // in the list the backend ordered, not a row counter, so filtering must not renumber it.
+    const filteredParticipants = useMemo(() => {
+        const seeded = participants.map((p, i) => ({ p, seed: i + 1 }));
+        const query = playerSearch.trim().toLowerCase();
+        if (!query) return seeded;
+        return seeded.filter(({ p }) => (p.username || p.Username || '').toLowerCase().includes(query));
+    }, [participants, playerSearch]);
+
+    const filteredRegistrations = useMemo(() => {
+        const query = playerSearch.trim().toLowerCase();
+        if (!query) return pendingRegistrations;
+        return pendingRegistrations.filter((r) => (r.username || r.Username || '').toLowerCase().includes(query));
+    }, [pendingRegistrations, playerSearch]);
+
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [isCreatingBracket, setIsCreatingBracket] = useState(false);
     const [isResettingBracket, setIsResettingBracket] = useState(false);
@@ -2309,6 +2328,7 @@ export default function TournamentDetailsScreen() {
             />
             <ScrollView
                 className="flex-1 bg-background"
+                keyboardShouldPersistTaps="handled"
                 refreshControl={
                     <RefreshControl
                         refreshing={isRefreshing}
@@ -3382,12 +3402,25 @@ export default function TournamentDetailsScreen() {
                                     activeTab={playersTab}
                                     onTabChange={(val) => {
                                         setPlayersTab(val as 'confirmed' | 'registrations');
+                                        // A term carried across sub-tabs reads as an empty list rather
+                                        // than as a filter, so each sub-tab opens unfiltered.
+                                        setPlayerSearch('');
                                         if (val === 'registrations' && pendingRegistrations.length === 0) {
                                             fetchPendingRegistrations();
                                         }
                                     }}
                                 />
                             </View>
+
+                            {/* Only offered once there is a list to narrow - on an empty tab it is noise. */}
+                            {(playersTab === 'confirmed' ? participants.length : pendingRegistrations.length) > 0 && (
+                                <SearchInput
+                                    value={playerSearch}
+                                    onChange={setPlayerSearch}
+                                    placeholder={playersTab === 'confirmed' ? 'Search confirmed players…' : 'Search registrations…'}
+                                    className="mb-1"
+                                />
+                            )}
 
                             {/* Confirmed Players */}
                             {playersTab === 'confirmed' && (
@@ -3398,8 +3431,13 @@ export default function TournamentDetailsScreen() {
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
                                         <Text className="text-slate-400 mt-4 text-center">No confirmed players yet.</Text>
                                     </View>
+                                ) : filteredParticipants.length === 0 ? (
+                                    <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
+                                        <Ionicons name="search-outline" size={40} color="#71717A" />
+                                        <Text className="text-slate-400 mt-4 text-center">No confirmed player matches “{playerSearch.trim()}”.</Text>
+                                    </View>
                                 ) : (
-                                    participants.map((p, i) => {
+                                    filteredParticipants.map(({ p, seed }) => {
                                         const pUserId = p.userId || p.UserId || p.id;
                                         const isCreator = canManage;
                                         const canRemove = isCreator && (tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2);
@@ -3412,7 +3450,7 @@ export default function TournamentDetailsScreen() {
                                         const isCurrentUser = user?.id?.toLowerCase() === pUserId?.toLowerCase();
 
                                         return (
-                                            <View key={`${p.participantId || p.id || pUserId || 'p'}-${i}`} className="flex-row items-center gap-2.5">
+                                            <View key={`${p.participantId || p.id || pUserId || 'p'}-${seed}`} className="flex-row items-center gap-2.5">
                                                 <Pressable
                                                     onPress={() => { if (pUserId) navigation.navigate('PlayerProfile', { id: pUserId }); }}
                                                     className="flex-1 active:opacity-80"
@@ -3457,7 +3495,7 @@ export default function TournamentDetailsScreen() {
                                                                     borderColor: isCurrentUser ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.07)',
                                                                 }}
                                                             >
-                                                                <Text className="font-black text-[13px]" style={{ color: isCurrentUser ? '#34D399' : '#64748B' }}>{i + 1}</Text>
+                                                                <Text className="font-black text-[13px]" style={{ color: isCurrentUser ? '#34D399' : '#64748B' }}>{seed}</Text>
                                                             </View>
                                                             <View style={{ shadowColor: '#10B981', shadowOpacity: 0.3, shadowRadius: 7, shadowOffset: { width: 0, height: 2 } }}>
                                                                 <View style={{ borderWidth: 1.5, borderColor: isCurrentUser ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)', borderRadius: 999, padding: 2 }}>
@@ -3536,8 +3574,10 @@ export default function TournamentDetailsScreen() {
                             {/* Registrations (admin, solo) */}
                             {playersTab === 'registrations' && canManage && (
                                 <>
-                                    {/* Approve All button */}
-                                    {pendingRegistrations.length > 0 && (
+                                    {/* Approve All button. Hidden while a search is narrowing the list:
+                                        it approves every pending registration, not the visible ones, and
+                                        next to three filtered rows that reads as "approve these three". */}
+                                    {pendingRegistrations.length > 0 && !playerSearch.trim() && (
                                         <View className="flex-row justify-end mb-1">
                                             <Button
                                                 size="sm"
@@ -3556,8 +3596,13 @@ export default function TournamentDetailsScreen() {
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
                                             <Text className="text-slate-400 mt-4 text-center">No pending registrations.</Text>
                                         </View>
+                                    ) : filteredRegistrations.length === 0 ? (
+                                        <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
+                                            <Ionicons name="search-outline" size={40} color="#71717A" />
+                                            <Text className="text-slate-400 mt-4 text-center">No registration matches “{playerSearch.trim()}”.</Text>
+                                        </View>
                                     ) : (
-                                        pendingRegistrations.map((reg) => {
+                                        filteredRegistrations.map((reg) => {
                                             const regId = reg.id || reg.registrationId || reg.Id;
                                             // Registration id ≠ user id — TournamentRegistrationOverview carries both.
                                             // The repo projects UserId with a `?? Guid.Empty` fallback, and the empty

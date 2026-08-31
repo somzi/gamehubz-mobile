@@ -18,6 +18,13 @@ export interface ConfirmationModalProps {
      *  gives each button half the width and Button truncates its label to one line, so any
      *  label longer than ~10 characters needs this. */
     stacked?: boolean;
+    /** Render as a plain absolute-fill view instead of its own Modal, for callers that are
+     *  already inside one. A Modal nested in a Modal is a second Android window: when both come
+     *  down in the same frame the inner one is torn down mid-teardown of its parent and the
+     *  window it leaves behind swallows every touch on the screen underneath. In overlay mode
+     *  the whole sheet-plus-confirmation flow stays in a single window, so that cannot happen.
+     *  The caller owns the hardware back key - route it to onClose while this is up. */
+    overlay?: boolean;
 }
 
 export function ConfirmationModal({
@@ -31,15 +38,10 @@ export function ConfirmationModal({
     isDestructive = true,
     isLoading = false,
     stacked = false,
+    overlay = false,
 }: ConfirmationModalProps) {
-    return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="fade"
-            onRequestClose={onClose}
-        >
-            <View className="flex-1 bg-black/60 items-center justify-center p-6">
+    const body = (
+        <View className="flex-1 bg-black/60 items-center justify-center p-6">
                 <Pressable className="absolute inset-0" onPress={onClose} />
 
                 <View className="bg-card w-full max-w-sm rounded-[32px] overflow-hidden border border-border/10 shadow-2xl">
@@ -111,6 +113,20 @@ export function ConfirmationModal({
                     </View>
                 </View>
             </View>
+    );
+
+    if (overlay) {
+        return visible ? <View className="absolute inset-0" style={{ elevation: 24 }}>{body}</View> : null;
+    }
+
+    return (
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            {body}
         </Modal>
     );
 }

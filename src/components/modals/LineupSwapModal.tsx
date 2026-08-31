@@ -67,8 +67,17 @@ export function LineupSwapModal({
     const accent = COLORS.team;
 
     return (
-        <>
-        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="slide"
+            // The confirmation is an overlay, not a window, so back has to be routed by hand.
+            onRequestClose={() => {
+                if (busy) return;
+                if (confirming) { setConfirming(false); return; }
+                onClose();
+            }}
+        >
             <View className="flex-1 justify-end">
                 <Pressable className="absolute inset-0 bg-black/70" onPress={busy ? undefined : onClose} />
 
@@ -265,22 +274,31 @@ export function LineupSwapModal({
                     </View>
                 </View>
             </View>
-        </Modal>
 
-        {/* Sits above the sheet so cancelling returns to the picker with the selection intact. */}
-        <ConfirmationModal
-            visible={confirming && !!selected && !!reserve}
-            onClose={() => setConfirming(false)}
-            onConfirm={() => selected && onConfirm(selected.userId)}
-            title="Confirm the swap"
-            message={selected && reserve
-                ? `${reserve.username} comes into the lineup and ${selected.username} goes to the bench.\n\n${reserve.username} plays ${selected.username}'s exact remaining games — the draw doesn't change. Games already played stay with ${selected.username}.`
-                : ''}
-            confirmText="Make the swap"
-            isDestructive={false}
-            isLoading={busy}
-            stacked
-        />
-        </>
+            {/* Overlay, not a nested Modal: this keeps the sheet and its confirmation in one
+                Android window, so closing them cannot strand a window over the screen. */}
+            <ConfirmationModal
+                overlay
+                visible={confirming && !!selected && !!reserve}
+                onClose={() => setConfirming(false)}
+                onConfirm={() => {
+                    if (!selected) return;
+                    // Drop the confirmation before the request goes out: the dashboard closes
+                    // this sheet on success, and unmounting it while the dialog is still
+                    // presented strands that dialog over the screen. The sheet's own CTA
+                    // carries the busy spinner, and a failure already renders inline above it.
+                    setConfirming(false);
+                    onConfirm(selected.userId);
+                }}
+                title="Confirm the swap"
+                message={selected && reserve
+                    ? `${reserve.username} comes into the lineup and ${selected.username} goes to the bench.\n\n${reserve.username} plays ${selected.username}'s exact remaining games — the draw doesn't change. Games already played stay with ${selected.username}.`
+                    : ''}
+                confirmText="Make the swap"
+                isDestructive={false}
+                isLoading={busy}
+                stacked
+            />
+        </Modal>
     );
 }
