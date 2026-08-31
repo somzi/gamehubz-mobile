@@ -210,13 +210,13 @@ export default function TournamentDetailsScreen() {
         const seeded = participants.map((p, i) => ({ p, seed: i + 1 }));
         const query = playerSearch.trim().toLowerCase();
         if (!query) return seeded;
-        return seeded.filter(({ p }) => (p.username || p.Username || '').toLowerCase().includes(query));
+        return seeded.filter(({ p }) => (p.username || p.Username || '').toLowerCase().startsWith(query));
     }, [participants, playerSearch]);
 
     const filteredRegistrations = useMemo(() => {
         const query = playerSearch.trim().toLowerCase();
         if (!query) return pendingRegistrations;
-        return pendingRegistrations.filter((r) => (r.username || r.Username || '').toLowerCase().includes(query));
+        return pendingRegistrations.filter((r) => (r.username || r.Username || '').toLowerCase().startsWith(query));
     }, [pendingRegistrations, playerSearch]);
 
     const [processingId, setProcessingId] = useState<string | null>(null);
