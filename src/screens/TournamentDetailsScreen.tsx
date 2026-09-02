@@ -1090,7 +1090,7 @@ export default function TournamentDetailsScreen() {
             const pid = p?.participantId ?? p?.ParticipantId;
             if (!pid || seen.has(pid)) return;
             seen.add(pid);
-            out.push({ id: pid, name: p.teamName ?? p.username ?? p.Username ?? p.name ?? 'Team', seed: p.seed ?? p.Seed });
+            out.push({ id: pid, name: p.teamName ?? p.username ?? p.Username ?? p.name ?? tCommon('app.tbd'), seed: p.seed ?? p.Seed });
         };
         stages
             .filter((s: any) => norm(s) === 3 || norm(s) === 4) // single-elim / DE winners bracket

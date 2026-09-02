@@ -515,7 +515,7 @@ export default function PlayerProfileScreen() {
                                                                 "text-[10px] font-black",
                                                                 match.outcome === 'W' ? "text-primary" : match.outcome === 'D' ? "text-yellow-500" : "text-destructive"
                                                             )}>
-                                                                {match.outcome}
+                                                                {tCommon(`outcome.${match.outcome}`)}
                                                             </Text>
                                                         </View>
                                                     </View>
