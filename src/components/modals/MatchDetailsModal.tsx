@@ -8,6 +8,7 @@ import { MatchTimingStrip } from '../match/MatchTimingStrip';
 import { PlayerIdentity, hasNickname } from '../match/PlayerIdentity';
 import { EvidenceSection } from '../match/EvidenceSection';
 import { MatchChatPanel } from '../match/MatchChatPanel';
+import { useMatchChatMute } from '../../hooks/useMatchChatMute';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -259,6 +260,10 @@ export function MatchDetailsModal({
     // so the chat composer only has to be lifted by whatever keyboard is left below it.
     const modalBottomPadding = Math.max(insets.bottom, 20);
     const chatKeyboardInset = useKeyboardInset(modalBottomPadding, visible && activeTab === 'chat');
+
+    // Mute lives in the header, opposite the close button: it is a property of the conversation,
+    // not a row inside it. Only fetched while the chat tab is actually open.
+    const chatMute = useMatchChatMute(matchId, visible && activeTab === 'chat');
 
     // Streams + availability now arrive with the details response via /details/full, so this
     // effect only handles the standalone fallback where /details/full wasn't reachable. In the
@@ -1910,7 +1915,30 @@ export function MatchDetailsModal({
                         </Text>
                         <Text className="text-[10px] text-slate-500 font-bold mt-0.5">{roundName}</Text>
                     </View>
-                    <View className="w-10" />
+                    {/* Same 40pt footprint whichever way it renders, so the title stays centred
+                        and nothing shifts when the user moves between tabs. */}
+                    {activeTab === 'chat' && showChatTab && chatMute.isMuted !== null ? (
+                        <Pressable
+                            onPress={chatMute.toggle}
+                            disabled={chatMute.isSaving}
+                            hitSlop={6}
+                            className={cn(
+                                'w-10 h-10 rounded-full items-center justify-center border active:opacity-60',
+                                chatMute.isMuted
+                                    ? 'bg-warning/10 border-warning/30'
+                                    : 'bg-white/5 border-white/[0.06]',
+                                chatMute.isSaving && 'opacity-50',
+                            )}
+                        >
+                            <Ionicons
+                                name={chatMute.isMuted ? 'notifications-off' : 'notifications-outline'}
+                                size={18}
+                                color={chatMute.isMuted ? '#F59E0B' : '#94A3B8'}
+                            />
+                        </Pressable>
+                    ) : (
+                        <View className="w-10" />
+                    )}
                 </View>
 
                 {/* Match / Chat / Stream tabs. The bar appears if chat OR stream is available;

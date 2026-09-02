@@ -421,7 +421,11 @@ export function LosersBracket({
                     paddingBottom: 8,
                 }}
             >
-                <View style={{ flexShrink: 1 }}>{headerLeft ?? null}</View>
+                {/* Grows so the admin strip can fill the row instead of sizing to its own
+                    text; the zoom controls keep their intrinsic width on the right. */}
+                <View style={{ flex: 1, flexDirection: 'row', marginRight: headerLeft ? 8 : 0 }}>
+                    {headerLeft ?? null}
+                </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
                         onPress={zoomOut}

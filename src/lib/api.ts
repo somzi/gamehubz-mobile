@@ -138,6 +138,11 @@ export const ENDPOINTS = {
     },
     POST_MATCH_COMMENT: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}`,
     MARK_MATCH_CHAT_READ: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/read`,
+    // Per-thread mute: GET reads the caller's flag, PUT { muted } sets it. Muting stops push,
+    // Discord DMs and the aggregate badge for that match; the thread stays in the inbox.
+    MATCH_CHAT_MUTED: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/mute`,
+    // Per-user notification switches (GET / PUT). Today: moderatedChatNotifications.
+    NOTIFICATION_SETTINGS: `${API_BASE_URL}/api/userProfile/notification-settings`,
     UPLOAD_AVATAR: `${API_BASE_URL}/api/userProfile/avatar`,
     UPLOAD_HUB_AVATAR: (id: string) => `${API_BASE_URL}/api/hub/${id}/avatar`,
     DELETE_HUB: (id: string) => `${API_BASE_URL}/api/hub/${id}`,

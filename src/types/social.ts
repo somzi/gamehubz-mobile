@@ -135,3 +135,9 @@ export interface ApprovalsBreakdown {
     hubs: HubApprovalCount[];
     tournaments: TournamentApprovalCount[];
 }
+
+/** Per-user notification switches. Mirrors backend NotificationSettingsDto. */
+export interface NotificationSettings {
+    /** Notify me about match chats I only moderate. Never affects the user's own matches. */
+    moderatedChatNotifications: boolean;
+}

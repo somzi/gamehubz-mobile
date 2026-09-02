@@ -47,6 +47,9 @@ import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
 import { ExportBracketModal, type ExportChoice } from '../components/modals/ExportBracketModal';
+import { RoundProgressModal } from '../components/modals/RoundProgressModal';
+import { COLORS } from '../lib/theme';
+import { StatStrip, type StatStripItem } from '../components/ui/StatStrip';
 import { TeamRegistrationModal } from '../components/modals/TeamRegistrationModal';
 import { TeamMatchDetailModal } from '../components/modals/TeamMatchDetailModal';
 import { SwapBracketModal, SwapTeam } from '../components/modals/SwapBracketModal';
@@ -296,6 +299,9 @@ export default function TournamentDetailsScreen() {
     const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([]);
     const [showApprovalsModal, setShowApprovalsModal] = useState(false);
     const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
+    // Round-by-round completion overview — admins only. Reads the bracket already in state,
+    // so it needs no fetch and no loading flag.
+    const [showProgressModal, setShowProgressModal] = useState(false);
     // Which tab MatchDetailsModal should open on. Bumped to 'chat' when an admin
     // enters via the help-requests inbox; reset to 'match' for every other entry.
     const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<'match' | 'chat'>('match');
@@ -1666,15 +1672,21 @@ export default function TournamentDetailsScreen() {
         }
     }, [id, tournament?.isTeamTournament]);
 
-    const handleMatchPress = (match: any) => {
+    // `tab` lets a caller land straight on the chat (the Round Progress list uses it to open
+    // the conversation with the two players who haven't played yet). Every other call site
+    // passes one argument and keeps the previous behaviour.
+    const handleMatchPress = (match: any, tab: 'match' | 'chat' = 'match') => {
 
         // Only allow if match has participants
         if (!match.home || !match.away) return;
 
-        // Allow Pending (1), Live (2), Completed (3, 4) and NoShow (5) matches. A no-show is
-        // terminal but reversible — the modal is where an admin undoes the double walkover or
-        // enters the real result the players played late, so it must stay openable.
-        if (match.status !== 1 && match.status !== 2 && match.status !== 3 && match.status !== 4 && match.status !== 5) return;
+        // Allow Pending (1), Live (2), Completed (3, 4), NoShow (5) and TieBreakRequired (6).
+        // A no-show is terminal but reversible — the modal is where an admin undoes the double
+        // walkover or enters the real result the players played late, so it must stay openable.
+        // TieBreakRequired matches BracketMatch's own canShowDetails, which already renders them
+        // pressable: without it the card looked tappable and then did nothing.
+        if (match.status !== 1 && match.status !== 2 && match.status !== 3 && match.status !== 4
+            && match.status !== 5 && match.status !== 6) return;
 
         const isCreator = canManage;
 
@@ -1685,7 +1697,7 @@ export default function TournamentDetailsScreen() {
 
         const backendCanRevert = match.canRevert ?? match.CanRevert ?? false;
         setSelectedMatch({ ...match, canRevert: backendCanRevert });
-        setMatchModalDefaultTab('match');
+        setMatchModalDefaultTab(tab);
         setShowReportModal(true);
     };
 
@@ -1759,89 +1771,86 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    // Admin inbox for player help requests — rendered inline with the bracket's
-    // zoom controls (left side of the same row).
-    const helpRequestsPill = canManage ? (
-        <Pressable
-            onPress={() => {
+    // Tournament-wide completion, just enough to number the Progress cell. The modal does the
+    // full per-round / per-group breakdown when it opens; this stays a single cheap pass so the
+    // header doesn't recompute a 1600-fixture league on every render.
+    const progressSummary = useMemo(() => {
+        let done = 0;
+        let total = 0;
+        const tally = (matches: any[] | undefined) => {
+            for (const m of matches ?? []) {
+                total += 1;
+                const status = m.status ?? m.Status;
+                // Completed (4) or NoShow (5) — the two ways a fixture ends up with a result.
+                if (status === 4 || status === 5) done += 1;
+            }
+        };
+        for (const stage of stages ?? []) {
+            for (const round of (stage.rounds ?? stage.Rounds ?? [])) tally(round.matches ?? round.Matches);
+            for (const group of (stage.groups ?? stage.Groups ?? [])) tally(group.matches ?? group.Matches);
+        }
+        return { done, total, remaining: total - done };
+    }, [stages]);
+
+    // The organizer's three numbers, as one aligned strip rather than three pills of different
+    // widths that wrapped onto a second line. Cells appear only when they mean something, and
+    // whatever is left divides the width equally.
+    //
+    // Approvals reads from the BadgesContext count, which gets a live SignalR push — deliberately
+    // NOT Math.max'd with the locally loaded pendingApprovals list: after an approve, the push
+    // drops the badge but the stale list (only refreshed when the cell is tapped) would keep the
+    // old higher number on screen.
+    // Not memoized on purpose: the cells carry onPress handlers that close over the fetchers,
+    // and a memo would freeze the first render's closures. Three array pushes cost nothing —
+    // progressSummary above is the only part worth caching.
+    const adminStripItems: StatStripItem[] = (() => {
+        if (!canManage) return [];
+
+        const items: StatStripItem[] = [];
+
+        if (progressSummary.total > 0) {
+            items.push({
+                key: 'progress',
+                icon: progressSummary.remaining > 0 ? 'stats-chart' : 'checkmark-done',
+                value: `${Math.round((progressSummary.done / progressSummary.total) * 100)}%`,
+                label: 'Progress',
+                tone: progressSummary.remaining > 0 ? 'info' : 'primary',
+                onPress: () => setShowProgressModal(true),
+            });
+        }
+
+        items.push({
+            key: 'help',
+            icon: adminHelpRequests.length > 0 ? 'hand-left' : 'hand-left-outline',
+            value: String(adminHelpRequests.length),
+            label: 'Help',
+            tone: adminHelpRequests.length > 0 ? 'warning' : 'muted',
+            onPress: () => {
                 setShowAdminHelpModal(true);
                 fetchAdminHelpRequests();
-            }}
-            className={cn(
-                "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
-                adminHelpRequests.length > 0
-                    ? "bg-warning/10 border-warning/30"
-                    : "bg-white/[0.04] border-white/[0.08]"
-            )}
-        >
-            <Ionicons
-                name={adminHelpRequests.length > 0 ? "hand-left" : "hand-left-outline"}
-                size={12}
-                color={adminHelpRequests.length > 0 ? "#F59E0B" : "#64748B"}
-            />
-            <Text className={cn(
-                "text-[10px] font-black uppercase tracking-wide",
-                adminHelpRequests.length > 0 ? "text-warning" : "text-slate-500"
-            )}>
-                Help Requests
-            </Text>
-            {adminHelpRequests.length > 0 && (
-                <View className="min-w-[16px] h-4 px-1 rounded-full bg-warning items-center justify-center">
-                    <Text className="text-[9px] font-black text-primary-foreground">{adminHelpRequests.length}</Text>
-                </View>
-            )}
-        </Pressable>
-    ) : null;
+            },
+        });
 
-    // Admin inbox for results awaiting approval — sits next to the help-requests pill.
-    // Only shown when the tournament was created with result approval enabled. The
-    // BadgesContext count is the single source of truth for the pill — it gets a live
-    // SignalR push whenever the count changes. Deliberately NOT Math.max'd with the
-    // locally loaded pendingApprovals list: after an approve, the push drops the badge
-    // but the stale list (only refreshed when the pill is tapped) would keep the old
-    // higher number on screen.
-    const approvalsPillCount = pendingApprovalsBadgeCount;
-    const approvalsPill = canManage && requiresApproval ? (
-        <Pressable
-            onPress={() => {
-                setShowApprovalsModal(true);
-                fetchPendingApprovals();
-            }}
-            className={cn(
-                "flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border active:opacity-70 self-start",
-                approvalsPillCount > 0
-                    ? "bg-primary/10 border-primary/30"
-                    : "bg-white/[0.04] border-white/[0.08]"
-            )}
-        >
-            <Ionicons
-                name={approvalsPillCount > 0 ? "checkmark-done" : "checkmark-done-outline"}
-                size={12}
-                color={approvalsPillCount > 0 ? "#10B981" : "#64748B"}
-            />
-            <Text className={cn(
-                "text-[10px] font-black uppercase tracking-wide",
-                approvalsPillCount > 0 ? "text-primary" : "text-slate-500"
-            )}>
-                Approvals
-            </Text>
-            {approvalsPillCount > 0 && (
-                <View className="min-w-[16px] h-4 px-1 rounded-full bg-primary items-center justify-center">
-                    <Text className="text-[9px] font-black text-primary-foreground">{approvalsPillCount}</Text>
-                </View>
-            )}
-        </Pressable>
-    ) : null;
+        if (requiresApproval) {
+            items.push({
+                key: 'approvals',
+                icon: pendingApprovalsBadgeCount > 0 ? 'checkmark-done' : 'checkmark-done-outline',
+                value: String(pendingApprovalsBadgeCount),
+                label: 'Approvals',
+                tone: pendingApprovalsBadgeCount > 0 ? 'primary' : 'muted',
+                onPress: () => {
+                    setShowApprovalsModal(true);
+                    fetchPendingApprovals();
+                },
+            });
+        }
 
-    // Both admin pills share the bracket header row (and the league / groups header).
-    // Compact so they sit side by side next to the zoom controls; flex-wrap is only a
-    // last-resort fallback on very narrow screens.
-    const adminPills = canManage ? (
-        <View className="flex-row items-center gap-1.5 flex-wrap">
-            {helpRequestsPill}
-            {approvalsPill}
-        </View>
-    ) : null;
+        return items;
+    })();
+
+    // Shares the bracket header row with the zoom controls, and gets a row of its own on the
+    // group / league view — the strip fills whatever width it is given either way.
+    const adminPills = adminStripItems.length > 0 ? <StatStrip items={adminStripItems} /> : null;
 
     // Admin-only bracket controls for the Groups + Bracket format:
     //  • Reset Bracket  — visible once the knockout is drawn; tears it down so a group result can be fixed.
@@ -3794,6 +3803,21 @@ export default function TournamentDetailsScreen() {
                 items={pendingApprovals}
                 isLoading={isLoadingApprovals}
                 onSelect={handleApprovalSelect}
+            />
+
+            <RoundProgressModal
+                visible={showProgressModal}
+                onClose={() => setShowProgressModal(false)}
+                stages={stages}
+                isTeamTournament={tournament?.isTeamTournament}
+                onOpenMatch={(match, tab) => {
+                    // Hand the fixture to the same handlers the bracket uses, so the guards
+                    // (round locked, missing participants) and the team / solo split stay in
+                    // one place. Closing first keeps the two sheets from stacking.
+                    setShowProgressModal(false);
+                    if (tournament?.isTeamTournament) handleTeamMatchPress(match);
+                    else handleMatchPress(match, tab);
+                }}
             />
 
             {/* Shared team link → confirm before joining / requesting. */}

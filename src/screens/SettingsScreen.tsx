@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -11,6 +12,9 @@ import Constants from 'expo-constants';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
+import { Toggle } from '../components/ui/Toggle';
+import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { NotificationSettings } from '../types/social';
 
 type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -26,6 +30,51 @@ export default function SettingsScreen() {
         title: string;
         message: string;
     }>({ type: 'success', title: '', message: '' });
+
+    // Notification switches. Loaded lazily on mount — one tiny GET, and the section simply
+    // stays out of the way until it arrives rather than rendering a toggle in a guessed state.
+    const [notificationSettings, setNotificationSettings] = React.useState<NotificationSettings | null>(null);
+    const [isSavingNotifications, setIsSavingNotifications] = React.useState(false);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const response = await authenticatedFetch(ENDPOINTS.NOTIFICATION_SETTINGS);
+                if (!response.ok) return;
+                const data = (await response.json()) as NotificationSettings;
+                if (!cancelled) setNotificationSettings(data);
+            } catch { /* best-effort — the section stays hidden */ }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Optimistic, with rollback: the toggle is the whole interaction, so it must not wait on
+    // a round-trip to move.
+    const handleToggleModeratedChats = async (enabled: boolean) => {
+        if (isSavingNotifications || !notificationSettings) return;
+        const previous = notificationSettings;
+        setNotificationSettings({ ...previous, moderatedChatNotifications: enabled });
+        setIsSavingNotifications(true);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.NOTIFICATION_SETTINGS, {
+                method: 'PUT',
+                body: JSON.stringify({ ...previous, moderatedChatNotifications: enabled }),
+            });
+            if (!response.ok) throw new Error(`NOTIFICATION_SETTINGS failed: ${response.status}`);
+        } catch (error) {
+            console.error('Error updating notification settings:', error);
+            setNotificationSettings(previous);
+            setStatusModalConfig({
+                type: 'error',
+                title: 'Could not save',
+                message: 'Your notification setting was not updated. Try again in a moment.',
+            });
+            setShowStatusModal(true);
+        } finally {
+            setIsSavingNotifications(false);
+        }
+    };
 
     const handleLogout = () => {
         Alert.alert(
@@ -98,6 +147,37 @@ export default function SettingsScreen() {
                             />
                         </View>
                     </View>
+
+                    {notificationSettings && (
+                        <View>
+                            <SectionLabel icon="notifications" title="Notifications" color={COLORS.warning} />
+                            <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                                <View className="flex-row items-center justify-between py-3.5 px-4">
+                                    <View className="flex-row items-center gap-3 flex-1 pr-3">
+                                        <View className="w-9 h-9 rounded-xl items-center justify-center border bg-white/[0.04] border-white/[0.06]">
+                                            <Ionicons name="shield-checkmark-outline" size={17} color={COLORS.slate300} />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="font-semibold text-[15px] text-white">Chats I moderate</Text>
+                                            <Text className="text-xs text-slate-500 mt-0.5">
+                                                Alert me when players reply in a match chat I joined as an organizer.
+                                                Chats on your own matches are never silenced by this.
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <Toggle
+                                        size="sm"
+                                        value={notificationSettings.moderatedChatNotifications}
+                                        onValueChange={handleToggleModeratedChats}
+                                        disabled={isSavingNotifications}
+                                    />
+                                </View>
+                            </View>
+                            <Text className="text-[11px] text-slate-600 mt-2 px-1 leading-4">
+                                To silence one specific match instead, open its chat and tap Muted.
+                            </Text>
+                        </View>
+                    )}
 
                     <View>
                         <SectionLabel icon="help-buoy" title="Support" color={COLORS.info} />
