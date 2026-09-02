@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { View, Text } from 'react-native';
 import { cn } from '../../lib/utils';
 import {
@@ -29,6 +30,7 @@ interface SeriesBreakdownProps {
  * break down and renders nothing.
  */
 export function SeriesBreakdown({ games, format, tone = 'final', className }: SeriesBreakdownProps) {
+    const { t } = useTranslation('tournament');
     if (games.length === 0) return null;
 
     const accent = tone === 'proposed' ? 'text-warning' : 'text-primary';
@@ -36,7 +38,7 @@ export function SeriesBreakdown({ games, format, tone = 'final', className }: Se
     return (
         <View className={cn('pt-4 border-t border-white/[0.06]', className)}>
             <Text className="text-[9px] font-black text-slate-500 uppercase tracking-[2px] text-center mb-3">
-                Best of {format.bestOf} · {format.condition === SeriesWinCondition.AggregateScore ? 'Total score' : 'Games won'}
+                {t('match:series.bestOfN', { n: format.bestOf })} · {format.condition === SeriesWinCondition.AggregateScore ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}
             </Text>
 
             {groupBySeries(games).map(block => (

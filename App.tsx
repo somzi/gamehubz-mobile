@@ -13,6 +13,9 @@ import './global.css';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { BadgesProvider } from './src/context/BadgesContext';
+import i18n from './src/i18n';
+import { I18nGate } from './src/i18n/I18nGate';
+import { I18nextProvider } from 'react-i18next';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useOtaUpdates } from './src/hooks/useOtaUpdates';
 import { RootStackParamList } from './src/types/navigation';
@@ -423,19 +426,26 @@ export default function App() {
             buster: Constants.expoConfig?.version ?? 'dev',
           }}
         >
-          <AuthProvider>
-            <BadgesProvider>
-              <NavigationContainer
-                ref={navigationRef}
-                linking={linking}
-                onReady={() => setNavReady(true)}
-              >
-                <RootNavigator />
-              </NavigationContainer>
-              <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
-              <OtaUpdater />
-            </BadgesProvider>
-          </AuthProvider>
+          {/* i18n sits above AuthProvider because the auth screens are translated too.
+              I18nGate holds render until the persisted language is applied; StatusBar
+              is left outside it so the bar is styled from the very first frame. */}
+          <I18nextProvider i18n={i18n}>
+            <I18nGate>
+              <AuthProvider>
+                <BadgesProvider>
+                  <NavigationContainer
+                    ref={navigationRef}
+                    linking={linking}
+                    onReady={() => setNavReady(true)}
+                  >
+                    <RootNavigator />
+                  </NavigationContainer>
+                  <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
+                  <OtaUpdater />
+                </BadgesProvider>
+              </AuthProvider>
+            </I18nGate>
+          </I18nextProvider>
           <StatusBar style="light" />
         </PersistQueryClientProvider>
       </SafeAreaProvider>

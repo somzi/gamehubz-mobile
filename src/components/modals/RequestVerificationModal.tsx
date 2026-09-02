@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
+import i18n from '../../i18n';
 
 enum HubVerificationStatus {
     Pending = 0,
@@ -27,6 +29,8 @@ interface Props {
 }
 
 export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, onClose, onSubmitted }: Props) {
+    const { t } = useTranslation('hub');
+    const { t: tCommon } = useTranslation('common');
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [request, setRequest] = useState<VerificationRequest | null>(null);
@@ -64,7 +68,7 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
 
     const handleSubmit = async () => {
         if (!reason.trim()) {
-            Alert.alert('Reason required', 'Please describe why this hub should be verified and provide any supporting evidence.');
+            Alert.alert(t('verification.reasonRequired'), t('verification.reasonRequiredMessage'));
             return;
         }
 
@@ -82,10 +86,10 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                 onSubmitted?.();
             } else {
                 const text = await response.text();
-                Alert.alert('Error', getErrorMessage(text) || 'Failed to submit verification request.');
+                Alert.alert(tCommon('error'), getErrorMessage(text) || t('verification.submitFailed'));
             }
         } catch (error) {
-            Alert.alert('Error', getErrorMessage(error));
+            Alert.alert(tCommon('error'), getErrorMessage(error));
         } finally {
             setIsSubmitting(false);
         }
@@ -98,9 +102,9 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                     <View className="w-14 h-14 rounded-full bg-sky-500 items-center justify-center mb-3">
                         <Ionicons name="checkmark" size={32} color="#fff" />
                     </View>
-                    <Text className="text-white font-black text-base">Hub is verified</Text>
+                    <Text className="text-white font-black text-base">{t('verification.isVerified')}</Text>
                     <Text className="text-slate-500 text-xs mt-1 text-center">
-                        This hub displays the verified badge across the app.
+                        {t('verification.isVerifiedHint')}
                     </Text>
                 </View>
             );
@@ -122,14 +126,14 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                             <Ionicons name="time-outline" size={20} color="#F59E0B" />
                         </View>
                         <View className="flex-1">
-                            <Text className="text-amber-400 font-black text-sm">Pending review</Text>
+                            <Text className="text-amber-400 font-black text-sm">{t('verification.pendingReview')}</Text>
                             <Text className="text-amber-300/70 text-xs mt-0.5">
-                                Submitted {request?.createdOn ? new Date(request.createdOn).toLocaleDateString() : ''}
+                                Submitted {request?.createdOn ? new Date(request.createdOn).toLocaleDateString(i18n.language) : ''}
                             </Text>
                         </View>
                     </View>
 
-                    <Text className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">Your submission</Text>
+                    <Text className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">{t('verification.yourSubmission')}</Text>
                     <View className="bg-card border border-white/5 rounded-xl p-3">
                         <Text className="text-slate-300 text-sm leading-5">{request?.reason}</Text>
                     </View>
@@ -145,19 +149,19 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                             <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
                         </View>
                         <View className="flex-1">
-                            <Text className="text-red-400 font-black text-sm">Previous request rejected</Text>
-                            <Text className="text-red-300/70 text-xs mt-0.5">You can submit a new request below.</Text>
+                            <Text className="text-red-400 font-black text-sm">{t('verification.previousRejected')}</Text>
+                            <Text className="text-red-300/70 text-xs mt-0.5">{t('verification.previousRejectedHint')}</Text>
                         </View>
                     </View>
                 )}
 
                 <Text className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2">
-                    Why should this hub be verified?
+                    {t('verification.whyVerify')}
                 </Text>
                 <TextInput
                     value={reason}
                     onChangeText={setReason}
-                    placeholder="Describe your role, link to official accounts, attach any proof that this hub represents you or your organization."
+                    placeholder={t('verification.reasonPlaceholder')}
                     placeholderTextColor="#475569"
                     multiline
                     numberOfLines={6}
@@ -170,7 +174,7 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                 <View className="bg-indigo-500/[0.06] border border-indigo-500/20 rounded-xl p-3 mt-3 flex-row" style={{ gap: 10 }}>
                     <Ionicons name="information-circle-outline" size={16} color="#818CF8" />
                     <Text className="text-slate-400 text-xs flex-1 leading-4">
-                        Your request is reviewed by a human. We may contact you for additional proof.
+                        {t('verification.humanReview')}
                     </Text>
                 </View>
             </View>
@@ -190,7 +194,7 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                             <View className="w-9 h-9 rounded-xl bg-sky-500/15 items-center justify-center">
                                 <Ionicons name="shield-checkmark-outline" size={18} color="#0EA5E9" />
                             </View>
-                            <Text className="text-white font-black text-base">Hub Verification</Text>
+                            <Text className="text-white font-black text-base">{t('verification.title')}</Text>
                         </View>
                         <Pressable onPress={onClose} hitSlop={10}>
                             <Ionicons name="close" size={22} color="#64748B" />
@@ -204,10 +208,10 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                     {canSubmit && (
                         <View className="flex-row px-5 py-4 border-t border-white/5" style={{ gap: 10 }}>
                             <Button onPress={onClose} variant="secondary" className="flex-1" disabled={isSubmitting}>
-                                Cancel
+                                {tCommon('cancel')}
                             </Button>
                             <Button onPress={handleSubmit} className="flex-1" disabled={isSubmitting || !reason.trim()}>
-                                {isSubmitting ? 'Submitting...' : 'Submit request'}
+                                {isSubmitting ? t('verification.submitting') : t('verification.submitRequest')}
                             </Button>
                         </View>
                     )}
@@ -215,7 +219,7 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                     {!canSubmit && (
                         <View className="px-5 py-4 border-t border-white/5">
                             <Button onPress={onClose} variant="secondary" className="w-full">
-                                Close
+                                {tCommon('close')}
                             </Button>
                         </View>
                     )}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -61,36 +62,38 @@ const MODE_ICON: Record<BracketSeedingMode, keyof typeof Ionicons.glyphMap> = {
     [BracketSeedingMode.Pots]: 'albums',
 };
 
-function modeTitle(mode: BracketSeedingMode) {
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+function modeTitle(mode: BracketSeedingMode, t: TFn) {
     switch (mode) {
-        case BracketSeedingMode.Manual: return 'Manual';
-        case BracketSeedingMode.Seeded: return 'Seeded';
-        case BracketSeedingMode.Pots: return 'Pot draw';
-        default: return 'Random';
+        case BracketSeedingMode.Manual: return t('mode.manual');
+        case BracketSeedingMode.Seeded: return t('mode.seeded');
+        case BracketSeedingMode.Pots: return t('mode.pots');
+        default: return t('mode.random');
     }
 }
 
-function modeSubtitle(mode: BracketSeedingMode, options: BracketDrawOptions, isGroups: boolean) {
-    const who = options.isTeamTournament ? 'teams' : 'players';
+function modeSubtitle(mode: BracketSeedingMode, options: BracketDrawOptions, isGroups: boolean, t: TFn) {
+    const who = options.isTeamTournament ? t('teams') : t('players');
 
     switch (mode) {
         case BracketSeedingMode.Random:
             return isGroups
-                ? `The ${who} are shuffled and spread evenly across the groups.`
-                : `The ${who} are shuffled into the bracket. One tap, nothing to set up.`;
+                ? t('blurb.randomGroups', { who })
+                : t('blurb.randomBracket', { who });
 
         case BracketSeedingMode.Manual:
             return isGroups
-                ? 'You fill every group sheet yourself.'
-                : `You place every entrant yourself — pick the pairings and who gets a bye.`;
+                ? t('blurb.manualGroups')
+                : t('blurb.manualBracket');
 
         case BracketSeedingMode.Seeded:
             return isGroups
-                ? 'Registration order snakes across the groups, so the early joiners are split up.'
-                : 'Registration order is the ranking: #1 v #N, #2 v #N-1 … and the top seeds take the byes.';
+                ? t('blurb.seededGroups')
+                : t('blurb.seededBracket');
 
         case BracketSeedingMode.Pots:
-            return `Sort the ${who} into ${options.potCount ?? 0} pots — each group draws one name out of every pot.`;
+            return t('blurb.pots', { who, count: options.potCount ?? 0 });
 
         default:
             return '';
@@ -126,6 +129,9 @@ export function BracketDrawModal({
     onRetry,
     onConfirm,
 }: BracketDrawModalProps) {
+    const { t } = useTranslation('bracket');
+    const { t: tCommon } = useTranslation('common');
+    const { t: tTournament } = useTranslation('tournament');
     const insets = useSafeAreaInsets();
 
     const [step, setStep] = useState<Step>('mode');
@@ -296,19 +302,19 @@ export function BracketDrawModal({
         if (step !== 'arrange' || !options) return null;
         if (unassigned.length > 0) {
             const noun = options.isTeamTournament ? 'team' : 'player';
-            return `${unassigned.length} ${noun}${unassigned.length === 1 ? '' : 's'} still to place.`;
+            return t('stillToPlace', { count: unassigned.length, noun });
         }
         if (bucketKind === 'pot') {
             const bad = buckets.findIndex((b, i) => b.length !== potTarget(i));
-            if (bad >= 0) return `Pot ${bad + 1} needs exactly ${potTarget(bad)} — it has ${buckets[bad].length}.`;
+            if (bad >= 0) return t('potNeedsExactly', { pot: bad + 1, target: potTarget(bad), actual: buckets[bad].length });
         } else if (isGroups) {
             const bad = buckets.findIndex((b) => b.length < 2);
-            if (bad >= 0) return `Group ${groupLabel(bad, groupsCount)} needs at least 2 — a one-entrant group never plays.`;
+            if (bad >= 0) return t('groupNeedsTwo', { group: groupLabel(bad, groupsCount) });
         } else {
             // Both sides empty isn't a bye, it's a match nobody can ever play — and the round it
             // feeds would wait forever for a winner. The server rejects it too.
             const bad = emptyMatchIndex();
-            if (bad >= 0) return `Match ${bad + 1} is empty — spread the byes out so every match has someone in it.`;
+            if (bad >= 0) return t('matchEmpty', { match: bad + 1 });
         }
         return null;
     }, [step, options, unassigned.length, buckets, bucketKind, isGroups, slots]);
@@ -317,7 +323,7 @@ export function BracketDrawModal({
     // match its own count could never produce a valid draw — say so instead of rendering an empty
     // bracket that reports "everyone is placed".
     const payloadBroken = !!options && (options.entrants?.length ?? 0) !== entrantCount;
-    const shownError = error ?? (payloadBroken ? 'The entrant list came back incomplete. Pull to refresh and open the draw again.' : null);
+    const shownError = error ?? (payloadBroken ? t('payloadBroken') : null);
 
     const needsSetup = mode === BracketSeedingMode.Manual || mode === BracketSeedingMode.Pots;
     const canSubmit = !busy && !!options && !payloadBroken && entrantCount >= 2 && !problem;
@@ -383,7 +389,7 @@ export function BracketDrawModal({
                             <Ionicons name="add" size={16} color={COLORS.slate600} />
                         </View>
                         <Text className="flex-1 text-[12px] font-bold text-slate-600">
-                            {drawDone ? 'BYE' : 'Tap to add'}
+                            {drawDone ? t('bye') : t('tapToAdd')}
                         </Text>
                     </>
                 )}
@@ -419,11 +425,11 @@ export function BracketDrawModal({
                                 </Text>
                                 {isEmpty ? (
                                     <View className="px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30">
-                                        <Text className="text-[9px] font-black tracking-wider text-red-300">NOBODY HERE</Text>
+                                        <Text className="text-[9px] font-black tracking-wider text-red-300">{t('nobodyHere')}</Text>
                                     </View>
                                 ) : isBye ? (
                                     <View className="px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/30">
-                                        <Text className="text-[9px] font-black tracking-wider text-amber-300">BYE</Text>
+                                        <Text className="text-[9px] font-black tracking-wider text-amber-300">{t('bye')}</Text>
                                     </View>
                                 ) : null}
                             </View>
@@ -464,7 +470,7 @@ export function BracketDrawModal({
                                     </Text>
                                 </View>
                                 <Text className="text-[13px] font-black text-white">
-                                    {isPot ? `Pot ${index + 1}` : `Group ${groupLabel(index, groupsCount)}`}
+                                    {isPot ? t('potN', { n: index + 1 }) : t('groupN', { n: groupLabel(index, groupsCount) })}
                                 </Text>
                             </View>
 
@@ -492,7 +498,7 @@ export function BracketDrawModal({
                                             </Text>
                                         </View>
                                         <Text className="flex-1 text-[13px] font-bold text-slate-100" numberOfLines={1}>
-                                            {entrant?.displayName ?? 'Unknown'}
+                                            {entrant?.displayName ?? tCommon('unknown')}
                                         </Text>
                                         <Ionicons name="close-circle-outline" size={16} color={COLORS.slate600} />
                                     </Pressable>
@@ -526,8 +532,8 @@ export function BracketDrawModal({
                 <View className="py-12 px-8 items-center">
                     <Ionicons name="people-outline" size={32} color={COLORS.slate600} />
                     <Text className="text-slate-400 text-sm text-center mt-3">
-                        A bracket needs at least 2 {options.isTeamTournament ? 'teams' : 'players'} — there
-                        {entrantCount === 1 ? ' is 1' : ' are none'} so far.
+                        {t('needTwoEntrants', { noun: options.isTeamTournament ? t('teams') : t('players') })}
+                        {entrantCount === 1 ? t('isOne') : t('areNone')} {t('soFar')}
                     </Text>
                 </View>
             );
@@ -557,9 +563,9 @@ export function BracketDrawModal({
                             </View>
 
                             <View className="flex-1">
-                                <Text className="text-[15px] font-black text-white">{modeTitle(supported)}</Text>
+                                <Text className="text-[15px] font-black text-white">{modeTitle(supported, t)}</Text>
                                 <Text className="text-slate-400 text-[11px] mt-1 leading-4">
-                                    {modeSubtitle(supported, options, isGroups)}
+                                    {modeSubtitle(supported, options, isGroups, t)}
                                 </Text>
                             </View>
 
@@ -579,8 +585,12 @@ export function BracketDrawModal({
                     <Ionicons name="information-circle-outline" size={15} color={COLORS.slate500} />
                     <Text className="flex-1 text-[11px] text-slate-500 leading-4">
                         {isGroups
-                            ? `${entrantCount} entrants · ${groupsCount} groups${options.qualifiersPerGroup ? ` · top ${options.qualifiersPerGroup} advance` : ''}`
-                            : `${entrantCount} entrants · bracket of ${bracketSize}${(options.byeCount ?? 0) > 0 ? ` · ${options.byeCount} bye${options.byeCount === 1 ? '' : 's'}` : ''}`}
+                            ? (options.qualifiersPerGroup
+                                ? t('summaryGroupsAdvance', { count: entrantCount, groups: groupsCount, advance: options.qualifiersPerGroup })
+                                : t('summaryGroups', { count: entrantCount, groups: groupsCount }))
+                            : ((options.byeCount ?? 0) > 0
+                                ? t('summaryBracketByes', { count: options.byeCount ?? 0, entrants: entrantCount, size: bracketSize })
+                                : t('summaryBracket', { count: entrantCount, size: bracketSize }))}
                     </Text>
                 </View>
             </View>
@@ -601,10 +611,10 @@ export function BracketDrawModal({
         const occupant = occupantId ? entrantById.get(occupantId) : undefined;
 
         const title = picker.kind === 'slot'
-            ? `Match ${Math.floor(picker.index / 2) + 1} · side ${(picker.index % 2) + 1}`
+            ? t('matchSide', { match: Math.floor(picker.index / 2) + 1, side: (picker.index % 2) + 1 })
             : bucketKind === 'pot'
-                ? `Pot ${picker.index + 1}`
-                : `Group ${groupLabel(picker.index, groupsCount)}`;
+                ? t('potN', { n: picker.index + 1 })
+                : t('groupN', { n: groupLabel(picker.index, groupsCount) });
 
         // Inline styles, not className — the codebase keeps Animated.View on plain styles
         // (NativeWind's interop on it isn't relied on anywhere else).
@@ -647,7 +657,7 @@ export function BracketDrawModal({
                     <SearchInput
                         value={search}
                         onChange={setSearch}
-                        placeholder={`Search ${options.isTeamTournament ? 'teams' : 'players'}…`}
+                        placeholder={t('searchEntrants', { noun: options.isTeamTournament ? t('teams') : t('players') })}
                     />
                 </View>
 
@@ -691,8 +701,8 @@ export function BracketDrawModal({
                     {visiblePool.length === 0 ? (
                         <Text className="text-[12px] text-slate-500 py-8 text-center">
                             {unassigned.length === 0
-                                ? 'Everyone is already placed.'
-                                : `Nobody left to place matches “${search.trim()}”.`}
+                                ? t('everyonePlaced')
+                                : t('nobodyMatches', { search: search.trim() })}
                         </Text>
                     ) : null}
                 </ScrollView>
@@ -701,32 +711,34 @@ export function BracketDrawModal({
     };
 
     const headerSubtitle = step === 'mode'
-        ? 'How should the opening fixtures be decided?'
+        ? t('howDecided')
         : mode === BracketSeedingMode.Pots
-            ? 'Tap a pot to fill it'
+            ? t('tapPot')
             : isGroups
-                ? 'Tap a group to fill it'
-                : 'Tap a spot to put someone in it';
+                ? t('tapGroup')
+                : t('tapSpot');
 
     const ctaLabel = step === 'mode'
-        ? (needsSetup ? 'Set up the draw' : 'Generate bracket')
-        : 'Generate bracket';
+        ? (needsSetup ? t('setUpDraw') : t('generateBracket'))
+        : t('generateBracket');
 
     // What the organiser is about to commit to, spelled out before anyone gets a push notification.
     const shapeLine = isGroups
-        ? `${groupsCount} group${groupsCount === 1 ? '' : 's'}`
-        : `bracket of ${bracketSize}${(options?.byeCount ?? 0) > 0 ? ` · ${options?.byeCount} bye${options?.byeCount === 1 ? '' : 's'}` : ''}`;
+        ? t('shapeGroups', { count: groupsCount })
+        : ((options?.byeCount ?? 0) > 0
+            ? t('shapeBracketByes', { count: options?.byeCount ?? 0, size: bracketSize })
+            : t('shapeBracket', { size: bracketSize }));
 
     const confirmMessage =
-        `${modeTitle(mode)} draw · ${entrantCount} ${options?.isTeamTournament ? 'teams' : 'players'} · ${shapeLine}.\n\n`
-        + 'Everyone registered gets a notification and the tournament goes live. The draw cannot be re-run afterwards'
-        + (isGroups ? '.' : ' — after this you can only swap two positions.');
+        t('confirmIntro', { mode: modeTitle(mode, t), count: entrantCount, noun: options?.isTeamTournament ? t('teams') : t('players'), shape: shapeLine })
+        + t('confirmNotice')
+        + (isGroups ? t('confirmTailGroups') : t('confirmTailBracket'));
 
     // Placement progress, so a big field doesn't need counting by eye.
     const placedCount = entrantCount - unassigned.length;
     const progressLine = isGroups
-        ? `${placedCount} of ${entrantCount} placed`
-        : `${placedCount} of ${entrantCount} placed · ${Math.max(0, bracketSize - entrantCount)} byes`;
+        ? t('placedCount', { placed: placedCount, total: entrantCount })
+        : t('placedCountByes', { placed: placedCount, total: entrantCount, byes: Math.max(0, bracketSize - entrantCount) });
 
     return (
         <Modal
@@ -761,7 +773,7 @@ export function BracketDrawModal({
 
                             <View className="flex-1">
                                 <Text className="text-xl font-black text-white" numberOfLines={1}>
-                                    {step === 'mode' ? 'Bracket draw' : modeTitle(mode)}
+                                    {step === 'mode' ? t('bracketDraw') : modeTitle(mode, t)}
                                 </Text>
                                 <Text className="text-[11px] text-slate-500 mt-0.5" numberOfLines={1}>
                                     {step === 'arrange' && !shownError ? progressLine : headerSubtitle}
@@ -788,7 +800,7 @@ export function BracketDrawModal({
                                 style={{ opacity: unassigned.length === 0 ? 0.4 : 1 }}
                             >
                                 <Ionicons name="shuffle" size={14} color={COLORS.slate300} />
-                                <Text className="text-[12px] font-black text-slate-300">Auto-fill rest</Text>
+                                <Text className="text-[12px] font-black text-slate-300">{t('autoFillRest')}</Text>
                             </Pressable>
                             <Pressable
                                 onPress={clearAll}
@@ -796,7 +808,7 @@ export function BracketDrawModal({
                                 className="flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] active:opacity-70"
                             >
                                 <Ionicons name="refresh" size={14} color={COLORS.slate300} />
-                                <Text className="text-[12px] font-black text-slate-300">Clear</Text>
+                                <Text className="text-[12px] font-black text-slate-300">{t('clear')}</Text>
                             </Pressable>
                         </View>
                     ) : null}
@@ -810,7 +822,7 @@ export function BracketDrawModal({
                         {loading ? (
                             <View className="py-16 items-center justify-center">
                                 <ActivityIndicator size="small" color={COLORS.primary} />
-                                <Text className="text-slate-500 text-xs mt-3">Loading the field…</Text>
+                                <Text className="text-slate-500 text-xs mt-3">{t('loadingField')}</Text>
                             </View>
                         ) : shownError ? (
                             <View className="py-12 px-8 items-center">
@@ -821,7 +833,7 @@ export function BracketDrawModal({
                                         onPress={onRetry}
                                         className="mt-4 px-4 py-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] active:opacity-70"
                                     >
-                                        <Text className="text-[12px] font-black text-slate-300">Try again</Text>
+                                        <Text className="text-[12px] font-black text-slate-300">{t('tryAgain')}</Text>
                                     </Pressable>
                                 ) : null}
                             </View>
@@ -882,9 +894,9 @@ export function BracketDrawModal({
                 visible={confirming}
                 onClose={() => setConfirming(false)}
                 onConfirm={generate}
-                title="Start the tournament?"
+                title={tTournament('details.startTournamentTitle')}
                 message={confirmMessage}
-                confirmText="Generate bracket"
+                confirmText={t('generateBracket')}
                 isDestructive={false}
                 stacked
             />

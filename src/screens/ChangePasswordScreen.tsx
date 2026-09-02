@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 
 export default function ChangePasswordScreen() {
+    const { t } = useTranslation('auth');
     const navigation = useNavigation();
     const { user } = useAuth();
     const [currentPassword, setCurrentPassword] = useState('');
@@ -35,8 +37,8 @@ export default function ChangePasswordScreen() {
         if (!currentPassword || !newPassword || !confirmPassword) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Missing Fields',
-                message: 'Please fill in all password fields.'
+                title: t('change.missingFields'),
+                message: t('change.missingFieldsMessage')
             });
             setShowStatusModal(true);
             return;
@@ -45,8 +47,8 @@ export default function ChangePasswordScreen() {
         if (newPassword !== confirmPassword) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Mismatch',
-                message: 'New password and retype password do not match.'
+                title: t('change.mismatch'),
+                message: t('change.mismatchMessage')
             });
             setShowStatusModal(true);
             return;
@@ -55,8 +57,8 @@ export default function ChangePasswordScreen() {
         if (newPassword.length < 6) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Weak Password',
-                message: 'New password must be at least 6 characters long.'
+                title: t('change.weakPassword'),
+                message: t('change.weakPasswordMessage')
             });
             setShowStatusModal(true);
             return;
@@ -77,15 +79,15 @@ export default function ChangePasswordScreen() {
             if (response.ok) {
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Password Changed',
-                    message: 'Your password has been updated successfully.',
+                    title: t('change.changedTitle'),
+                    message: t('change.changedMessage'),
                     onClose: () => navigation.goBack()
                 });
                 setShowStatusModal(true);
             } else {
                 const responseText = await response.text();
 
-                let errorMsg = `Please check your current password.`;
+                let errorMsg = t('change.checkCurrentPassword');
                 try {
                     const errorData = JSON.parse(responseText);
                     if (errorData.message) errorMsg = errorData.message;
@@ -96,7 +98,7 @@ export default function ChangePasswordScreen() {
 
                 setStatusModalConfig({
                     type: 'error',
-                    title: 'Update Failed',
+                    title: t('change.updateFailed'),
                     message: errorMsg
                 });
                 setShowStatusModal(true);
@@ -105,8 +107,8 @@ export default function ChangePasswordScreen() {
             console.error('Password change error:', error);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Network Error',
-                message: 'Unable to connect to the server. Please try again later.'
+                title: t('networkError'),
+                message: t('change.networkErrorMessage')
             });
             setShowStatusModal(true);
         } finally {
@@ -116,17 +118,17 @@ export default function ChangePasswordScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <PageHeader title="Change Password" showBack />
+            <PageHeader title={t('change.title')} showBack />
             <KeyboardAvoider>
                 <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
                     <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
-                        <SectionLabel icon="lock-closed" title="Security" />
+                        <SectionLabel icon="lock-closed" title={t('change.sectionSecurity')} />
                         <View className="gap-4">
                             <Input
-                                label="CURRENT PASSWORD"
+                                label={t('change.currentPasswordLabel')}
                                 value={currentPassword}
                                 onChangeText={setCurrentPassword}
-                                placeholder="Enter current password"
+                                placeholder={t('change.currentPasswordPlaceholder')}
                                 secureTextEntry={!showPasswords}
                                 leftIcon="lock-closed-outline"
                                 rightIcon={showPasswords ? "eye-off-outline" : "eye-outline"}
@@ -134,19 +136,19 @@ export default function ChangePasswordScreen() {
                             />
 
                             <Input
-                                label="NEW PASSWORD"
+                                label={t('change.newPasswordLabel')}
                                 value={newPassword}
                                 onChangeText={setNewPassword}
-                                placeholder="Enter new password"
+                                placeholder={t('change.newPasswordPlaceholder')}
                                 secureTextEntry={!showPasswords}
                                 leftIcon="key-outline"
                             />
 
                             <Input
-                                label="RETYPE NEW PASSWORD"
+                                label={t('change.retypePasswordLabel')}
                                 value={confirmPassword}
                                 onChangeText={setConfirmPassword}
-                                placeholder="Confirm new password"
+                                placeholder={t('change.retypePasswordPlaceholder')}
                                 secureTextEntry={!showPasswords}
                                 leftIcon="checkmark-circle-outline"
                             />
@@ -154,7 +156,7 @@ export default function ChangePasswordScreen() {
                             <View className="flex-row items-center gap-1.5 mt-1">
                                 <Ionicons name="information-circle-outline" size={13} color={COLORS.slate500} />
                                 <Text className="text-slate-500 text-xs">
-                                    Password must be at least 6 characters long.
+                                    {t('change.minLengthHint')}
                                 </Text>
                             </View>
                         </View>
@@ -169,7 +171,7 @@ export default function ChangePasswordScreen() {
                         className="h-14 rounded-2xl shadow-lg shadow-primary/30"
                     >
                         <View className="flex-row items-center justify-center gap-2">
-                            <Text className="text-primary-foreground font-black text-base">Update Password</Text>
+                            <Text className="text-primary-foreground font-black text-base">{t('change.updatePassword')}</Text>
                             <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
                         </View>
                     </Button>

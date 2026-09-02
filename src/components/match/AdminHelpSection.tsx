@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +10,7 @@ import { ConfirmationModal } from '../modals/ConfirmationModal';
 // is no usable text — for this surface we prefer a domain-specific fallback in that case.
 function extractErrorMessage(err: unknown, fallback: string): string {
     const parsed = getErrorMessage(err);
-    if (!parsed || parsed === 'An unexpected error occurred') return fallback;
+    if (!parsed || parsed === i18n.t('common:unexpectedError')) return fallback;
     return parsed;
 }
 
@@ -42,6 +44,7 @@ export function AdminHelpSection({
     canResolve,
     onChanged,
 }: AdminHelpSectionProps) {
+    const { t } = useTranslation('match');
     // Local mirror so the card flips to "requested" instantly after the POST,
     // before the parent refetches the match details.
     const [localRequested, setLocalRequested] = useState(requested);
@@ -66,7 +69,7 @@ export function AdminHelpSection({
             });
             if (!response.ok) {
                 const text = await response.text().catch(() => '');
-                throw new Error(text || 'Failed to notify admins');
+                throw new Error(text || t('adminHelp.notifyFailed'));
             }
             setLocalRequested(true);
             setLocalByMe(true);
@@ -75,7 +78,7 @@ export function AdminHelpSection({
         } catch (err: any) {
             console.error('[AdminHelpSection] Request error:', err);
             // Prefer the server's message so users see "Only match participants…" etc.
-            setError(extractErrorMessage(err, 'Could not notify the admins. Please try again.'));
+            setError(extractErrorMessage(err, t('adminHelp.notifyFailedHint')));
             setShowConfirm(false);
         } finally {
             setIsSubmitting(false);
@@ -97,14 +100,14 @@ export function AdminHelpSection({
             });
             if (!response.ok) {
                 const text = await response.text().catch(() => '');
-                throw new Error(text || 'Failed to resolve');
+                throw new Error(text || t('adminHelp.resolveFailed'));
             }
             setLocalRequested(false);
             setLocalByMe(false);
             if (onChanged) onChanged();
         } catch (err: any) {
             console.error('[AdminHelpSection] Resolve error:', err);
-            setError(extractErrorMessage(err, 'Could not resolve the request. Please try again.'));
+            setError(extractErrorMessage(err, t('adminHelp.resolveFailedHint')));
         } finally {
             setIsResolving(false);
         }
@@ -128,9 +131,9 @@ export function AdminHelpSection({
                         )}
                     </View>
                     <View className="flex-1">
-                        <Text className="text-[11px] font-black text-warning uppercase tracking-[2px]">Need Help?</Text>
+                        <Text className="text-[11px] font-black text-warning uppercase tracking-[2px]">{t('adminHelp.needHelp')}</Text>
                         <Text className="text-[11px] text-slate-400 mt-0.5">
-                            Problem with this match? Notify the tournament admins.
+                            {t('adminHelp.needHelpHint')}
                         </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color="#F59E0B" />
@@ -142,9 +145,9 @@ export function AdminHelpSection({
                     visible={showConfirm}
                     onClose={() => setShowConfirm(false)}
                     onConfirm={submitRequest}
-                    title="Request Admin Help"
-                    message="Tournament admins and the hub owner will be notified and can join your match chat to sort things out."
-                    confirmText="Notify Admins"
+                    title={t('adminHelp.requestTitle')}
+                    message={t('adminHelp.requestMessage')}
+                    confirmText={t('adminHelp.notifyAdmins')}
                     isDestructive={false}
                     isLoading={isSubmitting}
                 />
@@ -159,13 +162,13 @@ export function AdminHelpSection({
                     <Ionicons name="alert-circle" size={20} color="#F59E0B" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-[11px] font-black text-warning uppercase tracking-[2px]">Admin Help Requested</Text>
+                    <Text className="text-[11px] font-black text-warning uppercase tracking-[2px]">{t('adminHelp.helpRequested')}</Text>
                     <Text className="text-[11px] text-slate-400 mt-0.5">
                         {canResolve
-                            ? 'A player asked for help here. Check the match chat and mark it resolved when done.'
+                            ? t('adminHelp.adminView')
                             : localByMe
-                                ? 'Admins have been notified — they can join your match chat.'
-                                : 'An admin has been called to this match.'}
+                                ? t('adminHelp.requesterView')
+                                : t('adminHelp.otherView')}
                     </Text>
                 </View>
             </View>
@@ -180,7 +183,7 @@ export function AdminHelpSection({
                     ) : (
                         <>
                             <Ionicons name="checkmark-circle" size={16} color="#0F172A" />
-                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">Mark Resolved</Text>
+                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider">{t('adminHelp.markResolved')}</Text>
                         </>
                     )}
                 </Pressable>

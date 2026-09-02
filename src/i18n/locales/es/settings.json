@@ -1,0 +1,47 @@
+{
+  "title": "Configuración",
+  "sections": {
+    "notifications": "Notificaciones",
+    "account": "Cuenta",
+    "preferences": "Preferencias",
+    "support": "Soporte",
+    "accountActions": "Acciones de cuenta"
+  },
+  "editProfile": "Editar perfil",
+  "manageSocials": "Administrar redes",
+  "passwordSecurity": "Contraseña y seguridad",
+  "language": "Idioma",
+  "helpCenter": "Centro de ayuda",
+  "contactUs": "Contáctanos",
+  "aboutUs": "Sobre nosotros",
+  "logOut": "Cerrar sesión",
+  "deleteAccount": "Eliminar cuenta",
+  "version": "GameHubz Mobile v{{version}}",
+  "languagePicker": {
+    "title": "Idioma",
+    "subtitle": "Selecciona el idioma de la aplicación"
+  },
+  "logOutConfirm": {
+    "title": "Cerrar sesión",
+    "message": "¿Seguro que quieres cerrar sesión?"
+  },
+  "deleteConfirm": {
+    "title": "Eliminar cuenta",
+    "message": "¿Seguro que quieres eliminar tu cuenta? Esta acción es permanente y no se puede deshacer."
+  },
+  "deleteSuccess": {
+    "title": "Cuenta eliminada",
+    "message": "Tu cuenta se ha eliminado correctamente."
+  },
+  "deleteFailed": {
+    "title": "No se pudo eliminar",
+    "message": "No se pudo eliminar tu cuenta. Inténtalo de nuevo más tarde."
+  },
+  "notifications": {
+    "moderatedChats": "Chats que modero",
+    "moderatedChatsHint": "Avísame cuando los jugadores respondan en un chat de partido al que me uní como organizador. Esto nunca silencia los chats de tus propios partidos.",
+    "perMatchHint": "Para silenciar solo un partido, abre su chat y toca Silenciado.",
+    "saveFailedTitle": "No se pudo guardar",
+    "saveFailedMessage": "Tu ajuste de notificaciones no se actualizó. Inténtalo de nuevo en un momento."
+  }
+}

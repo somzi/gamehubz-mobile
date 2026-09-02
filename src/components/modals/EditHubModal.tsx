@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Button } from '../ui/Button';
@@ -30,6 +31,8 @@ export function EditHubModal({
     onClose,
     onSave,
 }: EditHubModalProps) {
+    const { t } = useTranslation('hub');
+    const { t: tCommon } = useTranslation('common');
     const [name, setName] = useState(initialName);
     const [description, setDescription] = useState(initialDescription);
     const [isPublic, setIsPublic] = useState(initialIsPublic);
@@ -76,7 +79,7 @@ export function EditHubModal({
                         className="bg-[#0D1525] rounded-3xl p-6 w-full max-w-md max-h-[88%] border border-white/[0.06]"
                     >
                         <View className="flex-row justify-between items-center mb-5">
-                            <Text className="text-xl font-black text-white">Edit Hub</Text>
+                            <Text className="text-xl font-black text-white">{t('edit.title')}</Text>
                             <Pressable onPress={onClose} className="w-8 h-8 rounded-xl bg-white/[0.05] items-center justify-center">
                                 <Ionicons name="close" size={18} color="#64748B" />
                             </Pressable>
@@ -90,22 +93,22 @@ export function EditHubModal({
                             alwaysBounceVertical={false}
                         >
                             <View className="mb-4">
-                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Hub Name</Text>
+                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('edit.hubName')}</Text>
                                 <TextInput
                                     value={name}
                                     onChangeText={setName}
-                                    placeholder="Enter hub name"
+                                    placeholder={t('edit.hubNamePlaceholder')}
                                     placeholderTextColor="#334155"
                                     className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm"
                                 />
                             </View>
 
                             <View className="mb-5">
-                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Description</Text>
+                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('edit.description')}</Text>
                                 <TextInput
                                     value={description}
                                     onChangeText={setDescription}
-                                    placeholder="Enter hub description"
+                                    placeholder={t('edit.descriptionPlaceholder')}
                                     placeholderTextColor="#334155"
                                     multiline
                                     numberOfLines={4}
@@ -116,7 +119,7 @@ export function EditHubModal({
 
                             <View className="h-[1px] bg-white/5 mb-5" />
 
-                            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Privacy</Text>
+                            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('edit.privacy')}</Text>
                             <View className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06]">
                                 <View className="flex-row items-center justify-between">
                                     <View className="flex-row items-center gap-3 flex-1">
@@ -132,12 +135,12 @@ export function EditHubModal({
                                         </View>
                                         <View className="flex-1">
                                             <Text className="text-white font-bold text-sm">
-                                                {isPublic ? "Public Hub" : "Private Hub"}
+                                                {isPublic ? t('edit.publicHub') : t('edit.privateHub')}
                                             </Text>
                                             <Text className="text-slate-500 text-xs mt-0.5">
                                                 {isPublic
-                                                    ? "Anyone can follow this hub"
-                                                    : "Members need approval to join"}
+                                                    ? t('edit.publicHint')
+                                                    : t('edit.privateHint')}
                                             </Text>
                                         </View>
                                     </View>
@@ -159,14 +162,14 @@ export function EditHubModal({
                                 className="flex-1"
                                 disabled={isSaving}
                             >
-                                Cancel
+                                {tCommon('cancel')}
                             </Button>
                             <Button
                                 onPress={handleSave}
                                 className="flex-1"
                                 disabled={isSaving || !name.trim()}
                             >
-                                {isSaving ? 'Saving...' : 'Save'}
+                                {isSaving ? t('edit.saving') : tCommon('save')}
                             </Button>
                         </View>
                     </View>

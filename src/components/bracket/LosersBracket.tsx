@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { BracketMatch, teamProgressFrom } from './BracketMatch';
@@ -85,9 +87,9 @@ function getRoundStatus(round: Round): RoundStatus {
 // of the structure (a 5-player bracket has no LB R1 to show), and we don't want a collapse
 // to push every later round's label up by one.
 function getLbRoundLabel(roundNumber: number, maxRoundNumber: number): string {
-    if (roundNumber === maxRoundNumber) return 'LB Final';
-    if (roundNumber === maxRoundNumber - 1) return 'LB Semifinal';
-    return `LB Round ${roundNumber}`;
+    if (roundNumber === maxRoundNumber) return i18n.t('bracket:card.lbFinal');
+    if (roundNumber === maxRoundNumber - 1) return i18n.t('bracket:card.lbSemifinal');
+    return i18n.t('bracket:card.lbRound', { n: roundNumber });
 }
 
 export function LosersBracket({
@@ -348,11 +350,11 @@ export function LosersBracket({
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                         <Ionicons name="time-outline" size={9} color="#F87171" />
                                         <Text style={{ fontSize: 9, color: '#F87171', fontWeight: '600' }}>
-                                            {parseUtcDate(round.roundDeadline).toLocaleDateString([], {
+                                            {parseUtcDate(round.roundDeadline).toLocaleDateString(i18n.language, {
                                                 month: 'short',
                                                 day: 'numeric',
                                             })}{' '}
-                                            {parseUtcDate(round.roundDeadline).toLocaleTimeString([], {
+                                            {parseUtcDate(round.roundDeadline).toLocaleTimeString(i18n.language, {
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                                 hour12: false,

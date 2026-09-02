@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ export interface SwapBracketModalProps {
 // Premium two-step re-seed: tap one team, then another, then Swap. The two glow as A / B and a
 // live "A ⇄ B" preview sits above the CTA. Only first-round, unplayed teams are passed in.
 export function SwapBracketModal({ visible, onClose, teams, onConfirm, busy }: SwapBracketModalProps) {
+    const { t } = useTranslation('tournament');
     const [selected, setSelected] = useState<string[]>([]);
 
     // Reset the selection whenever the sheet is (re)opened.
@@ -52,8 +54,8 @@ export function SwapBracketModal({ visible, onClose, teams, onConfirm, busy }: S
                                 <Ionicons name="swap-horizontal" size={18} color="#818CF8" />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-lg font-black text-white">Swap bracket positions</Text>
-                                <Text className="text-[11px] text-slate-500 mt-0.5">Pick two teams to exchange their spots. Works only before their matches are played.</Text>
+                                <Text className="text-lg font-black text-white">{t('swapBracket.title')}</Text>
+                                <Text className="text-[11px] text-slate-500 mt-0.5">{t('swapBracket.subtitle')}</Text>
                             </View>
                             <Pressable onPress={busy ? undefined : onClose} className="w-8 h-8 items-center justify-center rounded-full bg-white/[0.04]">
                                 <Ionicons name="close" size={18} color="#94A3B8" />
@@ -64,7 +66,7 @@ export function SwapBracketModal({ visible, onClose, teams, onConfirm, busy }: S
                     {/* Team list */}
                     <ScrollView className="px-4 py-3" contentContainerStyle={{ gap: 8 }}>
                         {teams.length === 0 ? (
-                            <Text className="text-slate-500 text-center py-8 px-6">No swappable teams — first-round matches have already been played. Reset the bracket to re-seed.</Text>
+                            <Text className="text-slate-500 text-center py-8 px-6">{t('swapBracket.noSwappable')}</Text>
                         ) : (
                             teams.map((t) => {
                                 const role = t.id === selected[0] ? 'A' : t.id === selected[1] ? 'B' : null;
@@ -98,9 +100,9 @@ export function SwapBracketModal({ visible, onClose, teams, onConfirm, busy }: S
                     {/* Footer: live preview + CTA */}
                     <View className="px-6 pt-3 pb-7 border-t border-white/[0.05] gap-3">
                         <View className="flex-row items-center justify-center gap-2 min-h-[20px]">
-                            <Text className="text-sm font-bold text-indigo-300" numberOfLines={1}>{a?.name ?? 'Team A'}</Text>
+                            <Text className="text-sm font-bold text-indigo-300" numberOfLines={1}>{a?.name ?? t('swapBracket.teamA')}</Text>
                             <Ionicons name="swap-horizontal" size={16} color="#64748B" />
-                            <Text className="text-sm font-bold text-indigo-300" numberOfLines={1}>{b?.name ?? 'Team B'}</Text>
+                            <Text className="text-sm font-bold text-indigo-300" numberOfLines={1}>{b?.name ?? t('swapBracket.teamB')}</Text>
                         </View>
                         <Pressable
                             onPress={() => { if (ready) onConfirm(a!.id, b!.id); }}
@@ -111,7 +113,7 @@ export function SwapBracketModal({ visible, onClose, teams, onConfirm, busy }: S
                             {busy
                                 ? <ActivityIndicator size="small" color="#FFFFFF" />
                                 : <Ionicons name="swap-horizontal" size={16} color={ready ? '#FFFFFF' : '#64748B'} />}
-                            <Text className="text-sm font-black" style={{ color: ready ? '#FFFFFF' : '#64748B' }}>Swap positions</Text>
+                            <Text className="text-sm font-black" style={{ color: ready ? '#FFFFFF' : '#64748B' }}>{t('swapBracket.swapPositions')}</Text>
                         </Pressable>
                     </View>
                 </View>

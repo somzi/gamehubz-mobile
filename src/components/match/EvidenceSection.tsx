@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -37,12 +38,13 @@ export function EvidenceSection({
     children,
     className,
 }: EvidenceSectionProps) {
+    const { t } = useTranslation('match');
     // Collapsed-state recap: what's here, or — when there's nothing — what it's for.
     const summary = pendingCount > 0
-        ? `${pendingCount} ready to upload`
+        ? t('evidence.readyToUpload', { count: pendingCount })
         : uploadedCount > 0
-            ? `${uploadedCount} screenshot${uploadedCount === 1 ? '' : 's'} attached`
-            : 'Add screenshots of the result';
+            ? t('evidence.attached', { count: uploadedCount })
+            : t('evidence.addScreenshots');
 
     return (
         <Animated.View
@@ -58,7 +60,7 @@ export function EvidenceSection({
                 </View>
                 <View className="flex-1 mr-1">
                     <View className="flex-row items-center gap-2">
-                        <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Evidence</Text>
+                        <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">{t('evidence.evidence')}</Text>
                         {uploadedCount > 0 && (
                             <View className="bg-white/[0.06] px-2 py-0.5 rounded-full">
                                 <Text className="text-[9px] font-black text-slate-400">{uploadedCount}</Text>
@@ -80,7 +82,7 @@ export function EvidenceSection({
                         className="flex-row items-center bg-primary/10 border border-primary/20 px-2.5 py-1.5 rounded-xl active:opacity-70"
                     >
                         <Ionicons name="add" size={14} color={COLORS.primary} />
-                        <Text className="text-[10px] font-black text-primary ml-1 uppercase tracking-wider">Add</Text>
+                        <Text className="text-[10px] font-black text-primary ml-1 uppercase tracking-wider">{t('evidence.add')}</Text>
                     </Pressable>
                 )}
                 <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={COLORS.slate600} />

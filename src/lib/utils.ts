@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -18,8 +19,8 @@ export function formatDateTimeShort(dateStr?: string | null, separator = ', '): 
     if (!dateStr) return '';
     const d = parseUtcDate(dateStr);
     if (isNaN(d.getTime())) return '';
-    const day = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const day = d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
     return `${day}${separator}${time}`;
 }
 
@@ -30,9 +31,9 @@ export function formatLocalDateTime(dateStr?: string | null): string {
     if (!dateStr) return '';
     const d = parseUtcDate(dateStr);
     if (isNaN(d.getTime())) return '';
-    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
     const isToday = d.toDateString() === new Date().toDateString();
-    return isToday ? time : `${d.toLocaleDateString()} ${time}`;
+    return isToday ? time : `${d.toLocaleDateString(i18n.language)} ${time}`;
 }
 
 // Schedule picker values are dual-format: the backend sends UTC ISO ("…Z"), while the
@@ -46,18 +47,20 @@ export function formatSchedulePickerValue(value?: string | null): { date: string
     const d = new Date(String(value).replace(' ', 'T'));
     if (isNaN(d.getTime())) return null;
     return {
-        date: d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }),
-        time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+        date: d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' }),
+        time: d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false }),
     };
 }
 
 // Safely format a backend date string for display. Returns the fallback if the
 // input is missing or unparseable — avoids "Invalid Date" leaking into UI.
-export function formatDateSafe(dateStr: string | null | undefined, fallback: string = 'TBD'): string {
-    if (!dateStr) return fallback;
+export function formatDateSafe(dateStr: string | null | undefined, fallback?: string): string {
+    // Display-only fallback. Callers that rely on 'TBD' as a *sentinel* pass it explicitly.
+    const shown = fallback ?? i18n.t('common:app.tbd');
+    if (!dateStr) return shown;
     const d = parseUtcDate(dateStr);
-    if (isNaN(d.getTime())) return fallback;
-    return d.toLocaleDateString();
+    if (isNaN(d.getTime())) return shown;
+    return d.toLocaleDateString(i18n.language);
 }
 
 // Backend PrizeCurrency enum:  1=EUR, 2=USD, 3=StarPass, 4=FCP

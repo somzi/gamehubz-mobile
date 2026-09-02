@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +27,8 @@ const DISCORD_BLURPLE = '#5865F2';
 type ManageUserSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ManageUserSocialsScreen() {
+    const { t } = useTranslation('socials');
+    const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<ManageUserSocialsNavigationProp>();
     const { user, saveUserSocial, deleteUserSocial, refreshUser } = useAuth();
 
@@ -86,7 +89,7 @@ export default function ManageUserSocialsScreen() {
         } catch (error) {
             console.error('Error starting Discord link:', error);
             awaitingDiscordLink.current = false;
-            showDiscordError('Could not start the Discord connection. Try again later.');
+            showDiscordError(t('startFailed'));
         } finally {
             setIsConnectingDiscord(false);
         }
@@ -104,7 +107,7 @@ export default function ManageUserSocialsScreen() {
             await refreshUser();
         } catch (error) {
             console.error('Error toggling Discord DMs:', error);
-            showDiscordError('Could not update DM notifications. Try again later.');
+            showDiscordError(t('dmUpdateFailed'));
         } finally {
             setIsTogglingDm(false);
         }
@@ -122,7 +125,7 @@ export default function ManageUserSocialsScreen() {
             await refreshUser();
         } catch (error) {
             console.error('Error toggling Discord profile visibility:', error);
-            showDiscordError('Could not update profile visibility. Try again later.');
+            showDiscordError(t('visibilityUpdateFailed'));
         } finally {
             setIsTogglingShow(false);
         }
@@ -138,7 +141,7 @@ export default function ManageUserSocialsScreen() {
             setShowDisconnectConfirm(false);
         } catch (error) {
             console.error('Error disconnecting Discord:', error);
-            showDiscordError('Could not disconnect Discord. Try again later.');
+            showDiscordError(t('unlinkFailed'));
         } finally {
             setIsDisconnecting(false);
         }
@@ -182,17 +185,17 @@ export default function ManageUserSocialsScreen() {
     const handleAddSocial = async () => {
         if (isSaving) return;
         if (!newSocialType) {
-            setStatusModalConfig({ type: 'error', title: 'Missing Platform', message: 'Please select a social platform' });
+            setStatusModalConfig({ type: 'error', title: t('missingPlatform'), message: t('missingPlatformMessage') });
             setShowStatusModal(true);
             return;
         }
         if (!newSocialUsername.trim()) {
-            setStatusModalConfig({ type: 'error', title: 'Missing Username', message: 'Please enter your username/handle' });
+            setStatusModalConfig({ type: 'error', title: t('missingUsername'), message: t('missingUsernameMessage') });
             setShowStatusModal(true);
             return;
         }
         if (user?.userSocials?.some(s => s.socialType === newSocialType)) {
-            setStatusModalConfig({ type: 'error', title: 'Platform Exists', message: 'You have already added this platform.' });
+            setStatusModalConfig({ type: 'error', title: t('platformExists'), message: t('platformExistsUser') });
             setShowStatusModal(true);
             return;
         }
@@ -204,7 +207,7 @@ export default function ManageUserSocialsScreen() {
                 setNewSocialType(undefined);
                 setNewSocialUsername('');
             } else {
-                setStatusModalConfig({ type: 'error', title: 'Failed', message: 'Failed to add social account' });
+                setStatusModalConfig({ type: 'error', title: t('failed'), message: t('addFailed') });
                 setShowStatusModal(true);
             }
         } finally {
@@ -216,19 +219,19 @@ export default function ManageUserSocialsScreen() {
         if (!social.id) return;
         if (removingId === social.id) return;
         Alert.alert(
-            'Remove Social Account',
-            `Are you sure you want to remove your ${getSocialLabel(social.socialType!)} account?`,
+            t('removeTitle'),
+            t('removeUserMessage', { platform: getSocialLabel(social.socialType!) }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: tCommon('remove'),
                     style: 'destructive',
                     onPress: async () => {
                         setRemovingId(social.id!);
                         try {
                             const success = await deleteUserSocial(social.id!);
                             if (!success) {
-                                setStatusModalConfig({ type: 'error', title: 'Failed', message: 'Failed to remove social account' });
+                                setStatusModalConfig({ type: 'error', title: t('failed'), message: t('removeFailed') });
                                 setShowStatusModal(true);
                             }
                         } finally {
@@ -244,7 +247,7 @@ export default function ManageUserSocialsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Manage Socials" showBack />
+            <PageHeader title={t('manageSocials')} showBack />
             {/* Screen is edges={['top']}, so the nav-bar strip is ours to add. */}
             <KeyboardAvoider bottomInset="none">
                 <ScrollView className="flex-1 px-4 py-6" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -262,14 +265,14 @@ export default function ManageUserSocialsScreen() {
                                 <View className="flex-1">
                                     {user?.discordUsername ? (
                                         <>
-                                            <Text className="text-sm font-bold text-white">Discord connected</Text>
+                                            <Text className="text-sm font-bold text-white">{t('discordConnected')}</Text>
                                             <Text className="text-xs text-slate-500">@{user.discordUsername}</Text>
                                         </>
                                     ) : (
                                         <>
-                                            <Text className="text-sm font-bold text-white">Connect Discord</Text>
+                                            <Text className="text-sm font-bold text-white">{t('connectDiscord')}</Text>
                                             <Text className="text-xs text-slate-500 mt-0.5">
-                                                Get match reminders and messages as Discord DMs
+                                                {t('connectDiscordHint')}
                                             </Text>
                                         </>
                                     )}
@@ -289,9 +292,9 @@ export default function ManageUserSocialsScreen() {
                                 <>
                                     <View className="flex-row items-center justify-between mt-4 pt-4 border-t border-white/5">
                                         <View className="flex-1 pr-3">
-                                            <Text className="text-sm font-bold text-white">DM notifications</Text>
+                                            <Text className="text-sm font-bold text-white">{t('dmNotifications')}</Text>
                                             <Text className="text-xs text-slate-500 mt-0.5">
-                                                Match reminders and messages from the GameHubz bot
+                                                {t('dmNotificationsHint')}
                                             </Text>
                                         </View>
                                         <Toggle
@@ -304,9 +307,9 @@ export default function ManageUserSocialsScreen() {
                                     </View>
                                     <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-white/5">
                                         <View className="flex-1 pr-3">
-                                            <Text className="text-sm font-bold text-white">Show on profile</Text>
+                                            <Text className="text-sm font-bold text-white">{t('showOnProfile')}</Text>
                                             <Text className="text-xs text-slate-500 mt-0.5">
-                                                Let others open your Discord from your public profile
+                                                {t('showOnProfileHint')}
                                             </Text>
                                         </View>
                                         <Toggle
@@ -329,7 +332,7 @@ export default function ManageUserSocialsScreen() {
                                     >
                                         <View className="flex-row items-center gap-2">
                                             <Ionicons name="logo-discord" size={16} color="white" />
-                                            <Text className="text-white font-bold">Connect Discord</Text>
+                                            <Text className="text-white font-bold">{t('connectDiscord')}</Text>
                                         </View>
                                     </Button>
                                 </View>
@@ -339,7 +342,7 @@ export default function ManageUserSocialsScreen() {
 
                     {/* Connected Accounts */}
                     <View className="mb-6">
-                        <SectionLabel icon="share-social" title="Connected Accounts" color={COLORS.info} />
+                        <SectionLabel icon="share-social" title={t('connectedAccounts')} color={COLORS.info} />
 
                         {socials.length > 0 ? (
                             <View className="gap-3">
@@ -375,18 +378,18 @@ export default function ManageUserSocialsScreen() {
                             <EmptyState
                                 icon="share-social-outline"
                                 color={COLORS.info}
-                                title="No social accounts yet"
-                                description="Add your social links below"
+                                title={t('noAccountsYet')}
+                                description={t('addYourLinksHint')}
                             />
                         )}
                     </View>
 
                     {/* Add New Account */}
                     <View className="mb-8">
-                        <SectionLabel icon="add-circle" title="Add Account" />
+                        <SectionLabel icon="add-circle" title={t('addAccount')} />
                         <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <SelectInput
-                                placeholder="Select Platform"
+                                placeholder={t('selectPlatform')}
                                 options={socialTypeOptions}
                                 value={newSocialType}
                                 onSelect={setNewSocialType}
@@ -396,7 +399,7 @@ export default function ManageUserSocialsScreen() {
                             {newSocialType && (
                                 <View className="mb-3">
                                     <Input
-                                        placeholder="Username / Handle"
+                                        placeholder={t('usernameHandle')}
                                         value={newSocialUsername}
                                         onChangeText={setNewSocialUsername}
                                     />
@@ -412,7 +415,7 @@ export default function ManageUserSocialsScreen() {
                             >
                                 <View className="flex-row items-center gap-2">
                                     <Ionicons name="add" size={16} color="white" />
-                                    <Text className="text-white font-bold">Add Account</Text>
+                                    <Text className="text-white font-bold">{t('addAccount')}</Text>
                                 </View>
                             </Button>
                         </View>
@@ -432,10 +435,10 @@ export default function ManageUserSocialsScreen() {
                 visible={showDisconnectConfirm}
                 onClose={() => setShowDisconnectConfirm(false)}
                 onConfirm={handleDisconnectDiscord}
-                title="Disconnect Discord"
-                message={`Disconnect @${user?.discordUsername || ''} from your GameHubz account? You'll stop receiving Discord DM notifications.`}
-                confirmText="Disconnect"
-                cancelText="Cancel"
+                title={t('disconnectDiscord')}
+                message={t('disconnectMessage', { username: user?.discordUsername || '' })}
+                confirmText={t('disconnect')}
+                cancelText={tCommon('cancel')}
                 isDestructive
                 isLoading={isDisconnecting}
             />

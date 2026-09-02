@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
 import { mergeMessagesById } from '../../lib/mergeMessages';
 import { cn, parseUtcDate } from '../../lib/utils';
+import i18n from '../../i18n';
 
 // Initial page size — load a screenful fast; older messages page in on demand.
 const PAGE_SIZE = 30;
@@ -34,6 +36,7 @@ interface MatchChatPanelProps {
  * admins opening a match from the bracket get the same conversation.
  */
 export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false }: MatchChatPanelProps) {
+    const { t } = useTranslation('match');
     const { user } = useAuth();
     const { refresh: refreshBadges } = useBadges();
     const [comments, setComments] = useState<MatchComment[]>([]);
@@ -157,7 +160,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             const mapped: MatchComment = {
                 id: newMessage.id || newMessage.Id,
                 userId: newMessage.userId || newMessage.UserId,
-                userNickname: newMessage.userNickname || newMessage.UserNickname || 'Unknown',
+                userNickname: newMessage.userNickname || newMessage.UserNickname || t('common:unknown'),
                 userAvatarUrl: newMessage.userAvatarUrl || newMessage.UserAvatarUrl,
                 content: newMessage.content || newMessage.Content,
                 sentAt: newMessage.sentAt || newMessage.SentAt,
@@ -236,9 +239,9 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     // messages not sent today, so same-day chat stays compact.
     const formatCommentTime = (dateString: string) => {
         const date = parseUtcDate(dateString);
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const time = date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
         const isToday = date.toDateString() === new Date().toDateString();
-        return isToday ? time : `${date.toLocaleDateString()} ${time}`;
+        return isToday ? time : `${date.toLocaleDateString(i18n.language)} ${time}`;
     };
 
     return (
@@ -281,7 +284,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                                     <ActivityIndicator size="small" color="#10B981" />
                                 ) : (
                                     <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                                        Load earlier messages
+                                        {t('chatPanel.loadEarlier')}
                                     </Text>
                                 )}
                             </Pressable>
@@ -292,8 +295,8 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                             <View className="w-14 h-14 rounded-full bg-white/[0.03] border border-white/10 items-center justify-center mb-3">
                                 <Ionicons name="chatbubble-outline" size={24} color="#475569" />
                             </View>
-                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">No messages yet</Text>
-                            <Text className="text-[11px] text-slate-600 mt-1">Say hi to get the conversation going.</Text>
+                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">{t('chatPanel.noMessagesYet')}</Text>
+                            <Text className="text-[11px] text-slate-600 mt-1">{t('chatPanel.sayHi')}</Text>
                         </View>
                     }
                     renderItem={({ item: comment }) => {
@@ -328,7 +331,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                                         )}
                                         {isAdminMessage && !isMyComment && (
                                             <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
-                                                <Text className="text-[8px] font-black text-warning uppercase tracking-widest">Admin</Text>
+                                                <Text className="text-[8px] font-black text-warning uppercase tracking-widest">{t('chatPanel.admin')}</Text>
                                             </View>
                                         )}
                                         <Text className="text-[9px] font-bold text-slate-500">
@@ -344,7 +347,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                                 {isMyComment && (
                                     <PlayerAvatar
                                         src={user?.avatarUrl}
-                                        name={user?.username || 'You'}
+                                        name={user?.username || t('chatPanel.you')}
                                         size="sm"
                                         className="w-7 h-7 shrink-0"
                                     />
@@ -361,7 +364,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     <View className="flex-row items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.03] border border-white/10">
                         <Ionicons name="lock-closed-outline" size={13} color="#64748B" />
                         <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                            Match completed — chat is read-only
+                            {t('chatPanel.readOnly')}
                         </Text>
                     </View>
                 </View>
@@ -371,7 +374,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     <TextInput
                         ref={inputRef}
                         className="flex-1 px-4 py-3 text-white font-medium"
-                        placeholder="Type a message..."
+                        placeholder={t('chatPanel.typeAMessage')}
                         placeholderTextColor="#64748B"
                         value={newComment}
                         onChangeText={setNewComment}

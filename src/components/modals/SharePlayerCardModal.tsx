@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
@@ -48,6 +49,7 @@ function PlayerCardPoster({ name, avatarUrl, stats, width }: {
     stats: PlayerCardStats;
     width: number;
 }) {
+    const { t } = useTranslation('common');
     const rate = Math.max(0, Math.min(100, Math.round(stats.winRate)));
     const filled = (rate / 100) * DONUT_CIRCUMFERENCE;
     const initial = (name || 'G').trim().charAt(0).toUpperCase() || 'G';
@@ -86,7 +88,7 @@ function PlayerCardPoster({ name, avatarUrl, stats, width }: {
 
                 {/* Matches | win-rate donut | trophies */}
                 <View style={{ marginTop: 26, flexDirection: 'row', alignItems: 'center' }}>
-                    <SideStat icon="game-controller" iconColor="rgba(45,212,237,0.65)" value={stats.matches} label="MATCHES" />
+                    <SideStat icon="game-controller" iconColor="rgba(45,212,237,0.65)" value={stats.matches} label={t('share.statMatches')} />
                     <StatDivider />
                     <View style={{ width: DONUT_SIZE, height: DONUT_SIZE, marginHorizontal: 8 }}>
                         <Svg width={DONUT_SIZE} height={DONUT_SIZE} viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}>
@@ -122,17 +124,17 @@ function PlayerCardPoster({ name, avatarUrl, stats, width }: {
                         </Svg>
                         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
                             <Text style={{ fontSize: 26, fontWeight: '800', color: '#F8FAFC', lineHeight: 28 }}>{rate}%</Text>
-                            <Text style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1.4, color: '#64748B', marginTop: 2 }}>WIN RATE</Text>
+                            <Text style={{ fontSize: 9, fontWeight: '700', letterSpacing: 1.4, color: '#64748B', marginTop: 2 }}>{t('app.winRate')}</Text>
                         </View>
                     </View>
                     <StatDivider />
-                    <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={stats.trophies} label="TROPHIES" valueColor="#FBBF24" />
+                    <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={stats.trophies} label={t('share.statTrophies')} valueColor="#FBBF24" />
                 </View>
 
                 <View style={{ marginTop: 24, flexDirection: 'row', gap: 10 }}>
-                    <StatPill value={stats.wins} label="WINS" background="rgba(52,211,153,0.08)" border="rgba(52,211,153,0.22)" valueColor="#34D399" labelColor="rgba(52,211,153,0.7)" />
-                    <StatPill value={stats.draws} label="DRAWS" background="rgba(148,163,184,0.06)" border="rgba(148,163,184,0.18)" valueColor="#94A3B8" labelColor="#64748B" />
-                    <StatPill value={stats.losses} label="LOSSES" background="rgba(248,113,113,0.07)" border="rgba(248,113,113,0.22)" valueColor="#F87171" labelColor="rgba(248,113,113,0.7)" />
+                    <StatPill value={stats.wins} label={t('share.statWins')} background="rgba(52,211,153,0.08)" border="rgba(52,211,153,0.22)" valueColor="#34D399" labelColor="rgba(52,211,153,0.7)" />
+                    <StatPill value={stats.draws} label={t('share.statDraws')} background="rgba(148,163,184,0.06)" border="rgba(148,163,184,0.18)" valueColor="#94A3B8" labelColor="#64748B" />
+                    <StatPill value={stats.losses} label={t('share.statLosses')} background="rgba(248,113,113,0.07)" border="rgba(248,113,113,0.22)" valueColor="#F87171" labelColor="rgba(248,113,113,0.7)" />
                 </View>
             </CardFrame>
 
@@ -142,12 +144,13 @@ function PlayerCardPoster({ name, avatarUrl, stats, width }: {
 }
 
 export function SharePlayerCardModal({ visible, onClose, playerId, name, avatarUrl, stats }: SharePlayerCardModalProps) {
+    const { t } = useTranslation('common');
     return (
         <ShareCardShell
             visible={visible}
             onClose={onClose}
-            headerTitle="Player Card"
-            dialogTitle={`${name} — GameHubz player card`}
+            headerTitle={t('app.playerCard')}
+            dialogTitle={t('app.playerDialogTitle', { name })}
             fileName={name || 'player'}
             onShareLink={() => shareUser(playerId, name)}
             renderPoster={(width) => (

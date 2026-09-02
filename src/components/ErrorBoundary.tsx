@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,14 +43,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
     render() {
         if (!this.state.error) return this.props.children;
 
-        const message = this.state.error.message || 'The app hit an unexpected error.';
+        const message = this.state.error.message || i18n.t('common:app.unexpectedCrash');
         return (
             <View className="flex-1 bg-background items-center justify-center px-6">
                 <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
                     <Ionicons name="warning" size={28} color="#EF4444" />
                 </View>
                 <Text className="text-lg font-black text-white mb-2 text-center">
-                    Something went wrong
+                    {i18n.t('common:app.somethingWentWrong')}
                 </Text>
                 <Text className="text-xs text-slate-500 text-center mb-6 leading-5">
                     {message}
@@ -58,10 +59,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
                     onPress={this.reset}
                     className="px-6 py-3 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 active:opacity-70"
                 >
-                    <Text className="text-sm font-bold text-indigo-300">Try Again</Text>
+                    <Text className="text-sm font-bold text-indigo-300">{i18n.t('common:app.tryAgain')}</Text>
                 </Pressable>
                 <Text className="text-[10px] text-slate-700 text-center mt-8 leading-4">
-                    If this keeps happening, please close and reopen the app.
+                    {i18n.t('common:app.keepsHappening')}
                 </Text>
             </View>
         );

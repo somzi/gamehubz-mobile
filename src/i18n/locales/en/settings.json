@@ -1,0 +1,47 @@
+{
+  "title": "Settings",
+  "sections": {
+    "notifications": "Notifications",
+    "account": "Account",
+    "preferences": "Preferences",
+    "support": "Support",
+    "accountActions": "Account Actions"
+  },
+  "editProfile": "Edit Profile Info",
+  "manageSocials": "Manage Socials",
+  "passwordSecurity": "Password & Security",
+  "language": "Language",
+  "helpCenter": "Help Center",
+  "contactUs": "Contact Us",
+  "aboutUs": "About Us",
+  "logOut": "Log Out",
+  "deleteAccount": "Delete Account",
+  "version": "GameHubz Mobile v{{version}}",
+  "languagePicker": {
+    "title": "Language",
+    "subtitle": "Choose your app language"
+  },
+  "logOutConfirm": {
+    "title": "Log Out",
+    "message": "Are you sure you want to log out?"
+  },
+  "deleteConfirm": {
+    "title": "Delete Account",
+    "message": "Are you sure you want to delete your account? This action is permanent and cannot be undone."
+  },
+  "deleteSuccess": {
+    "title": "Account Deleted",
+    "message": "Your account has been successfully deleted."
+  },
+  "deleteFailed": {
+    "title": "Delete Failed",
+    "message": "Failed to delete your account. Please try again later."
+  },
+  "notifications": {
+    "moderatedChats": "Chats I moderate",
+    "moderatedChatsHint": "Alert me when players reply in a match chat I joined as an organizer. Chats on your own matches are never silenced by this.",
+    "perMatchHint": "To silence one specific match instead, open its chat and tap Muted.",
+    "saveFailedTitle": "Could not save",
+    "saveFailedMessage": "Your notification setting was not updated. Try again in a moment."
+  }
+}

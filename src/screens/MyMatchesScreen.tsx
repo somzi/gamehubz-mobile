@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 import { parseUtcDate } from '../lib/utils';
+import i18n from '../i18n';
 
 interface MatchOverviewDto {
     id: string;
@@ -29,6 +31,7 @@ interface MatchOverviewDto {
 }
 
 export default function MyMatchesScreen() {
+    const { t } = useTranslation('match');
     const navigation = useNavigation();
     const { user } = useAuth();
     const [matches, setMatches] = useState<MatchOverviewDto[]>([]);
@@ -84,15 +87,15 @@ export default function MyMatchesScreen() {
     const pendingCount = matches.filter(m => !m.scheduledTime).length;
 
     const tabs: PremiumTabItem[] = [
-        { value: 'all', label: 'All', icon: 'apps' },
-        { value: 'pending', label: 'Pending', icon: 'time', badge: pendingCount > 0 ? pendingCount : undefined },
-        { value: 'scheduled', label: 'Scheduled', icon: 'calendar' },
+        { value: 'all', label: t('myMatches.tabAll'), icon: 'apps' },
+        { value: 'pending', label: t('myMatches.tabPending'), icon: 'time', badge: pendingCount > 0 ? pendingCount : undefined },
+        { value: 'scheduled', label: t('myMatches.tabScheduled'), icon: 'calendar' },
     ];
 
     return (
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader
-                title="My Matches"
+                title={t('myMatches.title')}
                 showBack={true}
             />
 
@@ -130,7 +133,7 @@ export default function MyMatchesScreen() {
                                 status={!match.scheduledTime ? 'pending_availability' : match.status === 3 ? 'completed' : 'scheduled'}
                                 // parseUtcDate, not new Date(): backend timestamps carry no Z, so
                                 // raw parsing read the UTC clock as local and showed a shifted time.
-                                scheduledTime={match.scheduledTime ? parseUtcDate(match.scheduledTime).toLocaleString() : undefined}
+                                scheduledTime={match.scheduledTime ? parseUtcDate(match.scheduledTime).toLocaleString(i18n.language) : undefined}
                                 scheduledTimeIso={match.scheduledTime}
                                 deadline={match.roundDeadline ?? undefined}
                                 onMatchUpdate={fetchMatches}
@@ -142,8 +145,8 @@ export default function MyMatchesScreen() {
                     ) : (
                         <EmptyState
                             icon="game-controller-outline"
-                            title="No matches found"
-                            description="Check back later or join a tournament"
+                            title={t('myMatches.noneFound')}
+                            description={t('myMatches.noneFoundHint')}
                         />
                     )}
                 </View>

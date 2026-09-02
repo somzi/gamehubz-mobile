@@ -2,13 +2,19 @@ import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { MenuItem } from '../ui/MenuItem';
 import { PressableScale } from '../ui/PressableScale';
+import { COLORS } from '../../lib/theme';
 
 export interface ActionSheetAction {
     label: string;
-    icon: keyof typeof Ionicons.glyphMap;
+    icon?: keyof typeof Ionicons.glyphMap;
+    /** Leading glyph rendered instead of `icon` — e.g. a flag in the language picker. */
+    emoji?: string;
     destructive?: boolean;
+    /** Marks the active choice with a trailing check, for sheets used as a picker. */
+    selected?: boolean;
     onPress: () => void;
 }
 
@@ -35,6 +41,7 @@ export function ActionSheetModal({
     actions,
 }: ActionSheetModalProps) {
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation('common');
 
     const run = (action: () => void) => {
         onClose();
@@ -82,10 +89,16 @@ export function ActionSheetModal({
                                 <MenuItem
                                     key={action.label}
                                     icon={action.icon}
+                                    emoji={action.emoji}
                                     label={action.label}
                                     onPress={() => run(action.onPress)}
                                     showChevron={false}
                                     isLast={i === regular.length - 1}
+                                    rightElement={
+                                        action.selected ? (
+                                            <Ionicons name="checkmark" size={18} color={COLORS.primary} />
+                                        ) : undefined
+                                    }
                                 />
                             ))}
                         </View>
@@ -97,6 +110,7 @@ export function ActionSheetModal({
                                 <MenuItem
                                     key={action.label}
                                     icon={action.icon}
+                                    emoji={action.emoji}
                                     label={action.label}
                                     onPress={() => run(action.onPress)}
                                     destructive
@@ -111,7 +125,7 @@ export function ActionSheetModal({
                         onPress={onClose}
                         className="h-14 rounded-2xl bg-white/[0.05] border border-white/[0.08] items-center justify-center"
                     >
-                        <Text className="text-white font-bold text-[15px]">Cancel</Text>
+                        <Text className="text-white font-bold text-[15px]">{t('cancel')}</Text>
                     </PressableScale>
                 </View>
             </View>

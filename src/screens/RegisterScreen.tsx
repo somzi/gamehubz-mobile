@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,18 +19,20 @@ import { CountryPicker } from '../components/ui/CountryPicker';
 import { getCountries, getRegionName } from '../lib/countries';
 import { StatusModal } from '../components/modals/StatusModal';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { LanguageToggle } from '../components/ui/LanguageToggle';
 
 export default function RegisterScreen() {
+    const { t } = useTranslation('auth');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { register, login, isLoading } = useAuth();
 
     const regionOptions = [
-        { label: 'North America', value: RegionType.NA },
-        { label: 'Europe', value: RegionType.EUROPE },
-        { label: 'Asia', value: RegionType.ASIA },
-        { label: 'South America', value: RegionType.SA },
-        { label: 'Africa', value: RegionType.AFRICA },
-        { label: 'Oceania', value: RegionType.OCEANIA },
+        { label: t('region.northAmerica'), value: RegionType.NA },
+        { label: t('region.europe'), value: RegionType.EUROPE },
+        { label: t('region.asia'), value: RegionType.ASIA },
+        { label: t('region.southAmerica'), value: RegionType.SA },
+        { label: t('region.africa'), value: RegionType.AFRICA },
+        { label: t('region.oceania'), value: RegionType.OCEANIA },
     ];
 
     // Form state
@@ -77,14 +80,14 @@ export default function RegisterScreen() {
 
     const validate = () => {
         const newErrors: Partial<typeof formData> = {};
-        if (!formData.username) newErrors.username = 'Username is required';
-        if (!formData.nickName) newErrors.nickName = 'Nickname is required' as any;
-        if (!formData.email) newErrors.email = 'Email is required';
-        if (!formData.password) newErrors.password = 'Password is required';
-        if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
-        if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+        if (!formData.username) newErrors.username = t('register.usernameRequired');
+        if (!formData.nickName) newErrors.nickName = t('register.nicknameRequired') as any;
+        if (!formData.email) newErrors.email = t('register.emailRequired');
+        if (!formData.password) newErrors.password = t('register.passwordRequired');
+        if (formData.password.length < 6) newErrors.password = t('register.passwordMinLength');
+        if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = t('register.passwordsDoNotMatch');
         // Region is required only when no country is chosen (country dictates region).
-        if (!formData.country && formData.region === undefined) newErrors.region = 'Region or country is required' as any;
+        if (!formData.country && formData.region === undefined) newErrors.region = t('register.regionRequired') as any;
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -121,16 +124,16 @@ export default function RegisterScreen() {
             // Account created but auto-login failed (e.g. needs verification) — send to Login.
             setStatusModalConfig({
                 type: 'success',
-                title: 'Account Created',
-                message: 'Your account has been successfully created. Please log in.',
+                title: t('register.createdTitle'),
+                message: t('register.createdMessage'),
                 onClose: () => navigation.navigate('Login')
             });
             setShowStatusModal(true);
         } else {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Registration Failed',
-                message: result.message || 'Unable to create account. Please try again.'
+                title: t('register.failedTitle'),
+                message: result.message || t('register.failedMessage')
             });
             setShowStatusModal(true);
         }
@@ -151,23 +154,31 @@ export default function RegisterScreen() {
                     className="px-6"
                     showsVerticalScrollIndicator={false}
                 >
+                    {/* Language first, before a single field is filled in: the whole form
+                        re-renders in the chosen language, and the `Language` header on submit
+                        is what stamps the new account — so notifications start out right too.
+                        Anyone who changes their mind later does it in Settings. */}
+                    <View className="flex-row justify-end mt-5">
+                        <LanguageToggle />
+                    </View>
+
                     {/* ── Hero ── */}
-                    <View className="flex-row items-start mt-6 mb-8">
+                    <View className="flex-row items-start mt-4 mb-8">
                         <View className="flex-1 mr-4">
                             <View className="flex-row items-center gap-2 mb-3">
                                 <View className="w-1.5 h-1.5 rounded-full bg-primary" />
                                 <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px]">
-                                    GameHubz
+                                    {t('brand')}
                                 </Text>
                             </View>
                             <Text
                                 className="text-white font-black tracking-tight"
                                 style={{ fontSize: 34, lineHeight: 38 }}
                             >
-                                Create account
+                                {t('register.createAccount')}
                             </Text>
                             <Text className="text-slate-400 text-[13px] font-medium mt-3 leading-5">
-                                Join the community and start competing at the highest level
+                                {t('register.tagline')}
                             </Text>
                         </View>
                         <View className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center">
@@ -178,11 +189,11 @@ export default function RegisterScreen() {
                     <View className="w-full max-w-sm self-center gap-5">
                         {/* ── Account ── */}
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-4">
-                            <SectionLabel icon="at" title="Account" />
+                            <SectionLabel icon="at" title={t('register.sectionAccount')} />
                             <View className="gap-4">
                                 <Input
-                                    label="USERNAME"
-                                    placeholder="ProGamer123"
+                                    label={t('register.usernameLabel')}
+                                    placeholder={t('register.usernamePlaceholder')}
                                     value={formData.username}
                                     onChangeText={(text) => updateForm('username', text)}
                                     leftIcon="person-outline"
@@ -190,8 +201,8 @@ export default function RegisterScreen() {
                                 />
 
                                 <Input
-                                    label="NICKNAME"
-                                    placeholder="In-game nick"
+                                    label={t('register.nicknameLabel')}
+                                    placeholder={t('register.nicknamePlaceholder')}
                                     value={formData.nickName}
                                     onChangeText={(text) => updateForm('nickName', text)}
                                     leftIcon="id-card-outline"
@@ -199,8 +210,8 @@ export default function RegisterScreen() {
                                 />
 
                                 <Input
-                                    label="EMAIL ADDRESS"
-                                    placeholder="you@example.com"
+                                    label={t('emailAddress')}
+                                    placeholder={t('register.emailPlaceholder')}
                                     value={formData.email}
                                     onChangeText={(text) => updateForm('email', text)}
                                     autoCapitalize="none"
@@ -213,11 +224,11 @@ export default function RegisterScreen() {
 
                         {/* ── Player profile ── */}
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-4">
-                            <SectionLabel icon="earth" title="Player Profile" />
+                            <SectionLabel icon="earth" title={t('register.sectionPlayerProfile')} />
                             <View className="gap-4">
                                 <CountryPicker
-                                    label="COUNTRY (OPTIONAL)"
-                                    placeholder="Select your country"
+                                    label={t('register.countryLabel')}
+                                    placeholder={t('register.countryPlaceholder')}
                                     value={formData.country}
                                     onSelect={handleSelectCountry}
                                     error={errors.country as string | undefined}
@@ -232,8 +243,8 @@ export default function RegisterScreen() {
                                     </View>
                                 ) : (
                                     <SelectInput
-                                        label="REGION"
-                                        placeholder="Select your region"
+                                        label={t('register.regionLabel')}
+                                        placeholder={t('register.regionPlaceholder')}
                                         options={regionOptions}
                                         value={formData.region}
                                         onSelect={(val) => updateForm('region', val)}
@@ -246,16 +257,16 @@ export default function RegisterScreen() {
                                 <View className="flex-row gap-3">
                                     <View className="flex-1">
                                         <Input
-                                            label="FIRST NAME (OPT)"
-                                            placeholder="John"
+                                            label={t('register.firstNameLabel')}
+                                            placeholder={t('register.firstNamePlaceholder')}
                                             value={formData.firstName}
                                             onChangeText={(text) => updateForm('firstName', text)}
                                         />
                                     </View>
                                     <View className="flex-1">
                                         <Input
-                                            label="LAST NAME (OPT)"
-                                            placeholder="Doe"
+                                            label={t('register.lastNameLabel')}
+                                            placeholder={t('register.lastNamePlaceholder')}
                                             value={formData.lastName}
                                             onChangeText={(text) => updateForm('lastName', text)}
                                         />
@@ -266,10 +277,10 @@ export default function RegisterScreen() {
 
                         {/* ── Security ── */}
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-4">
-                            <SectionLabel icon="lock-closed" title="Security" />
+                            <SectionLabel icon="lock-closed" title={t('register.sectionSecurity')} />
                             <View className="gap-4">
                                 <Input
-                                    label="PASSWORD"
+                                    label={t('passwordLabel')}
                                     placeholder="••••••••"
                                     value={formData.password}
                                     onChangeText={(text) => updateForm('password', text)}
@@ -281,7 +292,7 @@ export default function RegisterScreen() {
                                 />
 
                                 <Input
-                                    label="CONFIRM PASSWORD"
+                                    label={t('register.confirmPasswordLabel')}
                                     placeholder="••••••••"
                                     value={formData.confirmPassword}
                                     onChangeText={(text) => updateForm('confirmPassword', text)}
@@ -299,15 +310,15 @@ export default function RegisterScreen() {
                             size="lg"
                         >
                             <View className="flex-row items-center justify-center gap-2">
-                                <Text className="text-primary-foreground font-black text-lg">Create Account</Text>
+                                <Text className="text-primary-foreground font-black text-lg">{t('register.createAccountButton')}</Text>
                                 <Ionicons name="chevron-forward" size={18} color={COLORS.primaryForeground} />
                             </View>
                         </Button>
 
                         <View className="flex-row items-center justify-center mt-2 mb-4">
-                            <Text className="text-slate-500">Already have an account? </Text>
+                            <Text className="text-slate-500">{t('register.haveAccount')}</Text>
                             <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-                                <Text className="text-primary font-black">Log In</Text>
+                                <Text className="text-primary font-black">{t('register.logIn')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

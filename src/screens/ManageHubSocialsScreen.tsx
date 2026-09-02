@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +23,8 @@ type ManageHubSocialsRouteProp = RouteProp<RootStackParamList, 'ManageHubSocials
 type ManageHubSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ManageHubSocialsScreen() {
+    const { t } = useTranslation('socials');
+    const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<ManageHubSocialsNavigationProp>();
     const route = useRoute<ManageHubSocialsRouteProp>();
     const { hubId } = route.params;
@@ -92,8 +95,8 @@ export default function ManageHubSocialsScreen() {
         if (!newSocialType) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Missing Platform',
-                message: 'Please select a social platform'
+                title: t('missingPlatform'),
+                message: t('missingPlatformMessage')
             });
             setShowStatusModal(true);
             return;
@@ -101,8 +104,8 @@ export default function ManageHubSocialsScreen() {
         if (!newSocialUsername.trim()) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Missing Username',
-                message: 'Please enter your username/handle'
+                title: t('missingUsername'),
+                message: t('missingUsernameMessage')
             });
             setShowStatusModal(true);
             return;
@@ -111,8 +114,8 @@ export default function ManageHubSocialsScreen() {
         if (hubSocials.some(s => s.socialType === newSocialType || s.type === newSocialType)) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Platform Exists',
-                message: 'This hub already has this platform added.'
+                title: t('platformExists'),
+                message: t('platformExistsHub')
             });
             setShowStatusModal(true);
             return;
@@ -136,15 +139,15 @@ export default function ManageHubSocialsScreen() {
                 await fetchHubSocials();
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Success',
-                    message: 'Social account added successfully'
+                    title: tCommon('success'),
+                    message: t('addedSuccess')
                 });
                 setShowStatusModal(true);
             } else {
                 setStatusModalConfig({
                     type: 'error',
-                    title: 'Failed',
-                    message: 'Failed to add social account'
+                    title: t('failed'),
+                    message: t('addFailed')
                 });
                 setShowStatusModal(true);
             }
@@ -152,8 +155,8 @@ export default function ManageHubSocialsScreen() {
             console.error('Error adding social:', error);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
-                message: 'An unexpected error occurred'
+                title: tCommon('error'),
+                message: tCommon('unexpectedError')
             });
             setShowStatusModal(true);
         } finally {
@@ -165,12 +168,12 @@ export default function ManageHubSocialsScreen() {
         if (!social.id) return;
 
         Alert.alert(
-            'Remove Social Account',
-            `Are you sure you want to remove ${getSocialLabel(social.socialType || social.type!)}?`,
+            t('removeTitle'),
+            t('removeHubMessage', { platform: getSocialLabel(social.socialType || social.type!) }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: tCommon('remove'),
                     style: 'destructive',
                     onPress: async () => {
                         try {
@@ -183,8 +186,8 @@ export default function ManageHubSocialsScreen() {
                             } else {
                                 setStatusModalConfig({
                                     type: 'error',
-                                    title: 'Failed',
-                                    message: 'Failed to remove social account'
+                                    title: t('failed'),
+                                    message: t('removeFailed')
                                 });
                                 setShowStatusModal(true);
                             }
@@ -192,8 +195,8 @@ export default function ManageHubSocialsScreen() {
                             console.error('Error removing social:', error);
                             setStatusModalConfig({
                                 type: 'error',
-                                title: 'Error',
-                                message: 'An unexpected error occurred'
+                                title: tCommon('error'),
+                                message: tCommon('unexpectedError')
                             });
                             setShowStatusModal(true);
                         }
@@ -206,7 +209,7 @@ export default function ManageHubSocialsScreen() {
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title="Manage Socials" showBack />
+                <PageHeader title={t('manageSocials')} showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
@@ -216,11 +219,11 @@ export default function ManageHubSocialsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <PageHeader title="Manage Hub Socials" showBack />
+            <PageHeader title={t('manageHubSocials')} showBack />
             <KeyboardAvoider>
                 <ScrollView className="flex-1 px-4 py-6" keyboardShouldPersistTaps="handled">
                     <View className="mb-6">
-                        <SectionLabel icon="share-social" title="Social Accounts" color={COLORS.warning} />
+                        <SectionLabel icon="share-social" title={t('socialAccounts')} color={COLORS.warning} />
 
                         {hubSocials && hubSocials.length > 0 ? (
                             <View className="gap-3">
@@ -254,17 +257,17 @@ export default function ManageHubSocialsScreen() {
                             <EmptyState
                                 icon="share-social-outline"
                                 color={COLORS.warning}
-                                title="No social accounts yet"
-                                description="Add your hub's social links below"
+                                title={t('noAccountsYet')}
+                                description={t('addHubLinksHint')}
                             />
                         )}
                     </View>
 
                     <View className="mb-8">
-                        <SectionLabel icon="add-circle" title="Add Account" />
+                        <SectionLabel icon="add-circle" title={t('addAccount')} />
                         <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
                             <SelectInput
-                                placeholder="Select Platform"
+                                placeholder={t('selectPlatform')}
                                 options={socialTypeOptions}
                                 value={newSocialType}
                                 onSelect={setNewSocialType}
@@ -274,7 +277,7 @@ export default function ManageHubSocialsScreen() {
                             {newSocialType && (
                                 <View className="mb-3">
                                     <Input
-                                        placeholder="Username / Handle"
+                                        placeholder={t('usernameHandle')}
                                         value={newSocialUsername}
                                         onChangeText={setNewSocialUsername}
                                     />
@@ -290,7 +293,7 @@ export default function ManageHubSocialsScreen() {
                             >
                                 <View className="flex-row items-center gap-2">
                                     <Ionicons name="add" size={16} color="white" />
-                                    <Text className="text-white font-bold">Add Account</Text>
+                                    <Text className="text-white font-bold">{t('addAccount')}</Text>
                                 </View>
                             </Button>
                         </View>

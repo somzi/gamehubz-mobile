@@ -61,8 +61,9 @@ import {
     requestJoinTeam,
     getTeamsToJoin
 } from '../lib/teamApi';
-import { TEAM_LABELS } from '../lib/teamConstants';
+import { useTranslation } from 'react-i18next';
 import type { TeamDto } from '../types/team';
+import i18n from '../i18n';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -158,6 +159,9 @@ const pickDefaultStageIndex = (stages: any[]): number => {
 
 export default function TournamentDetailsScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+    const { t } = useTranslation('tournament');
+    const { t: tCommon } = useTranslation('common');
+    const { t: tTeam } = useTranslation('team');
     const route = useRoute<TournamentDetailsRouteProp>();
     const { id } = route.params;
     const { tournamentApprovals, refresh: refreshBadges } = useBadges();
@@ -346,20 +350,20 @@ export default function TournamentDetailsScreen() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Failed to join tournament');
+                throw new Error(errorData.message || t('details.joinFailed'));
             }
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Congratulations!',
-                message: 'Successfully registered to the tournament!'
+                title: t('details.congratulations'),
+                message: t('details.registeredSuccess')
             });
             setShowStatusModal(true);
             fetchTournamentDetails(); // Refresh details
         } catch (err: any) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Join Failed',
+                title: t('details.joinFailedTitle'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -375,15 +379,15 @@ export default function TournamentDetailsScreen() {
                 await requestJoinTeam(teamId);
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Request Sent',
-                    message: 'Your join request was sent to the team captain!'
+                    title: t('details.requestSent'),
+                    message: t('details.requestSentMessage')
                 });
             } else {
                 await joinTeam(teamId);
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Success!',
-                    message: 'You have successfully joined the team!'
+                    title: t('details.successExclaim'),
+                    message: t('details.joinedTeam')
                 });
             }
             setShowStatusModal(true);
@@ -394,7 +398,7 @@ export default function TournamentDetailsScreen() {
         } catch (err: unknown) {
             setStatusModalConfig({
                 type: 'error',
-                title: requiresApproval ? 'Request Failed' : 'Join Failed',
+                title: requiresApproval ? t('details.requestFailed') : t('details.joinFailedTitle'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -427,12 +431,12 @@ export default function TournamentDetailsScreen() {
             );
             const canShare = await Sharing.isAvailableAsync();
             if (!canShare) {
-                Alert.alert('Sharing not available', 'Your device does not support sharing.');
+                Alert.alert(t('details.sharingNotAvailable'), t('details.sharingNotAvailableMessage'));
                 return;
             }
             await Sharing.shareAsync(downloaded.uri, { mimeType, dialogTitle, UTI: uti });
         } catch (err: any) {
-            Alert.alert('Export Failed', err.message || 'Could not export the file.');
+            Alert.alert(t('details.exportFailed'), err.message || t('details.exportFailedMessage'));
         } finally {
             setIsExportingPdf(false);
         }
@@ -450,7 +454,7 @@ export default function TournamentDetailsScreen() {
             ENDPOINTS.EXPORT_BRACKET_PDF(id, includeSchedule),
             `${exportFileStem()}_bracket${suffix}.pdf`,
             'application/pdf',
-            'Share Bracket PDF',
+            t('details.shareBracketPdf'),
             'com.adobe.pdf',
         );
     };
@@ -461,7 +465,7 @@ export default function TournamentDetailsScreen() {
             ENDPOINTS.EXPORT_TOURNAMENT_CSV(id, dataset),
             `${exportFileStem()}_${dataset}.csv`,
             'text/csv',
-            dataset === 'standings' ? 'Share Rankings CSV' : 'Share Results CSV',
+            dataset === 'standings' ? t('details.shareRankingsCsv') : t('details.shareResultsCsv'),
             'public.comma-separated-values-text',
         );
     };
@@ -518,7 +522,7 @@ export default function TournamentDetailsScreen() {
             const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V3(id);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
-                throw new Error(`Failed to fetch tournament: ${response.status}`);
+                throw new Error(t('details.fetchTournamentFailed', { status: response.status }));
             }
             const data = await response.json();
             const rawData = data.result || data;
@@ -607,7 +611,7 @@ export default function TournamentDetailsScreen() {
             console.log('Fetching bracket from:', url);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
-                throw new Error(`Failed to fetch bracket: ${response.status}`);
+                throw new Error(t('details.fetchBracketFailed', { status: response.status }));
             }
             const data = await response.json();
             const nextStages = data.stages || [];
@@ -643,7 +647,7 @@ export default function TournamentDetailsScreen() {
             setBracketRequireResultApproval(data.requireResultApproval ?? data.RequireResultApproval ?? false);
         } catch (err) {
             console.error('Bracket fetch error:', err);
-            if (!silent) setBracketError('Failed to load bracket structure');
+            if (!silent) setBracketError(t('details.bracketLoadFailed'));
         } finally {
             if (!silent) setLoadingBracket(false);
         }
@@ -755,15 +759,15 @@ export default function TournamentDetailsScreen() {
         setSelectedMatch({
             id: item.matchId,
             status: item.status,
-            roundName: [item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+            roundName: [item.groupName, item.roundNumber ? t('details.roundNumber', { number: item.roundNumber }) : null]
                 .filter(Boolean)
-                .join(' · ') || 'Match',
+                .join(' · ') || t('details.match'),
             startTime: item.scheduledStartTime,
             home: item.homeUserId
-                ? { userId: item.homeUserId, username: item.homeUsername || 'Player', score: null }
+                ? { userId: item.homeUserId, username: item.homeUsername || tCommon('player'), score: null }
                 : null,
             away: item.awayUserId
-                ? { userId: item.awayUserId, username: item.awayUsername || 'Player', score: null }
+                ? { userId: item.awayUserId, username: item.awayUsername || tCommon('player'), score: null }
                 : null,
             canRevert: false,
             isRoundLocked: false,
@@ -779,15 +783,15 @@ export default function TournamentDetailsScreen() {
         setSelectedMatch({
             id: item.matchId,
             status: item.status,
-            roundName: [item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+            roundName: [item.groupName, item.roundNumber ? t('details.roundNumber', { number: item.roundNumber }) : null]
                 .filter(Boolean)
-                .join(' · ') || 'Match',
+                .join(' · ') || t('details.match'),
             startTime: item.scheduledStartTime,
             home: item.homeUserId
-                ? { userId: item.homeUserId, username: item.homeUsername || 'Player', score: null }
+                ? { userId: item.homeUserId, username: item.homeUsername || tCommon('player'), score: null }
                 : null,
             away: item.awayUserId
-                ? { userId: item.awayUserId, username: item.awayUsername || 'Player', score: null }
+                ? { userId: item.awayUserId, username: item.awayUsername || tCommon('player'), score: null }
                 : null,
             canRevert: false,
             isRoundLocked: false,
@@ -833,7 +837,7 @@ export default function TournamentDetailsScreen() {
         setSelectedMatch({
             id: sub.matchId,
             status: numericStatus,
-            roundName: 'Team Match',
+            roundName: t('details.teamMatch'),
             home: sub.homePlayer
                 ? { userId: sub.homePlayer.userId, username: sub.homePlayer.username, score: sub.homeScore ?? null }
                 : null,
@@ -877,7 +881,7 @@ export default function TournamentDetailsScreen() {
             fetchOpenTeams();
             setJoinPrompt({
                 teamId: focusTeamId,
-                teamName: focusTeamName || 'this team',
+                teamName: focusTeamName || t('details.thisTeam'),
                 requiresApproval: !!focusTeamRequiresApproval,
             });
             navigation.setParams({ focusTeamId: undefined, focusTeamName: undefined, focusTeamRequiresApproval: undefined });
@@ -904,7 +908,7 @@ export default function TournamentDetailsScreen() {
     const entrantCountTooLowMessage = (): string | null => {
         const entrantCount = Number(tournament?.numberOfParticipants ?? 0);
         if (tournament?.format === TournamentFormat.DoubleElimination && entrantCount > 0 && entrantCount < 4) {
-            return `Double Elimination requires at least 4 participants (currently ${entrantCount}).`;
+            return t('details.doubleElimMinParticipants', { count: entrantCount });
         }
         return null;
     };
@@ -935,7 +939,7 @@ export default function TournamentDetailsScreen() {
     const handleStartBracket = () => {
         const tooLow = entrantCountTooLowMessage();
         if (tooLow) {
-            setStatusModalConfig({ type: 'error', title: 'Cannot Create Bracket', message: tooLow });
+            setStatusModalConfig({ type: 'error', title: t('details.cannotCreateBracket'), message: tooLow });
             setShowStatusModal(true);
             return;
         }
@@ -959,7 +963,7 @@ export default function TournamentDetailsScreen() {
 
         const tooLow = entrantCountTooLowMessage();
         if (tooLow) {
-            setStatusModalConfig({ type: 'error', title: 'Cannot Create Bracket', message: tooLow });
+            setStatusModalConfig({ type: 'error', title: t('details.cannotCreateBracket'), message: tooLow });
             setShowStatusModal(true);
             return;
         }
@@ -989,8 +993,8 @@ export default function TournamentDetailsScreen() {
             setShowDrawModal(false);
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'Bracket created successfully!'
+                title: tCommon('success'),
+                message: t('details.bracketCreated')
             });
             setShowStatusModal(true);
             fetchBracket(); // Refresh the bracket view
@@ -1000,7 +1004,7 @@ export default function TournamentDetailsScreen() {
             // The picker stays open on failure so a rejected plan can be corrected in place.
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1022,14 +1026,14 @@ export default function TournamentDetailsScreen() {
             }
             setStatusModalConfig({
                 type: 'success',
-                title: 'Bracket Drawn',
-                message: 'The knockout bracket has been drawn from the group standings.'
+                title: t('details.bracketDrawn'),
+                message: t('details.bracketDrawnMessage')
             });
             setShowStatusModal(true);
             fetchBracket();
             fetchTournamentDetails();
         } catch (err: any) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setStatusModalConfig({ type: 'error', title: tCommon('error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
         } finally {
             setIsResettingBracket(false);
@@ -1047,14 +1051,14 @@ export default function TournamentDetailsScreen() {
             }
             setStatusModalConfig({
                 type: 'success',
-                title: 'Bracket Reset',
-                message: 'The knockout bracket was cleared. Fix any group result if needed, then draw the bracket again.'
+                title: t('details.bracketResetTitle'),
+                message: t('details.bracketResetMessage')
             });
             setShowStatusModal(true);
             fetchBracket();
             fetchTournamentDetails();
         } catch (err: any) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setStatusModalConfig({ type: 'error', title: tCommon('error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
         } finally {
             setIsResettingBracket(false);
@@ -1066,11 +1070,11 @@ export default function TournamentDetailsScreen() {
     // so the wording no longer mentions discarding results.
     const handleResetBracket = (knockoutMatchCount: number) => {
         Alert.alert(
-            'Reset bracket?',
-            `This deletes the current knockout bracket${knockoutMatchCount > 0 ? ` (${knockoutMatchCount} matches)` : ''}. Group standings are kept — you can then correct a group result and re-draw the bracket.`,
+            t('details.resetBracketConfirmTitle'),
+            t('details.resetBracketConfirmMessage', { suffix: knockoutMatchCount > 0 ? t('details.resetBracketMatchCount', { count: knockoutMatchCount }) : '' }),
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Reset bracket', style: 'destructive', onPress: performResetBracket },
+                { text: tCommon('cancel'), style: 'cancel' },
+                { text: t('details.resetBracketAction'), style: 'destructive', onPress: performResetBracket },
             ]
         );
     };
@@ -1120,11 +1124,11 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
             setShowSwapModal(false);
-            setStatusModalConfig({ type: 'success', title: 'Positions Swapped', message: 'The two teams have switched places in the bracket.' });
+            setStatusModalConfig({ type: 'success', title: t('details.positionsSwapped'), message: t('details.positionsSwappedMessage') });
             setShowStatusModal(true);
             fetchBracket();
         } catch (err: any) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setStatusModalConfig({ type: 'error', title: tCommon('error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
         } finally {
             setIsSwapping(false);
@@ -1147,8 +1151,8 @@ export default function TournamentDetailsScreen() {
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'Registration closed successfully!'
+                title: tCommon('success'),
+                message: t('details.registrationClosed')
             });
             setShowStatusModal(true);
             fetchTournamentDetails(); // Refresh details
@@ -1156,7 +1160,7 @@ export default function TournamentDetailsScreen() {
             console.error('Close registration error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1181,8 +1185,8 @@ export default function TournamentDetailsScreen() {
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'Registration opened successfully!'
+                title: tCommon('success'),
+                message: t('details.registrationOpened')
             });
             setShowStatusModal(true);
             fetchTournamentDetails(); // Refresh details
@@ -1190,7 +1194,7 @@ export default function TournamentDetailsScreen() {
             console.error('Open registration error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1205,7 +1209,7 @@ export default function TournamentDetailsScreen() {
         try {
             const url = ENDPOINTS.GET_PENDING_REGISTRATIONS(id);
             const response = await authenticatedFetch(url);
-            if (!response.ok) throw new Error('Failed to fetch pending registrations');
+            if (!response.ok) throw new Error(t('details.fetchPendingFailed'));
             const data = await response.json();
             setPendingRegistrations(data.result || data || []);
         } catch (err) {
@@ -1221,7 +1225,7 @@ export default function TournamentDetailsScreen() {
         try {
             const url = ENDPOINTS.GET_TOURNAMENT_PARTICIPANTS(id);
             const response = await authenticatedFetch(url);
-            if (!response.ok) throw new Error('Failed to fetch participants');
+            if (!response.ok) throw new Error(t('details.fetchParticipantsFailed'));
             const data = await response.json();
             const list = data.result || data || [];
             // Guard against duplicate participant rows for the same user (legacy data). The list
@@ -1262,8 +1266,8 @@ export default function TournamentDetailsScreen() {
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Approved',
-                message: 'Registration approved!'
+                title: t('details.approvedTitle'),
+                message: t('details.approvedMessage')
             });
             setShowStatusModal(true);
             fetchPendingRegistrations();
@@ -1273,7 +1277,7 @@ export default function TournamentDetailsScreen() {
             console.error('[Approve] Error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1300,8 +1304,8 @@ export default function TournamentDetailsScreen() {
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'Participant removed successfully!'
+                title: tCommon('success'),
+                message: t('details.participantRemoved')
             });
             setShowStatusModal(true);
             fetchParticipants(); // Refresh list
@@ -1310,7 +1314,7 @@ export default function TournamentDetailsScreen() {
             console.error('[RemoveParticipant] Error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1327,8 +1331,8 @@ export default function TournamentDetailsScreen() {
         setParticipantSwapTarget(null);
         setStatusModalConfig({
             type: 'success',
-            title: 'Player replaced',
-            message: `${incomingUsername} has taken over the spot, with every result so far.`
+            title: t('details.playerReplaced'),
+            message: t('details.playerReplacedMessage', { username: incomingUsername })
         });
         setShowStatusModal(true);
         fetchParticipants();
@@ -1353,8 +1357,8 @@ export default function TournamentDetailsScreen() {
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Rejected',
-                message: 'Registration rejected.'
+                title: t('details.rejectedTitle'),
+                message: t('details.rejectedMessage')
             });
             setShowStatusModal(true);
             fetchPendingRegistrations();
@@ -1362,7 +1366,7 @@ export default function TournamentDetailsScreen() {
             console.error('[Reject] Error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1402,8 +1406,8 @@ export default function TournamentDetailsScreen() {
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'All registrations approved!'
+                title: tCommon('success'),
+                message: t('details.allApproved')
             });
             setShowStatusModal(true);
             fetchPendingRegistrations();
@@ -1413,7 +1417,7 @@ export default function TournamentDetailsScreen() {
             console.error('[ApproveAll] Error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1520,15 +1524,14 @@ export default function TournamentDetailsScreen() {
                 if (skipped > 0) {
                     // Name the way out too: deleting a result puts that match back on the round's
                     // current format, which is otherwise impossible to discover.
-                    formatNote = ` ${skipped} already-reported ${skipped === 1 ? 'match keeps its' : 'matches keep their'} format`
-                        + ` — delete ${skipped === 1 ? 'its result' : 'their results'} to re-format ${skipped === 1 ? 'it' : 'them'}.`;
+                    formatNote = t('details.formatNote', { count: skipped });
                 }
             }
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: `Round schedule updated successfully!${formatNote}`
+                title: tCommon('success'),
+                message: t('details.roundScheduleUpdated', { note: formatNote })
             });
             setShowStatusModal(true);
 
@@ -1537,7 +1540,7 @@ export default function TournamentDetailsScreen() {
             console.error('[SetDeadline] Error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
+                title: tCommon('error'),
                 message: getErrorMessage(err)
             });
             setShowStatusModal(true);
@@ -1558,8 +1561,8 @@ export default function TournamentDetailsScreen() {
             if (user?.id) {
                 try {
                     const allTeams = await getPendingTournamentTeams(tournamentId);
-                    const myTeam = allTeams.find(t =>
-                        t.members && t.members.some(m => (m.userId || m.UserId)?.toLowerCase() === user.id.toLowerCase())
+                    const myTeam = allTeams.find(teamRow =>
+                        teamRow.members && teamRow.members.some(m => (m.userId || m.UserId)?.toLowerCase() === user.id.toLowerCase())
                     );
                     setUserTeam(myTeam || null);
                 } catch (checkErr) {
@@ -1583,12 +1586,12 @@ export default function TournamentDetailsScreen() {
 
     const handleRemoveTeam = (teamId: string, teamName: string) => {
         Alert.alert(
-            'Remove Team',
-            `Are you sure you want to remove "${teamName}" from this tournament?`,
+            t('details.removeTeamTitle'),
+            t('details.removeTeamMessage', { teamName }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: tCommon('remove'),
                     style: 'destructive',
                     onPress: async () => {
                         setRemovingTeamId(teamId);
@@ -1600,22 +1603,22 @@ export default function TournamentDetailsScreen() {
                                 { method: 'POST' }
                             );
                             if (!response.ok) {
-                                const text = await response.text().catch(() => 'Failed to remove team');
+                                const text = await response.text().catch(() => t('details.removeTeamFailed'));
                                 throw new Error(text);
                             }
                             setStatusModalConfig({
                                 type: 'success',
-                                title: 'Team Removed',
-                                message: `${teamName} has been removed from the tournament.`
+                                title: t('details.teamRemovedTitle'),
+                                message: t('details.teamRemovedMessage', { teamName })
                             });
                             setShowStatusModal(true);
-                            setTournamentTeams(prev => prev.filter(t => (t.teamId || t.TeamId) !== teamId));
+                            setTournamentTeams(prev => prev.filter(teamRow => (teamRow.teamId || teamRow.TeamId) !== teamId));
                             fetchTournamentTeams(id);
                             fetchTournamentDetails();
                         } catch (err: any) {
                             setStatusModalConfig({
                                 type: 'error',
-                                title: 'Error',
+                                title: tCommon('error'),
                                 message: getErrorMessage(err)
                             });
                             setShowStatusModal(true);
@@ -1691,7 +1694,7 @@ export default function TournamentDetailsScreen() {
         const isCreator = canManage;
 
         if (match.isRoundLocked && !isCreator) {
-            Alert.alert("Round Locked", "Unlocks when all matches in the previous round are completed");
+            Alert.alert(t('details.roundLocked'), t('details.roundLockedMessage'));
             return;
         }
 
@@ -1730,9 +1733,9 @@ export default function TournamentDetailsScreen() {
     };
 
     const tabs: PremiumTabItem[] = [
-        { label: 'Overview', value: 'overview', icon: 'grid-outline' },
+        { label: t('details.tabOverview'), value: 'overview', icon: 'grid-outline' },
         {
-            label: 'Bracket',
+            label: t('details.tabBracket'),
             value: 'bracket',
             icon: 'git-merge-outline',
             // Result approvals (when required) + open admin-help requests both live in the bracket.
@@ -1749,12 +1752,12 @@ export default function TournamentDetailsScreen() {
         },
         ...(tournament?.isTeamTournament
             ? [{
-                label: 'Teams', value: 'teams', icon: 'people-outline' as const,
+                label: t('details.tabTeams'), value: 'teams', icon: 'people-outline' as const,
                 badge: canManage && pendingRegCount > 0 ? pendingRegCount : undefined,
                 badgeTone: 'alert' as const,
             }]
             : [{
-                label: 'Players', value: 'players', icon: 'people-outline' as const,
+                label: t('details.tabPlayers'), value: 'players', icon: 'people-outline' as const,
                 badge: canManage && pendingRegCount > 0 ? pendingRegCount : undefined,
                 badgeTone: 'alert' as const,
             }]),
@@ -1762,12 +1765,12 @@ export default function TournamentDetailsScreen() {
 
     const getStatusText = (status: number) => {
         switch (status) {
-            case 0: return 'Open';
-            case 1: return 'Upcoming';
-            case 2: return 'Reg. Closed';
-            case 3: return 'Live';
-            case 4: return 'Completed';
-            default: return 'IDLE';
+            case 0: return t('details.statusOpen');
+            case 1: return t('details.statusUpcoming');
+            case 2: return t('details.statusRegClosed');
+            case 3: return t('details.statusLive');
+            case 4: return t('details.statusCompleted');
+            default: return t('details.statusIdle');
         }
     };
 
@@ -1813,7 +1816,7 @@ export default function TournamentDetailsScreen() {
                 key: 'progress',
                 icon: progressSummary.remaining > 0 ? 'stats-chart' : 'checkmark-done',
                 value: `${Math.round((progressSummary.done / progressSummary.total) * 100)}%`,
-                label: 'Progress',
+                label: t('details.progress'),
                 tone: progressSummary.remaining > 0 ? 'info' : 'primary',
                 onPress: () => setShowProgressModal(true),
             });
@@ -1823,7 +1826,7 @@ export default function TournamentDetailsScreen() {
             key: 'help',
             icon: adminHelpRequests.length > 0 ? 'hand-left' : 'hand-left-outline',
             value: String(adminHelpRequests.length),
-            label: 'Help',
+            label: t('details.help'),
             tone: adminHelpRequests.length > 0 ? 'warning' : 'muted',
             onPress: () => {
                 setShowAdminHelpModal(true);
@@ -1836,7 +1839,7 @@ export default function TournamentDetailsScreen() {
                 key: 'approvals',
                 icon: pendingApprovalsBadgeCount > 0 ? 'checkmark-done' : 'checkmark-done-outline',
                 value: String(pendingApprovalsBadgeCount),
-                label: 'Approvals',
+                label: t('details.approvals'),
                 tone: pendingApprovalsBadgeCount > 0 ? 'primary' : 'muted',
                 onPress: () => {
                     setShowApprovalsModal(true);
@@ -1899,7 +1902,7 @@ export default function TournamentDetailsScreen() {
             <View className="px-4 mb-4 gap-2">
                 {showDraw && (
                     <Button className="w-full" onPress={handleDrawBracket} loading={isResettingBracket}>
-                        Draw Bracket
+                        {t('details.drawBracket')}
                     </Button>
                 )}
                 {canSwap && (
@@ -1908,7 +1911,7 @@ export default function TournamentDetailsScreen() {
                         className="w-full flex-row items-center justify-center gap-2 py-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 active:opacity-70"
                     >
                         <Ionicons name="swap-horizontal" size={16} color="#818CF8" />
-                        <Text className="text-sm font-bold text-indigo-300">Swap Seeds</Text>
+                        <Text className="text-sm font-bold text-indigo-300">{t('details.swapSeeds')}</Text>
                     </Pressable>
                 )}
                 {showReset && (
@@ -1921,10 +1924,10 @@ export default function TournamentDetailsScreen() {
                             {isResettingBracket
                                 ? <ActivityIndicator size="small" color="#F87171" />
                                 : <Ionicons name="refresh" size={16} color="#F87171" />}
-                            <Text className="text-sm font-bold text-red-400">Reset Bracket</Text>
+                            <Text className="text-sm font-bold text-red-400">{t('details.resetBracketBtn')}</Text>
                         </Pressable>
                         <Text className="text-[11px] text-slate-500 text-center">
-                            Clears the knockout so you can correct a group result. Group standings are kept.
+                            {t('details.resetBracketHint')}
                         </Text>
                     </>
                 )}
@@ -1943,9 +1946,9 @@ export default function TournamentDetailsScreen() {
                     <Text className="text-muted-foreground mt-4 text-center">
                         {isCreator
                             ? (isRegClosed
-                                ? "Registration is closed! You can now generate the bracket."
-                                : "The bracket can be generated once registration is closed.")
-                            : "Bracket not available yet"}
+                                ? t('details.bracketReadyHint')
+                                : t('details.bracketNotReadyHint'))
+                            : t('details.bracketNotAvailable')}
                     </Text>
 
                     {isCreator && isRegClosed && (
@@ -1954,7 +1957,7 @@ export default function TournamentDetailsScreen() {
                             onPress={handleStartBracket}
                             loading={isCreatingBracket}
                         >
-                            Create Bracket
+                            {t('details.createBracket')}
                         </Button>
                     )}
                 </View>
@@ -2058,7 +2061,7 @@ export default function TournamentDetailsScreen() {
                                     "text-xs font-bold",
                                     selectedStageIndex === idx ? "text-primary-foreground" : "text-muted-foreground"
                                 )}>
-                                    {stage.name || `Stage ${idx + 1}`}
+                                    {stage.name || t('details.stageNumber', { number: idx + 1 })}
                                 </Text>
                             </Pressable>
                         ))}
@@ -2097,7 +2100,7 @@ export default function TournamentDetailsScreen() {
                             <View className="px-4 mt-6">
                                 <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
                                     <Ionicons name="trophy" size={16} color="#FBBF24" />
-                                    <Text className="text-sm font-bold text-white">Grand Final</Text>
+                                    <Text className="text-sm font-bold text-white">{t('details.grandFinal')}</Text>
                                     {matchSeriesFormat(grandFinalMatch) && (
                                         <SeriesFormatChip
                                             format={matchSeriesFormat(grandFinalMatch)!}
@@ -2126,7 +2129,7 @@ export default function TournamentDetailsScreen() {
                             <View className="px-4 mt-6">
                                 <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
                                     <Ionicons name="trophy" size={16} color="#FBBF24" />
-                                    <Text className="text-sm font-bold text-white">Grand Final (Reset)</Text>
+                                    <Text className="text-sm font-bold text-white">{t('details.grandFinalReset')}</Text>
                                     {matchSeriesFormat(grandFinalResetMatch) && (
                                         <SeriesFormatChip
                                             format={matchSeriesFormat(grandFinalResetMatch)!}
@@ -2159,7 +2162,7 @@ export default function TournamentDetailsScreen() {
                                 >
                                     <View className="flex-row items-center" style={{ gap: 6 }}>
                                         <Ionicons name="medal-outline" size={16} color="#CD7F32" />
-                                        <Text className="text-sm font-bold text-white">Third Place Match</Text>
+                                        <Text className="text-sm font-bold text-white">{t('details.thirdPlaceMatch')}</Text>
                                         {matchSeriesFormat(thirdPlaceMatch) && (
                                             <SeriesFormatChip
                                                 format={matchSeriesFormat(thirdPlaceMatch)!}
@@ -2256,15 +2259,15 @@ export default function TournamentDetailsScreen() {
                         <Ionicons name="time-outline" size={32} color="#475569" />
                         <Text className="text-sm font-bold text-slate-400 mt-3 text-center">
                             {stageType === 7
-                                ? 'Waiting for the Swiss rounds to finish'
+                                ? t('details.waitingSwiss')
                                 : stageType === 3 && (stages.length > 1)
                                     ? (stages.some((s: any) => (s.type ?? s.Type) === 7)
-                                        ? 'Waiting for the play-in matches to finish'
-                                        : 'Waiting for the previous stage to finish')
-                                    : 'No rounds or groups found for this stage'}
+                                        ? t('details.waitingPlayIn')
+                                        : t('details.waitingPreviousStage'))
+                                    : t('details.noRoundsOrGroups')}
                         </Text>
                         <Text className="text-xs text-slate-600 mt-1 text-center">
-                            Matches will appear here once the previous stage completes.
+                            {t('details.matchesAppearLater')}
                         </Text>
                     </View>
                 )}
@@ -2275,10 +2278,10 @@ export default function TournamentDetailsScreen() {
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title="Tournament" showBack />
+                <PageHeader title={t('details.headerTournament')} showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-muted-foreground mt-4">Loading tournament...</Text>
+                    <Text className="text-muted-foreground mt-4">{t('details.loadingTournament')}</Text>
                 </View>
             </SafeAreaView>
         );
@@ -2287,11 +2290,11 @@ export default function TournamentDetailsScreen() {
     if (error || !tournament) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title="Tournament" showBack />
+                <PageHeader title={t('details.headerTournament')} showBack />
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                    <Text className="text-destructive mt-4 text-center font-medium">{error || 'Tournament not found'}</Text>
-                    <Button onPress={fetchTournamentDetails} className="mt-6">Retry</Button>
+                    <Text className="text-destructive mt-4 text-center font-medium">{error || t('details.tournamentNotFound')}</Text>
+                    <Button onPress={fetchTournamentDetails} className="mt-6">{t('common:retry')}</Button>
                 </View>
             </SafeAreaView>
         );
@@ -2300,7 +2303,7 @@ export default function TournamentDetailsScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader
-                title="Tournament"
+                title={t('details.headerTournament')}
                 showBack
                 rightElement={
                     <View className="flex-row items-center gap-2">
@@ -2320,7 +2323,7 @@ export default function TournamentDetailsScreen() {
                         <Pressable
                             onPress={handleShare}
                             className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
-                            accessibilityLabel="Share tournament"
+                            accessibilityLabel={t('details.shareTournament')}
                         >
                             <Ionicons name="share-outline" size={20} color="#FAFAFA" />
                         </Pressable>
@@ -2359,31 +2362,31 @@ export default function TournamentDetailsScreen() {
                                     if (s === 3) return (
                                         <View className="bg-emerald-900 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-primary/20 mt-1">
                                             <View className="w-2 h-2 rounded-full bg-primary" />
-                                            <Text className="text-[10px] font-black text-primary uppercase tracking-tighter">LIVE</Text>
+                                            <Text className="text-[10px] font-black text-primary uppercase tracking-tighter">{t('details.liveBadge')}</Text>
                                         </View>
                                     );
                                     if (s === 4) return (
                                         <View className="bg-slate-800 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-slate-700/50 mt-1">
                                             <View className="w-2 h-2 rounded-full bg-slate-500" />
-                                            <Text className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Completed</Text>
+                                            <Text className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{t('details.statusCompleted')}</Text>
                                         </View>
                                     );
                                     if (s === 2) return (
                                         <View className="bg-yellow-500/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-yellow-500/20 mt-1">
                                             <View className="w-2 h-2 rounded-full bg-yellow-400" />
-                                            <Text className="text-[10px] font-black text-yellow-400 uppercase tracking-tighter">Reg. Closed</Text>
+                                            <Text className="text-[10px] font-black text-yellow-400 uppercase tracking-tighter">{t('details.statusRegClosed')}</Text>
                                         </View>
                                     );
                                     if (s === 1) return (
                                         <View className="bg-indigo-500/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-indigo-500/20 mt-1">
                                             <View className="w-2 h-2 rounded-full bg-indigo-400" />
-                                            <Text className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">Upcoming</Text>
+                                            <Text className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">{t('details.statusUpcoming')}</Text>
                                         </View>
                                     );
                                     if (s === 0) return (
                                         <View className="bg-indigo-500/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-indigo-500/20 mt-1">
                                             <View className="w-2 h-2 rounded-full bg-indigo-400" />
-                                            <Text className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">Open</Text>
+                                            <Text className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">{t('details.statusOpen')}</Text>
                                         </View>
                                     );
                                     return null;
@@ -2392,7 +2395,7 @@ export default function TournamentDetailsScreen() {
                             <View className="flex-row items-center gap-2">
                                 <Ionicons name="people-outline" size={16} color="#71717A" />
                                 <Text className="text-sm font-bold text-zinc-500">
-                                    {tournament?.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0)} {tournament?.isTeamTournament ? 'Teams' : 'Participants'}
+                                    {tournament?.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0)} {tournament?.isTeamTournament ? t('details.teamsWord') : t('details.participantsWord')}
                                 </Text>
                             </View>
                         </View>
@@ -2419,12 +2422,12 @@ export default function TournamentDetailsScreen() {
                             const isExclusiveEligible = !tournament.isExclusive || tournament.hasExclusiveAccess === true;
                             const isEligible = isRegionCountryEligible && isExclusiveEligible;
                             const restrictionLabel = !isExclusiveEligible
-                                ? 'exclusive members of this hub'
+                                ? t('details.exclusiveMembersOfHub')
                                 : isCountryScoped
                                     ? (tournamentCountries.length <= 3
                                         ? `${(tournament.countryFlags || []).join(' ')} ${(tournament.countryNames || tournamentCountries).join(', ')}`.trim()
-                                        : `${tournamentCountries.length} countries`)
-                                    : 'this region';
+                                        : t('details.countriesCount', { count: tournamentCountries.length }))
+                                    : t('details.thisRegion');
 
                             const buttons = [];
 
@@ -2450,10 +2453,10 @@ export default function TournamentDetailsScreen() {
                                         </View>
                                         <View className="flex-1">
                                             <Text className="text-amber-300 text-sm font-black tracking-tight">
-                                                Pending approval
+                                                {t('details.pendingApproval')}
                                             </Text>
                                             <Text className="text-slate-400 text-xs mt-0.5">
-                                                Your registration is waiting for hub review.
+                                                {t('details.pendingApprovalHint')}
                                             </Text>
                                         </View>
                                     </View>
@@ -2469,7 +2472,7 @@ export default function TournamentDetailsScreen() {
                                             className="w-full"
                                             onPress={() => setShowTeamRegistration(true)}
                                         >
-                                            {TEAM_LABELS.REGISTER_CREATE_JOIN}
+                                            {tTeam('registerCreateJoin')}
                                         </Button>
                                     );
                                 }
@@ -2483,7 +2486,7 @@ export default function TournamentDetailsScreen() {
                                             onPress={handleJoin}
                                             loading={isRegistering}
                                         >
-                                            Join Tournament
+                                            {t('details.joinTournament')}
                                         </Button>
                                     );
                                 }
@@ -2514,7 +2517,7 @@ export default function TournamentDetailsScreen() {
                                         onPress={handleCloseRegistration}
                                         loading={isLoading}
                                     >
-                                        Close Registration
+                                        {t('details.closeRegistration')}
                                     </Button>
                                 )}
 
@@ -2528,7 +2531,7 @@ export default function TournamentDetailsScreen() {
                                         onPress={handleOpenRegistration}
                                         loading={isLoading}
                                     >
-                                        {tournament?.status === 2 ? 'Open Registration' : 'Open Registration Now'}
+                                        {tournament?.status === 2 ? t('details.openRegistration') : t('details.openRegistrationNow')}
                                     </Button>
                                 )}
 
@@ -2539,15 +2542,15 @@ export default function TournamentDetailsScreen() {
                                         <Ionicons name="lock-open-outline" size={20} color="#818CF8" />
                                     </View>
                                     <View className="flex-1 gap-0.5">
-                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Registration Opens</Text>
+                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t('details.registrationOpensLabel')}</Text>
                                         <Text className="text-base font-black text-white">
                                             {(() => {
                                                 const d = new Date(tournament.registrationOpensAt);
-                                                return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                                                return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
                                             })()}
                                         </Text>
                                         <Text className="text-[11px] text-slate-400 mt-0.5">
-                                            You'll get a notification the moment sign-ups open.
+                                            {t('details.notifyOnOpen')}
                                         </Text>
                                     </View>
                                 </View>
@@ -2560,11 +2563,11 @@ export default function TournamentDetailsScreen() {
                                         <Ionicons name="time-outline" size={20} color="#EF4444" />
                                     </View>
                                     <View className="flex-1 gap-0.5">
-                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Registration Deadline</Text>
+                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t('details.registrationDeadlineLabel')}</Text>
                                         <Text className="text-base font-black text-white">
                                             {(() => {
                                                 const d = new Date(tournament.registrationDeadline);
-                                                return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                                                return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
                                             })()}
                                         </Text>
                                     </View>
@@ -2583,8 +2586,8 @@ export default function TournamentDetailsScreen() {
                                                 <Ionicons name="shield-half" size={24} color="#00E5A0" />
                                             </View>
                                             <View>
-                                                <Text className="text-white font-black text-lg tracking-wide">{TEAM_LABELS.MY_TEAM_BUTTON}</Text>
-                                                <Text className="text-team/80 text-[11px] font-bold tracking-widest uppercase mt-0.5">Manage Your Roster</Text>
+                                                <Text className="text-white font-black text-lg tracking-wide">{tTeam('myTeamButton')}</Text>
+                                                <Text className="text-team/80 text-[11px] font-bold tracking-widest uppercase mt-0.5">{t('details.manageYourRoster')}</Text>
                                             </View>
                                         </View>
                                         <View className="w-10 h-10 bg-white/5 border border-white/5 rounded-full items-center justify-center">
@@ -2598,29 +2601,29 @@ export default function TournamentDetailsScreen() {
                             <CollapsibleCard
                                 icon="information-circle"
                                 iconColor="#F59E0B"
-                                title="General Info"
+                                title={t('details.generalInfo')}
                                 isOpen={isGeneralInfoOpen}
                                 onToggle={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
                             >
                                 <InfoRow
                                     icon="trophy"
                                     iconColor="#F59E0B"
-                                    label="Prize Pool"
+                                    label={t('details.prizePool')}
                                     value={tournament.prize && Number(tournament.prize) > 0
                                         ? `${tournament.prize} ${getCurrencyLabel(tournament.prizeCurrency)}`
-                                        : 'No Prize'}
+                                        : t('details.noPrize')}
                                 />
                                 <InfoRow
                                     icon="people"
                                     iconColor="#818CF8"
-                                    label="Max Players"
-                                    value={String(tournament.maxPlayers || 'No Limit')}
+                                    label={t('details.maxPlayersLabel')}
+                                    value={String(tournament.maxPlayers || t('details.noLimit'))}
                                 />
                                 <InfoRow
                                     icon="list"
                                     iconColor="#A78BFA"
-                                    label="Format"
-                                    value={getTournamentFormatLabel(Number(tournament.format))}
+                                    label={t('details.formatLabel')}
+                                    value={getTournamentFormatLabel(Number(tournament.format), t)}
                                 />
                                 {/* Only once the bracket exists (InProgress / Completed). A started
                                     tournament with no recorded mode predates the draw picker, and
@@ -2629,21 +2632,21 @@ export default function TournamentDetailsScreen() {
                                     <InfoRow
                                         icon="git-network"
                                         iconColor="#22D3EE"
-                                        label="Bracket Draw"
-                                        value={getBracketSeedingModeLabel(tournament.bracketSeedingMode)}
+                                        label={t('details.bracketDrawLabel')}
+                                        value={getBracketSeedingModeLabel(tournament.bracketSeedingMode, t)}
                                     />
                                 )}
                                 <InfoRow
                                     icon="game-controller"
                                     iconColor="#34D399"
-                                    label="Mode"
-                                    value={tournament.isTeamTournament ? 'Team' : 'Solo'}
+                                    label={t('details.modeLabel')}
+                                    value={tournament.isTeamTournament ? tTeam('modeTeam') : tTeam('modeSolo')}
                                 />
                                 {tournament.isTeamTournament && (
                                     <InfoRow
                                         icon="people-circle"
                                         iconColor="#F472B6"
-                                        label="Team Size"
+                                        label={t('details.teamSizeLabel')}
                                         value={`${tournament.teamSize || '?'}v${tournament.teamSize || '?'}`}
                                     />
                                 )}
@@ -2651,26 +2654,26 @@ export default function TournamentDetailsScreen() {
                                     <InfoRow
                                         icon="podium"
                                         iconColor="#FBBF24"
-                                        label="Win Condition"
+                                        label={t('details.winConditionLabel')}
                                         value={(tournament.teamWinCondition === 1 || tournament.teamWinCondition === 'AggregateScore')
-                                            ? 'Aggregate Score'
-                                            : 'Match Wins'}
+                                            ? t('teamWinCondition.aggregateScore')
+                                            : t('teamWinCondition.matchWins')}
                                     />
                                 )}
                                 <InfoRow
                                     icon="calendar"
                                     iconColor="#60A5FA"
-                                    label="Start Date"
-                                    value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD'}
+                                    label={t('details.startDateLabel')}
+                                    value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' }) : tCommon('app.tbd')}
                                 />
                                 {tournament.registrationDeadline && (
                                     <InfoRow
                                         icon="time-outline"
                                         iconColor="#EF4444"
-                                        label="Reg. Deadline"
+                                        label={t('details.regDeadlineLabel')}
                                         value={(() => {
                                             const d = new Date(tournament.registrationDeadline);
-                                            return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                                            return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
                                         })()}
                                     />
                                 )}
@@ -2679,15 +2682,15 @@ export default function TournamentDetailsScreen() {
                                         <InfoRow
                                             icon="flag"
                                             iconColor="#34D399"
-                                            label="Country"
+                                            label={t('details.countryLabel')}
                                             value={`${tournament.countryFlags?.[0] ? tournament.countryFlags[0] + ' ' : ''}${tournament.countryNames?.[0] ?? tournament.countries[0]}`}
                                         />
                                     ) : (
                                         <InfoRow
                                             icon="flag"
                                             iconColor="#34D399"
-                                            label="Countries"
-                                            value={`${tournament.countries.length} countries`}
+                                            label={t('details.countriesLabel')}
+                                            value={t('details.countriesCount', { count: tournament.countries.length })}
                                             onPress={() => setShowCountriesModal(true)}
                                         />
                                     )
@@ -2695,7 +2698,7 @@ export default function TournamentDetailsScreen() {
                                     <InfoRow
                                         icon="globe"
                                         iconColor="#34D399"
-                                        label="Region"
+                                        label={t('details.regionLabel')}
                                         value={
                                             tournament.region === TournamentRegion.Europe ? 'EU'
                                                 : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
@@ -2703,7 +2706,7 @@ export default function TournamentDetailsScreen() {
                                                         : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
                                                             : tournament.region === TournamentRegion.Africa ? 'AFR'
                                                                 : tournament.region === TournamentRegion.Oceania ? 'OCE'
-                                                                    : 'Global'
+                                                                    : t('details.regionGlobal')
                                         }
                                     />
                                 )}
@@ -2711,10 +2714,10 @@ export default function TournamentDetailsScreen() {
                                     <InfoRow
                                         icon="sparkles"
                                         iconColor="#E879F9"
-                                        label="Access"
+                                        label={t('details.accessLabel')}
                                         value={
                                             <Text className="text-[14px] font-black text-fuchsia-300" numberOfLines={1}>
-                                                Exclusive members
+                                                {t('details.exclusiveMembers')}
                                             </Text>
                                         }
                                     />
@@ -2723,7 +2726,7 @@ export default function TournamentDetailsScreen() {
                                     <InfoRow
                                         icon="home"
                                         iconColor="#A5B4FC"
-                                        label="Hub"
+                                        label={t('details.hubLabel')}
                                         value={
                                             <Text className="text-[14px] font-black text-emerald-300 text-right" numberOfLines={2}>
                                                 {tournament.hubName}
@@ -2738,12 +2741,12 @@ export default function TournamentDetailsScreen() {
                             <CollapsibleCard
                                 icon="document-text"
                                 iconColor="#FBBF24"
-                                title="Description"
+                                title={t('details.descriptionTitle')}
                                 isOpen={isDescriptionOpen}
                                 onToggle={() => setIsDescriptionOpen(!isDescriptionOpen)}
                             >
                                 <QuoteBlock accentColor="#FBBF24">
-                                    {tournament.description || 'Join this competitive tournament and prove your skills to climb the leaderboard.'}
+                                    {tournament.description || t('details.descriptionFallback')}
                                 </QuoteBlock>
                             </CollapsibleCard>
 
@@ -2751,12 +2754,12 @@ export default function TournamentDetailsScreen() {
                             <CollapsibleCard
                                 icon="shield-checkmark"
                                 iconColor="#A78BFA"
-                                title="Rules & Regulations"
+                                title={t('details.rulesTitle')}
                                 isOpen={isRulesOpen}
                                 onToggle={() => setIsRulesOpen(!isRulesOpen)}
                             >
                                 <QuoteBlock accentColor="#A78BFA">
-                                    {tournament.rules || '• Fair play is mandatory\n• No toxic behavior\n• Tournament organizers\' decisions are final.'}
+                                    {tournament.rules || t('details.rulesFallback')}
                                 </QuoteBlock>
                             </CollapsibleCard>
                         </View>
@@ -2774,17 +2777,17 @@ export default function TournamentDetailsScreen() {
                         <View className="px-4 py-4 gap-3 pb-12">
                             <View className="flex-row items-center gap-2 mb-4">
                                 <Ionicons name="people-outline" size={20} color="#00E5A0" />
-                                <Text className="text-lg font-bold text-white">{TEAM_LABELS.TEAMS_SECTION_TITLE}</Text>
+                                <Text className="text-lg font-bold text-white">{tTeam('teamsSectionTitle')}</Text>
                             </View>
 
                             {/* Sub Tabs */}
                             <View className="mb-4">
                                 <PremiumTabs
                                     tabs={[
-                                        { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
-                                        ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: 'Open', icon: 'open-outline' as const }] : []),
+                                        { value: 'confirmed', label: t('details.tabConfirmed'), icon: 'checkmark-circle-outline' },
+                                        ...((tournament?.status ?? 99) < 3 ? [{ value: 'open', label: t('details.tabOpen'), icon: 'open-outline' as const }] : []),
                                         ...(canManage && isPreStart ? [{
-                                            value: 'registrations', label: 'Requests', icon: 'hourglass-outline' as const,
+                                            value: 'registrations', label: t('details.tabRequests'), icon: 'hourglass-outline' as const,
                                             badge: pendingRegCount > 0 ? pendingRegCount : undefined,
                                             badgeTone: 'alert' as const,
                                         }] : []),
@@ -2801,15 +2804,15 @@ export default function TournamentDetailsScreen() {
                                 ) : tournamentTeams.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
-                                        <Text className="text-slate-400 mt-4 text-center">{TEAM_LABELS.NO_TEAMS_REGISTERED}</Text>
+                                        <Text className="text-slate-400 mt-4 text-center">{tTeam('noTeamsRegistered')}</Text>
                                     </View>
                                 ) : (
-                                    tournamentTeams.map((t, index) => {
-                                        const teamId = t.teamId || t.TeamId;
-                                        const teamName = t.teamName || t.TeamName;
-                                        const roster = rosterInfo(t, tournament);
+                                    tournamentTeams.map((teamRow, index) => {
+                                        const teamId = teamRow.teamId || teamRow.TeamId;
+                                        const teamName = teamRow.teamName || teamRow.TeamName;
+                                        const roster = rosterInfo(teamRow, tournament);
                                         const { memberCount, teamSize } = roster;
-                                        const captainUserId = t.captainUserId || t.CaptainUserId;
+                                        const captainUserId = teamRow.captainUserId || teamRow.CaptainUserId;
 
                                         const membersList = roster.members;
                                         const captain = membersList.find((m: any) =>
@@ -2837,7 +2840,7 @@ export default function TournamentDetailsScreen() {
                                                         </View>
                                                         <View className="flex-1">
                                                             <Text className="font-black text-lg text-white" numberOfLines={1}>
-                                                                {teamName || 'Unknown Team'}
+                                                                {teamName || t('details.unknownTeam')}
                                                             </Text>
                                                             <View className="flex-row items-center gap-2 mt-1">
                                                                 {/* "Full" now means the whole roster is taken. Without reserves the
@@ -2845,12 +2848,12 @@ export default function TournamentDetailsScreen() {
                                                                 {(memberCount >= roster.rosterCapacity && teamSize > 0) ? (
                                                                     <View className="bg-team/10 px-2 py-0.5 rounded-full border border-team/20 flex-shrink-0">
                                                                         <Text className="text-[9px] font-black text-team uppercase">
-                                                                            {TEAM_LABELS.TEAM_FULL}
+                                                                            {tTeam('teamFull')}
                                                                         </Text>
                                                                     </View>
                                                                 ) : (
                                                                     <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
-                                                                        {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                        {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {tTeam('membersLabel')}
                                                                     </Text>
                                                                 )}
                                                                 {roster.allowReserves && roster.reserveCount > 0 && (
@@ -2902,7 +2905,7 @@ export default function TournamentDetailsScreen() {
                                                                                             style={{ backgroundColor: 'rgba(129,140,248,0.14)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)' }}
                                                                                         >
                                                                                             <Text className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#A5B4FC' }}>
-                                                                                                Reserve
+                                                                                                {t('details.reserveBadge')}
                                                                                             </Text>
                                                                                         </View>
                                                                                     )}
@@ -2910,11 +2913,11 @@ export default function TournamentDetailsScreen() {
                                                                                 {isMemberCaptain ? (
                                                                                     <View className="flex-row items-center gap-1 mt-0.5">
                                                                                         <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
-                                                                                        <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
+                                                                                        <Text className="text-[9px] font-black text-warning uppercase tracking-wider">{tTeam('captainBadge')}</Text>
                                                                                     </View>
                                                                                 ) : (
                                                                                     <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                                                                                        {isMemberOnBench(m) ? 'Not playing' : 'Player'}
+                                                                                        {isMemberOnBench(m) ? t('details.notPlaying') : tCommon('player')}
                                                                                     </Text>
                                                                                 )}
                                                                             </View>
@@ -2923,7 +2926,7 @@ export default function TournamentDetailsScreen() {
                                                                     );
                                                                 })
                                                             ) : (
-                                                                <Text className="text-slate-500 text-center text-xs py-2 italic">No members found</Text>
+                                                                <Text className="text-slate-500 text-center text-xs py-2 italic">{t('details.noMembersFound')}</Text>
                                                             )}
 
                                                             {teamSize > 0 && Array.from({ length: Math.max(0, roster.rosterCapacity - membersList.length) }).map((_, si) => (
@@ -2938,7 +2941,7 @@ export default function TournamentDetailsScreen() {
                                                                     >
                                                                         <Ionicons name="person-add-outline" size={14} color="#475569" />
                                                                     </View>
-                                                                    <Text className="text-slate-600 text-xs font-semibold">Open slot</Text>
+                                                                    <Text className="text-slate-600 text-xs font-semibold">{t('details.openSlot')}</Text>
                                                                 </View>
                                                             ))}
 
@@ -2947,15 +2950,15 @@ export default function TournamentDetailsScreen() {
                                                                 bench players, so gate on capacity, not on the lineup. */}
                                                             {(!userTeam && !isUserRegistered && roster.hasRoom) && (
                                                                 <Button
-                                                                    className={t.requiresApproval || t.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
-                                                                    onPress={() => handleJoinTeam(teamId as string, t.requiresApproval || t.RequiresApproval)}
+                                                                    className={teamRow.requiresApproval || teamRow.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
+                                                                    onPress={() => handleJoinTeam(teamId as string, teamRow.requiresApproval || teamRow.RequiresApproval)}
                                                                     loading={joiningTeamId === teamId}
-                                                                    disabled={joiningTeamId !== null || t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending'}
+                                                                    disabled={joiningTeamId !== null || teamRow.userRequestStatus === 'Pending' || teamRow.UserRequestStatus === 'Pending'}
                                                                 >
-                                                                    <Text numberOfLines={1} className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center w-full" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center w-full"}>
-                                                                        {(t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending')
-                                                                            ? 'Request Pending'
-                                                                            : (t.requiresApproval || t.RequiresApproval) ? 'Request to Join' : 'Join This Team'}
+                                                                    <Text numberOfLines={1} className={teamRow.requiresApproval || teamRow.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center w-full" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center w-full"}>
+                                                                        {(teamRow.userRequestStatus === 'Pending' || teamRow.UserRequestStatus === 'Pending')
+                                                                            ? t('details.requestPending')
+                                                                            : (teamRow.requiresApproval || teamRow.RequiresApproval) ? t('details.requestToJoin') : t('details.joinThisTeam')}
                                                                     </Text>
                                                                 </Button>
                                                             )}
@@ -2994,15 +2997,15 @@ export default function TournamentDetailsScreen() {
                                 ) : openTeams.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center mt-2">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
-                                        <Text className="text-slate-400 mt-4 text-center">No open teams looking for players right now.</Text>
+                                        <Text className="text-slate-400 mt-4 text-center">{t('details.noOpenTeams')}</Text>
                                     </View>
                                 ) : (
-                                    openTeams.map((t, index) => {
-                                        const teamId = t.teamId || t.TeamId;
-                                        const teamName = t.teamName || t.TeamName;
-                                        const roster = rosterInfo(t, tournament);
+                                    openTeams.map((teamRow, index) => {
+                                        const teamId = teamRow.teamId || teamRow.TeamId;
+                                        const teamName = teamRow.teamName || teamRow.TeamName;
+                                        const roster = rosterInfo(teamRow, tournament);
                                         const { memberCount, teamSize } = roster;
-                                        const captainUserId = t.captainUserId || t.CaptainUserId;
+                                        const captainUserId = teamRow.captainUserId || teamRow.CaptainUserId;
                                         const membersList = roster.members;
                                         const captain = membersList.find((m: any) =>
                                             m.userId?.toLowerCase() === captainUserId?.toLowerCase() ||
@@ -3029,18 +3032,18 @@ export default function TournamentDetailsScreen() {
                                                         </View>
                                                         <View className="flex-1">
                                                             <Text className="font-black text-lg text-white" numberOfLines={1}>
-                                                                {teamName || 'Unknown Team'}
+                                                                {teamName || t('details.unknownTeam')}
                                                             </Text>
                                                             <View className="flex-row items-center gap-2 mt-1">
                                                                 {(memberCount >= roster.rosterCapacity && teamSize > 0) ? (
                                                                     <View className="bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20 flex-shrink-0">
                                                                         <Text className="text-[9px] font-black text-blue-500 uppercase">
-                                                                            {TEAM_LABELS.TEAM_FULL}
+                                                                            {tTeam('teamFull')}
                                                                         </Text>
                                                                     </View>
                                                                 ) : (
                                                                     <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
-                                                                        {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                        {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {tTeam('membersLabel')}
                                                                     </Text>
                                                                 )}
                                                                 {roster.allowReserves && roster.reserveCount > 0 && (
@@ -3092,7 +3095,7 @@ export default function TournamentDetailsScreen() {
                                                                                             style={{ backgroundColor: 'rgba(129,140,248,0.14)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)' }}
                                                                                         >
                                                                                             <Text className="text-[8px] font-black uppercase tracking-wider" style={{ color: '#A5B4FC' }}>
-                                                                                                Reserve
+                                                                                                {t('details.reserveBadge')}
                                                                                             </Text>
                                                                                         </View>
                                                                                     )}
@@ -3100,11 +3103,11 @@ export default function TournamentDetailsScreen() {
                                                                                 {isMemberCaptain ? (
                                                                                     <View className="flex-row items-center gap-1 mt-0.5">
                                                                                         <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
-                                                                                        <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
+                                                                                        <Text className="text-[9px] font-black text-warning uppercase tracking-wider">{tTeam('captainBadge')}</Text>
                                                                                     </View>
                                                                                 ) : (
                                                                                     <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                                                                                        {isMemberOnBench(m) ? 'Not playing' : 'Player'}
+                                                                                        {isMemberOnBench(m) ? t('details.notPlaying') : tCommon('player')}
                                                                                     </Text>
                                                                                 )}
                                                                             </View>
@@ -3113,7 +3116,7 @@ export default function TournamentDetailsScreen() {
                                                                     );
                                                                 })
                                                             ) : (
-                                                                <Text className="text-slate-500 text-center text-xs py-2 italic">No members found</Text>
+                                                                <Text className="text-slate-500 text-center text-xs py-2 italic">{t('details.noMembersFound')}</Text>
                                                             )}
 
                                                             {teamSize > 0 && Array.from({ length: Math.max(0, roster.rosterCapacity - membersList.length) }).map((_, si) => (
@@ -3128,14 +3131,14 @@ export default function TournamentDetailsScreen() {
                                                                     >
                                                                         <Ionicons name="person-add-outline" size={14} color="#475569" />
                                                                     </View>
-                                                                    <Text className="text-slate-600 text-xs font-semibold">Open slot</Text>
+                                                                    <Text className="text-slate-600 text-xs font-semibold">{t('details.openSlot')}</Text>
                                                                 </View>
                                                             ))}
 
                                                             {/* Join Button inside Expanded View */}
                                                             {(() => {
-                                                                const isApproved = t.userRequestStatus === 'Approved' || t.UserRequestStatus === 'Approved' || (t.userRequestStatus as any) === 1 || (t.UserRequestStatus as any) === 1;
-                                                                const isPending = t.userRequestStatus === 'Pending' || t.UserRequestStatus === 'Pending' || (t.userRequestStatus as any) === 0 || (t.UserRequestStatus as any) === 0;
+                                                                const isApproved = teamRow.userRequestStatus === 'Approved' || teamRow.UserRequestStatus === 'Approved' || (teamRow.userRequestStatus as any) === 1 || (teamRow.UserRequestStatus as any) === 1;
+                                                                const isPending = teamRow.userRequestStatus === 'Pending' || teamRow.UserRequestStatus === 'Pending' || (teamRow.userRequestStatus as any) === 0 || (teamRow.UserRequestStatus as any) === 0;
                                                                 // If the user has no team (they may have been kicked), trust userTeam state.
                                                                 // Per-team isApproved prevents rejoining a team they're already "approved" in.
                                                                 // Capacity, not lineup: a full side can still take bench players.
@@ -3145,15 +3148,15 @@ export default function TournamentDetailsScreen() {
 
                                                                 return (
                                                                     <Button
-                                                                        className={t.requiresApproval || t.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
-                                                                        onPress={() => handleJoinTeam(teamId as string, t.requiresApproval || t.RequiresApproval)}
+                                                                        className={teamRow.requiresApproval || teamRow.RequiresApproval ? "bg-blue-500 py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-blue-500/20" : "bg-team py-3.5 rounded-2xl w-full mt-3 shadow-md shadow-team/20"}
+                                                                        onPress={() => handleJoinTeam(teamId as string, teamRow.requiresApproval || teamRow.RequiresApproval)}
                                                                         loading={joiningTeamId === teamId}
                                                                         disabled={joiningTeamId !== null || isPending}
                                                                     >
-                                                                        <Text numberOfLines={1} className={t.requiresApproval || t.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center w-full" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center w-full"}>
+                                                                        <Text numberOfLines={1} className={teamRow.requiresApproval || teamRow.RequiresApproval ? "text-white font-black uppercase tracking-widest text-sm text-center w-full" : "text-primary-foreground font-black uppercase tracking-widest text-sm text-center w-full"}>
                                                                             {isPending
-                                                                                ? 'Request Pending'
-                                                                                : (t.requiresApproval || t.RequiresApproval) ? 'Request to Join' : 'Join This Team'}
+                                                                                ? t('details.requestPending')
+                                                                                : (teamRow.requiresApproval || teamRow.RequiresApproval) ? t('details.requestToJoin') : t('details.joinThisTeam')}
                                                                         </Text>
                                                                     </Button>
                                                                 );
@@ -3172,7 +3175,7 @@ export default function TournamentDetailsScreen() {
                                 <View className="mt-2">
                                     <View className="flex-row justify-between items-center mb-4">
                                         <Text className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-                                            Pending Requests
+                                            {t('details.pendingRequests')}
                                         </Text>
                                         {(() => {
                                             const displayedRegistrations = pendingRegistrations.reduce((acc: any[], current: any) => {
@@ -3193,7 +3196,7 @@ export default function TournamentDetailsScreen() {
                                                     loading={isLoadingPending}
                                                     className="bg-primary"
                                                 >
-                                                    Approve All
+                                                    {t('details.approveAll')}
                                                 </Button>
                                             );
                                         })()}
@@ -3204,7 +3207,7 @@ export default function TournamentDetailsScreen() {
                                     ) : pendingRegistrations.length === 0 ? (
                                         <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#F59E0B" />
-                                            <Text className="text-slate-400 mt-4 text-center">No pending requests.</Text>
+                                            <Text className="text-slate-400 mt-4 text-center">{t('details.noPendingRequests')}</Text>
                                         </View>
                                     ) : (
                                         pendingRegistrations.reduce((acc: any[], current: any) => {
@@ -3252,18 +3255,18 @@ export default function TournamentDetailsScreen() {
                                                             </View>
                                                             <View className="flex-1">
                                                                 <Text className="font-black text-lg text-white" numberOfLines={1}>
-                                                                    {teamName || 'Unknown Team'}
+                                                                    {teamName || t('details.unknownTeam')}
                                                                 </Text>
                                                                 <View className="flex-row items-center gap-2 mt-1">
                                                                     {(memberCount >= roster.rosterCapacity && teamSize > 0) ? (
                                                                         <View className="bg-warning/10 px-2 py-0.5 rounded-full border border-warning/20 flex-shrink-0">
                                                                             <Text className="text-[9px] font-black text-warning uppercase">
-                                                                                {TEAM_LABELS.TEAM_FULL}
+                                                                                {tTeam('teamFull')}
                                                                             </Text>
                                                                         </View>
                                                                     ) : (
                                                                         <Text className="text-[10px] font-bold tracking-widest uppercase text-slate-400 flex-shrink-0">
-                                                                            {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {TEAM_LABELS.MEMBERS_LABEL}
+                                                                            {roster.starterCount} / {teamSize > 0 ? teamSize : '?'} {tTeam('membersLabel')}
                                                                         </Text>
                                                                     )}
                                                                     {roster.allowReserves && roster.reserveCount > 0 && (
@@ -3311,10 +3314,10 @@ export default function TournamentDetailsScreen() {
                                                                                     {isMemberCaptain ? (
                                                                                         <View className="flex-row items-center gap-1 mt-0.5">
                                                                                             <Ionicons name="shield-checkmark" size={10} color="#F59E0B" />
-                                                                                            <Text className="text-[9px] font-black text-warning uppercase tracking-wider">Captain</Text>
+                                                                                            <Text className="text-[9px] font-black text-warning uppercase tracking-wider">{tTeam('captainBadge')}</Text>
                                                                                         </View>
                                                                                     ) : (
-                                                                                        <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">Player</Text>
+                                                                                        <Text className="text-[10px] font-semibold text-slate-500 mt-0.5">{tCommon('player')}</Text>
                                                                                     )}
                                                                                 </View>
                                                                                 <Ionicons name="chevron-forward" size={14} color="#475569" />
@@ -3322,7 +3325,7 @@ export default function TournamentDetailsScreen() {
                                                                         );
                                                                     })
                                                                 ) : (
-                                                                    <Text className="text-slate-500 text-center text-xs py-2 italic">No members found</Text>
+                                                                    <Text className="text-slate-500 text-center text-xs py-2 italic">{t('details.noMembersFound')}</Text>
                                                                 )}
 
                                                                 {teamSize > 0 && Array.from({ length: Math.max(0, teamSize - membersList.length) }).map((_, si) => (
@@ -3337,7 +3340,7 @@ export default function TournamentDetailsScreen() {
                                                                         >
                                                                             <Ionicons name="person-add-outline" size={14} color="#475569" />
                                                                         </View>
-                                                                        <Text className="text-slate-600 text-xs font-semibold">Open slot</Text>
+                                                                        <Text className="text-slate-600 text-xs font-semibold">{t('details.openSlot')}</Text>
                                                                     </View>
                                                                 ))}
                                                             </View>
@@ -3355,7 +3358,7 @@ export default function TournamentDetailsScreen() {
                                                                 ) : (
                                                                     <>
                                                                         <Ionicons name="checkmark" size={18} color="#10B981" />
-                                                                        <Text className="text-primary font-bold text-sm">Approve</Text>
+                                                                        <Text className="text-primary font-bold text-sm">{t('details.approve')}</Text>
                                                                     </>
                                                                 )}
                                                             </Pressable>
@@ -3365,7 +3368,7 @@ export default function TournamentDetailsScreen() {
                                                                 className="flex-row items-center justify-center gap-2 h-11 px-5 rounded-2xl bg-red-500/10 border border-red-500/20 active:opacity-60"
                                                             >
                                                                 <Ionicons name="close" size={18} color="#EF4444" />
-                                                                <Text className="text-red-400 font-bold text-sm">Decline</Text>
+                                                                <Text className="text-red-400 font-bold text-sm">{t('details.decline')}</Text>
                                                             </Pressable>
                                                         </View>
                                                     </Pressable>
@@ -3387,7 +3390,7 @@ export default function TournamentDetailsScreen() {
                             <View className="flex-row items-center justify-between mb-1">
                                 <View className="flex-row items-center gap-2">
                                     <Ionicons name="people-outline" size={20} color="#3B82F6" />
-                                    <Text className="text-lg font-black text-white">Players</Text>
+                                    <Text className="text-lg font-black text-white">{t('details.playersTitle')}</Text>
                                 </View>
                             </View>
 
@@ -3395,10 +3398,10 @@ export default function TournamentDetailsScreen() {
                             <View className="mb-2">
                                 <PremiumTabs
                                     tabs={[
-                                        { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
+                                        { value: 'confirmed', label: t('details.tabConfirmed'), icon: 'checkmark-circle-outline' },
                                         ...(canManage ? [{
                                             value: 'registrations',
-                                            label: 'Registrations',
+                                            label: t('details.tabRegistrations'),
                                             icon: 'hourglass-outline' as const,
                                             // Use the live list length once it's been fetched, but fall back to the
                                             // cascaded approval count so the badge shows immediately — before the
@@ -3426,7 +3429,7 @@ export default function TournamentDetailsScreen() {
                                 <SearchInput
                                     value={playerSearch}
                                     onChange={setPlayerSearch}
-                                    placeholder={playersTab === 'confirmed' ? 'Search confirmed players…' : 'Search registrations…'}
+                                    placeholder={playersTab === 'confirmed' ? t('details.searchConfirmed') : t('details.searchRegistrations')}
                                     className="mb-1"
                                 />
                             )}
@@ -3438,7 +3441,7 @@ export default function TournamentDetailsScreen() {
                                 ) : participants.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
-                                        <Text className="text-slate-400 mt-4 text-center">No confirmed players yet.</Text>
+                                        <Text className="text-slate-400 mt-4 text-center">{t('details.noConfirmedPlayers')}</Text>
                                     </View>
                                 ) : filteredParticipants.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
@@ -3508,7 +3511,7 @@ export default function TournamentDetailsScreen() {
                                                             </View>
                                                             <View style={{ shadowColor: '#10B981', shadowOpacity: 0.3, shadowRadius: 7, shadowOffset: { width: 0, height: 2 } }}>
                                                                 <View style={{ borderWidth: 1.5, borderColor: isCurrentUser ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)', borderRadius: 999, padding: 2 }}>
-                                                                    <PlayerAvatar src={p.avatarUrl || p.AvatarUrl} name={p.username || p.Username || 'Player'} size="md" />
+                                                                    <PlayerAvatar src={p.avatarUrl || p.AvatarUrl} name={p.username || p.Username || tCommon('player')} size="md" />
                                                                 </View>
                                                                 <View
                                                                     className="absolute items-center justify-center"
@@ -3522,13 +3525,13 @@ export default function TournamentDetailsScreen() {
                                                                     <Text className="font-black text-base text-white" numberOfLines={1}>{p.username || p.Username}</Text>
                                                                     {isCurrentUser && (
                                                                         <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
-                                                                            <Text className="text-[9px] font-black uppercase tracking-wider text-emerald-300">You</Text>
+                                                                            <Text className="text-[9px] font-black uppercase tracking-wider text-emerald-300">{t('details.youBadge')}</Text>
                                                                         </View>
                                                                     )}
                                                                 </View>
                                                                 <View className="flex-row items-center gap-1 mt-1">
                                                                     <View className="w-1 h-1 rounded-full" style={{ backgroundColor: '#10B981' }} />
-                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: 'rgba(16,185,129,0.8)' }}>Confirmed</Text>
+                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: 'rgba(16,185,129,0.8)' }}>{t('details.confirmedBadge')}</Text>
                                                                 </View>
                                                             </View>
                                                             <View
@@ -3544,7 +3547,7 @@ export default function TournamentDetailsScreen() {
                                                     <Pressable
                                                         onPress={() => setParticipantSwapTarget({
                                                             userId: pUserId,
-                                                            username: p.username || p.Username || 'Player',
+                                                            username: p.username || p.Username || tCommon('player'),
                                                             avatarUrl: p.avatarUrl || p.AvatarUrl,
                                                         })}
                                                         disabled={processingId !== null}
@@ -3562,7 +3565,7 @@ export default function TournamentDetailsScreen() {
                                                     <Pressable
                                                         onPress={() => setRemoveParticipantTarget({
                                                             userId: pUserId,
-                                                            username: p.username || p.Username || 'this player',
+                                                            username: p.username || p.Username || t('details.thisPlayer'),
                                                         })}
                                                         disabled={processingId !== null}
                                                         className="w-11 h-11 rounded-2xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
@@ -3594,7 +3597,7 @@ export default function TournamentDetailsScreen() {
                                                 loading={isLoadingPending}
                                                 className="bg-primary"
                                             >
-                                                Approve All
+                                                {t('details.approveAll')}
                                             </Button>
                                         </View>
                                     )}
@@ -3603,7 +3606,7 @@ export default function TournamentDetailsScreen() {
                                     ) : pendingRegistrations.length === 0 ? (
                                         <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
-                                            <Text className="text-slate-400 mt-4 text-center">No pending registrations.</Text>
+                                            <Text className="text-slate-400 mt-4 text-center">{t('details.noPendingRegistrations')}</Text>
                                         </View>
                                     ) : filteredRegistrations.length === 0 ? (
                                         <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
@@ -3650,7 +3653,7 @@ export default function TournamentDetailsScreen() {
                                                         >
                                                             <View style={{ shadowColor: '#F59E0B', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
                                                                 <View style={{ borderWidth: 1.5, borderColor: 'rgba(245,158,11,0.5)', borderRadius: 999, padding: 2 }}>
-                                                                    <PlayerAvatar src={reg.avatarUrl || reg.AvatarUrl} name={reg.username || reg.Username || 'Unknown'} size="md" />
+                                                                    <PlayerAvatar src={reg.avatarUrl || reg.AvatarUrl} name={reg.username || reg.Username || tCommon('unknown')} size="md" />
                                                                 </View>
                                                                 <View
                                                                     className="absolute items-center justify-center"
@@ -3666,7 +3669,7 @@ export default function TournamentDetailsScreen() {
                                                                 </View>
                                                                 <View className="flex-row items-center gap-1 mt-1">
                                                                     <Ionicons name="person-add" size={11} color="#FBBF24" />
-                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1px]" style={{ color: '#FCD34D' }}>Wants to join</Text>
+                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1px]" style={{ color: '#FCD34D' }}>{t('details.wantsToJoin')}</Text>
                                                                 </View>
                                                             </View>
                                                         </Pressable>
@@ -3730,7 +3733,7 @@ export default function TournamentDetailsScreen() {
                 matchId={selectedMatch?.id}
                 tournamentId={id}
                 tournamentName={tournament?.name}
-                roundName={selectedMatch?.roundName || 'Match Details'}
+                roundName={selectedMatch?.roundName || t('details.matchDetails')}
                 opponentName={selectedMatch?.away?.username}
                 // formatDateTimeShort parses as UTC (backend timestamps carry no Z suffix, so raw
                 // parsing reads the UTC clock as local and shows a shifted kick-off time) and
@@ -3826,13 +3829,13 @@ export default function TournamentDetailsScreen() {
                 onClose={() => setJoinPrompt(null)}
                 onConfirm={handleJoinPromptConfirm}
                 isDestructive={false}
-                title={joinPrompt?.requiresApproval ? 'Request to Join' : 'Join Team'}
+                title={joinPrompt?.requiresApproval ? t('details.requestToJoin') : t('details.joinTeam')}
                 message={
                     joinPrompt?.requiresApproval
-                        ? `Send a request to join ${joinPrompt?.teamName}? The captain will need to approve it.`
-                        : `Join ${joinPrompt?.teamName}?`
+                        ? t('details.joinPromptRequest', { teamName: joinPrompt?.teamName })
+                        : t('details.joinPromptDirect', { teamName: joinPrompt?.teamName })
                 }
-                confirmText={joinPrompt?.requiresApproval ? 'Request to Join' : 'Join This Team'}
+                confirmText={joinPrompt?.requiresApproval ? t('details.requestToJoin') : t('details.joinThisTeam')}
                 isLoading={joiningTeamId !== null && joiningTeamId === joinPrompt?.teamId}
             />
 
@@ -3875,7 +3878,7 @@ export default function TournamentDetailsScreen() {
                 visible={showCountriesModal}
                 onClose={() => setShowCountriesModal(false)}
                 codes={tournament?.countries || []}
-                title="Eligible Countries"
+                title={t('details.eligibleCountries')}
             />
 
             {/* Team Match Detail Modal */}
@@ -3900,9 +3903,9 @@ export default function TournamentDetailsScreen() {
                 visible={showStartConfirm}
                 onClose={() => setShowStartConfirm(false)}
                 onConfirm={() => { setShowStartConfirm(false); handleCreateBracket(); }}
-                title="Start the tournament?"
-                message={`The ${getTournamentFormatLabel(Number(tournament?.format))} schedule is generated from a random draw.\n\nEveryone registered gets a notification and the tournament goes live.`}
-                confirmText="Generate bracket"
+                title={t('details.startTournamentTitle')}
+                message={t('details.startTournamentMessage', { format: getTournamentFormatLabel(Number(tournament?.format), t) })}
+                confirmText={t('details.generateBracket')}
                 isDestructive={false}
                 stacked
             />
@@ -3939,9 +3942,9 @@ export default function TournamentDetailsScreen() {
                 visible={!!removeParticipantTarget}
                 onClose={() => setRemoveParticipantTarget(null)}
                 onConfirm={() => removeParticipantTarget && handleRemoveParticipant(removeParticipantTarget.userId)}
-                title="Remove this player?"
-                message={`${removeParticipantTarget?.username} is taken out of the tournament along with their registration.\n\nTo hand their spot to someone else instead — keeping the seed and any results — use the swap button.`}
-                confirmText="Remove player"
+                title={t('details.removePlayerTitle')}
+                message={t('details.removePlayerMessage', { username: removeParticipantTarget?.username })}
+                confirmText={t('details.removePlayer')}
                 isLoading={processingId === removeParticipantTarget?.userId}
                 stacked
             />
@@ -3959,7 +3962,7 @@ export default function TournamentDetailsScreen() {
                     visible={shareCardVisible}
                     onClose={() => setShareCardVisible(false)}
                     tournamentId={id}
-                    name={tournament.name || 'Tournament'}
+                    name={tournament.name || t('details.headerTournament')}
                     status={Number(tournament.status)}
                     isTeam={!!tournament.isTeamTournament}
                     participants={tournament.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0)}

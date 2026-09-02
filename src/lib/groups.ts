@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 /**
  * Group labels, mirroring the server's GroupNaming helper.
  *
@@ -24,7 +25,7 @@ export function groupLabel(index: number, totalGroups: number): string {
 
 /** Full display name for the group at `index`, e.g. "Group C". */
 export function groupName(index: number, totalGroups: number): string {
-    return `Group ${groupLabel(index, totalGroups)}`;
+    return i18n.t('common:groupN', { label: groupLabel(index, totalGroups) });
 }
 
 /**

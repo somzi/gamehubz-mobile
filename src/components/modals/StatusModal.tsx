@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,8 +19,9 @@ export function StatusModal({
     type = 'success',
     title,
     message,
-    buttonText = 'Okay'
+    buttonText
 }: StatusModalProps) {
+    const { t } = useTranslation('common');
     const getIcon = () => {
         switch (type) {
             case 'success':
@@ -67,7 +69,7 @@ export function StatusModal({
                             onPress={onClose}
                             variant={type === 'error' ? 'destructive' : 'default'}
                         >
-                            {buttonText}
+                            {buttonText ?? t('app.okay')}
                         </Button>
                     </View>
                 </View>

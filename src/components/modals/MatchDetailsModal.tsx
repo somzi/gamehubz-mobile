@@ -22,6 +22,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { cn, parseUtcDate, formatDateTimeShort } from '../../lib/utils';
 import { MatchStage } from '../../types/tournament';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
@@ -36,6 +37,7 @@ import {
     normalizeCondition,
     seriesGamesFrom,
 } from '../../lib/series';
+import i18n from '../../i18n';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -154,6 +156,8 @@ export function MatchDetailsModal({
     defaultTab = 'match',
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
+    const { t } = useTranslation('match');
+    const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const insets = useSafeAreaInsets();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -246,7 +250,7 @@ export function MatchDetailsModal({
     const [isResolvingHelp, setIsResolvingHelp] = useState(false);
     // What the admin just did, so the prompt opens with an accurate confirmation of it.
     // Stored without trailing punctuation — the copy below supplies it.
-    const [settleSummary, setSettleSummary] = useState('Result saved');
+    const [settleSummary, setSettleSummary] = useState(() => t('details.resultSaved'));
 
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
@@ -382,7 +386,7 @@ export function MatchDetailsModal({
                     if (inlineAvailability.matchDeadline) setLocalDeadline(inlineAvailability.matchDeadline);
                     if (inlineAvailability.confirmedTime) {
                         const confirmedDate = parseUtcDate(inlineAvailability.confirmedTime);
-                        setConfirmedTime(confirmedDate.toLocaleString());
+                        setConfirmedTime(confirmedDate.toLocaleString(i18n.language));
                         setConfirmedTimeIso(inlineAvailability.confirmedTime);
                         setCurrentStatus('scheduled');
                     }
@@ -431,11 +435,11 @@ export function MatchDetailsModal({
                     setConfirmedTime(formatDateTimeShort(normalizedData.scheduledTime, '\n'));
                 }
             } else {
-                setError('Failed to load match results');
+                setError(t('details.loadResultsFailed'));
             }
         } catch (err) {
             console.error('Error fetching match details:', err);
-            setError('An error occurred while loading results');
+            setError(t('details.loadResultsError'));
         } finally {
             setIsLoadingDetails(false);
             setIsEditMode(false);
@@ -456,7 +460,7 @@ export function MatchDetailsModal({
                 }
                 if (data.confirmedTime) {
                     const confirmedDate = parseUtcDate(data.confirmedTime);
-                    setConfirmedTime(confirmedDate.toLocaleString());
+                    setConfirmedTime(confirmedDate.toLocaleString(i18n.language));
                     setConfirmedTimeIso(data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
@@ -472,7 +476,7 @@ export function MatchDetailsModal({
         try {
             const { status: pStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (pStatus !== 'granted') {
-                setError('Sorry, we need camera roll permissions to make this work!');
+                setError(t('details.cameraRollPermission'));
                 return;
             }
 
@@ -486,8 +490,8 @@ export function MatchDetailsModal({
                 const oversized = result.assets.filter(asset => !isFileSizeValid(asset));
 
                 if (oversized.length > 0) {
-                    const oversizedNames = oversized.map(a => a.fileName || 'Image').join(', ');
-                    setError(`Some images are too large: ${oversizedNames}. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`);
+                    const oversizedNames = oversized.map(a => a.fileName || t('details.imageFallbackName')).join(', ');
+                    setError(t('details.imagesTooLarge', { names: oversizedNames, max: formatFileSize(MAX_FILE_SIZE) }));
 
                     const validAssets = result.assets.filter(asset => isFileSizeValid(asset));
                     if (validAssets.length > 0) {
@@ -500,7 +504,7 @@ export function MatchDetailsModal({
             }
         } catch (err) {
             console.error('Error picking images:', err);
-            setError('Failed to pick images');
+            setError(t('details.pickImagesFailed'));
         }
     };
 
@@ -533,7 +537,7 @@ export function MatchDetailsModal({
 
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to upload images');
+                throw new Error(text || t('details.uploadImagesFailed'));
             }
 
             setSelectedImages([]);
@@ -542,7 +546,7 @@ export function MatchDetailsModal({
 
         } catch (err: any) {
             console.error('Upload evidence error:', err);
-            setError(err.message || 'An error occurred while uploading evidence');
+            setError(err.message || t('details.uploadEvidenceError'));
         } finally {
             setIsUploadingEvidence(false);
         }
@@ -581,7 +585,7 @@ export function MatchDetailsModal({
             });
             if (!response.ok) {
                 const text = await response.text().catch(() => '');
-                throw new Error(text || 'Failed to resolve the help request');
+                throw new Error(text || t('details.resolveHelpFailed'));
             }
             if (onMatchUpdate) onMatchUpdate();
             closeAfterPrompt();
@@ -592,7 +596,7 @@ export function MatchDetailsModal({
             // Refetch first: fetchMatchDetails clears `error` on entry and would wipe the message.
             setShowResolveHelpPrompt(false);
             await fetchMatchDetails();
-            setError(`${settleSummary}, but the help request could not be closed — use "Mark Resolved" below to try again.`);
+            setError(t('details.helpNotClosed', { summary: settleSummary }));
         } finally {
             setIsResolvingHelp(false);
         }
@@ -603,15 +607,15 @@ export function MatchDetailsModal({
 
         if (isSeriesMatch) {
             if (seriesGames.length === 0) {
-                setError('Enter the score for at least one game');
+                setError(t('details.enterAtLeastOneGame'));
                 return;
             }
             if (!isSeriesComplete) {
-                setError('Enter the remaining games before submitting');
+                setError(t('details.enterRemainingGames'));
                 return;
             }
         } else if (homeScore === '' || awayScore === '') {
-            setError('Please enter scores for both players');
+            setError(t('details.enterBothScores'));
             return;
         }
 
@@ -649,7 +653,7 @@ export function MatchDetailsModal({
 
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to report result');
+                throw new Error(text || t('details.reportResultFailed'));
             }
 
             // Backend returns the freshly computed bracket structure inline so the parent
@@ -685,11 +689,11 @@ export function MatchDetailsModal({
                 setIsEditMode(false);
                 await fetchMatchDetails();
             } else {
-                finishAfterSettle(isEditMode ? 'Result updated' : 'Result saved');
+                finishAfterSettle(isEditMode ? t('details.resultUpdated') : t('details.resultSaved'));
             }
         } catch (err: any) {
             console.error('Report result error:', err);
-            setError(err.message || 'An error occurred while reporting result');
+            setError(err.message || t('details.reportResultError'));
         } finally {
             setIsSubmitting(false);
         }
@@ -706,13 +710,13 @@ export function MatchDetailsModal({
             });
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to approve result');
+                throw new Error(text || t('details.approveResultFailed'));
             }
             if (onMatchUpdate) onMatchUpdate();
-            finishAfterSettle('Result approved');
+            finishAfterSettle(t('details.resultApproved'));
         } catch (err: any) {
             console.error('Approve result error:', err);
-            setError(err.message || 'An error occurred while approving the result');
+            setError(err.message || t('details.approveResultError'));
         } finally {
             setIsApproving(false);
         }
@@ -729,13 +733,13 @@ export function MatchDetailsModal({
             });
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to reject result');
+                throw new Error(text || t('details.rejectResultFailed'));
             }
             if (onMatchUpdate) onMatchUpdate();
             await fetchMatchDetails();
         } catch (err: any) {
             console.error('Reject result error:', err);
-            setError(err.message || 'An error occurred while rejecting the result');
+            setError(err.message || t('details.rejectResultError'));
         } finally {
             setIsRejecting(false);
         }
@@ -767,13 +771,13 @@ export function MatchDetailsModal({
             });
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to delete result');
+                throw new Error(text || t('details.deleteResultFailed'));
             }
             if (onMatchUpdate) onMatchUpdate();
             onClose();
         } catch (err: any) {
             console.error('Delete result error:', err);
-            setError(err.message || 'An error occurred while deleting the result');
+            setError(err.message || t('details.deleteResultError'));
         } finally {
             setIsDeletingResult(false);
         }
@@ -785,7 +789,7 @@ export function MatchDetailsModal({
         const isUpper = a.isUpperBracket ?? a.IsUpperBracket ?? true;
         const hs = a.homeScore ?? a.HomeScore ?? 0;
         const as = a.awayScore ?? a.AwayScore ?? 0;
-        const side = isUpper ? `Round ${round}` : `Losers R${round}`;
+        const side = isUpper ? t('details.roundLabel', { round }) : t('details.losersRoundLabel', { round });
         return `${side}  ·  ${hs}–${as}`;
     };
 
@@ -819,24 +823,24 @@ export function MatchDetailsModal({
                 // Undoing a no-show isn't deleting a played result — it just reopens a fixture
                 // nobody played, so it gets its own, non-alarming copy.
                 Alert.alert(
-                    isNoShow ? 'Undo no-show?' : 'Delete result?',
+                    isNoShow ? t('details.undoNoShowTitle') : t('details.deleteResultTitle'),
                     isNoShow
-                        ? 'This reopens the match so it can be played or reported normally. Standings are unaffected — a no-show never counted.'
-                        : 'This clears the score and winner and reopens the match. You can report the result again afterwards.',
+                        ? t('details.undoNoShowBody')
+                        : t('details.deleteResultBody'),
                     [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: isNoShow ? 'Undo' : 'Delete', style: 'destructive', onPress: () => onConfirm(false) },
+                        { text: tCommon('cancel'), style: 'cancel' },
+                        { text: isNoShow ? t('details.undo') : tCommon('delete'), style: 'destructive', onPress: () => onConfirm(false) },
                     ],
                 );
             } else {
                 Alert.alert(
-                    'Save changes?',
+                    t('details.saveChangesTitle'),
                     isNoShow
-                        ? 'This replaces the no-show with a real result and counts it towards the standings.'
-                        : 'This changes the winner and re-advances the bracket.',
+                        ? t('details.replaceNoShowBody')
+                        : t('details.changeWinnerBody'),
                     [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Save', onPress: () => onConfirm(false) },
+                        { text: tCommon('cancel'), style: 'cancel' },
+                        { text: tCommon('save'), onPress: () => onConfirm(false) },
                     ],
                 );
             }
@@ -844,14 +848,13 @@ export function MatchDetailsModal({
         }
 
         const list = affected.map((a) => `•  ${describeAffected(a)}`).join('\n');
-        const verb = mode === 'delete' ? 'Deleting' : 'Changing';
         Alert.alert(
-            `${count} linked result${count > 1 ? 's' : ''} will also be reopened`,
-            `${verb} this result first reopens ${count} already-played match${count > 1 ? 'es' : ''} below it — their scores will be cleared and they'll have to be played again:\n\n${list}\n\nThis cannot be undone. Continue?`,
+            t('details.linkedReopenTitle', { count }),
+            t(mode === 'delete' ? 'details.linkedReopenBodyDelete' : 'details.linkedReopenBodyChange', { count, list }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: mode === 'delete' ? 'Delete all' : 'Change & reopen',
+                    text: mode === 'delete' ? t('details.deleteAll') : t('details.changeAndReopen'),
                     style: 'destructive',
                     onPress: () => onConfirm(true),
                 },
@@ -872,11 +875,11 @@ export function MatchDetailsModal({
     const handleSubmitEdit = () => {
         if (isSeriesMatch) {
             if (!isSeriesComplete) {
-                setError('Enter the remaining games before submitting');
+                setError(t('details.enterRemainingGames'));
                 return;
             }
         } else if (homeScore === '' || awayScore === '') {
-            setError('Please enter scores for both players');
+            setError(t('details.enterBothScores'));
             return;
         }
 
@@ -897,11 +900,11 @@ export function MatchDetailsModal({
 
         if (winnerUnchanged) {
             Alert.alert(
-                'Save changes?',
-                'This updates the result. The winner stays the same, so the rest of the bracket is unaffected.',
+                t('details.saveChangesTitle'),
+                t('details.updatesResultBody'),
                 [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Save', onPress: () => handleSubmitResult(false) },
+                    { text: tCommon('cancel'), style: 'cancel' },
+                    { text: tCommon('save'), onPress: () => handleSubmitResult(false) },
                 ],
             );
             return;
@@ -921,13 +924,13 @@ export function MatchDetailsModal({
             });
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to apply double walkover');
+                throw new Error(text || t('details.doubleWalkoverFailed'));
             }
             if (onMatchUpdate) onMatchUpdate();
-            finishAfterSettle('Double walkover applied');
+            finishAfterSettle(t('details.doubleWalkoverApplied'));
         } catch (err: any) {
             console.error('Double walkover error:', err);
-            setError(err.message || 'An error occurred while applying the double walkover');
+            setError(err.message || t('details.doubleWalkoverError'));
         } finally {
             setIsApplyingWalkover(false);
         }
@@ -939,19 +942,19 @@ export function MatchDetailsModal({
     // a team-tie game closes as a no-show counting for neither team, and if no game of the tie
     // ends up played the whole tie is voided. Backend re-checks the manage permission and state.
     const handleDoubleWalkover = () => {
-        const homeName = home?.username || matchDetails?.homeUser || 'Player 1';
-        const awayName = away?.username || matchDetails?.awayUser || 'Player 2';
+        const homeName = home?.username || matchDetails?.homeUser || t('details.player1');
+        const awayName = away?.username || matchDetails?.awayUser || t('details.player2');
         const message = matchDetails?.isTeamSub
-            ? `Neither ${homeName} nor ${awayName} played this game, so it closes as a no-show and counts for neither team. The tie is decided by the games that were played — if none end up played, the whole tie is voided (both teams out, or zero points in a league). You can still enter a real result later. Continue?`
+            ? t('details.dwGameBody', { home: homeName, away: awayName })
             : isEliminationMatch
-                ? `Neither ${homeName} nor ${awayName} played, so both are eliminated and their opponent advances by walkover. This usually can't be undone once the opponent moves on. Continue?`
-                : `Neither ${homeName} nor ${awayName} played, so the match closes as a no-show: no points for either player (not a draw) and the round can continue. You can still enter a real result later. Continue?`;
+                ? t('details.dwEliminationBody', { home: homeName, away: awayName })
+                : t('details.dwDefaultBody', { home: homeName, away: awayName });
         Alert.alert(
-            'Double walkover?',
+            t('details.doubleWalkoverTitle'),
             message,
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Double walkover', style: 'destructive', onPress: submitDoubleWalkover },
+                { text: tCommon('cancel'), style: 'cancel' },
+                { text: t('details.doubleWalkover'), style: 'destructive', onPress: submitDoubleWalkover },
             ],
         );
     };
@@ -1084,7 +1087,7 @@ export function MatchDetailsModal({
             return (
                 <View className="flex-1 items-center justify-center py-20">
                     <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-slate-500 mt-4 font-bold uppercase tracking-widest text-[10px] w-full text-center" numberOfLines={1}>Loading match data...</Text>
+                    <Text className="text-slate-500 mt-4 font-bold uppercase tracking-widest text-[10px] w-full text-center" numberOfLines={1}>{t('details.loadingMatchData')}</Text>
                 </View>
             );
         }
@@ -1093,7 +1096,7 @@ export function MatchDetailsModal({
             return (
                 <View className="py-20 items-center">
                     <Ionicons name="alert-circle-outline" size={48} color="#71717A" />
-                    <Text className="text-muted-foreground mt-2">{error || 'No details available'}</Text>
+                    <Text className="text-muted-foreground mt-2">{error || t('details.noDetailsAvailable')}</Text>
                 </View>
             );
         }
@@ -1121,12 +1124,12 @@ export function MatchDetailsModal({
                                     "text-[9px] font-black uppercase tracking-[3px]",
                                     isNoShow ? "text-warning" : "text-primary"
                                 )}>
-                                    {isNoShow ? 'No-Show' : 'Final Score'}
+                                    {isNoShow ? t('details.noShowHeading') : t('details.finalScore')}
                                 </Text>
                             </View>
                             {isNoShow && (
                                 <Text className="text-[10px] text-slate-500 mt-2 font-bold text-center px-6">
-                                    Nobody played — no points for either side
+                                    {t('details.nobodyPlayed')}
                                 </Text>
                             )}
                         </View>
@@ -1164,7 +1167,7 @@ export function MatchDetailsModal({
                                 <View className="mt-1.5 h-5 items-center justify-center">
                                     {winner === 'home' && (
                                         <View className="bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">Winner</Text>
+                                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">{t('details.winner')}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -1213,7 +1216,7 @@ export function MatchDetailsModal({
                                 <View className="mt-1.5 h-5 items-center justify-center">
                                     {winner === 'away' && (
                                         <View className="bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">Winner</Text>
+                                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">{t('details.winner')}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -1257,7 +1260,7 @@ export function MatchDetailsModal({
                             <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
                                 <Ionicons name="images-outline" size={18} color="#818CF8" />
                             </View>
-                            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>No Evidence Attached</Text>
+                            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>{t('details.noEvidenceAttached')}</Text>
                         </View>
                     )}
                 </EvidenceSection>
@@ -1278,7 +1281,7 @@ export function MatchDetailsModal({
                                 <Ionicons name="create-outline" size={16} color="#10B981" />
                             </View>
                             <Text className="text-sm font-black text-primary uppercase tracking-widest" numberOfLines={1}>
-                                {isNoShow ? 'Enter Result' : 'Edit Result'}
+                                {isNoShow ? t('details.enterResult') : t('details.editResult')}
                             </Text>
                         </Pressable>
                         <Pressable
@@ -1294,7 +1297,7 @@ export function MatchDetailsModal({
                                         <Ionicons name="trash-outline" size={16} color="#F87171" />
                                     </View>
                                     <Text className="text-sm font-black text-red-400 uppercase tracking-widest" numberOfLines={1}>
-                                        {isNoShow ? 'Undo No-Show' : 'Delete Result'}
+                                        {isNoShow ? t('details.undoNoShow') : t('details.deleteResultBtn')}
                                     </Text>
                                 </>
                             )}
@@ -1317,11 +1320,11 @@ export function MatchDetailsModal({
                 <View className="items-center mb-5">
                     <View className="bg-warning/10 px-4 py-1.5 rounded-full border border-warning/20">
                         <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">
-                            {isNoShow ? 'Entering Result' : 'Editing Result'}
+                            {isNoShow ? t('details.enteringResult') : t('details.editingResult')}
                         </Text>
                     </View>
                     <Text className="text-[10px] text-slate-500 mt-2 font-bold">
-                        {isNoShow ? 'Replaces The No-Show' : isHubOwner ? 'Hub Owner Privileges' : 'Fix Your Score'}
+                        {isNoShow ? t('details.replacesTheNoShow') : isHubOwner ? t('details.hubOwnerPrivileges') : t('details.fixYourScore')}
                     </Text>
                 </View>
 
@@ -1410,11 +1413,11 @@ export function MatchDetailsModal({
                             <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
                                 <Ionicons name="images-outline" size={14} color="#818CF8" />
                             </View>
-                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">Evidence</Text>
+                            <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">{t('details.evidence')}</Text>
                         </View>
                         <Pressable onPress={pickImages} className="flex-row items-center bg-primary/10 px-3 py-2 rounded-xl border border-primary/20 active:opacity-70">
                             <Ionicons name="add" size={14} color="#10B981" />
-                            <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider" numberOfLines={1}>Add</Text>
+                            <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider" numberOfLines={1}>{t('details.addEvidence')}</Text>
                         </Pressable>
                     </View>
                     {selectedImages.length > 0 ? (
@@ -1433,7 +1436,7 @@ export function MatchDetailsModal({
                     ) : (
                         <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                             <Ionicons name="images-outline" size={22} color="#334155" />
-                            <Text className="text-[10px] text-slate-600 mt-1 font-bold">No photos selected</Text>
+                            <Text className="text-[10px] text-slate-600 mt-1 font-bold">{t('details.noPhotosSelected')}</Text>
                         </Pressable>
                     )}
                 </View>
@@ -1444,7 +1447,7 @@ export function MatchDetailsModal({
                         onPress={handleCancelEdit}
                         className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
                     >
-                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Cancel</Text>
+                        <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>{tCommon('cancel')}</Text>
                     </Pressable>
                     <Pressable
                         onPress={handleSubmitEdit}
@@ -1453,7 +1456,7 @@ export function MatchDetailsModal({
                         {isSubmitting ? (
                             <ActivityIndicator size="small" color="#0F172A" />
                         ) : (
-                            <Text className="text-sm font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>Save</Text>
+                            <Text className="text-sm font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>{tCommon('save')}</Text>
                         )}
                     </Pressable>
                 </View>
@@ -1482,13 +1485,13 @@ export function MatchDetailsModal({
                     <View className="items-center mb-5">
                         <View className="bg-warning/10 px-4 py-1.5 rounded-full">
                             <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">
-                                {isProposer ? 'Awaiting Approval' : 'Result Reported'}
+                                {isProposer ? t('details.awaitingApprovalHeading') : t('details.resultReported')}
                             </Text>
                         </View>
                         <Text className="text-[10px] text-slate-400 mt-2 font-bold text-center">
                             {isProposer
-                                ? 'Your opponent needs to confirm before this match is final.'
-                                : `${proposerName} reported the result. Confirm if it's correct.`}
+                                ? t('details.opponentMustConfirm')
+                                : t('details.proposerReported', { name: proposerName })}
                         </Text>
                     </View>
 
@@ -1546,7 +1549,7 @@ export function MatchDetailsModal({
                                     {isRejecting ? (
                                         <ActivityIndicator size="small" color="#F87171" />
                                     ) : (
-                                        <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Reject</Text>
+                                        <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('details.reject')}</Text>
                                     )}
                                 </Pressable>
                             )}
@@ -1559,7 +1562,7 @@ export function MatchDetailsModal({
                                     {isApproving ? (
                                         <ActivityIndicator size="small" color="#0F172A" />
                                     ) : (
-                                        <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>Approve</Text>
+                                        <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('details.approve')}</Text>
                                     )}
                                 </Pressable>
                             )}
@@ -1572,7 +1575,7 @@ export function MatchDetailsModal({
                                     }}
                                     className="flex-1 bg-warning/10 border border-warning/25 rounded-2xl py-3.5 items-center active:opacity-70"
                                 >
-                                    <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>Edit</Text>
+                                    <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>{tCommon('edit')}</Text>
                                 </Pressable>
                             )}
                         </View>
@@ -1626,12 +1629,12 @@ export function MatchDetailsModal({
                             </View>
                             <View className="flex-1">
                                 <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">
-                                    {isPrivileged && !isProposer ? 'Edit & Finalize' : 'Editing Your Report'}
+                                    {isPrivileged && !isProposer ? t('details.editAndFinalize') : t('details.editingYourReport')}
                                 </Text>
                                 <Text className="text-[11px] text-slate-400 mt-0.5">
                                     {isPrivileged && !isProposer
-                                        ? 'This will overwrite the proposal and finalize the match.'
-                                        : 'Update the score and tap Update Report to notify your opponent.'}
+                                        ? t('details.overwriteProposal')
+                                        : t('details.updateAndNotify')}
                                 </Text>
                             </View>
                         </View>
@@ -1652,9 +1655,9 @@ export function MatchDetailsModal({
                         <View className="flex-row items-center gap-3 mb-4 p-3.5 rounded-2xl bg-warning/[0.08] border border-warning/20">
                             <Ionicons name="flash" size={16} color="#F59E0B" />
                             <View className="flex-1">
-                                <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">Tiebreak Needed</Text>
+                                <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">{t('details.tiebreakNeeded')}</Text>
                                 <Text className="text-[11px] text-slate-400 mt-0.5">
-                                    The series finished level. Add the tiebreak games to decide the match.
+                                    {t('details.tiebreakNeededBody')}
                                 </Text>
                             </View>
                         </View>
@@ -1671,10 +1674,10 @@ export function MatchDetailsModal({
                     ) : isSeriesMatch ? (
                         <SeriesScoreEntry
                             key={`report-${matchId}-${entrySeedGames.length}-${seriesFormat.bestOf}`}
-                            leftName={effectiveHome?.username || 'Home'}
+                            leftName={effectiveHome?.username || t('details.homeSide')}
                             leftNickname={homeIdentity.nickname}
                             leftAvatarUrl={homeAvatar}
-                            rightName={effectiveAway?.username || opponentName || 'Away'}
+                            rightName={effectiveAway?.username || opponentName || t('details.awaySide')}
                             rightNickname={awayIdentity.nickname}
                             rightAvatarUrl={awayAvatar}
                             format={seriesFormat}
@@ -1691,9 +1694,9 @@ export function MatchDetailsModal({
                     ) : (
                     <View className="flex-row items-center justify-center gap-4">
                         <View className="flex-1 items-center gap-3">
-                            <PlayerAvatar src={homeAvatar} name={effectiveHome?.username || 'Home'} size="lg" className="rounded-2xl border-0" />
+                            <PlayerAvatar src={homeAvatar} name={effectiveHome?.username || t('details.homeSide')} size="lg" className="rounded-2xl border-0" />
                             <PlayerIdentity
-                                username={effectiveHome?.username || 'Home'}
+                                username={effectiveHome?.username || t('details.homeSide')}
                                 nickname={homeIdentity.nickname}
                                 tone="home"
                                 reserveNicknameSpace={pairingHasNickname}
@@ -1717,9 +1720,9 @@ export function MatchDetailsModal({
                             </View>
                         </View>
                         <View className="flex-1 items-center gap-3">
-                            <PlayerAvatar src={awayAvatar} name={effectiveAway?.username || opponentName || 'Away'} size="lg" className="rounded-2xl border-0" />
+                            <PlayerAvatar src={awayAvatar} name={effectiveAway?.username || opponentName || t('details.awaySide')} size="lg" className="rounded-2xl border-0" />
                             <PlayerIdentity
-                                username={effectiveAway?.username || opponentName || 'Away'}
+                                username={effectiveAway?.username || opponentName || t('details.awaySide')}
                                 nickname={awayIdentity.nickname}
                                 tone="away"
                                 reserveNicknameSpace={pairingHasNickname}
@@ -1745,14 +1748,14 @@ export function MatchDetailsModal({
                             onPress={() => { setIsEditingProposal(false); setHomeScore(''); setAwayScore(''); setError(null); }}
                             className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
                         >
-                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Cancel</Text>
+                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>{tCommon('cancel')}</Text>
                         </Pressable>
                     ) : (
                         <Pressable
                             onPress={() => { setHomeScore(''); setAwayScore(''); setError(null); setSelectedImages([]); }}
                             className="flex-1 bg-white/5 rounded-2xl py-4 items-center border border-white/[0.06] active:opacity-70"
                         >
-                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Clear</Text>
+                            <Text className="text-sm font-black text-slate-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('details.clear')}</Text>
                         </Pressable>
                     )}
                     <Pressable
@@ -1771,12 +1774,12 @@ export function MatchDetailsModal({
                                 ((isRoundLocked && !isHubOwner) || !canSubmit) ? "text-slate-500" : "text-primary-foreground"
                             )}>
                                 {(isRoundLocked && !isHubOwner)
-                                    ? "Locked"
+                                    ? t('details.locked')
                                     : !canSubmit
-                                        ? "View Only"
+                                        ? t('details.viewOnly')
                                         : isEditingProposal
-                                            ? "Update Report"
-                                            : (approvalRequired && !isPrivileged ? "Report" : "Submit")}
+                                            ? t('details.updateReport')
+                                            : (approvalRequired && !isPrivileged ? t('details.report') : t('details.submit'))}
                             </Text>
                         )}
                     </Pressable>
@@ -1801,16 +1804,16 @@ export function MatchDetailsModal({
                             ) : (
                                 <>
                                     <Ionicons name="play-skip-forward-outline" size={16} color="#F59E0B" />
-                                    <Text className="text-sm font-black text-warning uppercase tracking-wider" numberOfLines={1}>Double Walkover</Text>
+                                    <Text className="text-sm font-black text-warning uppercase tracking-wider" numberOfLines={1}>{t('details.doubleWalkoverBtn')}</Text>
                                 </>
                             )}
                         </Pressable>
                         <Text className="text-[11px] text-slate-500 mt-2 text-center px-2 leading-4">
                             {matchDetails?.isTeamSub
-                                ? 'Both players failed to play — closes this game as a no-show. It counts for neither team; if no game of the tie is played, the whole tie is voided.'
+                                ? t('details.dwHintGame')
                                 : isEliminationMatch
-                                    ? 'Both players failed to play — closes this match with no winner and advances their opponent automatically.'
-                                    : 'Both players failed to play — closes this match as a no-show. No points for either player (not a draw).'}
+                                    ? t('details.dwHintElimination')
+                                    : t('details.dwHintDefault')}
                         </Text>
                     </View>
                 )}
@@ -1829,7 +1832,7 @@ export function MatchDetailsModal({
                     >
                         {uploadedEvidenceCount > 0 && (
                             <View className={cn(canAttachEvidence && "mb-4")}>
-                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Uploaded</Text>
+                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{t('details.uploaded')}</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                     {matchDetails!.evidences.map((url, idx) => (
                                         <Pressable key={idx} className="mr-3" onPress={() => setPreviewImage(url)}>
@@ -1863,7 +1866,7 @@ export function MatchDetailsModal({
                         ) : (
                             <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                                 <Ionicons name="images-outline" size={22} color="#334155" />
-                                <Text className="text-[10px] text-slate-600 mt-1 font-bold">Tap to add result screenshots</Text>
+                                <Text className="text-[10px] text-slate-600 mt-1 font-bold">{t('details.tapToAddScreenshots')}</Text>
                             </Pressable>
                         ))}
 
@@ -1877,7 +1880,7 @@ export function MatchDetailsModal({
                                 ) : (
                                     <>
                                         <Ionicons name="cloud-upload-outline" size={14} color="#818CF8" />
-                                        <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider" numberOfLines={1}>Upload Evidence</Text>
+                                        <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider" numberOfLines={1}>{t('details.uploadEvidence')}</Text>
                                     </>
                                 )}
                             </Pressable>
@@ -1955,7 +1958,7 @@ export function MatchDetailsModal({
                             <Text numberOfLines={1} className={cn(
                                 "text-xs font-black uppercase tracking-widest w-full text-center",
                                 activeTab === 'match' ? "text-primary" : "text-slate-500"
-                            )}>Match</Text>
+                            )}>{t('tournament:details.match')}</Text>
                         </Pressable>
                         {showChatTab && (
                         <Pressable
@@ -1974,7 +1977,7 @@ export function MatchDetailsModal({
                                 <Text numberOfLines={1} className={cn(
                                     "text-xs font-black uppercase tracking-widest",
                                     activeTab === 'chat' ? "text-primary" : "text-slate-500"
-                                )}>Chat</Text>
+                                )}>{t('match:chat.chat')}</Text>
                                 {adminHelpRequested && (
                                     <View className="w-1.5 h-1.5 rounded-full bg-warning" />
                                 )}
@@ -1993,11 +1996,11 @@ export function MatchDetailsModal({
                                 <Text numberOfLines={1} className={cn(
                                     "text-xs font-black uppercase tracking-widest",
                                     activeTab === 'stream' ? "text-primary" : "text-slate-500"
-                                )}>Stream</Text>
+                                )}>{t('common:stream')}</Text>
                                 {hasLiveStream && (
                                     <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
                                         <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                        <Text className="text-[8px] font-black text-red-400 uppercase">Live</Text>
+                                        <Text className="text-[8px] font-black text-red-400 uppercase">{t('details.liveBadge')}</Text>
                                     </View>
                                 )}
                             </View>
@@ -2079,7 +2082,7 @@ export function MatchDetailsModal({
                                                         // parseUtcDate, not new Date(): the backend serializes without a
                                                         // Z suffix, so raw parsing reads UTC as local and shifts the time.
                                                         const confirmedDate = parseUtcDate(result.data.confirmedTime);
-                                                        setConfirmedTime(confirmedDate.toLocaleString());
+                                                        setConfirmedTime(confirmedDate.toLocaleString(i18n.language));
                                                         setConfirmedTimeIso(result.data.confirmedTime);
                                                         setCurrentStatus('scheduled');
                                                     }
@@ -2095,7 +2098,7 @@ export function MatchDetailsModal({
                                 </View>
                             ) : (
                                 <View className="py-10 items-center justify-center">
-                                    <Text className="text-muted-foreground italic">Scheduling Not Supported Here</Text>
+                                    <Text className="text-muted-foreground italic">{t('details.schedulingNotSupported')}</Text>
                                 </View>
                             )}
                         </View>
@@ -2126,10 +2129,10 @@ export function MatchDetailsModal({
                 visible={showResolveHelpPrompt}
                 onClose={closeAfterPrompt}
                 onConfirm={confirmResolveHelp}
-                title="Close the help request?"
-                message={`${settleSummary} — ${adminHelpRequesterName || 'a player'} asked for help here.`}
-                confirmText="Mark Resolved"
-                cancelText="Keep It Open"
+                title={t('details.closeHelpTitle')}
+                message={t('details.closeHelpMessage', { summary: settleSummary, name: adminHelpRequesterName || t('details.aPlayer') })}
+                confirmText={t('details.markResolved')}
+                cancelText={t('details.keepItOpen')}
                 isDestructive={false}
                 isLoading={isResolvingHelp}
                 stacked

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -11,6 +12,7 @@ import { DateTimePickerModal } from './DateTimePickerModal';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
 import { BestOfInput } from '../match/BestOfInput';
 import { normalizeBestOf } from '../../lib/series';
+import i18n from '../../i18n';
 
 interface RoundScheduleModalProps {
     visible: boolean;
@@ -50,11 +52,11 @@ const isLockSentinel = (d: Date | null): boolean => !!d && d.getFullYear() > 900
 const formatDatePart = (d: Date): string => {
     const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' };
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-    return d.toLocaleDateString([], opts);
+    return d.toLocaleDateString(i18n.language, opts);
 };
 
 const formatTimePart = (d: Date): string =>
-    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
 
 const formatWindow = (ms: number): string => {
     const totalHours = Math.round(ms / 3600000);
@@ -75,6 +77,7 @@ function ScheduleField({ label, value, accent, emptyIcon, emptyLabel, lockedSent
     onPress: () => void;
     onClear: () => void;
 }) {
+    const { t } = useTranslation('match');
     const date = parseValue(value);
 
     return (
@@ -87,7 +90,7 @@ function ScheduleField({ label, value, accent, emptyIcon, emptyLabel, lockedSent
                         className="flex-1 bg-white/5 rounded-xl border border-white/10 px-4 py-3.5 flex-row items-center mr-2"
                     >
                         <Ionicons name="lock-closed-outline" size={16} color="#F59E0B" style={{ marginRight: 8 }} />
-                        <Text className="text-slate-300 font-semibold">Locked — opens after previous round</Text>
+                        <Text className="text-slate-300 font-semibold">{t('round.lockedOpensAfter')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={onClear} className="bg-white/10 p-1.5 rounded-full">
                         <Ionicons name="close" size={14} color="#94A3B8" />
@@ -142,6 +145,7 @@ function BestOfField({ label, value, onChange, inheritLabel, inheritFallback, hi
     inheritFallback: number;
     hint: string;
 }) {
+    const { t } = useTranslation('match');
     return (
         <View>
             <Text className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">{label}</Text>
@@ -149,7 +153,7 @@ function BestOfField({ label, value, onChange, inheritLabel, inheritFallback, hi
             <SegmentedToggle
                 options={[
                     { value: 'inherit', label: inheritLabel },
-                    { value: 'custom', label: 'Override' },
+                    { value: 'custom', label: t('round.override') },
                 ]}
                 value={value == null ? 'inherit' : 'custom'}
                 onChange={v => onChange(v === 'inherit' ? null : normalizeBestOf(inheritFallback))}
@@ -178,6 +182,7 @@ export function RoundScheduleModal({
     tournamentBestOf = 1,
     hasKnockout = false,
 }: RoundScheduleModalProps) {
+    const { t } = useTranslation('match');
     const [openAt, setOpenAt] = useState<string | null>(initialOpenAt || null);
     const [deadline, setDeadline] = useState<string | null>(initialDeadline || null);
     const [bestOf, setBestOf] = useState<number | null>(initialBestOf ?? null);
@@ -229,11 +234,11 @@ export function RoundScheduleModal({
 
                     <View className="p-6">
                         <ScheduleField
-                            label="Round Opens At"
+                            label={t('round.roundOpensAt')}
                             value={openAt}
                             accent="#10B981"
                             emptyIcon="lock-open-outline"
-                            emptyLabel="Round is open — tap to schedule"
+                            emptyLabel={t('round.roundOpenEmpty')}
                             lockedSentinel={openIsLocked}
                             onPress={() => setPickerType('openAt')}
                             onClear={() => setOpenAt(null)}
@@ -248,11 +253,11 @@ export function RoundScheduleModal({
                         </View>
 
                         <ScheduleField
-                            label="Round Deadline"
+                            label={t('round.roundDeadline')}
                             value={deadline}
                             accent="#ef4444"
                             emptyIcon="infinite-outline"
-                            emptyLabel="No deadline — tap to set one"
+                            emptyLabel={t('round.roundDeadlineEmpty')}
                             onPress={() => setPickerType('deadline')}
                             onClear={() => setDeadline(null)}
                         />
@@ -261,23 +266,23 @@ export function RoundScheduleModal({
                             organizer can make one round a Bo3 without touching the whole tournament. */}
                         <View className="mt-5 pt-5 border-t border-white/5">
                             <BestOfField
-                                label="Match Format"
+                                label={t('round.matchFormat')}
                                 value={bestOf}
                                 onChange={setBestOf}
-                                inheritLabel={`Default · Bo${tournamentBestOf}`}
+                                inheritLabel={t('round.defaultBo', { bo: tournamentBestOf })}
                                 inheritFallback={tournamentBestOf}
-                                hint="Applies to matches in this round that have not been reported yet. Anything already played keeps the format it was played under."
+                                hint={t('round.matchFormatHint')}
                             />
 
                             {hasKnockout && (
                                 <View className="mt-4">
                                     <BestOfField
-                                        label="Tiebreak Format"
+                                        label={t('round.tiebreakFormat')}
                                         value={tiebreakBestOf}
                                         onChange={setTiebreakBestOf}
-                                        inheritLabel="Same"
+                                        inheritLabel={t('round.same')}
                                         inheritFallback={normalizeBestOf(bestOf ?? tournamentBestOf)}
-                                        hint={`Played when a knockout match in this round ends level. "Same" replays another Bo${normalizeBestOf(bestOf ?? tournamentBestOf)}.`}
+                                        hint={t('round.tiebreakHint', { bo: normalizeBestOf(bestOf ?? tournamentBestOf) })}
                                     />
                                 </View>
                             )}
@@ -293,11 +298,11 @@ export function RoundScheduleModal({
                             {isInvalid && (
                                 <View className="flex-row items-center justify-center bg-destructive/10 border border-destructive/20 rounded-xl py-2.5 px-4">
                                     <Ionicons name="alert-circle-outline" size={15} color="#ef4444" style={{ marginRight: 6 }} />
-                                    <Text className="text-destructive font-semibold text-sm">Deadline must be after the open time</Text>
+                                    <Text className="text-destructive font-semibold text-sm">{t('round.deadlineAfterOpen')}</Text>
                                 </View>
                             )}
                             {windowMs === null && (
-                                <Text className="text-center text-slate-500 text-xs">Times are shown in your local timezone</Text>
+                                <Text className="text-center text-slate-500 text-xs">{t('round.localTimezone')}</Text>
                             )}
                         </View>
 
@@ -306,7 +311,7 @@ export function RoundScheduleModal({
                             disabled={isInvalid}
                             className={`w-full py-4 rounded-2xl items-center ${isInvalid ? 'bg-white/10' : 'bg-primary shadow-lg shadow-primary/30'}`}
                         >
-                            <Text className={`font-bold text-lg ${isInvalid ? 'text-slate-500' : 'text-background'}`}>Save Schedule</Text>
+                            <Text className={`font-bold text-lg ${isInvalid ? 'text-slate-500' : 'text-background'}`}>{t('round.saveSchedule')}</Text>
                         </TouchableOpacity>
                     </View>
                 </Pressable>
@@ -318,9 +323,9 @@ export function RoundScheduleModal({
                 onConfirm={(val) => {
                     setOpenAt(val);
                 }}
-                title="Round Open Time"
+                title={t('round.roundOpenTime')}
                 initialValue={openAt && !openIsLocked ? openAt : undefined}
-                clearText="Clear Open Time"
+                clearText={t('round.clearOpenTime')}
             />
 
             <DateTimePickerModal
@@ -329,10 +334,10 @@ export function RoundScheduleModal({
                 onConfirm={(val) => {
                     setDeadline(val);
                 }}
-                title="Round Deadline"
+                title={t('round.roundDeadline')}
                 initialValue={deadline || undefined}
                 minDate={openAt && !openIsLocked ? openAt : undefined}
-                clearText="Clear Deadline"
+                clearText={t('round.clearDeadline')}
             />
         </Modal>
     );

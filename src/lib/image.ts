@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 /**
  * Optimizes a Cloudinary URL by injecting transformation parameters.
  * If the URL is not a Cloudinary image, it returns the original URL.
@@ -42,7 +43,7 @@ export const isFileSizeValid = (asset: { fileSize?: number | null }, maxSize: nu
  * Formats a byte size into a human-readable string (e.g., "1.2 MB").
  */
 export const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return i18n.t('common:zeroBytes');
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));

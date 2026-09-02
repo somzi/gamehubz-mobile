@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +24,8 @@ type ManageHubScreenRouteProp = RouteProp<RootStackParamList, 'ManageHub'>;
 type ManageHubScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ManageHubScreen() {
+    const { t } = useTranslation('hub');
+    const { t: tCommon } = useTranslation('common');
     const route = useRoute<ManageHubScreenRouteProp>();
     const navigation = useNavigation<ManageHubScreenNavigationProp>();
     const { hubId } = route.params;
@@ -80,7 +83,7 @@ export default function ManageHubScreen() {
         try {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (permissionResult.status !== 'granted') {
-                Alert.alert('Permission Required', 'We need access to your photos to change hub avatar.');
+                Alert.alert(t('manage.permissionRequired'), t('manage.photoPermission'));
                 return;
             }
 
@@ -98,8 +101,8 @@ export default function ManageHubScreen() {
                 if (!isFileSizeValid(selectedAsset)) {
                     setStatusModalConfig({
                         type: 'error',
-                        title: 'File Too Large',
-                        message: `Maximum allowed image size is ${formatFileSize(MAX_FILE_SIZE)}. Your image is ${formatFileSize(selectedAsset.fileSize || 0)}.`
+                        title: t('manage.fileTooLarge'),
+                        message: t('manage.fileTooLargeMessage', { max: formatFileSize(MAX_FILE_SIZE), actual: formatFileSize(selectedAsset.fileSize || 0) })
                     });
                     setShowStatusModal(true);
                     return;
@@ -110,7 +113,7 @@ export default function ManageHubScreen() {
             }
         } catch (error) {
             console.error('Error picking avatar:', error);
-            Alert.alert('Error', 'Failed to pick image');
+            Alert.alert(tCommon('error'), t('manage.pickImageFailed'));
         }
     };
 
@@ -135,20 +138,20 @@ export default function ManageHubScreen() {
             if (response.ok) {
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Hub Avatar Updated',
-                    message: 'Hub profile picture has been updated successfully.'
+                    title: t('manage.avatarUpdated'),
+                    message: t('manage.avatarUpdatedMessage')
                 });
                 setShowStatusModal(true);
                 await fetchHubDetails();
             } else {
-                throw new Error('Failed to upload avatar');
+                throw new Error(t('manage.uploadAvatarFailed'));
             }
         } catch (error: any) {
             console.error('Error uploading hub avatar:', error);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Upload Failed',
-                message: 'Failed to update hub profile picture'
+                title: t('manage.uploadFailed'),
+                message: t('manage.uploadFailedMessage')
             });
             setShowStatusModal(true);
             setAvatarUri(null);
@@ -178,22 +181,22 @@ export default function ManageHubScreen() {
             if (response.ok) {
                 fetchHubDetails();
             } else {
-                Alert.alert('Error', 'Failed to update hub.');
+                Alert.alert(tCommon('error'), t('manage.updateHubFailed'));
             }
         } catch (error) {
             console.error('Error updating hub:', error);
-            Alert.alert('Error', 'An unexpected error occurred.');
+            Alert.alert(tCommon('error'), tCommon('unexpectedError'));
         }
     };
 
     const handleDeleteHub = async () => {
         Alert.alert(
-            "Delete Hub",
-            "Are you sure you want to delete this hub? This action is permanent and cannot be undone.",
+            t('manage.deleteHubTitle'),
+            t('manage.deleteHubMessage'),
             [
-                { text: "Cancel", style: "cancel" },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: "Delete",
+                    text: tCommon('delete'),
                     style: "destructive",
                     onPress: async () => {
                         try {
@@ -205,8 +208,8 @@ export default function ManageHubScreen() {
                             if (response.ok) {
                                 setStatusModalConfig({
                                     type: 'success',
-                                    title: 'Hub Deleted',
-                                    message: 'The hub has been successfully deleted.'
+                                    title: t('manage.hubDeleted'),
+                                    message: t('manage.hubDeletedMessage')
                                 });
                                 setShowStatusModal(true);
                                 
@@ -220,12 +223,12 @@ export default function ManageHubScreen() {
                                 }, 1500);
                             } else {
                                 setIsLoading(false);
-                                Alert.alert('Error', 'Failed to delete hub. Please try again.');
+                                Alert.alert(tCommon('error'), t('manage.deleteHubFailed'));
                             }
                         } catch (error) {
                             setIsLoading(false);
                             console.error('Error deleting hub:', error);
-                            Alert.alert('Error', 'An unexpected error occurred during hub deletion.');
+                            Alert.alert(tCommon('error'), t('manage.deleteHubError'));
                         }
                     }
                 }
@@ -236,7 +239,7 @@ export default function ManageHubScreen() {
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title="Manage Hub" showBack />
+                <PageHeader title={t('manage.title')} showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
@@ -249,14 +252,14 @@ export default function ManageHubScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Manage Hub" showBack />
+            <PageHeader title={t('manage.title')} showBack />
 
             <ScrollView className="flex-1 px-6">
                 {/* Hub Info Preview with Avatar Upload */}
                 <View className="items-center py-6 mb-2">
                     <View className="relative">
                         <PlayerAvatar
-                            name={hubData?.name || 'Hub'}
+                            name={hubData?.name || t('manage.hubFallback')}
                             src={avatarUri || hubData?.avatarUrl || hubData?.logoUrl}
                             size="lg"
                             className="w-20 h-20"
@@ -275,22 +278,22 @@ export default function ManageHubScreen() {
                             </TouchableOpacity>
                         )}
                     </View>
-                    <Text className="text-xl font-bold text-white text-center mt-3">{hubData?.name || 'Hub'}</Text>
+                    <Text className="text-xl font-bold text-white text-center mt-3">{hubData?.name || t('manage.hubFallback')}</Text>
                 </View>
 
                 {/* Management Menu — grouped cards */}
                 <View className="gap-5">
                     <View>
-                        <SectionLabel icon="people" title="Community" color={COLORS.info} />
+                        <SectionLabel icon="people" title={t('manage.sectionCommunity')} color={COLORS.info} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
                                 icon="person-add-outline"
-                                label="Manage Members"
+                                label={t('manage.manageMembers')}
                                 onPress={() => navigation.navigate('HubMembers', { hubId })}
                             />
                             <MenuItem
                                 icon="trophy-outline"
-                                label="Create Tournament"
+                                label={t('manage.createTournament')}
                                 onPress={() => setShowCreateTournamentModal(true)}
                                 isLast
                             />
@@ -298,35 +301,35 @@ export default function ManageHubScreen() {
                     </View>
 
                     <View>
-                        <SectionLabel icon="settings" title="Hub Settings" />
+                        <SectionLabel icon="settings" title={t('manage.sectionSettings')} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             {isOwner && (
                                 <MenuItem
                                     icon="create-outline"
-                                    label="Edit Hub Info"
+                                    label={t('manage.editHubInfo')}
                                     onPress={() => setShowEditModal(true)}
                                 />
                             )}
                             <MenuItem
                                 icon="share-social-outline"
-                                label="Manage Socials"
+                                label={t('manage.manageSocials')}
                                 onPress={() => navigation.navigate('ManageHubSocials', { hubId })}
                                 isLast={!isOwner}
                             />
                             {isOwner && (
                                 <MenuItem
                                     icon="logo-discord"
-                                    label="Discord"
+                                    label={t('manage.discord')}
                                     onPress={() => navigation.navigate('ManageHubDiscord', { hubId })}
                                     rightElement={
                                         hubData?.discordWebhookUrl ? (
                                             <View className="flex-row items-center bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
                                                 <Ionicons name="checkmark" size={11} color="#818CF8" />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-indigo-300">Connected</Text>
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-indigo-300">{t('manage.connected')}</Text>
                                             </View>
                                         ) : (
                                             <View className="bg-white/[0.05] border border-white/10 px-2.5 py-1 rounded-full">
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-500">Off</Text>
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('manage.off')}</Text>
                                             </View>
                                         )
                                     }
@@ -335,24 +338,24 @@ export default function ManageHubScreen() {
                             {isOwner && (
                                 <MenuItem
                                     icon="shield-checkmark-outline"
-                                    label="Verification"
+                                    label={t('manage.verification')}
                                     onPress={() => setShowVerificationModal(true)}
                                     isLast
                                     rightElement={
                                         hubData?.isVerified ? (
                                             <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
                                                 <Ionicons name="checkmark" size={11} color="#38BDF8" />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">Verified</Text>
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">{t('manage.verified')}</Text>
                                             </View>
                                         ) : verificationStatus === 0 ? (
                                             <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
                                                 <Ionicons name="time-outline" size={11} color={COLORS.warning} />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">Pending</Text>
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">{t('manage.pending')}</Text>
                                             </View>
                                         ) : verificationStatus === 2 ? (
                                             <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
                                                 <Ionicons name="close" size={11} color={COLORS.destructive} />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">Rejected</Text>
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">{t('manage.rejected')}</Text>
                                             </View>
                                         ) : null
                                     }
@@ -363,11 +366,11 @@ export default function ManageHubScreen() {
 
                     {isOwner && (
                         <View>
-                            <SectionLabel icon="exit-outline" title="Owner Actions" color={COLORS.destructive} />
+                            <SectionLabel icon="exit-outline" title={t('manage.sectionOwnerActions')} color={COLORS.destructive} />
                             <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                                 <MenuItem
                                     icon="trash-outline"
-                                    label="Delete Hub"
+                                    label={t('manage.deleteHub')}
                                     onPress={handleDeleteHub}
                                     destructive
                                     showChevron={false}

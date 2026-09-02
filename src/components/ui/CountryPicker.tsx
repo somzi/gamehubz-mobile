@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,7 @@ interface CountryPickerProps {
 
 export function CountryPicker({
     label,
-    placeholder = 'Select your country',
+    placeholder,
     value,
     onSelect,
     multiple = false,
@@ -32,6 +33,7 @@ export function CountryPicker({
     locked = false,
     className,
 }: CountryPickerProps) {
+    const { t } = useTranslation('common');
     const [modalVisible, setModalVisible] = useState(false);
     const [countries, setCountries] = useState<Country[]>([]);
     const [loading, setLoading] = useState(false);
@@ -88,7 +90,7 @@ export function CountryPicker({
         if (multiple) {
             if (selectedMulti.length === 0) return placeholder;
             if (selectedMulti.length <= 3) return selectedMulti.map(c => `${c.flag} ${c.name}`).join(', ');
-            return `${selectedMulti.slice(0, 3).map(c => c.flag).join(' ')}  +${selectedMulti.length - 3} more`;
+            return t('ui.moreCountries', { flags: selectedMulti.slice(0, 3).map(c => c.flag).join(' '), count: selectedMulti.length - 3 });
         }
         return selected ? `${selected.flag}  ${selected.name}` : (value ? value : placeholder);
     })();
@@ -134,7 +136,7 @@ export function CountryPicker({
 
             {locked && (
                 <Text className="text-[11px] text-slate-500 mt-1.5 ml-1 font-medium">
-                    Country can't be changed once set.
+                    {t('ui.countryLocked')}
                 </Text>
             )}
 
@@ -165,7 +167,7 @@ export function CountryPicker({
 
                         <View className="px-6 py-3 flex-row justify-between items-center bg-card/50">
                             <Text className="text-xl font-black text-white tracking-tight">
-                                {label || (multiple ? 'Select Countries' : 'Select Country')}
+                                {label || (multiple ? t('ui.selectCountries') : t('ui.selectCountry'))}
                             </Text>
                             <TouchableOpacity
                                 onPress={() => setModalVisible(false)}
@@ -181,7 +183,7 @@ export function CountryPicker({
                                 <TextInput
                                     value={search}
                                     onChangeText={setSearch}
-                                    placeholder="Search country..."
+                                    placeholder={t('ui.searchCountry')}
                                     placeholderTextColor="#64748B"
                                     autoCorrect={false}
                                     className="flex-1 ml-2 text-white text-[15px]"
@@ -231,7 +233,7 @@ export function CountryPicker({
                                     );
                                 }}
                                 ListEmptyComponent={
-                                    <Text className="text-slate-500 text-center mt-8 font-medium">No countries found</Text>
+                                    <Text className="text-slate-500 text-center mt-8 font-medium">{t('ui.noCountriesFound')}</Text>
                                 }
                             />
                         )}

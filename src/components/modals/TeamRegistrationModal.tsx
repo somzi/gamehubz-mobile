@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
-import { TEAM_LABELS } from '../../lib/teamConstants';
+import { useTranslation } from 'react-i18next';
 import { createTeam, joinTeam, getPendingTournamentTeams } from '../../lib/teamApi';
 import { getErrorMessage } from '../../lib/api';
 import type { TeamDto } from '../../types/team';
@@ -33,6 +33,7 @@ export function TeamRegistrationModal({
     tournamentId,
     onTeamJoined,
 }: TeamRegistrationModalProps) {
+    const { t } = useTranslation('team');
     const [teamName, setTeamName] = useState('');
     const [isCreating, setIsCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export function TeamRegistrationModal({
 
     const handleCreateTeam = async () => {
         if (!teamName.trim()) {
-            setCreateError('Team name is required');
+            setCreateError(t('teamNameRequired'));
             return;
         }
         setIsCreating(true);
@@ -89,7 +90,7 @@ export function TeamRegistrationModal({
                         {/* Header */}
                         <View className="flex-row justify-between items-center p-6 border-b border-white/5">
                             <Text className="text-xl font-bold text-white">
-                                {TEAM_LABELS.REGISTRATION_MODAL_TITLE}
+                                {t('registrationModalTitle')}
                             </Text>
                             <TouchableOpacity
                                 onPress={onClose}
@@ -116,12 +117,12 @@ export function TeamRegistrationModal({
                                                 style={{ marginRight: 6 }}
                                             />
                                             <Text className="text-sm font-bold text-white">
-                                                {TEAM_LABELS.TEAM_NAME_LABEL}
+                                                {t('teamNameLabel')}
                                             </Text>
                                         </View>
                                         <TextInput
                                             className="bg-card p-4 rounded-xl text-white border border-white/10"
-                                            placeholder={TEAM_LABELS.TEAM_NAME_PLACEHOLDER}
+                                            placeholder={t('teamNamePlaceholder')}
                                             placeholderTextColor="#6b7280"
                                             value={teamName}
                                             onChangeText={setTeamName}
@@ -133,9 +134,9 @@ export function TeamRegistrationModal({
                                         <View className="flex-1 mr-4 gap-1">
                                             <View className="flex-row items-center gap-2">
                                                 <Ionicons name="lock-closed-outline" size={16} color="#3B82F6" />
-                                                <Text className="text-sm font-bold text-white">Private Team</Text>
+                                                <Text className="text-sm font-bold text-white">{t('privateTeam')}</Text>
                                             </View>
-                                            <Text className="text-xs text-slate-400">Require approval for new members to join</Text>
+                                            <Text className="text-xs text-slate-400">{t('privateTeamHint')}</Text>
                                         </View>
                                         <Switch
                                             value={requiresApproval}
@@ -157,7 +158,7 @@ export function TeamRegistrationModal({
                                         disabled={isCreating || !teamName.trim()}
                                         className="bg-team py-4 rounded-2xl w-full"
                                     >
-                                        {TEAM_LABELS.CREATE_TEAM_BUTTON}
+                                        {t('createTeamButton')}
                                     </Button>
                                 </View>
                         </ScrollView>

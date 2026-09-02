@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -61,6 +62,7 @@ interface BracketMatchProps {
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress }: BracketMatchProps) {
+    const { t } = useTranslation('bracket');
     const navigation = useNavigation<NavigationProp>();
 
     // A team fixture with at least one game decided but no settled result yet. The final Score
@@ -97,7 +99,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed' }}
                     />
                     <Text className="text-xs text-slate-700 italic ml-3 flex-1 font-medium">
-                        {isCompletedBye ? 'BYE' : 'TBD'}
+                        {isCompletedBye ? t('bye') : t('common:app.tbd')}
                     </Text>
                     <View className="w-8 h-8 rounded-xl bg-white/[0.02] items-center justify-center">
                         <Text className="text-xs text-slate-700 font-black">—</Text>
@@ -271,11 +273,11 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         <>
                             <View className="flex-row items-center gap-1.5">
                                 <View className={cn("w-1.5 h-1.5 rounded-full", isTieBreakNeeded ? "bg-warning" : "bg-emerald-400")} />
-                                <Text className={cn(
+                                <Text numberOfLines={1} className={cn(
                                     "text-[10px] font-black uppercase tracking-[1.5px]",
                                     isTieBreakNeeded ? "text-warning" : "text-emerald-400",
                                 )}>
-                                    {isTieBreakNeeded ? 'Report Tiebreak' : 'Report Result'}
+                                    {isTieBreakNeeded ? t('card.reportTiebreak') : t('card.reportResult')}
                                 </Text>
                             </View>
                             <View className="flex-row items-center gap-1.5">
@@ -295,8 +297,8 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         <>
                             <View className="flex-row items-center gap-1.5">
                                 <View className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
-                                    Live
+                                <Text numberOfLines={1} className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
+                                    {t('card.live')}
                                 </Text>
                             </View>
                             <Text className="text-[10px] font-black text-emerald-300/70 tracking-[0.5px]">
@@ -308,8 +310,8 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         <>
                             <View className="flex-row items-center gap-1.5">
                                 <Ionicons name="hourglass-outline" size={11} color="#F59E0B" />
-                                <Text className="text-[10px] font-black text-warning uppercase tracking-[1.5px]">
-                                    Awaiting Approval
+                                <Text numberOfLines={1} className="text-[10px] font-black text-warning uppercase tracking-[1.5px]">
+                                    {t('card.awaitingApproval')}
                                 </Text>
                             </View>
                             <Ionicons name="chevron-forward" size={11} color="#F59E0B" />
@@ -318,40 +320,40 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                     {!canReport && !isAwaitingApproval && !isTeamInProgress && isLive && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="time-outline" size={11} color="#34D399" />
-                            <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
-                                Scheduled
+                            <Text numberOfLines={1} className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
+                                {t('card.scheduled')}
                             </Text>
                         </View>
                     )}
                     {!canReport && !isAwaitingApproval && isCompleted && !isDoubleWalkover && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="checkmark-circle" size={11} color="#34D399" />
-                            <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-[1.5px]">
-                                Completed
+                            <Text numberOfLines={1} className="text-[10px] font-bold text-slate-500 uppercase tracking-[1.5px]">
+                                {t('card.completed')}
                             </Text>
                         </View>
                     )}
                     {!canReport && !isAwaitingApproval && isDoubleWalkover && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="play-skip-forward-outline" size={11} color="#F59E0B" />
-                            <Text className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
-                                Double Walkover
+                            <Text numberOfLines={1} className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
+                                {t('card.doubleWalkover')}
                             </Text>
                         </View>
                     )}
                     {!canReport && isNoShow && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="ban-outline" size={11} color="#F59E0B" />
-                            <Text className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
-                                No-Show
+                            <Text numberOfLines={1} className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
+                                {t('card.noShow')}
                             </Text>
                         </View>
                     )}
                     {!canReport && isTieBreakNeeded && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="flash-outline" size={11} color="#F59E0B" />
-                            <Text className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
-                                Tiebreak Needed
+                            <Text numberOfLines={1} className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
+                                {t('card.tiebreakNeeded')}
                             </Text>
                         </View>
                     )}

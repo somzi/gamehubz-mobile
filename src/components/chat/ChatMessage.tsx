@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { JSX, useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +21,7 @@ export interface ChatMessageProps {
 }
 
 export function ChatMessage({ text, isOwn }: ChatMessageProps): JSX.Element {
+    const { t } = useTranslation('common');
   const [translated, setTranslated] = useState<string | null>(null);
   const [translatedLang, setTranslatedLang] = useState<Language | null>(null);
   const [showOriginal, setShowOriginal] = useState<boolean>(false);
@@ -35,6 +37,7 @@ export function ChatMessage({ text, isOwn }: ChatMessageProps): JSX.Element {
         setTranslatedLang(lang);
         setShowOriginal(false);
       } catch (err) {
+    const { t } = useTranslation('common');
         console.warn('Translation failed', err);
       } finally {
         setLoading(false);
@@ -95,14 +98,14 @@ export function ChatMessage({ text, isOwn }: ChatMessageProps): JSX.Element {
               (Translated to {translatedLang.label})
             </Text>
             <Pressable onPress={toggleToOriginal} hitSlop={8}>
-              <Text style={styles.metaLink}>Show Original</Text>
+              <Text style={styles.metaLink}>{t('app.showOriginal')}</Text>
             </Pressable>
           </View>
         )}
 
         {isShowingOriginalAfterTranslation && translatedLang && (
           <View style={styles.translationMeta}>
-            <Text style={styles.metaLabel}>(Original)</Text>
+            <Text style={styles.metaLabel}>{t('app.originalSuffix')}</Text>
             <Pressable onPress={toggleToTranslation} hitSlop={8}>
               <Text style={styles.metaLink}>
                 Show Translation ({translatedLang.label})
@@ -121,7 +124,7 @@ export function ChatMessage({ text, isOwn }: ChatMessageProps): JSX.Element {
               onPress={openLanguagePicker}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="Translate message"
+              accessibilityLabel={t('app.translateMessage')}
               style={styles.iconPressable}
             >
               <Ionicons name="language" size={18} color="#5F6E89" />

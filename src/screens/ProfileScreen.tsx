@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,13 +21,18 @@ import { TournamentCard } from '../components/cards/TournamentCard';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 
 
-const tabs: PremiumTabItem[] = [
-    { label: 'Stats', value: 'stats', icon: 'stats-chart' },
-    { label: 'Tournaments', value: 'tournaments', icon: 'trophy-outline' },
-    { label: 'Matches', value: 'matches', icon: 'game-controller-outline' },
+// Module scope: keys, not text — labels are resolved per render in the component.
+const TAB_DEFS = [
+    { labelKey: 'tabStats', value: 'stats', icon: 'stats-chart' },
+    { labelKey: 'tabTournaments', value: 'tournaments', icon: 'trophy-outline' },
+    { labelKey: 'tabMatches', value: 'matches', icon: 'game-controller-outline' },
 ];
 
 export default function ProfileScreen() {
+    const { t } = useTranslation('profile');
+    const { t: tCommon } = useTranslation('common');
+    const { t: tAuth } = useTranslation('auth');
+    const tabs: PremiumTabItem[] = TAB_DEFS.map(d => ({ ...d, label: t(d.labelKey) })) as PremiumTabItem[];
     const { user, refreshUser } = useAuth();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [activeTab, setActiveTab] = useState('stats');
@@ -47,7 +53,7 @@ export default function ProfileScreen() {
 
     // Stable so the memoized TournamentCard doesn't invalidate on every parent
     // re-render (tab-flip, badge tick, pagination). Note: the map below still
-    // creates a fresh `() => openTournament(t.id)` per row, so memo bails on
+    // creates a fresh `() => openTournament(row.id)` per row, so memo bails on
     // that lambda alone — collapsing that fully would require either changing
     // TournamentCard's onClick signature to accept an id or lifting each row
     // into its own memoized child, both of which are out of scope here.
@@ -88,7 +94,7 @@ export default function ProfileScreen() {
 
         } catch (error: any) {
             console.error('Error fetching profile detailed data:', error);
-            setError('Failed to refresh stats');
+            setError(t('refreshStatsFailed'));
         } finally {
             setIsLoadingData(false);
         }
@@ -107,8 +113,8 @@ export default function ProfileScreen() {
                 const itemsArray = Array.isArray(items) ? items : [];
 
                 setUserTournaments(prev => {
-                    const existingIds = new Set(prev.map((t: any) => t.id || t.Id));
-                    const newItems = itemsArray.filter((t: any) => !existingIds.has(t.id || t.Id));
+                    const existingIds = new Set(prev.map((row: any) => row.id || row.Id));
+                    const newItems = itemsArray.filter((row: any) => !existingIds.has(row.id || row.Id));
                     return [...prev, ...newItems];
                 });
                 setTournamentsPage(prev => prev + 1);
@@ -174,19 +180,19 @@ export default function ProfileScreen() {
 
     const getRegionName = (region?: number) => {
         switch (region) {
-            case 1: return 'North America';
-            case 2: return 'Europe';
-            case 3: return 'Asia';
-            case 4: return 'South America';
-            case 5: return 'Africa';
-            case 6: return 'Oceania';
-            default: return 'Global';
+            case 1: return tAuth('region.northAmerica');
+            case 2: return tAuth('region.europe');
+            case 3: return tAuth('region.asia');
+            case 4: return tAuth('region.southAmerica');
+            case 5: return tAuth('region.africa');
+            case 6: return tAuth('region.oceania');
+            default: return t('regionGlobal');
         }
     };
 
     const displayData = {
-        username: user?.username || 'Guest',
-        nickName: user?.nickName || 'No Nickname',
+        username: user?.username || t('guest'),
+        nickName: user?.nickName || t('noNickname'),
         region: getRegionName(user?.region),
         countryName: user?.countryName || null,
         countryFlag: user?.countryFlag || null,
@@ -248,12 +254,12 @@ export default function ProfileScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             {/* Top Bar */}
             <View className="flex-row justify-between items-center px-6 py-2">
-                <Text className="text-lg font-black text-white tracking-tight">Profile</Text>
+                <Text className="text-lg font-black text-white tracking-tight">{t('common:nav.profile')}</Text>
                 <View className="flex-row items-center gap-2">
                     <Pressable
                         onPress={() => { if (user?.id) setShareCardVisible(true); }}
                         className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
-                        accessibilityLabel="Share profile"
+                        accessibilityLabel={t('shareProfile')}
                     >
                         <Ionicons name="share-outline" size={20} color="#FAFAFA" />
                     </Pressable>
@@ -377,22 +383,22 @@ export default function ProfileScreen() {
                                 <View className="flex-row bg-card rounded-2xl p-1" style={{ gap: 2 }}>
                                     <View className="flex-1 py-2 items-center">
                                         <Text className="text-white text-base font-black">{displayData.totalMatches}</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">Played</Text>
+                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('played')}</Text>
                                     </View>
                                     <View className="w-[1px] bg-white/[0.04] my-2" />
                                     <View className="flex-1 py-2 items-center">
                                         <Text className="text-primary text-base font-black">{displayData.wins}</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">Wins</Text>
+                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('wins')}</Text>
                                     </View>
                                     <View className="w-[1px] bg-white/[0.04] my-2" />
                                     <View className="flex-1 py-2 items-center">
                                         <Text className="text-amber-400 text-base font-black">{displayData.tournamentsWon || 0}</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">Trophies</Text>
+                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('trophies')}</Text>
                                     </View>
                                     <View className="w-[1px] bg-white/[0.04] my-2" />
                                     <View className="flex-1 py-2 items-center">
                                         <Text className="text-indigo-400 text-base font-black">{Math.round(displayData.winPercentage)}%</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">Win %</Text>
+                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('winPercent')}</Text>
                                     </View>
                                 </View>
 
@@ -403,21 +409,21 @@ export default function ProfileScreen() {
                                             <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
                                                 <Ionicons name="trending-up" size={14} color="#818CF8" />
                                             </View>
-                                            <Text className="text-[11px] font-black text-white uppercase tracking-widest">Recent Form</Text>
+                                            <Text className="text-[11px] font-black text-white uppercase tracking-widest">{t('recentForm')}</Text>
                                         </View>
                                         {performanceList.length > 0 && (
                                             <View className="flex-row items-center" style={{ gap: 8 }}>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
                                                     <View className="w-2 h-2 rounded-full bg-primary" />
-                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">Win</Text>
+                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">{t('win')}</Text>
                                                 </View>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
                                                     <View className="w-2 h-2 rounded-full bg-yellow-500" />
-                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">Draw</Text>
+                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">{t('draw')}</Text>
                                                 </View>
                                                 <View className="flex-row items-center" style={{ gap: 3 }}>
                                                     <View className="w-2 h-2 rounded-full bg-destructive" />
-                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">Loss</Text>
+                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">{t('loss')}</Text>
                                                 </View>
                                             </View>
                                         )}
@@ -455,15 +461,15 @@ export default function ProfileScreen() {
                                                 ))}
                                             </View>
                                             <View className="flex-row items-center justify-between mt-2 px-1">
-                                                <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">Oldest</Text>
+                                                <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">{t('oldest')}</Text>
                                                 <View className="flex-1 mx-3 h-[1px] bg-white/[0.04]" />
-                                                <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">Latest</Text>
+                                                <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">{t('latest')}</Text>
                                             </View>
                                         </>
                                     ) : (
                                         <View className="items-center py-4">
                                             <Ionicons name="analytics-outline" size={28} color="#1E293B" />
-                                            <Text className="text-slate-600 text-[10px] mt-2">No performance data yet</Text>
+                                            <Text className="text-slate-600 text-[10px] mt-2">{t('noPerformanceData')}</Text>
                                         </View>
                                     )}
                                 </View>
@@ -493,7 +499,7 @@ export default function ProfileScreen() {
                                         />
                                         <View className="absolute inset-0 items-center justify-center">
                                             <Text className="text-white text-2xl font-black">{Math.round(displayData.winPercentage)}%</Text>
-                                            <Text className="text-slate-500 text-[7px] uppercase font-black tracking-[2px]">Win Rate</Text>
+                                            <Text className="text-slate-500 text-[7px] uppercase font-black tracking-[2px]">{t('winRate')}</Text>
                                         </View>
                                     </View>
 
@@ -503,7 +509,7 @@ export default function ProfileScreen() {
                                             <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
                                                     <View className="w-2 h-2 rounded-full bg-primary" />
-                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Wins</Text>
+                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('wins')}</Text>
                                                 </View>
                                                 <Text className="text-primary text-sm font-black">{displayData.wins}</Text>
                                             </View>
@@ -518,7 +524,7 @@ export default function ProfileScreen() {
                                             <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
                                                     <View className="w-2 h-2 rounded-full bg-yellow-500" />
-                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Draws</Text>
+                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('draws')}</Text>
                                                 </View>
                                                 <Text className="text-yellow-500 text-sm font-black">{displayData.draws}</Text>
                                             </View>
@@ -533,7 +539,7 @@ export default function ProfileScreen() {
                                             <View className="flex-row items-center justify-between mb-1">
                                                 <View className="flex-row items-center" style={{ gap: 6 }}>
                                                     <View className="w-2 h-2 rounded-full bg-destructive" />
-                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Losses</Text>
+                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('losses')}</Text>
                                                 </View>
                                                 <Text className="text-destructive text-sm font-black">{displayData.losses}</Text>
                                             </View>
@@ -553,18 +559,18 @@ export default function ProfileScreen() {
                             <View className="gap-3">
                                 {userTournaments.length > 0 ? (
                                     <>
-                                        {userTournaments.map((t) => (
+                                        {userTournaments.map((row) => (
                                             <TournamentCard
-                                                key={t.id}
-                                                name={t.name || t.title}
-                                                status={getTournamentStatus(t.status)}
-                                                date={formatDateSafe(t.startDate, 'N/A')}
-                                                region="Global"
-                                                prizePool={`${getCurrencySymbol(t.prizeCurrency)}${t.prize}`}
-                                                players={new Array(t.numberOfParticipants || 0).fill({})}
-                                                onClick={() => openTournament(t.id)}
-                                                hubName={t.hubName || t.HubName}
-                                                hubAvatarUrl={t.hubAvatarUrl || t.HubAvatarUrl}
+                                                key={row.id}
+                                                name={row.name || row.title}
+                                                status={getTournamentStatus(row.status)}
+                                                date={formatDateSafe(row.startDate, tCommon('app.notAvailableShort'))}
+                                                region={t('regionGlobal')}
+                                                prizePool={`${getCurrencySymbol(row.prizeCurrency)}${row.prize}`}
+                                                players={new Array(row.numberOfParticipants || 0).fill({})}
+                                                onClick={() => openTournament(row.id)}
+                                                hubName={row.hubName || row.HubName}
+                                                hubAvatarUrl={row.hubAvatarUrl || row.HubAvatarUrl}
                                             />
                                         ))}
                                         {hasMoreTournaments && isLoadingMoreTournaments && (
@@ -576,7 +582,7 @@ export default function ProfileScreen() {
                                 ) : (
                                     <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
                                         <Ionicons name="trophy-outline" size={48} color="#1E293B" />
-                                        <Text className="text-slate-600 mt-4 text-center text-sm">No tournaments found.</Text>
+                                        <Text className="text-slate-600 mt-4 text-center text-sm">{t('noTournamentsFound')}</Text>
                                     </View>
                                 )}
                             </View>
@@ -589,11 +595,11 @@ export default function ProfileScreen() {
                                         {userMatches.map((match, idx) => (
                                             <MatchHistoryCard
                                                 key={idx}
-                                                tournamentName={match.tournamentName || match.TournamentName || 'Match'}
+                                                tournamentName={match.tournamentName || match.TournamentName || t('matchWord')}
                                                 hubName={match.hubName || match.HubName || match.hub || match.Hub}
                                                 userName={match.username || match.userName || match.Username || match.UserName || displayData.username}
                                                 userAvatarUrl={match.userAvatarUrl || match.userAvatar || match.UserAvatarUrl || match.UserAvatar || user?.avatarUrl}
-                                                opponentName={match.opponentName || match.OpponentName || 'Opponent'}
+                                                opponentName={match.opponentName || match.OpponentName || t('opponent')}
                                                 opponentAvatarUrl={match.opponentAvatarUrl || match.opponentAvatar || match.OpponentAvatarUrl || match.OpponentAvatar}
                                                 result={(
                                                     (match.userScore ?? match.UserScore) !== null &&
@@ -604,7 +610,7 @@ export default function ProfileScreen() {
                                                 ) ? 'draw' : (match.isWin === true || match.IsWin === true ? 'win' : (match.isWin === false || match.IsWin === false ? 'loss' : 'draw'))}
                                                 userScore={match.userScore ?? match.UserScore ?? undefined}
                                                 opponentScore={match.opponentScore ?? match.OpponentScore ?? undefined}
-                                                date={formatDateSafe(match.scheduledTime || match.ScheduledTime, 'N/A')}
+                                                date={formatDateSafe(match.scheduledTime || match.ScheduledTime, tCommon('app.notAvailableShort'))}
                                             />
                                         ))}
                                         {hasMoreMatches && isLoadingMoreMatches && (
@@ -616,7 +622,7 @@ export default function ProfileScreen() {
                                 ) : (
                                     <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
                                         <Ionicons name="documents-outline" size={48} color="#1E293B" />
-                                        <Text className="text-slate-600 mt-4 text-center text-sm">No match history available yet.</Text>
+                                        <Text className="text-slate-600 mt-4 text-center text-sm">{t('noMatchHistory')}</Text>
                                     </View>
                                 )}
                             </View>
@@ -630,7 +636,7 @@ export default function ProfileScreen() {
                     visible={shareCardVisible}
                     onClose={() => setShareCardVisible(false)}
                     playerId={user.id}
-                    name={user.nickName || user.username || 'Player'}
+                    name={user.nickName || user.username || tCommon('player')}
                     avatarUrl={user.avatarUrl}
                     stats={{
                         matches: displayData.totalMatches,

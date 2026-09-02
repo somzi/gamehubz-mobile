@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ export function FairPlayStats({
     reportsCount,
     matchesPlayed,
 }: FairPlayStatsProps) {
+    const { t } = useTranslation('profile');
     const getScoreColor = (score: number) => {
         if (score >= 90) return 'text-accent';
         if (score >= 70) return 'text-primary';
@@ -26,10 +28,10 @@ export function FairPlayStats({
     };
 
     const getScoreLabel = (score: number) => {
-        if (score >= 90) return 'Excellent';
-        if (score >= 70) return 'Good';
-        if (score >= 50) return 'Fair';
-        return 'Poor';
+        if (score >= 90) return t('fairPlayExcellent');
+        if (score >= 70) return t('fairPlayGood');
+        if (score >= 50) return t('fairPlayFair');
+        return t('fairPlayPoor');
     };
 
     const getBarColor = (score: number) => {
@@ -48,7 +50,7 @@ export function FairPlayStats({
                         <View className="w-8 h-8 rounded-lg items-center justify-center bg-primary/20">
                             <Ionicons name="shield-checkmark" size={16} color={COLORS.primary} />
                         </View>
-                        <Text className="font-medium text-foreground">Fair Play Score</Text>
+                        <Text className="font-medium text-foreground">{t('fairPlayScore')}</Text>
                     </View>
                     <Text className={cn('text-sm font-medium', getScoreColor(fairPlayScore))}>
                         {getScoreLabel(fairPlayScore)}
@@ -78,7 +80,7 @@ export function FairPlayStats({
                         <Ionicons name="trending-up" size={16} color={COLORS.slate400} />
                     </View>
                     <Text className="text-xl font-bold text-foreground">{matchesPlayed}</Text>
-                    <Text className="text-xs text-muted-foreground">Matches</Text>
+                    <Text className="text-xs text-muted-foreground">{t('matches')}</Text>
                 </View>
 
                 <View className="flex-1 bg-card p-4 rounded-xl border border-border/50 items-center">
@@ -98,7 +100,7 @@ export function FairPlayStats({
                     )}>
                         {noShowCount}
                     </Text>
-                    <Text className="text-xs text-muted-foreground">No-Shows</Text>
+                    <Text className="text-xs text-muted-foreground">{t('noShows')}</Text>
                 </View>
 
                 <View className="flex-1 bg-card p-4 rounded-xl border border-border/50 items-center">
@@ -118,7 +120,7 @@ export function FairPlayStats({
                     )}>
                         {reportsCount}
                     </Text>
-                    <Text className="text-xs text-muted-foreground">Reports</Text>
+                    <Text className="text-xs text-muted-foreground">{t('reports')}</Text>
                 </View>
             </View>
 
@@ -127,9 +129,9 @@ export function FairPlayStats({
                 <View className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 flex-row items-start gap-2">
                     <Ionicons name="warning" size={16} color={COLORS.destructive} />
                     <View className="flex-1">
-                        <Text className="font-medium text-destructive">Low Fair Play Score</Text>
+                        <Text className="font-medium text-destructive">{t('lowFairPlay')}</Text>
                         <Text className="text-xs text-muted-foreground mt-0.5">
-                            Improve your score by showing up to matches on time and following tournament rules.
+                            {t('lowFairPlayHint')}
                         </Text>
                     </View>
                 </View>

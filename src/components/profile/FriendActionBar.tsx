@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ type Confirm = {
 } | null;
 
 export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: Props) {
+    const { t } = useTranslation('profile');
     const navigation = useNavigation<Nav>();
     const [status, setStatus] = useState<FriendRelationStatusInfo | null>(null);
     const [loading, setLoading] = useState(true);
@@ -34,7 +36,7 @@ export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: 
     const [confirm, setConfirm] = useState<Confirm>(null);
     const [sheetOpen, setSheetOpen] = useState(false);
 
-    const targetName = otherUsername || 'this user';
+    const targetName = otherUsername || t('friend.thisUser');
 
     const fetchStatus = useCallback(async () => {
         try {
@@ -103,16 +105,16 @@ export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: 
     });
 
     const confirmRemoveFriend = () => setConfirm({
-        title: 'Remove friend?',
-        message: `You will no longer be friends with ${targetName}. You can send a new request later.`,
-        confirmText: 'Remove',
+        title: t('friend.removeTitle'),
+        message: t('friend.removeMessage', { name: targetName }),
+        confirmText: t('friend.remove'),
         action: unfriend,
     });
 
     const confirmBlock = () => setConfirm({
-        title: `Block ${targetName}?`,
-        message: `${targetName} won't be able to message you or send friend requests. Any existing friendship will be removed.`,
-        confirmText: 'Block',
+        title: t('friend.blockTitle', { name: targetName }),
+        message: t('friend.blockMessage', { name: targetName }),
+        confirmText: t('friend.block'),
         action: block,
     });
 
@@ -142,7 +144,7 @@ export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: 
     const sheetActions: ActionSheetAction[] = [];
     if (s === FriendRelationStatus.Friends) {
         sheetActions.push({
-            label: 'Remove Friend',
+            label: t('friend.removeFriend'),
             icon: 'person-remove-outline',
             destructive: true,
             onPress: confirmRemoveFriend,
@@ -150,7 +152,7 @@ export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: 
     }
     if (canBlock) {
         sheetActions.push({
-            label: 'Block User',
+            label: t('friend.blockUser'),
             icon: 'ban-outline',
             destructive: true,
             onPress: confirmBlock,
@@ -158,10 +160,10 @@ export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: 
     }
 
     const sheetSubtitle =
-        s === FriendRelationStatus.Friends ? 'You are friends' :
-            s === FriendRelationStatus.OutgoingRequest ? 'Friend request sent' :
-                s === FriendRelationStatus.IncomingRequest ? 'Sent you a friend request' :
-                    'Not friends yet';
+        s === FriendRelationStatus.Friends ? t('friend.youAreFriends') :
+            s === FriendRelationStatus.OutgoingRequest ? t('friend.requestSent') :
+                s === FriendRelationStatus.IncomingRequest ? t('friend.sentYouRequest') :
+                    t('friend.notFriendsYet');
 
     return (
         <>
@@ -169,45 +171,45 @@ export function FriendActionBar({ otherUserId, otherUsername, otherAvatarUrl }: 
                 <View className="flex-row" style={{ gap: 8 }}>
                     {/* ── Primary action ─────────────────────────────── */}
                     {s === FriendRelationStatus.None && (
-                        <ActionButton icon="person-add" label="Add Friend" onPress={sendRequest} variant="primary" busy={busy} />
+                        <ActionButton icon="person-add" label={t('friend.addFriend')} onPress={sendRequest} variant="primary" busy={busy} />
                     )}
                     {s === FriendRelationStatus.OutgoingRequest && (
-                        <ActionButton icon="time-outline" label="Request Sent" onPress={cancelRequest} variant="secondary" busy={busy} />
+                        <ActionButton icon="time-outline" label={t('friend.requestSentLabel')} onPress={cancelRequest} variant="secondary" busy={busy} />
                     )}
                     {s === FriendRelationStatus.IncomingRequest && (
-                        <ActionButton icon="checkmark" label="Accept Request" onPress={acceptRequest} variant="primary" busy={busy} />
+                        <ActionButton icon="checkmark" label={t('friend.acceptRequest')} onPress={acceptRequest} variant="primary" busy={busy} />
                     )}
                     {s === FriendRelationStatus.Friends && (
-                        <ActionButton icon="chatbubble-ellipses" label="Message" onPress={openChat} variant="primary" busy={busy} />
+                        <ActionButton icon="chatbubble-ellipses" label={t('friend.message')} onPress={openChat} variant="primary" busy={busy} />
                     )}
                     {s === FriendRelationStatus.BlockedByMe && (
-                        <ActionButton icon="lock-open" label="Unblock" onPress={unblock} variant="secondary" busy={busy} />
+                        <ActionButton icon="lock-open" label={t('friend.unblock')} onPress={unblock} variant="secondary" busy={busy} />
                     )}
                     {s === FriendRelationStatus.BlockedByOther && (
                         <View className="flex-1 bg-white/[0.03] border border-white/[0.04] rounded-2xl h-12 items-center justify-center">
-                            <Text className="text-slate-500 text-xs font-bold">Not available</Text>
+                            <Text className="text-slate-500 text-xs font-bold">{t('friend.notAvailable')}</Text>
                         </View>
                     )}
 
                     {/* ── Secondary actions ──────────────────────────── */}
                     {s === FriendRelationStatus.IncomingRequest && (
-                        <IconButton icon="close" onPress={rejectRequest} label="Decline request" busy={busy} />
+                        <IconButton icon="close" onPress={rejectRequest} label={t('friend.declineRequest')} busy={busy} />
                     )}
                     {s === FriendRelationStatus.Friends && (
                         <PressableScale
                             onPress={() => setSheetOpen(true)}
                             disabled={busy}
                             accessibilityRole="button"
-                            accessibilityLabel="Manage friendship"
+                            accessibilityLabel={t('friend.manageFriendship')}
                             className="h-12 px-3.5 rounded-2xl flex-row items-center justify-center bg-emerald-500/10 border border-emerald-500/25 gap-1.5"
                         >
                             <Ionicons name="people" size={15} color="#34D399" />
-                            <Text className="text-emerald-300 font-black text-xs">Friends</Text>
+                            <Text className="text-emerald-300 font-black text-xs">{t('friend.friends')}</Text>
                             <Ionicons name="chevron-down" size={12} color="#34D399" />
                         </PressableScale>
                     )}
                     {canBlock && s !== FriendRelationStatus.Friends && (
-                        <IconButton icon="ellipsis-horizontal" onPress={() => setSheetOpen(true)} label="More options" busy={busy} />
+                        <IconButton icon="ellipsis-horizontal" onPress={() => setSheetOpen(true)} label={t('friend.moreOptions')} busy={busy} />
                     )}
                 </View>
             </View>

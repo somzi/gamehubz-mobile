@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Image } from 'expo-image';
@@ -36,6 +37,7 @@ import {
 } from '../../lib/series';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
+import i18n from '../../i18n';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -87,6 +89,8 @@ export function MatchScheduleCard({
     unreadMessages = 0,
     bestOf: bestOfProp,
 }: MatchScheduleCardProps) {
+    const { t } = useTranslation('match');
+    const { t: tCommon } = useTranslation('common');
     const { user } = useAuth();
     const { refresh: refreshBadges } = useBadges();
     const insets = useSafeAreaInsets();
@@ -231,7 +235,7 @@ export function MatchScheduleCard({
                     // parseUtcDate, not new Date(): the backend serializes without a Z suffix,
                     // so raw parsing reads the UTC clock as local and shifts the time.
                     const confirmedDate = parseUtcDate(data.confirmedTime);
-                    setMatchTime(confirmedDate.toLocaleString());
+                    setMatchTime(confirmedDate.toLocaleString(i18n.language));
                     setMatchTimeIso(data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
@@ -435,7 +439,7 @@ export function MatchScheduleCard({
             });
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to approve result');
+                throw new Error(text || t('card.approveFailed'));
             }
             setModalVisible(false);
             // The consumed proposal drops both this user's "result to confirm" badge and the
@@ -444,7 +448,7 @@ export function MatchScheduleCard({
             if (onMatchUpdate) onMatchUpdate();
         } catch (err: any) {
             console.error('[MatchScheduleCard] Approve error:', err);
-            setError(err.message || 'An error occurred while approving the result');
+            setError(err.message || t('card.approveError'));
         } finally {
             setIsApproving(false);
         }
@@ -461,7 +465,7 @@ export function MatchScheduleCard({
             });
             if (!response.ok) {
                 const text = await response.text();
-                throw new Error(text || 'Failed to reject result');
+                throw new Error(text || t('card.rejectFailed'));
             }
             // Refresh details so the modal returns to the empty-score state and the proposer can resubmit.
             await fetchDbHomeUserId();
@@ -469,7 +473,7 @@ export function MatchScheduleCard({
             if (onMatchUpdate) onMatchUpdate();
         } catch (err: any) {
             console.error('[MatchScheduleCard] Reject error:', err);
-            setError(err.message || 'An error occurred while rejecting the result');
+            setError(err.message || t('card.rejectError'));
         } finally {
             setIsRejecting(false);
         }
@@ -527,7 +531,7 @@ export function MatchScheduleCard({
             const mappedMessage: MatchComment = {
                 id: newMessage.id || newMessage.Id,
                 userId: newMessage.userId || newMessage.UserId,
-                userNickname: newMessage.userNickname || newMessage.UserNickname || 'Unknown',
+                userNickname: newMessage.userNickname || newMessage.UserNickname || tCommon('unknown'),
                 userAvatarUrl: newMessage.userAvatarUrl || newMessage.UserAvatarUrl,
                 content: newMessage.content || newMessage.Content,
                 sentAt: newMessage.sentAt || newMessage.SentAt,
@@ -604,7 +608,7 @@ export function MatchScheduleCard({
                 // Check if match was scheduled
                 if (result.data?.confirmedTime) {
                     const confirmedDate = parseUtcDate(result.data.confirmedTime);
-                    setMatchTime(confirmedDate.toLocaleString());
+                    setMatchTime(confirmedDate.toLocaleString(i18n.language));
                     setMatchTimeIso(result.data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
@@ -632,7 +636,7 @@ export function MatchScheduleCard({
 
             if (response.ok) {
                 setCurrentStatus('scheduled');
-                setMatchTime('Agreed outside app');
+                setMatchTime(t('card.agreedOutsideApp'));
                 // No agreed timestamp in this path — clear the raw one so the strip shows the text.
                 setMatchTimeIso(undefined);
                 
@@ -640,12 +644,12 @@ export function MatchScheduleCard({
                     onMatchUpdate();
                 }
             } else {
-                const errorText = await response.text().catch(() => 'Failed to mark as scheduled');
+                const errorText = await response.text().catch(() => t('card.markScheduledFailed'));
                 setError(errorText);
             }
         } catch (error: any) {
             console.error('Error marking scheduled:', error);
-            setError(error.message || 'An error occurred');
+            setError(error.message || t('card.genericError'));
         } finally {
             setIsSubmitting(false);
         }
@@ -655,7 +659,7 @@ export function MatchScheduleCard({
         try {
             const { status: pStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (pStatus !== 'granted') {
-                setError('Sorry, we need camera roll permissions to make this work!');
+                setError(t('card.cameraRollPermission'));
                 return;
             }
 
@@ -670,8 +674,8 @@ export function MatchScheduleCard({
                 const oversized = result.assets.filter(asset => !isFileSizeValid(asset));
 
                 if (oversized.length > 0) {
-                    const oversizedNames = oversized.map(a => a.fileName || 'Image').join(', ');
-                    setError(`Some images are too large: ${oversizedNames}. Max size is ${formatFileSize(MAX_FILE_SIZE)}.`);
+                    const oversizedNames = oversized.map(a => a.fileName || t('card.imageFallbackName')).join(', ');
+                    setError(t('card.imagesTooLarge', { names: oversizedNames, max: formatFileSize(MAX_FILE_SIZE) }));
 
                     // Only add the valid ones
                     const validAssets = result.assets.filter(asset => isFileSizeValid(asset));
@@ -685,7 +689,7 @@ export function MatchScheduleCard({
             }
         } catch (err) {
             console.error('Error picking images:', err);
-            setError('Failed to pick images');
+            setError(t('card.pickImagesFailed'));
         }
     };
 
@@ -707,16 +711,16 @@ export function MatchScheduleCard({
 
         if (isSeriesMatch) {
             if (seriesGames.length === 0) {
-                setError('Enter the score for at least one game');
+                setError(t('card.enterAtLeastOneGame'));
                 return;
             }
             if (!isSeriesComplete) {
-                setError('Enter the remaining games before submitting');
+                setError(t('card.enterRemainingGames'));
                 return;
             }
         } else if (homeScore === '' || awayScore === '') {
             console.log('[MatchScheduleCard] Missing scores');
-            setError('Please enter scores for both players');
+            setError(t('card.enterBothScores'));
             return;
         }
 
@@ -738,7 +742,7 @@ export function MatchScheduleCard({
             // would pick a side by assumption, and picking wrong records the match with the
             // scores reversed — a far worse outcome than asking for another go.
             if (resolvedHomeUserId == null) {
-                setError('Could not load this match. Check your connection and try again.');
+                setError(t('card.loadMatchFailed'));
                 setIsSubmitting(false);
                 return;
             }
@@ -820,7 +824,7 @@ export function MatchScheduleCard({
             }
         } catch (err: any) {
             console.error('[MatchScheduleCard] Report result error:', err);
-            setError(err.message || 'An error occurred while reporting result');
+            setError(err.message || t('card.reportError'));
         } finally {
             setIsSubmitting(false);
         }
@@ -840,7 +844,7 @@ export function MatchScheduleCard({
                     >
                         <Ionicons name="calendar" size={11} color="#FBBF24" />
                         <Text className="text-[10px] font-black text-amber-300 uppercase tracking-tight">
-                            Set Availability
+                            {t('card.setAvailability')}
                         </Text>
                     </View>
                 );
@@ -872,7 +876,7 @@ export function MatchScheduleCard({
                     >
                         <Ionicons name="flash" size={11} color="#A5B4FC" />
                         <Text className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">
-                            Ready Check
+                            {t('card.readyCheck')}
                         </Text>
                     </View>
                 );
@@ -928,7 +932,7 @@ export function MatchScheduleCard({
                         {isSetAvailability ? (
                             <View className="flex-row items-center gap-2 bg-yellow-500/10 self-start px-3 py-2 rounded-xl border border-yellow-500/20">
                                 <Ionicons name="calendar-outline" size={14} color="#EAB308" />
-                                <Text className="text-[11px] font-black text-yellow-500 uppercase tracking-tight">Set Availability</Text>
+                                <Text className="text-[11px] font-black text-yellow-500 uppercase tracking-tight">{t('card.setAvailability')}</Text>
                             </View>
                         ) : (
                             <View className={cn(
@@ -944,7 +948,7 @@ export function MatchScheduleCard({
                                     "text-[11px] font-black uppercase tracking-tight",
                                     currentStatus === 'scheduled' ? "text-primary" : "text-indigo-500"
                                 )}>
-                                    {currentStatus === 'scheduled' ? matchTime : "Ready Check"}
+                                    {currentStatus === 'scheduled' ? matchTime : t('card.readyCheck')}
                                 </Text>
                             </View>
                         )}
@@ -1215,7 +1219,7 @@ export function MatchScheduleCard({
                                     <Text numberOfLines={1} className={cn(
                                         "text-xs font-black uppercase tracking-widest w-full text-center",
                                         activeModalTab === 'match' ? "text-emerald-300" : "text-slate-500"
-                                    )}>Match</Text>
+                                    )}>{t('tournament:details.match')}</Text>
                                 </ModalTabButton>
                                 <ModalTabButton
                                     active={activeModalTab === 'chat'}
@@ -1225,7 +1229,7 @@ export function MatchScheduleCard({
                                         <Text numberOfLines={1} className={cn(
                                             "text-xs font-black uppercase tracking-widest",
                                             activeModalTab === 'chat' ? "text-emerald-300" : "text-slate-500"
-                                        )}>Chat</Text>
+                                        )}>{t('match:chat.chat')}</Text>
                                         {comments.length > 0 && (
                                             <View className={cn(
                                                 "min-w-[20px] h-5 items-center justify-center rounded-full px-1.5",
@@ -1250,11 +1254,11 @@ export function MatchScheduleCard({
                                             <Text numberOfLines={1} className={cn(
                                                 "text-xs font-black uppercase tracking-widest",
                                                 activeModalTab === 'stream' ? "text-emerald-300" : "text-slate-500"
-                                            )}>Stream</Text>
+                                            )}>{t('common:stream')}</Text>
                                             {streams.some(s => s.status === MatchStreamStatus.Live) && (
                                                 <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
                                                     <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                                    <Text className="text-[8px] font-black text-red-400 uppercase">Live</Text>
+                                                    <Text className="text-[8px] font-black text-red-400 uppercase">{t('card.live')}</Text>
                                                 </View>
                                             )}
                                         </View>
@@ -1307,8 +1311,8 @@ export function MatchScheduleCard({
                                             const visualLeftScore = isUserDbHome ? proposedHomeScore : proposedAwayScore;
                                             const visualRightScore = isUserDbHome ? proposedAwayScore : proposedHomeScore;
                                             const proposerName = !!proposedByUserId && dbHomeUserId && proposedByUserId.toLowerCase() === dbHomeUserId.toLowerCase()
-                                                ? (dbHomeUsername || 'Opponent')
-                                                : (dbAwayUsername || 'Opponent');
+                                                ? (dbHomeUsername || t('card.opponent'))
+                                                : (dbAwayUsername || t('card.opponent'));
 
                                             // The scores are in visual orientation (you on the left), so the faces
                                             // have to follow them: a bare "1 : 0" left nobody able to tell whose
@@ -1335,7 +1339,7 @@ export function MatchScheduleCard({
                                                         <View className="items-center mb-3">
                                                             <View className="bg-warning/10 px-3 py-1 rounded-full">
                                                                 <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">
-                                                                    {isProposer ? 'Awaiting Approval' : 'Result Reported'}
+                                                                    {isProposer ? t('card.awaitingApproval') : t('card.resultReported')}
                                                                 </Text>
                                                             </View>
                                                             <Text className={cn(
@@ -1343,8 +1347,8 @@ export function MatchScheduleCard({
                                                                 isPremium ? "text-slate-400" : "text-muted-foreground"
                                                             )}>
                                                                 {isProposer
-                                                                    ? 'Waiting for your opponent or admin to confirm.'
-                                                                    : `${proposerName} reported the result. Confirm if it's correct.`}
+                                                                    ? t('card.waitingConfirm')
+                                                                    : t('card.proposerReported', { name: proposerName })}
                                                             </Text>
                                                         </View>
 
@@ -1352,13 +1356,13 @@ export function MatchScheduleCard({
                                                             <View className="flex-1 items-center">
                                                                 <PlayerAvatar
                                                                     src={user?.avatarUrl}
-                                                                    name={user?.username || 'You'}
+                                                                    name={user?.username || t('card.you')}
                                                                     size="lg"
                                                                     className="rounded-2xl border-0"
                                                                 />
                                                                 <PlayerIdentity
                                                                     className="mt-2"
-                                                                    username={user?.username || 'You'}
+                                                                    username={user?.username || t('card.you')}
                                                                     nickname={leftNickname}
                                                                     tone="home"
                                                                     reserveNicknameSpace={pairingHasNickname}
@@ -1414,7 +1418,7 @@ export function MatchScheduleCard({
                                                                         {isRejecting ? (
                                                                             <ActivityIndicator size="small" color="#F87171" />
                                                                         ) : (
-                                                                            <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>Reject</Text>
+                                                                            <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('card.reject')}</Text>
                                                                         )}
                                                                     </Pressable>
                                                                 )}
@@ -1427,7 +1431,7 @@ export function MatchScheduleCard({
                                                                         {isApproving ? (
                                                                             <ActivityIndicator size="small" color="#0F172A" />
                                                                         ) : (
-                                                                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>Approve</Text>
+                                                                            <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('card.approve')}</Text>
                                                                         )}
                                                                     </Pressable>
                                                                 )}
@@ -1440,7 +1444,7 @@ export function MatchScheduleCard({
                                                                         }}
                                                                         className="flex-1 bg-warning/10 border border-warning/25 rounded-2xl py-3 items-center active:opacity-70"
                                                                     >
-                                                                        <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>Edit</Text>
+                                                                        <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>{tCommon('edit')}</Text>
                                                                     </Pressable>
                                                                 )}
                                                             </View>
@@ -1483,12 +1487,12 @@ export function MatchScheduleCard({
                                                             <Ionicons name="create-outline" size={18} color="#F59E0B" />
                                                         </View>
                                                         <View className="flex-1">
-                                                            <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">Editing Your Report</Text>
+                                                            <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">{t('card.editingYourReport')}</Text>
                                                             <Text className={cn(
                                                                 "text-[11px] mt-0.5",
                                                                 isPremium ? "text-slate-400" : "text-muted-foreground"
                                                             )}>
-                                                                Update the score and tap Update Report to notify your opponent.
+                                                                {t('card.updateAndNotify')}
                                                             </Text>
                                                         </View>
                                                     </View>
@@ -1504,7 +1508,7 @@ export function MatchScheduleCard({
                                                 ) : isSeriesMatch ? (
                                                     <SeriesScoreEntry
                                                         key={`${matchId}-${visualEntrySeedGames.length}-${seriesFormat.bestOf}`}
-                                                        leftName={user?.username || 'You'}
+                                                        leftName={user?.username || t('card.you')}
                                                         leftNickname={userNickname || user?.nickName}
                                                         leftAvatarUrl={user?.avatarUrl}
                                                         rightName={opponentName}
@@ -1536,13 +1540,13 @@ export function MatchScheduleCard({
                                                             )}>
                                                                 <PlayerAvatar
                                                                     src={user?.avatarUrl}
-                                                                    name={user?.username || 'You'}
+                                                                    name={user?.username || t('card.you')}
                                                                     size={isPremium ? "xl" : "lg"}
                                                                     className={cn(isPremium ? "border-2 border-background-deep" : "")}
                                                                 />
                                                             </View>
                                                             <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
-                                                                {user?.username || 'You'}
+                                                                {user?.username || t('card.you')}
                                                             </Text>
                                                             {(userNickname || user?.nickName) && (
                                                                 <View className="flex-row items-center justify-center gap-1 mb-1">
@@ -1636,7 +1640,7 @@ export function MatchScheduleCard({
                                                             onPress={() => { setIsEditingProposal(false); setHomeScore(''); setAwayScore(''); setError(null); }}
                                                             className="flex-1 h-14 rounded-2xl border border-white/[0.06] bg-white/[0.04] items-center justify-center active:opacity-70"
                                                         >
-                                                            <Text className="text-xs font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>Cancel</Text>
+                                                            <Text className="text-xs font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>{tCommon('cancel')}</Text>
                                                         </Pressable>
                                                     )}
                                                     <Pressable
@@ -1673,15 +1677,15 @@ export function MatchScheduleCard({
                                                                         isRoundLocked ? "text-slate-200" : "text-emerald-950"
                                                                     )}>
                                                                         {isRoundLocked
-                                                                            ? "Round not open yet"
+                                                                            ? t('card.roundNotOpen')
                                                                             : isEditingProposal
-                                                                                ? "Update Report"
+                                                                                ? t('card.updateReport')
                                                                                 // A level knockout series is reported now and decided by a
                                                                                 // tiebreak later — say so on the button rather than letting
                                                                                 // "Submit Result" imply the match is settled.
                                                                                 : (isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel)
-                                                                                    ? "Report — Tiebreak Needed"
-                                                                                    : (requireResultApproval ? "Report Result" : "Submit Result")}
+                                                                                    ? t('card.reportTiebreakNeeded')
+                                                                                    : (requireResultApproval ? t('card.reportResult') : t('card.submitResult'))}
                                                                     </Text>
                                                                 </View>
                                                             )}
@@ -1702,7 +1706,7 @@ export function MatchScheduleCard({
                                                     {/* Already-uploaded evidence (read-only carousel) — visible to both proposer and opponent. */}
                                                     {existingEvidences.length > 0 && (
                                                         <View className="mb-3">
-                                                            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Uploaded</Text>
+                                                            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{t('card.uploaded')}</Text>
                                                             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                                                 {existingEvidences.map((url, idx) => (
                                                                     <View key={idx} className="mr-2.5">
@@ -1725,7 +1729,7 @@ export function MatchScheduleCard({
                                                                 style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                                                             >
                                                                 <Ionicons name="trash-outline" size={14} color={isPremium ? "#64748B" : "#71717A"} />
-                                                                <Text className="font-bold uppercase ml-1 text-[10px] text-slate-500">Clear</Text>
+                                                                <Text className="font-bold uppercase ml-1 text-[10px] text-slate-500">{t('card.clear')}</Text>
                                                             </Pressable>
                                                         </View>
                                                     )}
@@ -1746,7 +1750,7 @@ export function MatchScheduleCard({
                                                             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                                                         >
                                                             <Ionicons name="cloud-upload-outline" size={24} color={isPremium ? "#334155" : "#71717A"} />
-                                                            <Text className="font-semibold tracking-wider mt-1 text-[10px] text-slate-600">Tap to upload</Text>
+                                                            <Text className="font-semibold tracking-wider mt-1 text-[10px] text-slate-600">{t('card.tapToUpload')}</Text>
                                                         </Pressable>
                                                     )}
 
@@ -1782,7 +1786,7 @@ export function MatchScheduleCard({
                                                             ) : (
                                                                 <>
                                                                     <Ionicons name="cloud-upload-outline" size={14} color="#818CF8" />
-                                                                    <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider" numberOfLines={1}>Upload Evidence</Text>
+                                                                    <Text className="text-xs font-black text-indigo-400 uppercase tracking-wider" numberOfLines={1}>{t('card.uploadEvidence')}</Text>
                                                                 </>
                                                             )}
                                                         </Pressable>
@@ -1797,8 +1801,8 @@ export function MatchScheduleCard({
                                                 <View className={cn("w-20 h-20 rounded-full items-center justify-center border", isPremium ? "bg-primary/20 border-primary/30" : "bg-primary/20 border-transparent")}>
                                                     <Ionicons name="checkmark" size={40} color="#10B981" />
                                                 </View>
-                                                <Text numberOfLines={1} className={cn("font-black mt-6 uppercase tracking-widest w-full text-center", isPremium ? "text-xl text-white" : "text-foreground")}>Completed</Text>
-                                                {isPremium && <Text className="text-sm font-medium text-slate-500 mt-2">Results have been recorded</Text>}
+                                                <Text numberOfLines={1} className={cn("font-black mt-6 uppercase tracking-widest w-full text-center", isPremium ? "text-xl text-white" : "text-foreground")}>{t('card.completed')}</Text>
+                                                {isPremium && <Text className="text-sm font-medium text-slate-500 mt-2">{t('card.resultsRecorded')}</Text>}
                                             </View>
                                         )}
 
@@ -1829,7 +1833,7 @@ export function MatchScheduleCard({
                                     <View className="flex-1">
                                         <View className="flex-row items-center gap-2 mb-4">
                                             <Ionicons name="chatbubbles-outline" size={isPremium ? 20 : 18} color="#10B981" />
-                                            <Text className={cn("font-black uppercase tracking-tight", isPremium ? "text-lg text-white" : "text-sm text-foreground")}>Match Chat</Text>
+                                            <Text className={cn("font-black uppercase tracking-tight", isPremium ? "text-lg text-white" : "text-sm text-foreground")}>{t('card.matchChat')}</Text>
                                             <Text className={cn("font-bold", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>({comments.length})</Text>
                                         </View>
 
@@ -1858,7 +1862,7 @@ export function MatchScheduleCard({
                                                 ListEmptyComponent={
                                                     <View className={cn("h-32 border border-dashed rounded-2xl items-center justify-center mb-4", isPremium ? "border-white/10 bg-white/[0.02]" : "border-border/20 bg-muted/5")}>
                                                         <Ionicons name="chatbubble-outline" size={isPremium ? 28 : 24} color={isPremium ? "#475569" : "#71717A"} />
-                                                        <Text numberOfLines={1} className={cn("font-bold uppercase tracking-widest mt-1 w-full text-center", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>No messages yet</Text>
+                                                        <Text numberOfLines={1} className={cn("font-bold uppercase tracking-widest mt-1 w-full text-center", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>{t('card.noMessagesYet')}</Text>
                                                     </View>
                                                 }
                                                 renderItem={({ item: comment }) => {
@@ -1899,7 +1903,7 @@ export function MatchScheduleCard({
                                                                     )}
                                                                     {isAdminMessage && (
                                                                         <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
-                                                                            <Text className="text-[8px] font-black text-warning uppercase tracking-widest">Admin</Text>
+                                                                            <Text className="text-[8px] font-black text-warning uppercase tracking-widest">{t('card.admin')}</Text>
                                                                         </View>
                                                                     )}
                                                                     <Text className="text-[9px] font-bold text-slate-500">
@@ -1915,7 +1919,7 @@ export function MatchScheduleCard({
                                                             {isMyComment && (
                                                                 <PlayerAvatar
                                                                     src={user?.avatarUrl}
-                                                                    name={user?.username || 'You'}
+                                                                    name={user?.username || t('card.you')}
                                                                     size="sm"
                                                                     className="w-7 h-7 shrink-0"
                                                                 />
@@ -1935,7 +1939,7 @@ export function MatchScheduleCard({
                                     <View className="flex-row items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.03] border border-white/10">
                                         <Ionicons name="lock-closed-outline" size={13} color="#64748B" />
                                         <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                            Match completed — chat is read-only
+                                            {t('card.chatReadOnly')}
                                         </Text>
                                     </View>
                                 </View>
@@ -1948,7 +1952,7 @@ export function MatchScheduleCard({
                                             className={cn(
                                                 "flex-1 px-4 py-3 text-white font-medium",
                                             )}
-                                            placeholder="Type a message..."
+                                            placeholder={t('card.typeAMessage')}
                                             placeholderTextColor="#64748B"
                                             value={newComment}
                                             onChangeText={setNewComment}

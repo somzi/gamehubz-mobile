@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import {
     StatPill,
     PosterWordmark,
 } from './ShareCardShell';
+import i18n from '../../i18n';
 
 // Shareable tournament card — the player-card poster style in a violet/gold
 // "champion" theme: trophy emblem, name + status chip, prize (or participants)
@@ -42,23 +44,23 @@ interface ShareTournamentCardModalProps {
     hubName?: string | null;
 }
 
-const STATUS_META: Record<number, { label: string; color: string; bg: string; border: string }> = {
-    0: { label: 'OPEN', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.35)' },
-    1: { label: 'UPCOMING', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.35)' },
-    2: { label: 'REG. CLOSED', color: '#FBBF24', bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.3)' },
-    3: { label: 'LIVE', color: '#10B981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
-    4: { label: 'COMPLETED', color: '#94A3B8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)' },
+const STATUS_META: Record<number, { labelKey: string; color: string; bg: string; border: string }> = {
+    0: { labelKey: 'share.stOpen', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.35)' },
+    1: { labelKey: 'share.stUpcoming', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.35)' },
+    2: { labelKey: 'share.regClosed', color: '#FBBF24', bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.3)' },
+    3: { labelKey: 'share.stLive', color: '#10B981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)' },
+    4: { labelKey: 'share.stCompleted', color: '#94A3B8', bg: 'rgba(148,163,184,0.10)', border: 'rgba(148,163,184,0.25)' },
 };
 
 // getTournamentFormatLabel's full labels don't fit a stat column — short forms only.
 const FORMAT_SHORT: Record<number, string> = {
-    0: 'League',
-    1: 'Groups + SE',
-    2: 'Groups + DE',
-    3: 'Single Elim',
-    4: 'Double Elim',
-    5: 'Groups + KO',
-    6: 'Swiss',
+    0: 'share.fmtLeague',
+    1: 'share.fmtGroupsSE',
+    2: 'share.fmtGroupsDE',
+    3: 'share.fmtSingleElim',
+    4: 'share.fmtDoubleElim',
+    5: 'share.fmtGroupsKO',
+    6: 'share.fmtSwiss',
 };
 
 const REGION_SHORT: Record<number, string> = {
@@ -74,10 +76,11 @@ const REGION_SHORT: Record<number, string> = {
 function TournamentCardPoster({ name, status, isTeam, participants, teamSize, prize, prizeCurrency, format, startDate, region, countries, countryFlags, hubName, width }: {
     width: number;
 } & Omit<ShareTournamentCardModalProps, 'visible' | 'onClose' | 'tournamentId'>) {
+    const { t } = useTranslation('common');
     const statusMeta = STATUS_META[status] ?? STATUS_META[1];
-    const participantsLabel = isTeam ? 'TEAMS' : 'PLAYERS';
+    const participantsLabel = isTeam ? t('share.teams') : t('share.players');
     const prizeText = prize != null && String(prize).trim() !== '' ? String(prize).trim() : null;
-    const formatLabel = FORMAT_SHORT[Number(format)] ?? 'Custom';
+    const formatLabel = FORMAT_SHORT[Number(format)] ? t(FORMAT_SHORT[Number(format)]) : t('share.custom');
 
     const currencyLabel = getCurrencyLabel(prizeCurrency);
 
@@ -92,9 +95,9 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
     }
 
     const dateValue = startDate
-        ? new Date(startDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-        : 'TBD';
-    const modeValue = isTeam ? (teamSize ? `${teamSize}v${teamSize}` : 'Team') : 'Solo';
+        ? new Date(startDate).toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })
+        : t('app.tbd');
+    const modeValue = isTeam ? (teamSize ? `${teamSize}v${teamSize}` : t('team:modeTeam')) : t('team:modeSolo');
 
     return (
         <PosterRoot width={width} glowA="#8B5CF6" glowB="#F59E0B">
@@ -129,7 +132,7 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                         borderColor: statusMeta.border,
                     }}>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.color }} />
-                        <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 1.6, color: statusMeta.color }}>{statusMeta.label}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 1.6, color: statusMeta.color }}>{t(statusMeta.labelKey)}</Text>
                     </View>
                 </View>
 
@@ -139,13 +142,13 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                         <>
                             <SideStat icon="people" iconColor="rgba(129,140,248,0.75)" value={participants} label={participantsLabel} />
                             <StatDivider />
-                            <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={prizeText} label={`${currencyLabel.toUpperCase()} PRIZE`} valueColor="#FBBF24" />
+                            <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={prizeText} label={t('share.prizeLabel', { currency: currencyLabel.toUpperCase() })} valueColor="#FBBF24" />
                             <StatDivider />
-                            <SideStat icon="list" iconColor="rgba(167,139,250,0.75)" value={formatLabel} label="FORMAT" valueSize={15} />
+                            <SideStat icon="list" iconColor="rgba(167,139,250,0.75)" value={formatLabel} label={t('share.statFormat')} valueSize={15} />
                         </>
                     ) : (
                         <>
-                            <SideStat icon="list" iconColor="rgba(167,139,250,0.75)" value={formatLabel} label="FORMAT" valueSize={15} />
+                            <SideStat icon="list" iconColor="rgba(167,139,250,0.75)" value={formatLabel} label={t('share.statFormat')} valueSize={15} />
                             <StatDivider />
                             <SideStat icon="people" iconColor="rgba(129,140,248,0.75)" value={participants} label={participantsLabel} />
                             <StatDivider />
@@ -157,7 +160,7 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                 <View style={{ marginTop: 24, flexDirection: 'row', gap: 10 }}>
                     <StatPill
                         value={modeValue}
-                        label="MODE"
+                        label={t('share.statMode')}
                         background="rgba(45,212,237,0.08)"
                         border="rgba(45,212,237,0.22)"
                         valueColor="#2DD4ED"
@@ -166,7 +169,7 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                     />
                     <StatPill
                         value={dateValue}
-                        label="DATE"
+                        label={t('share.statDate')}
                         background="rgba(167,139,250,0.08)"
                         border="rgba(167,139,250,0.25)"
                         valueColor="#A78BFA"
@@ -199,12 +202,13 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
 }
 
 export function ShareTournamentCardModal({ visible, onClose, tournamentId, name, ...poster }: ShareTournamentCardModalProps) {
+    const { t } = useTranslation('common');
     return (
         <ShareCardShell
             visible={visible}
             onClose={onClose}
-            headerTitle="Tournament Card"
-            dialogTitle={`${name} — GameHubz tournament`}
+            headerTitle={t('share.tournamentCard')}
+            dialogTitle={t('share.tournamentDialogTitle', { name })}
             fileName={name || 'tournament'}
             onShareLink={() => shareTournament(tournamentId, name)}
             renderPoster={(width) => (

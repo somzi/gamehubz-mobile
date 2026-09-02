@@ -9,6 +9,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { formatDateSafe } from '../lib/utils';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { COLORS } from '../lib/theme';
@@ -40,37 +41,40 @@ interface BannedRow {
     bannedAt?: string;
 }
 
-const ROLE_META: Record<HubRole, { label: string; container: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
+// Labels carry i18n keys, not text: this map is module scope and would otherwise
+// freeze whatever language was active at import time.
+const ROLE_META: Record<HubRole, { labelKey: string; container: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
     [HubRole.HubOwner]: {
-        label: 'Owner',
+        labelKey: 'role.owner',
         container: 'bg-amber-500/15 border border-amber-500/30',
         text: 'text-amber-400',
         icon: 'shield-checkmark',
     },
     [HubRole.HubAdmin]: {
-        label: 'Admin',
+        labelKey: 'role.admin',
         container: 'bg-indigo-500/15 border border-indigo-500/30',
         text: 'text-indigo-300',
         icon: 'star',
     },
     [HubRole.HubExclusive]: {
-        label: 'Exclusive',
+        labelKey: 'role.exclusive',
         container: 'bg-fuchsia-500/15 border border-fuchsia-500/30',
         text: 'text-fuchsia-300',
         icon: 'sparkles',
     },
     [HubRole.HubMember]: {
-        label: 'Member',
+        labelKey: 'role.member',
         container: 'bg-white/[0.05] border border-white/10',
         text: 'text-slate-400',
         icon: 'person',
     },
 };
 
-function normalizeMember(raw: any): MemberRow | null {
+// Module scope, so the "unknown" fallback is passed in rather than resolved here.
+function normalizeMember(raw: any, unknownLabel: string): MemberRow | null {
     const userId = raw.UserId || raw.userId || raw.id || raw.Id;
     if (!userId) return null;
-    const username = raw.Username || raw.username || raw.Name || raw.name || 'Unknown';
+    const username = raw.Username || raw.username || raw.Name || raw.name || unknownLabel;
     const nickname = raw.Nickname || raw.nickname || raw.nickName || '';
     const avatarUrl = raw.AvatarUrl || raw.avatarUrl || undefined;
     const role = raw.HubRole ?? raw.hubRole ?? HubRole.HubMember;
@@ -78,6 +82,7 @@ function normalizeMember(raw: any): MemberRow | null {
 }
 
 function RoleBadge({ role }: { role: HubRole }) {
+    const { t } = useTranslation('hub');
     const meta = ROLE_META[role] ?? ROLE_META[HubRole.HubMember];
     return (
         <View className={`flex-row items-center px-2 py-1 rounded-full ${meta.container}`} style={{ gap: 4 }}>
@@ -88,13 +93,15 @@ function RoleBadge({ role }: { role: HubRole }) {
                             : '#94A3B8'
             } />
             <Text className={`text-[10px] font-black uppercase tracking-wide ${meta.text}`}>
-                {meta.label}
+                {t(meta.labelKey)}
             </Text>
         </View>
     );
 }
 
 export default function HubMembersScreen() {
+    const { t } = useTranslation('hub');
+    const { t: tCommon } = useTranslation('common');
     const route = useRoute<HubMembersScreenRouteProp>();
     const { hubId } = route.params;
     const { user: currentUser } = useAuth();
@@ -139,7 +146,7 @@ export default function HubMembersScreen() {
             if (response.ok) {
                 const data = await response.json();
                 const raw = data.result || data || [];
-                const normalized = (Array.isArray(raw) ? raw : []).map(normalizeMember).filter(Boolean) as MemberRow[];
+                const normalized = (Array.isArray(raw) ? raw : []).map((row: any) => normalizeMember(row, tCommon('unknown'))).filter(Boolean) as MemberRow[];
                 // Backend can return the same user twice (e.g. the owner also listed as a plain
                 // member), which crashes the FlatList with duplicate keys (keyExtractor = userId).
                 // Dedupe by userId, keeping the most-privileged role on collision.
@@ -190,7 +197,7 @@ export default function HubMembersScreen() {
                 const raw: any[] = Array.isArray(data) ? data : (data.result || []);
                 const normalized: BannedRow[] = raw.map(b => ({
                     userId: b.userId || b.UserId,
-                    username: b.username || b.Username || 'Unknown',
+                    username: b.username || b.Username || tCommon('unknown'),
                     avatarUrl: b.avatarUrl || b.AvatarUrl,
                     bannedAt: b.bannedAt || b.BannedAt,
                 })).filter(b => !!b.userId);
@@ -228,10 +235,10 @@ export default function HubMembersScreen() {
                 );
             } else {
                 const text = await response.text();
-                Alert.alert('Error', getErrorMessage(text) || 'Failed to update role.');
+                Alert.alert(tCommon('error'), getErrorMessage(text) || t('members.updateRoleFailed'));
             }
         } catch (error) {
-            Alert.alert('Error', getErrorMessage(error));
+            Alert.alert(tCommon('error'), getErrorMessage(error));
         } finally {
             markProcessing(member.userId, false);
         }
@@ -241,16 +248,12 @@ export default function HubMembersScreen() {
     // in two steps because the caller cannot undo it afterwards — only the new owner can transfer back.
     const transferOwnership = (member: MemberRow) => {
         Alert.alert(
-            'Transfer Ownership',
-            `Make ${member.username} the owner of this hub?
-
-`
-            + 'You will stay on as an admin. Only the new owner will be able to transfer the hub, '
-            + 'edit its details or delete it.',
+            t('members.transferTitle'),
+            t('members.transferMessage', { username: member.username }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Transfer',
+                    text: t('members.transfer'),
                     style: 'destructive',
                     onPress: async () => {
                         markProcessing(member.userId, true);
@@ -266,13 +269,13 @@ export default function HubMembersScreen() {
                                 // The viewer is no longer the owner, so re-read both the hub meta
                                 // (drops the owner-only controls) and the member list (new badges).
                                 await Promise.all([fetchHubMeta(), fetchMembers()]);
-                                Alert.alert('Ownership transferred', `${member.username} now owns this hub.`);
+                                Alert.alert(t('members.ownershipTransferred'), t('members.ownershipTransferredMessage', { username: member.username }));
                             } else {
                                 const text = await response.text();
-                                Alert.alert('Error', getErrorMessage(text) || 'Failed to transfer ownership.');
+                                Alert.alert(tCommon('error'), getErrorMessage(text) || t('members.transferFailed'));
                             }
                         } catch (error) {
-                            Alert.alert('Error', getErrorMessage(error));
+                            Alert.alert(tCommon('error'), getErrorMessage(error));
                         } finally {
                             markProcessing(member.userId, false);
                         }
@@ -284,12 +287,12 @@ export default function HubMembersScreen() {
 
     const removeMember = (member: MemberRow) => {
         Alert.alert(
-            'Remove Member',
-            `Remove ${member.username} from the hub? They will be able to join again.`,
+            t('members.removeTitle'),
+            t('members.removeMessage', { username: member.username }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Remove',
+                    text: tCommon('remove'),
                     style: 'destructive',
                     onPress: async () => {
                         markProcessing(member.userId, true);
@@ -302,10 +305,10 @@ export default function HubMembersScreen() {
                                 setMembers(prev => prev.filter(m => m.userId !== member.userId));
                             } else {
                                 const text = await response.text();
-                                Alert.alert('Error', getErrorMessage(text) || 'Failed to remove member.');
+                                Alert.alert(tCommon('error'), getErrorMessage(text) || t('members.removeFailed'));
                             }
                         } catch (error) {
-                            Alert.alert('Error', getErrorMessage(error));
+                            Alert.alert(tCommon('error'), getErrorMessage(error));
                         } finally {
                             markProcessing(member.userId, false);
                         }
@@ -317,12 +320,12 @@ export default function HubMembersScreen() {
 
     const banMember = (member: MemberRow) => {
         Alert.alert(
-            'Ban Member',
-            `Ban ${member.username} from the hub? They will no longer be able to join or send requests.`,
+            t('members.banTitle'),
+            t('members.banMessage', { username: member.username }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Ban',
+                    text: t('members.ban'),
                     style: 'destructive',
                     onPress: async () => {
                         markProcessing(member.userId, true);
@@ -336,10 +339,10 @@ export default function HubMembersScreen() {
                                 fetchBans();
                             } else {
                                 const text = await response.text();
-                                Alert.alert('Error', getErrorMessage(text) || 'Failed to ban member.');
+                                Alert.alert(tCommon('error'), getErrorMessage(text) || t('members.banFailed'));
                             }
                         } catch (error) {
-                            Alert.alert('Error', getErrorMessage(error));
+                            Alert.alert(tCommon('error'), getErrorMessage(error));
                         } finally {
                             markProcessing(member.userId, false);
                         }
@@ -351,12 +354,12 @@ export default function HubMembersScreen() {
 
     const unbanMember = (ban: BannedRow) => {
         Alert.alert(
-            'Unban Member',
-            `Lift the ban on ${ban.username}? They will be able to join the hub again.`,
+            t('members.unbanTitle'),
+            t('members.unbanMessage', { username: ban.username }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Unban',
+                    text: t('members.unban'),
                     onPress: async () => {
                         markProcessing(ban.userId, true);
                         try {
@@ -368,10 +371,10 @@ export default function HubMembersScreen() {
                                 setBans(prev => prev.filter(b => b.userId !== ban.userId));
                             } else {
                                 const text = await response.text();
-                                Alert.alert('Error', getErrorMessage(text) || 'Failed to unban user.');
+                                Alert.alert(tCommon('error'), getErrorMessage(text) || t('members.unbanFailed'));
                             }
                         } catch (error) {
-                            Alert.alert('Error', getErrorMessage(error));
+                            Alert.alert(tCommon('error'), getErrorMessage(error));
                         } finally {
                             markProcessing(ban.userId, false);
                         }
@@ -392,34 +395,34 @@ export default function HubMembersScreen() {
         if (viewerIsOwner) {
             if (member.hubRole === HubRole.HubMember) {
                 actions.push({
-                    label: 'Promote to admin',
+                    label: t('members.promoteToAdmin'),
                     icon: 'star-outline',
                     onPress: () => changeRole(member, HubRole.HubAdmin),
                 });
                 actions.push({
-                    label: 'Promote to exclusive',
+                    label: t('members.promoteToExclusive'),
                     icon: 'sparkles-outline',
                     onPress: () => changeRole(member, HubRole.HubExclusive),
                 });
             } else if (member.hubRole === HubRole.HubExclusive) {
                 actions.push({
-                    label: 'Promote to admin',
+                    label: t('members.promoteToAdmin'),
                     icon: 'star-outline',
                     onPress: () => changeRole(member, HubRole.HubAdmin),
                 });
                 actions.push({
-                    label: 'Demote to member',
+                    label: t('members.demoteToMember'),
                     icon: 'person-outline',
                     onPress: () => changeRole(member, HubRole.HubMember),
                 });
             } else if (member.hubRole === HubRole.HubAdmin) {
                 actions.push({
-                    label: 'Demote to exclusive',
+                    label: t('members.demoteToExclusive'),
                     icon: 'sparkles-outline',
                     onPress: () => changeRole(member, HubRole.HubExclusive),
                 });
                 actions.push({
-                    label: 'Demote to member',
+                    label: t('members.demoteToMember'),
                     icon: 'person-outline',
                     onPress: () => changeRole(member, HubRole.HubMember),
                 });
@@ -427,7 +430,7 @@ export default function HubMembersScreen() {
 
             // Marked destructive: it is the one action here the owner cannot take back.
             actions.push({
-                label: 'Transfer ownership',
+                label: t('members.transferOwnership'),
                 icon: 'key-outline',
                 destructive: true,
                 onPress: () => transferOwnership(member),
@@ -435,13 +438,13 @@ export default function HubMembersScreen() {
         }
 
         actions.push({
-            label: 'Remove from hub',
+            label: t('members.removeFromHub'),
             icon: 'person-remove-outline',
             destructive: true,
             onPress: () => removeMember(member),
         });
         actions.push({
-            label: 'Ban from hub',
+            label: t('members.banFromHub'),
             icon: 'ban-outline',
             destructive: true,
             onPress: () => banMember(member),
@@ -462,10 +465,10 @@ export default function HubMembersScreen() {
                 setRequests(prev => prev.filter(r => r.requestId !== requestId));
                 fetchMembers();
             } else {
-                Alert.alert('Error', `Failed to approve request from ${username}.`);
+                Alert.alert(tCommon('error'), t('members.approveFailed', { username }));
             }
         } catch (error) {
-            Alert.alert('Error', 'An unexpected error occurred.');
+            Alert.alert(tCommon('error'), tCommon('unexpectedError'));
         } finally {
             markProcessing(requestId, false);
         }
@@ -473,12 +476,12 @@ export default function HubMembersScreen() {
 
     const handleReject = (requestId: string, username: string) => {
         Alert.alert(
-            'Reject Request',
-            `Reject join request from ${username}?`,
+            t('members.rejectTitle'),
+            t('members.rejectMessage', { username }),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Reject',
+                    text: t('members.reject'),
                     style: 'destructive',
                     onPress: async () => {
                         markProcessing(requestId, true);
@@ -489,10 +492,10 @@ export default function HubMembersScreen() {
                             if (response.ok) {
                                 setRequests(prev => prev.filter(r => r.requestId !== requestId));
                             } else {
-                                Alert.alert('Error', 'Failed to reject request.');
+                                Alert.alert(tCommon('error'), t('members.rejectFailed'));
                             }
                         } catch (error) {
-                            Alert.alert('Error', 'An unexpected error occurred.');
+                            Alert.alert(tCommon('error'), tCommon('unexpectedError'));
                         } finally {
                             markProcessing(requestId, false);
                         }
@@ -532,19 +535,19 @@ export default function HubMembersScreen() {
     };
 
     const tabs: PremiumTabItem[] = [
-        { value: 'members', label: 'Members', icon: 'people-outline', badge: members.length > 0 ? members.length : undefined },
-        { value: 'requests', label: 'Requests', icon: 'mail-outline', badge: requests.length > 0 ? requests.length : undefined },
-        { value: 'blacklisted', label: 'Banned', icon: 'ban-outline', badge: bans.length > 0 ? bans.length : undefined },
+        { value: 'members', label: t('members.tabMembers'), icon: 'people-outline', badge: members.length > 0 ? members.length : undefined },
+        { value: 'requests', label: t('members.tabRequests'), icon: 'mail-outline', badge: requests.length > 0 ? requests.length : undefined },
+        { value: 'blacklisted', label: t('members.tabBanned'), icon: 'ban-outline', badge: bans.length > 0 ? bans.length : undefined },
     ];
 
     const searchPlaceholder =
-        activeTab === 'members' ? 'Search members...'
-            : activeTab === 'requests' ? 'Search requests...'
-                : 'Search blacklisted...';
+        activeTab === 'members' ? t('members.searchMembers')
+            : activeTab === 'requests' ? t('members.searchRequests')
+                : t('members.searchBanned');
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Hub Members" showBack />
+            <PageHeader title={t('members.title')} showBack />
 
             {/* Tabs */}
             <View className="px-4 pt-2 pb-1">
@@ -602,7 +605,7 @@ export default function HubMembersScreen() {
                                                 </Text>
                                                 {isSelf && (
                                                     <Text className="text-[10px] font-black uppercase text-slate-500">
-                                                        You
+                                                        {t('members.you')}
                                                     </Text>
                                                 )}
                                             </View>
@@ -639,7 +642,7 @@ export default function HubMembersScreen() {
                         ListEmptyComponent={
                             <View className="items-center py-20 opacity-30">
                                 <Ionicons name="people-outline" size={64} color="white" />
-                                <Text className="text-white mt-4">No members found</Text>
+                                <Text className="text-white mt-4">{t('members.noMembersFound')}</Text>
                             </View>
                         }
                     />
@@ -704,8 +707,8 @@ export default function HubMembersScreen() {
                                 <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
                                     <Ionicons name="mail-outline" size={28} color="#334155" />
                                 </View>
-                                <Text className="text-sm font-semibold text-slate-500">No pending requests</Text>
-                                <Text className="text-xs text-slate-600 mt-1">New join requests will appear here</Text>
+                                <Text className="text-sm font-semibold text-slate-500">{t('members.noPendingRequests')}</Text>
+                                <Text className="text-xs text-slate-600 mt-1">{t('members.noPendingRequestsHint')}</Text>
                             </View>
                         }
                     />
@@ -755,7 +758,7 @@ export default function HubMembersScreen() {
                                         >
                                             <Ionicons name="checkmark-circle-outline" size={15} color="#10B981" />
                                             <Text className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
-                                                Unban
+                                                {t('members.unban')}
                                             </Text>
                                         </Pressable>
                                     )}
@@ -767,8 +770,8 @@ export default function HubMembersScreen() {
                                 <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
                                     <Ionicons name="ban-outline" size={28} color="#334155" />
                                 </View>
-                                <Text className="text-sm font-semibold text-slate-500">No banned users</Text>
-                                <Text className="text-xs text-slate-600 mt-1">Banned users will appear here</Text>
+                                <Text className="text-sm font-semibold text-slate-500">{t('members.noBannedUsers')}</Text>
+                                <Text className="text-xs text-slate-600 mt-1">{t('members.noBannedUsersHint')}</Text>
                             </View>
                         }
                     />
@@ -779,7 +782,7 @@ export default function HubMembersScreen() {
                 visible={!!actionMember}
                 onClose={() => setActionMember(null)}
                 title={actionMember?.username ?? ''}
-                subtitle="Choose an action"
+                subtitle={t('members.chooseAnAction')}
                 header={actionMember ? (
                     <PlayerAvatar name={actionMember.username} src={actionMember.avatarUrl} size="md" />
                 ) : undefined}

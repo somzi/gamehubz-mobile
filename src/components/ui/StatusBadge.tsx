@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Animated } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { useEffect, useRef } from 'react';
 
@@ -9,6 +10,7 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+    const { t } = useTranslation('common');
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
@@ -66,7 +68,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
             )}
         >
             <Text className={cn('text-xs font-semibold uppercase', styles.text)}>
-                {status}
+                {t(`status.${status}`)}
             </Text>
         </View>
     );

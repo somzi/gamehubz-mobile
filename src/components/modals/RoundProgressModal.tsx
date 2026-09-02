@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
@@ -62,6 +63,13 @@ interface RoundProgressModalProps {
 
 // ── helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Loose translator signature. `buildStages` runs outside a component (it is called from a
+ * `useMemo`), so it takes `t` as an argument rather than pulling in the hook — the labels it
+ * bakes into the buckets are read straight into the UI.
+ */
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
 const norm = (o: any, camel: string, pascal: string) => o?.[camel] ?? o?.[pascal];
 
 function cleanDeadline(value: any): string | null {
@@ -71,11 +79,11 @@ function cleanDeadline(value: any): string | null {
     return String(value);
 }
 
-function sideName(side: any, isTeam: boolean): string {
-    if (!side) return 'TBD';
+function sideName(side: any, isTeam: boolean, t: Translate): string {
+    if (!side) return t('common:app.tbd');
     const team = norm(side, 'teamName', 'TeamName');
     const username = norm(side, 'username', 'Username');
-    return (isTeam ? team || username : username) || 'TBD';
+    return (isTeam ? team || username : username) || t('common:app.tbd');
 }
 
 function fixtureState(match: any, home: any, away: any): FixtureState {
@@ -86,21 +94,21 @@ function fixtureState(match: any, home: any, away: any): FixtureState {
     return 'awaiting';
 }
 
-const STATE_META: Record<FixtureState, { label: string; color: string }> = {
-    awaiting: { label: 'Not played', color: COLORS.slate500 },
-    proposed: { label: 'Awaiting approval', color: COLORS.primary },
-    tiebreak: { label: 'Tiebreak owed', color: COLORS.highlight },
-    locked: { label: 'Round locked', color: COLORS.slate600 },
-    tbd: { label: 'Waiting on previous round', color: COLORS.slate600 },
+const STATE_META: Record<FixtureState, { labelKey: string; color: string }> = {
+    awaiting: { labelKey: 'progress.state.awaiting', color: COLORS.slate500 },
+    proposed: { labelKey: 'progress.state.proposed', color: COLORS.primary },
+    tiebreak: { labelKey: 'progress.state.tiebreak', color: COLORS.highlight },
+    locked: { labelKey: 'progress.state.locked', color: COLORS.slate600 },
+    tbd: { labelKey: 'progress.state.tbd', color: COLORS.slate600 },
 };
 
 /** Flattens the tournament structure into per-stage then per-round completion buckets. */
-function buildStages(stages: any[], isTeam: boolean): StageBucket[] {
+function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[] {
     const result: StageBucket[] = [];
 
     for (const stage of stages ?? []) {
         const stageId = String(norm(stage, 'stageId', 'StageId') ?? norm(stage, 'name', 'Name') ?? result.length);
-        const stageName = norm(stage, 'name', 'Name') || 'Stage';
+        const stageName = norm(stage, 'name', 'Name') || t('progress.stage');
         const byRound = new Map<
             number,
             { label: string; matches: { match: any; groupName: string }[]; deadline: string | null }
@@ -120,7 +128,7 @@ function buildStages(stages: any[], isTeam: boolean): StageBucket[] {
         // Bracket stages already come grouped by round and carry their own labels ("Final", ...).
         for (const round of norm(stage, 'rounds', 'Rounds') ?? []) {
             const number = norm(round, 'roundNumber', 'RoundNumber') ?? 0;
-            const label = norm(round, 'name', 'Name') || `Round ${number}`;
+            const label = norm(round, 'name', 'Name') || t('details.roundNumber', { number });
             const deadline = cleanDeadline(norm(round, 'roundDeadline', 'RoundDeadline'));
             for (const match of norm(round, 'matches', 'Matches') ?? []) {
                 push(number, label, match, '', deadline ?? cleanDeadline(norm(match, 'roundDeadline', 'RoundDeadline')));
@@ -133,7 +141,7 @@ function buildStages(stages: any[], isTeam: boolean): StageBucket[] {
             const groupName = norm(group, 'name', 'Name') || '';
             for (const match of norm(group, 'matches', 'Matches') ?? []) {
                 const number = norm(match, 'round', 'Round') || norm(match, 'order', 'Order') || 1;
-                push(number, `Round ${number}`, match, groupName, cleanDeadline(norm(match, 'roundDeadline', 'RoundDeadline')));
+                push(number, t('details.roundNumber', { number }), match, groupName, cleanDeadline(norm(match, 'roundDeadline', 'RoundDeadline')));
             }
         }
 
@@ -162,9 +170,9 @@ function buildStages(stages: any[], isTeam: boolean): StageBucket[] {
                         match,
                         matchId: String(norm(match, 'id', 'Id')),
                         groupName,
-                        homeName: sideName(home, isTeam),
+                        homeName: sideName(home, isTeam, t),
                         homeAvatarUrl: home ? norm(home, 'avatarUrl', 'AvatarUrl') : null,
-                        awayName: sideName(away, isTeam),
+                        awayName: sideName(away, isTeam, t),
                         awayAvatarUrl: away ? norm(away, 'avatarUrl', 'AvatarUrl') : null,
                         state: fixtureState(match, home, away),
                         overdue: !!bucket.deadline && parseUtcDate(bucket.deadline).getTime() < now,
@@ -236,6 +244,7 @@ function FixtureRow({
     showChat: boolean;
     onOpen: (tab: 'match' | 'chat') => void;
 }) {
+    const { t } = useTranslation('tournament');
     const meta = STATE_META[fixture.state];
     const openable = fixture.state !== 'tbd';
 
@@ -255,11 +264,11 @@ function FixtureRow({
                     <View className="flex-row items-center gap-1.5 mt-0.5">
                         <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
                         <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
-                            {meta.label}
+                            {t(meta.labelKey)}
                         </Text>
                         {fixture.overdue && fixture.state === 'awaiting' && (
                             <Text className="text-[9px] font-black uppercase tracking-wider text-destructive">
-                                · Overdue
+                                · {t('progress.overdue')}
                             </Text>
                         )}
                     </View>
@@ -295,6 +304,7 @@ function RoundCard({
     showChat: boolean;
     onOpenMatch: (match: any, tab: 'match' | 'chat') => void;
 }) {
+    const { t } = useTranslation('tournament');
     const remaining = round.total - round.done;
     const complete = remaining === 0;
     const overdue = !!round.deadline && !complete && parseUtcDate(round.deadline).getTime() < Date.now();
@@ -340,10 +350,10 @@ function RoundCard({
                         </Text>
                         <Text className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-0.5">
                             {complete
-                                ? 'All played'
-                                : `${remaining} left${
+                                ? t('progress.allPlayed')
+                                : `${t('progress.remaining', { count: remaining })}${
                                       round.groupsIncomplete > 0
-                                          ? ` · ${round.groupsIncomplete} ${round.groupsIncomplete === 1 ? 'group' : 'groups'}`
+                                          ? ` · ${t('progress.groupsIncomplete', { count: round.groupsIncomplete })}`
                                           : ''
                                   }`}
                         </Text>
@@ -374,7 +384,7 @@ function RoundCard({
                             color={overdue ? COLORS.destructive : COLORS.slate500}
                         />
                         <Text className={cn('text-[10px] font-bold', overdue ? 'text-destructive' : 'text-slate-500')}>
-                            {overdue ? 'Deadline passed' : 'Deadline'} · {formatLocalDateTime(round.deadline)}
+                            {overdue ? t('progress.deadlinePassed') : t('progress.deadline')} · {formatLocalDateTime(round.deadline)}
                         </Text>
                     </View>
                 )}
@@ -421,7 +431,11 @@ export function RoundProgressModal({
     isTeamTournament,
     onOpenMatch,
 }: RoundProgressModalProps) {
-    const data = useMemo(() => buildStages(stages ?? [], !!isTeamTournament), [stages, isTeamTournament]);
+    const { t } = useTranslation('tournament');
+    const data = useMemo(
+        () => buildStages(stages ?? [], !!isTeamTournament, t),
+        [stages, isTeamTournament, t],
+    );
 
     const [stageIndex, setStageIndex] = useState(0);
     const [expandedRound, setExpandedRound] = useState<string | null>(null);
@@ -466,11 +480,11 @@ export function RoundProgressModal({
                                 <Ionicons name="stats-chart" size={18} color={COLORS.info} />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-base font-black text-white tracking-tight">Round Progress</Text>
+                                <Text className="text-base font-black text-white tracking-tight">{t('progress.title')}</Text>
                                 <Text className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                                     {totals.total === 0
-                                        ? 'Nothing scheduled yet'
-                                        : `${totals.done} of ${totals.total} fixtures played`}
+                                        ? t('progress.nothingScheduled')
+                                        : t('progress.fixturesPlayed', { done: totals.done, total: totals.total })}
                                 </Text>
                             </View>
                         </View>
@@ -538,10 +552,10 @@ export function RoundProgressModal({
                                     <Ionicons name="stats-chart-outline" size={26} color={COLORS.info} />
                                 </View>
                                 <Text className="text-sm font-black text-white uppercase tracking-widest">
-                                    No Fixtures Yet
+                                    {t('progress.emptyTitle')}
                                 </Text>
                                 <Text className="text-xs text-slate-500 mt-2 text-center px-8">
-                                    Once the bracket is generated, every round&apos;s completion shows up here.
+                                    {t('progress.emptyBody')}
                                 </Text>
                             </View>
                         ) : (

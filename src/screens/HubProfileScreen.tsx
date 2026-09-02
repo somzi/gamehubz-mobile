@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,10 +22,14 @@ import { ShareHubCardModal } from '../components/modals/ShareHubCardModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
+import i18n from '../i18n';
 
 type HubProfileRouteProp = RouteProp<RootStackParamList, 'HubProfile'>;
 
 export default function HubProfileScreen() {
+    const { t } = useTranslation('hub');
+    const { t: tCommon } = useTranslation('common');
+    const { t: tAuth } = useTranslation('auth');
     const route = useRoute<HubProfileRouteProp>();
     const navigation = useNavigation<any>();
     const { id } = route.params;
@@ -40,7 +45,7 @@ export default function HubProfileScreen() {
     // shows where the items are (status 3 = Live, 4 = Past, everything else = Upcoming).
     const hubTournamentApprovals = tournamentsForHub(id);
     const sumApprovals = (pred: (status: number) => boolean) =>
-        hubTournamentApprovals.filter((t) => pred(t.status)).reduce((acc, t) => acc + t.total, 0);
+        hubTournamentApprovals.filter((row) => pred(row.status)).reduce((acc, row) => acc + row.total, 0);
     const liveApprovals = sumApprovals((s) => s === 3);
     const pastApprovals = sumApprovals((s) => s === 4);
     const upcomingApprovals = sumApprovals((s) => s !== 3 && s !== 4);
@@ -103,7 +108,7 @@ export default function HubProfileScreen() {
             setIsLoading(true);
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB(id));
             if (!response.ok) {
-                throw new Error('Failed to fetch hub details');
+                throw new Error(t('profile.fetchFailed'));
             }
             const data = await response.json();
             const hub = data.result || data;
@@ -116,7 +121,7 @@ export default function HubProfileScreen() {
             setError(null);
         } catch (err: any) {
             console.error('Error fetching hub details:', err);
-            setError(err.message || 'An unexpected error occurred');
+            setError(err.message || tCommon('unexpectedError'));
         } finally {
             setIsLoading(false);
         }
@@ -207,15 +212,15 @@ export default function HubProfileScreen() {
 
     const getRoleMeta = (role: number) => {
         if (role === HubRole.HubOwner) {
-            return { label: 'Owner', color: 'text-amber-400', bg: 'bg-amber-500/15 border border-amber-500/30', icon: 'shield-checkmark', iconColor: '#FBBF24' };
+            return { label: t('role.owner'), color: 'text-amber-400', bg: 'bg-amber-500/15 border border-amber-500/30', icon: 'shield-checkmark', iconColor: '#FBBF24' };
         }
         if (role === HubRole.HubAdmin) {
-            return { label: 'Admin', color: 'text-indigo-300', bg: 'bg-indigo-500/15 border border-indigo-500/30', icon: 'star', iconColor: '#A5B4FC' };
+            return { label: t('role.admin'), color: 'text-indigo-300', bg: 'bg-indigo-500/15 border border-indigo-500/30', icon: 'star', iconColor: '#A5B4FC' };
         }
         if (role === HubRole.HubExclusive) {
-            return { label: 'Exclusive', color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/15 border border-fuchsia-500/30', icon: 'sparkles', iconColor: '#E879F9' };
+            return { label: t('role.exclusive'), color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/15 border border-fuchsia-500/30', icon: 'sparkles', iconColor: '#E879F9' };
         }
-        return { label: 'Member', color: 'text-slate-400', bg: 'bg-white/[0.05] border border-white/10', icon: 'person', iconColor: '#94A3B8' };
+        return { label: t('role.member'), color: 'text-slate-400', bg: 'bg-white/[0.05] border border-white/10', icon: 'person', iconColor: '#94A3B8' };
     };
 
     const handleFollowToggle = async () => {
@@ -238,10 +243,10 @@ export default function HubProfileScreen() {
                     setHasPendingRequest(false);
                 } else {
                     const text = await response.text();
-                    Alert.alert('Unable to cancel', getErrorMessage(text) || 'Failed to cancel join request.');
+                    Alert.alert(t('profile.unableToCancel'), getErrorMessage(text) || t('profile.cancelRequestFailed'));
                 }
             } catch (error) {
-                Alert.alert('Unable to cancel', getErrorMessage(error));
+                Alert.alert(t('profile.unableToCancel'), getErrorMessage(error));
             } finally {
                 setIsRequestingJoin(false);
             }
@@ -262,10 +267,10 @@ export default function HubProfileScreen() {
                 }
             } else {
                 const text = await response.text();
-                Alert.alert('Unable to join', getErrorMessage(text) || 'Failed to join hub.');
+                Alert.alert(t('profile.unableToJoin'), getErrorMessage(text) || t('profile.joinFailed'));
             }
         } catch (error) {
-            Alert.alert('Unable to join', getErrorMessage(error));
+            Alert.alert(t('profile.unableToJoin'), getErrorMessage(error));
         } finally {
             setIsRequestingJoin(false);
         }
@@ -283,10 +288,10 @@ export default function HubProfileScreen() {
                 setShowUnfollowConfirm(false);
             } else {
                 const text = await response.text();
-                Alert.alert('Unable to unfollow', getErrorMessage(text) || 'Failed to unfollow hub.');
+                Alert.alert(t('profile.unableToUnfollow'), getErrorMessage(text) || t('profile.unfollowFailed'));
             }
         } catch (error) {
-            Alert.alert('Unable to unfollow', getErrorMessage(error));
+            Alert.alert(t('profile.unableToUnfollow'), getErrorMessage(error));
         } finally {
             setIsUnfollowing(false);
         }
@@ -337,14 +342,14 @@ export default function HubProfileScreen() {
     };
 
     const hubTabs: PremiumTabItem[] = [
-        { label: 'Overview', value: 'overview', icon: 'grid-outline' },
+        { label: t('profile.tabOverview'), value: 'overview', icon: 'grid-outline' },
         {
             label: 'Tournaments', value: 'tournaments', icon: 'trophy-outline',
             badge: hubTournamentsCount > 0 ? hubTournamentsCount : undefined,
             badgeTone: 'alert',
         },
         {
-            label: 'Members', value: 'members', icon: 'people-outline',
+            label: t('profile.tabMembers'), value: 'members', icon: 'people-outline',
             badge: hubJoinCount > 0 ? hubJoinCount : undefined,
             badgeTone: 'alert',
         },
@@ -352,15 +357,15 @@ export default function HubProfileScreen() {
 
     const tournamentFilterTabs: PremiumTabItem[] = [
         {
-            label: 'Live', value: 'live', icon: 'radio',
+            label: t('profile.tabLive'), value: 'live', icon: 'radio',
             badge: liveApprovals > 0 ? liveApprovals : undefined, badgeTone: 'alert',
         },
         {
-            label: 'Upcoming', value: 'upcoming', icon: 'time-outline',
+            label: t('profile.tabUpcoming'), value: 'upcoming', icon: 'time-outline',
             badge: upcomingApprovals > 0 ? upcomingApprovals : undefined, badgeTone: 'alert',
         },
         {
-            label: 'Past', value: 'past', icon: 'checkmark-circle-outline',
+            label: t('profile.tabPast'), value: 'past', icon: 'checkmark-circle-outline',
             badge: pastApprovals > 0 ? pastApprovals : undefined, badgeTone: 'alert',
         },
     ];
@@ -370,7 +375,7 @@ export default function HubProfileScreen() {
             return (
                 <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
                     <Ionicons name="trophy-outline" size={48} color="#1E293B" />
-                    <Text className="text-slate-600 mt-4 text-center text-sm">No tournaments found</Text>
+                    <Text className="text-slate-600 mt-4 text-center text-sm">{t('profile.noTournamentsFound')}</Text>
                 </View>
             );
         }
@@ -391,7 +396,7 @@ export default function HubProfileScreen() {
                             date={(tournament.status === 0 && tournament.registrationOpensAt)
                                 ? formatLocalDateTime(tournament.registrationOpensAt)
                                 : formatDateSafe(tournament.startDate)}
-                            region={tournament.region === 1 ? 'North America' : 'Europe'}
+                            region={tournament.region === 1 ? tAuth('region.northAmerica') : tAuth('region.europe')}
                             prizePool={`${getCurrencySymbol(tournament.prizeCurrency)}${tournament.prize}`}
                             players={new Array(tournament.numberOfParticipants || 0).fill({})}
                             onClick={() => openTournament(tournament.id)}
@@ -421,12 +426,12 @@ export default function HubProfileScreen() {
                     >
                         <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                     </Pressable>
-                    <Text className="text-lg font-black text-white tracking-tight">Hub</Text>
+                    <Text className="text-lg font-black text-white tracking-tight">{t('profile.headerHub')}</Text>
                     <View className="w-10" />
                 </View>
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-slate-500 mt-4">Loading hub...</Text>
+                    <Text className="text-slate-500 mt-4">{t('profile.loadingHub')}</Text>
                 </View>
             </SafeAreaView>
         );
@@ -442,17 +447,17 @@ export default function HubProfileScreen() {
                     >
                         <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                     </Pressable>
-                    <Text className="text-lg font-black text-white tracking-tight">Hub</Text>
+                    <Text className="text-lg font-black text-white tracking-tight">{t('profile.headerHub')}</Text>
                     <View className="w-10" />
                 </View>
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                    <Text className="text-red-400 mt-4 text-center font-medium">{error || 'Hub not found'}</Text>
+                    <Text className="text-red-400 mt-4 text-center font-medium">{error || t('profile.hubNotFound')}</Text>
                     <Pressable
                         onPress={fetchHubDetails}
                         className="mt-6 bg-card px-8 py-3 rounded-2xl border border-white/5"
                     >
-                        <Text className="text-white font-bold">Retry</Text>
+                        <Text className="text-white font-bold">{tCommon('retry')}</Text>
                     </Pressable>
                 </View>
             </SafeAreaView>
@@ -473,12 +478,12 @@ export default function HubProfileScreen() {
                 >
                     <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                 </Pressable>
-                <Text className="text-lg font-black text-white tracking-tight">Hub</Text>
+                <Text className="text-lg font-black text-white tracking-tight">{t('profile.headerHub')}</Text>
                 <View className="flex-row items-center gap-2">
                     <Pressable
                         onPress={handleShare}
                         className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
-                        accessibilityLabel="Share hub"
+                        accessibilityLabel={t('profile.shareHub')}
                     >
                         <Ionicons name="share-outline" size={20} color="#FAFAFA" />
                     </Pressable>
@@ -548,12 +553,12 @@ export default function HubProfileScreen() {
                             {/* Follow / Request Join Button */}
                             {!isOwner && (() => {
                                 const buttonLabel = isFollowing
-                                    ? "Following"
+                                    ? t('profile.following')
                                     : hasPendingRequest
-                                        ? "Request Pending"
+                                        ? t('profile.requestPending')
                                         : isPublic
-                                            ? "Follow Hub"
-                                            : "Request to Join";
+                                            ? t('profile.followHub')
+                                            : t('profile.requestToJoin');
                                 const buttonIcon = isFollowing
                                     ? "checkmark-circle"
                                     : hasPendingRequest
@@ -619,15 +624,15 @@ export default function HubProfileScreen() {
                         <CollapsibleCard
                             icon="information-circle"
                             iconColor="#F59E0B"
-                            title="General Info"
+                            title={t('profile.generalInfo')}
                             isOpen={isGeneralInfoOpen}
                             onToggle={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
                         >
                             <InfoRow
                                 icon="people"
                                 iconColor="#818CF8"
-                                label="Members"
-                                value={(hubData.numberOfUsers || 0).toLocaleString()}
+                                label={t('profile.membersLabel')}
+                                value={(hubData.numberOfUsers || 0).toLocaleString(i18n.language)}
                             />
                             <InfoRow
                                 icon="trophy"
@@ -638,14 +643,14 @@ export default function HubProfileScreen() {
                             <InfoRow
                                 icon={isPublic ? 'globe-outline' : 'lock-closed'}
                                 iconColor={isPublic ? '#34D399' : '#F59E0B'}
-                                label="Access"
-                                value={isPublic ? 'Public' : 'Private'}
+                                label={t('profile.accessLabel')}
+                                value={isPublic ? t('profile.public') : t('profile.private')}
                             />
                             {(hubData.createdOn || hubData.CreatedOn) && (
                                 <InfoRow
                                     icon="calendar-outline"
                                     iconColor="#38BDF8"
-                                    label="Established"
+                                    label={t('profile.established')}
                                     value={formatDateSafe(hubData.createdOn || hubData.CreatedOn)}
                                 />
                             )}
@@ -659,7 +664,7 @@ export default function HubProfileScreen() {
                                     <InfoRow
                                         icon={roleMeta.icon as any}
                                         iconColor={roleMeta.iconColor}
-                                        label="Your Role"
+                                        label={t('profile.yourRole')}
                                         value={
                                             <View className={`flex-row items-center px-2 py-1 rounded-full ${roleMeta.bg}`} style={{ gap: 4 }}>
                                                 <Ionicons name={roleMeta.icon as any} size={10} color={roleMeta.iconColor} />
@@ -675,7 +680,7 @@ export default function HubProfileScreen() {
                                 <InfoRow
                                     icon="person"
                                     iconColor="#34D399"
-                                    label="Owner"
+                                    label={t('profile.ownerLabel')}
                                     value={
                                         <Text className="text-[14px] font-black text-emerald-300 text-right" numberOfLines={2}>
                                             {hubData.ownerName || hubData.OwnerName}
@@ -696,7 +701,7 @@ export default function HubProfileScreen() {
                             <CollapsibleCard
                                 icon="document-text"
                                 iconColor="#FBBF24"
-                                title="About"
+                                title={t('profile.about')}
                                 isOpen={isAboutOpen}
                                 onToggle={() => setIsAboutOpen(!isAboutOpen)}
                             >
@@ -720,7 +725,7 @@ export default function HubProfileScreen() {
                                         <Ionicons name="search-outline" size={18} color="#475569" />
                                         <TextInput
                                             className="flex-1 h-11 text-white ml-2 text-sm"
-                                            placeholder="Search members..."
+                                            placeholder={t('profile.searchMembers')}
                                             placeholderTextColor="#475569"
                                             value={memberSearch}
                                             onChangeText={setMemberSearch}
@@ -738,7 +743,7 @@ export default function HubProfileScreen() {
                                 <View className="bg-card rounded-2xl border border-white/5 overflow-hidden">
                                     {members.map((member, index) => {
                                         const mId = member.userId || member.UserId;
-                                        const mName = member.username || member.Username || 'Unknown';
+                                        const mName = member.username || member.Username || tCommon('unknown');
                                         const mAvatar = member.avatarUrl || member.AvatarUrl;
                                         const role = member.hubRole ?? member.HubRole ?? HubRole.HubMember;
                                         const roleMeta = getRoleMeta(role);
@@ -778,10 +783,10 @@ export default function HubProfileScreen() {
                                                 <Ionicons name="people-outline" size={24} color="#334155" />
                                             </View>
                                             <Text className="text-sm font-semibold text-slate-500">
-                                                {memberSearch ? 'No matches' : 'No members yet'}
+                                                {memberSearch ? t('profile.noMatches') : t('profile.noMembersYet')}
                                             </Text>
                                             {memberSearch ? (
-                                                <Text className="text-xs text-slate-600 mt-1">Try a different search</Text>
+                                                <Text className="text-xs text-slate-600 mt-1">{t('profile.tryDifferentSearch')}</Text>
                                             ) : null}
                                         </View>
                                     )}
@@ -793,8 +798,8 @@ export default function HubProfileScreen() {
                                     <View className="w-16 h-16 rounded-2xl bg-background items-center justify-center mb-4 border border-white/5">
                                         <Ionicons name="lock-closed-outline" size={28} color="#334155" />
                                     </View>
-                                    <Text className="text-white font-black text-lg text-center">Private Content</Text>
-                                    <Text className="text-slate-500 mt-2 text-center text-sm px-6">Follow this hub to see its members</Text>
+                                    <Text className="text-white font-black text-lg text-center">{t('profile.privateContent')}</Text>
+                                    <Text className="text-slate-500 mt-2 text-center text-sm px-6">{t('profile.privateMembersHint')}</Text>
                                 </View>
                             </View>
                         )}
@@ -824,8 +829,8 @@ export default function HubProfileScreen() {
                                     <View className="w-16 h-16 rounded-2xl bg-background items-center justify-center mb-4 border border-white/5">
                                         <Ionicons name="lock-closed-outline" size={28} color="#334155" />
                                     </View>
-                                    <Text className="text-white font-black text-lg text-center">Private Content</Text>
-                                    <Text className="text-slate-500 mt-2 text-center text-sm px-6">Follow this hub to see its tournaments and activities</Text>
+                                    <Text className="text-white font-black text-lg text-center">{t('profile.privateContent')}</Text>
+                                    <Text className="text-slate-500 mt-2 text-center text-sm px-6">{t('profile.privateTournamentsHint')}</Text>
                                 </View>
                             </View>
                         )}
@@ -837,7 +842,7 @@ export default function HubProfileScreen() {
                 visible={shareCardVisible}
                 onClose={() => setShareCardVisible(false)}
                 hubId={id}
-                name={hubData.name || 'Hub'}
+                name={hubData.name || t('profile.headerHub')}
                 avatarUrl={hubData.avatarUrl || hubData.logoUrl}
                 isVerified={!!(hubData.isVerified || hubData.IsVerified)}
                 isPublic={isPublic}
@@ -852,8 +857,8 @@ export default function HubProfileScreen() {
                 visible={showUnfollowConfirm}
                 onClose={() => setShowUnfollowConfirm(false)}
                 onConfirm={handleConfirmUnfollow}
-                title="Unfollow Hub"
-                message={`Are you sure you want to unfollow ${hubData?.name || 'this hub'}? You will lose access to its private tournaments.`}
+                title={t('profile.unfollowTitle')}
+                message={t('profile.unfollowMessage', { name: hubData?.name || t('profile.thisHub') })}
                 isDestructive={true}
                 isLoading={isUnfollowing}
             />

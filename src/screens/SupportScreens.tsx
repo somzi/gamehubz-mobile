@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Pressable, Linking } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -11,35 +12,20 @@ import { COLORS } from '../lib/theme';
 
 const DISCORD_BLURPLE = '#5865F2';
 
-const FAQS: { question: string; answer: string }[] = [
-    {
-        question: 'How do I join a tournament?',
-        answer: 'Navigate to the Hubs screen, find a Hub you like in the Discovery section, and join it. Once you are a member, you can find active competitions under the Upcoming Tournaments section.',
-    },
-    {
-        question: 'How do I report a match result?',
-        answer: 'You can report your score from your Home page by clicking on the active match, or by going to the tournament Bracket tab, clicking on your match, and submitting the result.',
-    },
-    {
-        question: 'How can I create my own Hub?',
-        answer: 'Go to the Hubs section and click the "Create" button. Follow the instructions to set up your community and start building your player base.',
-    },
-    {
-        question: 'How do I find new Hubs to join?',
-        answer: 'Use the Discovery tab within the Hubs section. This allows you to explore and search for different gaming communities that you might want to join.',
-    },
-    {
-        question: 'How do I create a tournament?',
-        answer: 'You must be the owner of a Hub to create tournaments. If you own a Hub, go to its settings menu where you will find the option to create and configure a new tournament.',
-    },
-    {
-        question: 'How can I change my password?',
-        answer: 'Navigate to your Profile screen. Under the account settings, you will find the option to securely update your password.',
-    },
+const FAQ_KEYS = [
+    { q: 'q1', a: 'a1' },
+    { q: 'q2', a: 'a2' },
+    { q: 'q3', a: 'a3' },
+    { q: 'q4', a: 'a4' },
+    { q: 'q5', a: 'a5' },
+    { q: 'q6', a: 'a6' },
 ];
 
-function FaqItem({ question, answer }: { question: string; answer: string }) {
+function FaqItem({ questionKey, answerKey }: { questionKey: string; answerKey: string }) {
+    const { t } = useTranslation('support');
     const [open, setOpen] = useState(false);
+    const question = t(questionKey);
+    const answer = t(answerKey);
 
     // Expand/collapse animates via a Reanimated layout transition on the wrapper —
     // LayoutAnimation ghosts text on the new architecture.
@@ -67,29 +53,31 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export function HelpCenterScreen() {
+    const { t } = useTranslation('support');
+    const { t: tAuth } = useTranslation('auth');
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <PageHeader title="Help Center" showBack />
+            <PageHeader title={t('helpCenter')} showBack />
             <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 <View className="items-center py-6">
                     <View className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                         <Ionicons name="help-circle-outline" size={30} color={COLORS.primary} />
                     </View>
-                    <Text className="text-2xl font-black text-white text-center tracking-tight">How can we help?</Text>
+                    <Text className="text-2xl font-black text-white text-center tracking-tight">{t('howCanWeHelp')}</Text>
                     <Text className="text-slate-400 text-[13px] text-center mt-2 px-8 leading-5">
-                        Find answers to the most common questions
+                        {t('findAnswers')}
                     </Text>
                 </View>
 
-                <SectionLabel icon="chatbubbles" title="Frequently Asked Questions" />
+                <SectionLabel icon="chatbubbles" title={t('faqTitle')} />
                 <View className="gap-3">
-                    {FAQS.map((faq) => (
-                        <FaqItem key={faq.question} question={faq.question} answer={faq.answer} />
+                    {FAQ_KEYS.map((faq) => (
+                        <FaqItem key={faq.q} questionKey={faq.q} answerKey={faq.a} />
                     ))}
                 </View>
 
                 <Animated.View layout={LinearTransition.duration(200)} style={{ marginTop: 32 }}>
-                    <SectionLabel icon="mail" title="Still need help?" color={COLORS.info} />
+                    <SectionLabel icon="mail" title={t('stillNeedHelp')} color={COLORS.info} />
                     <TouchableOpacity
                         onPress={() => Linking.openURL('mailto:support@codespheresolutions.dev')}
                         className="bg-card p-4 rounded-2xl border border-white/[0.06] flex-row items-center gap-3 active:opacity-70"
@@ -98,7 +86,7 @@ export function HelpCenterScreen() {
                             <Ionicons name="mail" size={18} color={COLORS.info} />
                         </View>
                         <View className="flex-1">
-                            <Text className="text-white font-bold text-sm">Email Support</Text>
+                            <Text className="text-white font-bold text-sm">{t('emailSupport')}</Text>
                             <Text className="text-slate-500 text-xs mt-0.5">support@codespheresolutions.dev</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />
@@ -110,28 +98,30 @@ export function HelpCenterScreen() {
 }
 
 export function AboutUsScreen() {
+    const { t } = useTranslation('support');
+    const { t: tAuth } = useTranslation('auth');
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <PageHeader title="About Us" showBack />
+            <PageHeader title={t('aboutUs')} showBack />
             <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 <View className="items-center py-6">
                     <View className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                         <Ionicons name="information-circle-outline" size={30} color={COLORS.primary} />
                     </View>
-                    <Text className="text-3xl font-black text-white tracking-tight">GameHubz</Text>
+                    <Text className="text-3xl font-black text-white tracking-tight">{tAuth('brand')}</Text>
                 </View>
 
                 <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-6">
                     <Text className="text-slate-300 leading-7 text-center text-base">
-                        GameHubz is the ultimate platform for tournament organizers and competitive gamers.
-                        We provide the professional tools you need to create, manage, and scale your gaming communities
+                        {t('aboutLine1')}
+                        {t('aboutLine2')}
                         from the ground up.
                     </Text>
                 </View>
 
                 <View className="mt-12 items-center">
                     <Text className="text-slate-500 text-xs tracking-widest uppercase w-full text-center" numberOfLines={1}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
-                    <Text className="text-slate-500 text-xs mt-2">© 2026 CodeSphere Solutions</Text>
+                    <Text className="text-slate-500 text-xs mt-2">{t('copyright')}</Text>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -139,17 +129,19 @@ export function AboutUsScreen() {
 }
 
 export function ContactUsScreen() {
+    const { t } = useTranslation('support');
+    const { t: tAuth } = useTranslation('auth');
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <PageHeader title="Contact Us" showBack />
+            <PageHeader title={t('contactUs')} showBack />
             <ScrollView className="flex-1 px-5" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 <View className="items-center py-6 mb-2">
                     <View className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                         <Ionicons name="mail-outline" size={30} color={COLORS.primary} />
                     </View>
-                    <Text className="text-2xl font-black text-white tracking-tight">Get in Touch</Text>
+                    <Text className="text-2xl font-black text-white tracking-tight">{t('getInTouch')}</Text>
                     <Text className="text-slate-400 text-[13px] text-center mt-2 px-8 leading-5">
-                        Our team is here to support your competitive journey.
+                        {t('contactLine')}
                     </Text>
                 </View>
 
@@ -162,7 +154,7 @@ export function ContactUsScreen() {
                             <Ionicons name="mail" size={18} color={COLORS.primary} />
                         </View>
                         <View className="flex-1">
-                            <Text className="text-white font-bold text-sm">Email Support</Text>
+                            <Text className="text-white font-bold text-sm">{t('emailSupport')}</Text>
                             <Text className="text-slate-500 text-xs mt-0.5">support@codespheresolutions.dev</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />
@@ -179,7 +171,7 @@ export function ContactUsScreen() {
                             <Ionicons name="logo-discord" size={18} color={DISCORD_BLURPLE} />
                         </View>
                         <View className="flex-1">
-                            <Text className="text-white font-bold text-sm">Join our Discord</Text>
+                            <Text className="text-white font-bold text-sm">{t('joinDiscord')}</Text>
                             <Text className="text-slate-500 text-xs mt-0.5">discord.gg/CUFWXhfRPb</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />

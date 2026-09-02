@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 /**
  * Best-of series maths, mirroring the server's SeriesEvaluator.
  *
@@ -210,8 +211,8 @@ export function groupBySeries(games: SeriesGame[]): { seriesNumber: number; game
 
 /** "Main series" / "Tiebreak" / "Tiebreak 2" — the label above each block of games. */
 export function seriesBlockLabel(seriesNumber: number): string {
-    if (seriesNumber <= 1) return 'Main series';
-    return seriesNumber === 2 ? 'Tiebreak' : `Tiebreak ${seriesNumber - 1}`;
+    if (seriesNumber <= 1) return i18n.t('match:seriesInfo.mainSeries');
+    return seriesNumber === 2 ? i18n.t('match:seriesInfo.tiebreak') : i18n.t('match:seriesInfo.tiebreakN', { n: seriesNumber - 1 });
 }
 
 /**
@@ -257,15 +258,15 @@ export function seriesGamesFrom(match: any): SeriesGame[] {
 export function bestOfInlineDescription(bestOf: number, condition: SeriesWinConditionValue): string {
     const n = normalizeBestOf(bestOf);
 
-    if (n === 1) return 'A single game decides the match';
+    if (n === 1) return i18n.t('match:seriesInfo.singleGameDecides');
 
     if (condition === SeriesWinCondition.AggregateScore) {
-        return `Highest total score across ${n} games`;
+        return i18n.t('match:seriesInfo.highestTotal', { n });
     }
 
     return n % 2 === 0
-        ? `Up to ${n} games — can end level`
-        : `First to ${winsNeeded(n)} game wins`;
+        ? i18n.t('match:seriesInfo.upToGames', { n })
+        : i18n.t('match:seriesInfo.firstToWins', { wins: winsNeeded(n) });
 }
 
 /** The sentence under the tiebreak selector, spelling out what actually happens on a draw. */
@@ -273,6 +274,6 @@ export function tiebreakDescription(bestOf: number, tiebreakBestOf: number | nul
     const replay = normalizeBestOf(tiebreakBestOf ?? bestOf);
 
     return tiebreakBestOf == null
-        ? `If the knockout series ends in a draw, another Bo${replay} series will be played.`
-        : `If the knockout series ends in a draw, a Bo${replay} tiebreak will be played.`;
+        ? i18n.t('match:seriesInfo.drawReplaySeries', { bo: replay })
+        : i18n.t('match:seriesInfo.drawTiebreak', { bo: replay });
 }

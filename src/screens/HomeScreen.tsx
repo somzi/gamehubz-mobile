@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -18,6 +19,7 @@ import { COLORS } from '../lib/theme';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
 import { parseUtcDate, formatLocalDateTime } from '../lib/utils';
+import i18n from '../i18n';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -51,6 +53,8 @@ const EMPTY_ACTIVITIES: DashboardActivityDto[] = [];
 type SectionKey = 'attention' | 'active' | 'highlights';
 
 export default function HomeScreen() {
+    const { t } = useTranslation('home');
+    const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -169,16 +173,16 @@ export default function HomeScreen() {
 
     const greeting = useMemo(() => {
         const h = new Date().getHours();
-        if (h < 5) return 'Still up';
-        if (h < 12) return 'Good morning';
-        if (h < 17) return 'Good afternoon';
-        return 'Good evening';
+        if (h < 5) return t('greetStillUp');
+        if (h < 12) return t('greetMorning');
+        if (h < 17) return t('greetAfternoon');
+        return t('greetEvening');
     }, []);
 
     const dateLabel = useMemo(() => {
         const d = new Date();
-        const day = d.toLocaleDateString([], { weekday: 'short' });
-        const monthDay = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        const day = d.toLocaleDateString(i18n.language, { weekday: 'short' });
+        const monthDay = d.toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' });
         return `${day.toUpperCase()} · ${monthDay.toUpperCase()}`;
     }, []);
 
@@ -192,15 +196,15 @@ export default function HomeScreen() {
 
     const subtitle = useMemo(() => {
         if (actionRequiredMatches.length && myMatches.length) {
-            return `${myMatches.length} scheduled · ${actionRequiredMatches.length} need${actionRequiredMatches.length === 1 ? 's' : ''} action`;
+            return t('subtitleBoth', { count: actionRequiredMatches.length, scheduled: myMatches.length });
         }
         if (actionRequiredMatches.length) {
-            return `${actionRequiredMatches.length} match${actionRequiredMatches.length === 1 ? '' : 'es'} need your attention`;
+            return t('subtitleAttention', { count: actionRequiredMatches.length });
         }
         if (myMatches.length) {
-            return `${myMatches.length} match${myMatches.length === 1 ? '' : 'es'} scheduled today`;
+            return t('subtitleScheduled', { count: myMatches.length });
         }
-        return 'Ready when you are';
+        return t('readyWhenYouAre');
     }, [actionRequiredMatches.length, myMatches.length]);
 
     return (
@@ -245,7 +249,7 @@ export default function HomeScreen() {
                             style={{ fontSize: 36, lineHeight: 40 }}
                             numberOfLines={1}
                         >
-                            {user?.username || user?.nickName || 'Player'}
+                            {user?.username || user?.nickName || tCommon('player')}
                         </Text>
                         <Text className="text-slate-400 text-[13px] font-medium mt-3 leading-5">
                             {subtitle}
@@ -268,8 +272,8 @@ export default function HomeScreen() {
                                 iconColor="#F59E0B"
                                 iconBg="rgba(245, 158, 11, 0.01)"
                                 iconBorder="rgba(245, 158, 11, 0.1)"
-                                title="Needs Attention"
-                                subtitle="Requires your action"
+                                title={t('needsAttention')}
+                                subtitle={t('needsAttentionSub')}
                                 onSeeAll={() => navigation.navigate('MyMatches')}
                                 collapsed={collapsed.attention}
                                 onToggle={() => toggleSection('attention')}
@@ -309,8 +313,8 @@ export default function HomeScreen() {
                             iconColor="#10B981"
                             iconBg="rgba(16, 185, 129, 0.01)"
                             iconBorder="rgba(16, 185, 129, 0.1)"
-                            title="Active Matches"
-                            subtitle="In progress & scheduled"
+                            title={t('activeMatches')}
+                            subtitle={t('activeMatchesSub')}
                             onSeeAll={() => navigation.navigate('MyMatches')}
                             collapsed={collapsed.active}
                             onToggle={() => toggleSection('active')}
@@ -334,13 +338,13 @@ export default function HomeScreen() {
                                         status="scheduled"
                                         scheduledTime={
                                             match.scheduledTime
-                                                ? parseUtcDate(match.scheduledTime).toLocaleString([], {
+                                                ? parseUtcDate(match.scheduledTime).toLocaleString(i18n.language, {
                                                     month: 'short',
                                                     day: 'numeric',
                                                     hour: '2-digit',
                                                     minute: '2-digit',
                                                 })
-                                                : 'TBD'
+                                                : t('common:app.tbd')
                                         }
                                         scheduledTimeIso={match.scheduledTime}
                                         deadline={match.roundDeadline ?? undefined}
@@ -354,8 +358,8 @@ export default function HomeScreen() {
                             <EmptyState
                                 icon="game-controller-outline"
                                 color={COLORS.primary}
-                                title="No active matches"
-                                description="Your competitive matches will appear here once they start"
+                                title={t('noActiveMatches')}
+                                description={t('noActiveMatchesHint')}
                             />
                         )}
                         </Animated.View>
@@ -369,8 +373,8 @@ export default function HomeScreen() {
                             iconColor="#A78BFA"
                             iconBg="rgba(167, 139, 250, 0.01)"
                             iconBorder="rgba(167, 139, 250, 0.1)"
-                            title="Highlights"
-                            subtitle="Latest from your hubs"
+                            title={t('highlights')}
+                            subtitle={t('highlightsSub')}
                             onSeeAll={() => setShowHighlightsModal(true)}
                             collapsed={collapsed.highlights}
                             onToggle={() => toggleSection('highlights')}
@@ -403,8 +407,8 @@ export default function HomeScreen() {
                             <EmptyState
                                 icon="planet-outline"
                                 color={COLORS.highlight}
-                                title="No highlights yet"
-                                description="Activity from your hubs will appear here"
+                                title={t('noHighlights')}
+                                description={t('noHighlightsHint')}
                             />
                         )}
                         </Animated.View>
@@ -444,6 +448,7 @@ function SectionHeader({
     collapsed,
     onToggle,
 }: SectionHeaderProps) {
+    const { t } = useTranslation('home');
     return (
         <View className="flex-row items-center justify-between mb-4">
             {/* Tapping the title cluster collapses/expands the section. */}
@@ -488,7 +493,7 @@ function SectionHeader({
                     hitSlop={6}
                 >
                     <Text className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                        See All
+                        {t('seeAll')}
                     </Text>
                     <Ionicons name="chevron-forward" size={12} color="#CBD5E1" />
                 </Pressable>

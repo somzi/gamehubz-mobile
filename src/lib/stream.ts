@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { SocialType } from '../types/auth';
 
@@ -109,7 +110,7 @@ export function getLiveEmbed(platform: SocialType, handle: string): EmbedSource 
                 };
             }
             const url = /https?:\/\//i.test(handle) ? handle : `https://www.youtube.com/@${h}/live`;
-            return { kind: 'external', url, reason: "YouTube live can't be embedded without a channel ID." };
+            return { kind: 'external', url, reason: i18n.t('match:stream.youtubeNeedsChannelId') };
         }
 
         default:

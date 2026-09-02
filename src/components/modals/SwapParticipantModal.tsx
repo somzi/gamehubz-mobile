@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     View,
@@ -53,11 +54,12 @@ interface SwapParticipantModalProps {
     onSwapped: (incomingUsername: string) => void;
 }
 
-const ROLE_LABELS: Record<number, string> = {
-    [HubRole.HubOwner]: 'Owner',
-    [HubRole.HubAdmin]: 'Admin',
-    [HubRole.HubExclusive]: 'Exclusive',
-    [HubRole.HubMember]: 'Member',
+// Keys, not text — this map is module scope.
+const ROLE_LABEL_KEYS: Record<number, string> = {
+    [HubRole.HubOwner]: 'role.owner',
+    [HubRole.HubAdmin]: 'role.admin',
+    [HubRole.HubExclusive]: 'role.exclusive',
+    [HubRole.HubMember]: 'role.member',
 };
 
 const ROLE_ACCENTS: Record<number, string> = {
@@ -83,6 +85,9 @@ export function SwapParticipantModal({
     outgoing,
     onSwapped,
 }: SwapParticipantModalProps) {
+    const { t } = useTranslation('tournament');
+    const { t: tCommon } = useTranslation('common');
+    const { t: tHub } = useTranslation('hub');
     const insets = useSafeAreaInsets();
 
     const [eligibility, setEligibility] = useState<SwapEligibility | null>(null);
@@ -129,7 +134,7 @@ export function SwapParticipantModal({
                 const response = await authenticatedFetch(
                     ENDPOINTS.PARTICIPANT_SWAP_CANDIDATES(tournamentId, term, pageNumber),
                 );
-                if (!response.ok) throw new Error(await response.text().catch(() => 'Failed to load members'));
+                if (!response.ok) throw new Error(await response.text().catch(() => t('swap.loadMembersFailed')));
 
                 const data = await response.json();
                 const list: SwapCandidate[] = data?.result ?? data ?? [];
@@ -165,7 +170,7 @@ export function SwapParticipantModal({
                 const response = await authenticatedFetch(
                     ENDPOINTS.PARTICIPANT_SWAP_ELIGIBILITY(tournamentId, outgoing.userId),
                 );
-                if (!response.ok) throw new Error(await response.text().catch(() => 'Failed to check eligibility'));
+                if (!response.ok) throw new Error(await response.text().catch(() => t('swap.checkEligibilityFailed')));
 
                 const data = await response.json();
                 const result: SwapEligibility = data?.result ?? data;
@@ -209,7 +214,7 @@ export function SwapParticipantModal({
                 }),
             });
 
-            if (!response.ok) throw new Error(await response.text().catch(() => 'Swap failed'));
+            if (!response.ok) throw new Error(await response.text().catch(() => t('swap.swapFailed')));
 
             const name = selected.username;
 
@@ -283,10 +288,10 @@ export function SwapParticipantModal({
                             </View>
                             <View className="flex-1">
                                 <Text className="text-white text-lg font-black" numberOfLines={1}>
-                                    Replace player
+                                    {t('swap.replacePlayer')}
                                 </Text>
                                 <Text className="text-slate-500 text-[11px] mt-0.5" numberOfLines={2}>
-                                    The replacement inherits the spot, the seed and every result so far.
+                                    {t('swap.replaceHint')}
                                 </Text>
                             </View>
                             <Pressable
@@ -311,7 +316,7 @@ export function SwapParticipantModal({
                             {/* ── Outgoing player + verdict ───────────────────────────────── */}
                             <View className="px-5 pt-4">
                                 <Text className="text-[10px] font-black uppercase tracking-[1.6px] text-slate-500 mb-2.5">
-                                    Leaving
+                                    {t('swap.leaving')}
                                 </Text>
 
                                 <View
@@ -329,20 +334,22 @@ export function SwapParticipantModal({
                                         <View style={{ borderWidth: 1.5, borderColor: `${accent}66`, borderRadius: 999, padding: 2 }}>
                                             <PlayerAvatar
                                                 src={eligibility?.avatarUrl ?? outgoing?.avatarUrl ?? undefined}
-                                                name={eligibility?.username || outgoing?.username || 'Player'}
+                                                name={eligibility?.username || outgoing?.username || tCommon('player')}
                                                 size="md"
                                             />
                                         </View>
                                         <View className="flex-1">
                                             <Text className="text-white font-black text-[15px]" numberOfLines={1}>
-                                                {eligibility?.username || outgoing?.username || 'Player'}
+                                                {eligibility?.username || outgoing?.username || tCommon('player')}
                                             </Text>
                                             {loadingEligibility ? (
-                                                <Text className="text-slate-500 text-[11px] mt-1">Checking eligibility…</Text>
+                                                <Text className="text-slate-500 text-[11px] mt-1">{t('swap.checkingEligibility')}</Text>
                                             ) : meter ? (
                                                 <Text className="text-slate-400 text-[11px] mt-1">
-                                                    {meter.playedMatches} of {meter.totalMatches}{' '}
-                                                    {meter.totalMatches === 1 ? 'match' : 'matches'} played
+                                                    {t('swap.meterPlayed', {
+                                                        played: meter.playedMatches,
+                                                        count: meter.totalMatches,
+                                                    })}
                                                 </Text>
                                             ) : null}
                                         </View>
@@ -362,7 +369,7 @@ export function SwapParticipantModal({
                                                 <Text
                                                     style={{ color: accent, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 }}
                                                 >
-                                                    {blocked ? 'LOCKED' : 'ALLOWED'}
+                                                    {blocked ? t('swap.eligibleLocked') : t('swap.eligibleAllowed')}
                                                 </Text>
                                             </View>
                                         ) : null}
@@ -387,8 +394,8 @@ export function SwapParticipantModal({
                                                 </Text>
                                                 <Text className="text-[10px] font-bold text-slate-500">
                                                     {meter.allowsPartiallyPlayed && meter.limit !== null
-                                                        ? `Limit ${meter.limit}%`
-                                                        : 'Must be unplayed'}
+                                                        ? t('swap.limitPercent', { limit: meter.limit })
+                                                        : t('swap.mustBeUnplayed')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -418,11 +425,11 @@ export function SwapParticipantModal({
                                 <View className="px-5 pt-5">
                                     <View className="flex-row items-center justify-between mb-2.5">
                                         <Text className="text-[10px] font-black uppercase tracking-[1.6px] text-slate-500">
-                                            Coming in
+                                            {t('swap.comingIn')}
                                         </Text>
                                         {selected && (
                                             <Pressable onPress={() => setSelected(null)} hitSlop={8}>
-                                                <Text className="text-[11px] font-bold text-slate-400">Clear</Text>
+                                                <Text className="text-[11px] font-bold text-slate-400">{t('swap.clear')}</Text>
                                             </Pressable>
                                         )}
                                     </View>
@@ -440,7 +447,7 @@ export function SwapParticipantModal({
                                         <TextInput
                                             value={search}
                                             onChangeText={setSearch}
-                                            placeholder="Search hub members…"
+                                            placeholder={t('swap.searchHubMembers')}
                                             placeholderTextColor="#64748B"
                                             autoCorrect={false}
                                             autoCapitalize="none"
@@ -469,10 +476,10 @@ export function SwapParticipantModal({
                                         >
                                             <Ionicons name="person-remove-outline" size={34} color="#475569" />
                                             <Text className="text-slate-400 text-[13px] font-bold mt-3 text-center">
-                                                {search.trim() ? 'No member matches that name' : 'No members left to swap in'}
+                                                {search.trim() ? t('swap.noMemberMatches') : t('swap.noMembersLeft')}
                                             </Text>
                                             <Text className="text-slate-600 text-[11px] mt-1.5 text-center leading-4">
-                                                Everyone already in this tournament is hidden from the list.
+                                                {t('swap.alreadyInHidden')}
                                             </Text>
                                         </View>
                                     ) : (
@@ -509,7 +516,7 @@ export function SwapParticipantModal({
                                                                 className="text-[10px] font-black uppercase tracking-wider mt-0.5"
                                                                 style={{ color: roleAccent }}
                                                             >
-                                                                {ROLE_LABELS[candidate.hubRole] ?? 'Member'}
+                                                                {tHub(ROLE_LABEL_KEYS[candidate.hubRole] ?? 'role.member')}
                                                             </Text>
                                                         </View>
                                                         <View
@@ -544,7 +551,7 @@ export function SwapParticipantModal({
                                                     {loadingMore ? (
                                                         <ActivityIndicator size="small" color={COLORS.slate400} />
                                                     ) : (
-                                                        <Text className="text-slate-300 font-bold text-[12px]">Load more</Text>
+                                                        <Text className="text-slate-300 font-bold text-[12px]">{t('swap.loadMore')}</Text>
                                                     )}
                                                 </Pressable>
                                             )}
@@ -573,7 +580,7 @@ export function SwapParticipantModal({
                                 {selected && eligibility.playedMatches > 0 && (
                                     <Text className="text-slate-500 text-[11px] text-center mb-3 leading-4">
                                         {selected.username} inherits {eligibility.playedMatches}{' '}
-                                        {eligibility.playedMatches === 1 ? 'played match' : 'played matches'} and the
+                                        {t('swap.playedMatch', { count: eligibility.playedMatches })} and the
                                         standings that go with them.
                                     </Text>
                                 )}
@@ -615,7 +622,7 @@ export function SwapParticipantModal({
                                                 className="font-black text-[15px]"
                                                 style={{ color: selected ? COLORS.primaryForeground : '#64748B' }}
                                             >
-                                                {selected ? `Swap in ${selected.username}` : 'Pick a replacement'}
+                                                {selected ? t('swap.swapIn', { name: selected.username }) : t('swap.pickReplacement')}
                                             </Text>
                                         </>
                                     )}
@@ -633,15 +640,15 @@ export function SwapParticipantModal({
                 visible={confirming && !!selected}
                 onClose={() => setConfirming(false)}
                 onConfirm={handleConfirm}
-                title="Confirm the replacement"
+                title={t('swap.confirmTitle')}
                 message={selected
-                    ? `${selected.username} takes over ${eligibility?.username || outgoing?.username || 'this player'}'s spot in the tournament.`
+                    ? t('swap.takesOver', { incoming: selected.username, outgoing: eligibility?.username || outgoing?.username || t('swap.thisPlayer') })
                         + (eligibility && eligibility.playedMatches > 0
-                            ? `\n\nThey inherit ${eligibility.playedMatches === 1 ? '1 played match' : `${eligibility.playedMatches} played matches`}, the seed and the standings that go with them.`
-                            : '\n\nThey take the seed and the fixtures that go with the spot.')
-                        + `\n\n${eligibility?.username || 'The outgoing player'} is removed from this tournament.`
+                            ? t('swap.inheritMatches', { count: eligibility.playedMatches })
+                            : t('swap.takeSeedOnly'))
+                        + t('swap.outgoingRemoved', { name: eligibility?.username || t('swap.theOutgoingPlayer') })
                     : ''}
-                confirmText="Swap the player"
+                confirmText={t('swap.swapThePlayer')}
                 isDestructive={false}
                 isLoading={submitting}
                 stacked

@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
+import i18n from '../../i18n';
 
 interface MatchTimingStripProps {
     /** Agreed match time as a raw backend timestamp — preferred, it renders as clock + date. */
@@ -40,8 +42,8 @@ function toDate(value?: string | null): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
-const formatClock = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-const formatDay = (d: Date) => d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+const formatClock = (d: Date) => d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
+const formatDay = (d: Date) => d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
 
 const dayDelta = (d: Date, now: number) => {
     const startOfToday = new Date(now);
@@ -53,24 +55,26 @@ const dayDelta = (d: Date, now: number) => {
 
 // How much room is left. Sub-day windows are the ones players actually need to feel,
 // so anything under a day reads in hours/minutes and escalates in colour.
-function describeRemaining(deadline: Date, now: number): { label: string; tone: Tone } {
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+function describeRemaining(deadline: Date, now: number, tr: TFn): { label: string; tone: Tone } {
     const minutes = Math.floor((deadline.getTime() - now) / 60000);
-    if (minutes <= 0) return { label: 'Overdue', tone: 'danger' };
-    if (minutes < 60) return { label: `${minutes}m left`, tone: 'danger' };
+    if (minutes <= 0) return { label: tr('timing.overdue'), tone: 'danger' };
+    if (minutes < 60) return { label: tr('timing.minutesLeft', { count: minutes }), tone: 'danger' };
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return { label: `${hours}h left`, tone: hours < 6 ? 'danger' : 'warning' };
+    if (hours < 24) return { label: tr('timing.hoursLeft', { count: hours }), tone: hours < 6 ? 'danger' : 'warning' };
     const days = Math.floor(hours / 24);
-    return { label: `${days}d left`, tone: days <= 1 ? 'warning' : 'calm' };
+    return { label: tr('timing.daysLeft', { count: days }), tone: days <= 1 ? 'warning' : 'calm' };
 }
 
 // Only worth a chip when the match is close enough to change what you do today.
-function describeMatchTime(matchDate: Date, now: number): { label: string; tone: Tone } | null {
+function describeMatchTime(matchDate: Date, now: number, tr: TFn): { label: string; tone: Tone } | null {
     const minutes = Math.floor((matchDate.getTime() - now) / 60000);
     if (minutes <= 0) return null;
-    if (minutes < 60) return { label: 'Starting soon', tone: 'good' };
+    if (minutes < 60) return { label: tr('timing.startingSoon'), tone: 'good' };
     const delta = dayDelta(matchDate, now);
-    if (delta === 0) return { label: 'Today', tone: 'good' };
-    if (delta === 1) return { label: 'Tomorrow', tone: 'calm' };
+    if (delta === 0) return { label: tr('timing.today'), tone: 'good' };
+    if (delta === 1) return { label: tr('timing.tomorrow'), tone: 'calm' };
     return null;
 }
 
@@ -99,6 +103,7 @@ export function MatchTimingStrip({
     isLoading = false,
     className,
 }: MatchTimingStripProps) {
+    const { t } = useTranslation('match');
     const matchDate = useMemo(() => toDate(matchTimeIso), [matchTimeIso]);
     const deadlineDate = useMemo(() => toDate(deadline), [deadline]);
 
@@ -112,8 +117,8 @@ export function MatchTimingStrip({
         return () => clearInterval(id);
     }, [hasCountdown]);
 
-    const remaining = deadlineDate ? describeRemaining(deadlineDate, now) : null;
-    const upcoming = matchDate ? describeMatchTime(matchDate, now) : null;
+    const remaining = deadlineDate ? describeRemaining(deadlineDate, now, t) : null;
+    const upcoming = matchDate ? describeMatchTime(matchDate, now, t) : null;
 
     return (
         <View className={cn('flex-row gap-3', className)}>
@@ -122,7 +127,7 @@ export function MatchTimingStrip({
                 <View className="flex-row items-center gap-1.5">
                     <Ionicons name="time-outline" size={11} color={COLORS.primary} />
                     <Text numberOfLines={1} className="flex-1 text-[9px] font-black text-primary uppercase tracking-[2px]">
-                        Match Time
+                        {t('timing.matchTime')}
                     </Text>
                 </View>
                 {matchDate ? (
@@ -132,7 +137,7 @@ export function MatchTimingStrip({
                     </>
                 ) : (
                     <Text numberOfLines={2} className="text-[15px] font-black text-white mt-1.5">
-                        {matchTimeText || 'TBD'}
+                        {matchTimeText || t('common:app.tbd')}
                     </Text>
                 )}
                 {upcoming && <TimingChip label={upcoming.label} tone={upcoming.tone} />}
@@ -143,7 +148,7 @@ export function MatchTimingStrip({
                 <View className="flex-row items-center gap-1.5">
                     <Ionicons name="hourglass-outline" size={11} color={COLORS.warning} />
                     <Text numberOfLines={1} className="flex-1 text-[9px] font-black text-warning uppercase tracking-[2px]">
-                        Deadline
+                        {t('timing.deadline')}
                     </Text>
                 </View>
                 {deadlineDate ? (
@@ -154,10 +159,10 @@ export function MatchTimingStrip({
                 ) : (
                     <>
                         <Text numberOfLines={1} className="text-[17px] font-black text-slate-600 mt-1.5">
-                            {isLoading ? '—' : 'Not set'}
+                            {isLoading ? '—' : t('timing.notSet')}
                         </Text>
                         <Text numberOfLines={1} className="text-[11px] font-bold text-slate-600 mt-0.5">
-                            {isLoading ? ' ' : 'No round deadline'}
+                            {isLoading ? ' ' : t('timing.noRoundDeadline')}
                         </Text>
                     </>
                 )}

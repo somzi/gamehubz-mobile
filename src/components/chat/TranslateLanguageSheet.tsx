@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { JSX } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +39,7 @@ export function TranslateLanguageSheet({
   onSelect,
   onClose,
 }: TranslateLanguageSheetProps): JSX.Element | null {
+  const { t } = useTranslation('match');
   const insets = useSafeAreaInsets();
 
   if (!visible) return null;
@@ -57,7 +59,7 @@ export function TranslateLanguageSheet({
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('common:close')}
             className="w-10 h-10 rounded-full bg-white/5 items-center justify-center active:bg-white/10"
           >
             <Ionicons name="close" size={20} color="#94A3B8" />
@@ -67,10 +69,10 @@ export function TranslateLanguageSheet({
               className="text-sm font-black text-white uppercase tracking-[3px] w-full text-center"
               numberOfLines={1}
             >
-              Translate Message
+              {t('translate.translateMessage')}
             </Text>
             <Text className="text-[10px] text-slate-500 font-bold mt-0.5">
-              Choose a target language
+              {t('translate.chooseTargetLanguage')}
             </Text>
           </View>
           <View className="w-10" />
@@ -89,7 +91,7 @@ export function TranslateLanguageSheet({
                 key={lang.code}
                 onPress={() => onSelect(lang)}
                 accessibilityRole="button"
-                accessibilityLabel={`Translate to ${lang.label}`}
+                accessibilityLabel={t('translate.translateTo', { language: lang.label })}
                 className="flex-row items-center gap-3.5 px-6 py-[18px] border-b border-white/10 active:bg-white/5"
               >
                 <Text className="text-[22px]">{lang.flag}</Text>

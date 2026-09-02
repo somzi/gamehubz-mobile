@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,15 +28,16 @@ type SocialRoute = RouteProp<MainTabParamList, 'Social'>;
 const EMPTY_CHATS: DirectChat[] = [];
 
 export default function SocialScreen() {
+    const { t } = useTranslation('social');
     const navigation = useNavigation<NavProp>();
     const route = useRoute<SocialRoute>();
     const { badges } = useBadges();
     const [activeTab, setActiveTab] = useState<TabKey>(route.params?.initialTab ?? 'friends');
 
     const tabs: PremiumTabItem[] = [
-        { value: 'friends', label: 'Friends', icon: 'people' },
-        { value: 'requests', label: 'Requests', icon: 'person-add', badge: badges.friendRequests > 0 ? badges.friendRequests : undefined, badgeTone: 'alert' },
-        { value: 'chats', label: 'Chats', icon: 'chatbubble-ellipses', badge: badges.unreadDirectMessages > 0 ? badges.unreadDirectMessages : undefined, badgeTone: 'alert' },
+        { value: 'friends', label: t('tabFriends'), icon: 'people' },
+        { value: 'requests', label: t('tabRequests'), icon: 'person-add', badge: badges.friendRequests > 0 ? badges.friendRequests : undefined, badgeTone: 'alert' },
+        { value: 'chats', label: t('tabChats'), icon: 'chatbubble-ellipses', badge: badges.unreadDirectMessages > 0 ? badges.unreadDirectMessages : undefined, badgeTone: 'alert' },
     ];
 
     useFocusEffect(
@@ -49,9 +52,9 @@ export default function SocialScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             {/* ─── Header ──────────────────────────────────────── */}
             <View className="px-5 pt-2 pb-3">
-                <Text className="text-white text-2xl font-black tracking-tight">Social</Text>
+                <Text className="text-white text-2xl font-black tracking-tight">{t('common:nav.social')}</Text>
                 <Text className="text-slate-500 text-xs font-medium mt-0.5">
-                    Stay connected with your gaming circle
+                    {t('tagline')}
                 </Text>
             </View>
 
@@ -79,6 +82,7 @@ export default function SocialScreen() {
 // ═════════════════════════════════════════════════════════════════════
 
 function FriendsTab({ navigation }: { navigation: NavProp }) {
+    const { t } = useTranslation('social');
     const [friends, setFriends] = useState<Friend[]>([]);
     const [search, setSearch] = useState('');
     // Debounced value drives the actual fetch; live `search` only drives the input.
@@ -110,7 +114,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
                 setFriends(Array.isArray(data) ? data : []);
                 setError(null);
             } else {
-                setError('Failed to load friends');
+                setError(t('loadFriendsFailed'));
             }
         } catch (e: any) {
             if (seq !== reqSeqRef.current) return;
@@ -151,7 +155,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
                 <SearchBar
                     value={search}
                     onChange={setSearch}
-                    placeholder="Search friends..."
+                    placeholder={t('searchFriends')}
                 />
             }
             refreshControl={
@@ -164,8 +168,8 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
             ListEmptyComponent={
                 <EmptyState
                     icon="people-outline"
-                    title={search ? "No friends matched" : "No friends yet"}
-                    subtitle={search ? "Try a different search term" : "Add players to grow your circle"}
+                    title={search ? t('noFriendsMatched') : t('noFriendsYet')}
+                    subtitle={search ? t('tryDifferentSearch') : t('growCircle')}
                 />
             }
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -178,7 +182,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
                                 {item.username}
                             </Text>
                             <Text className="text-slate-500 text-[11px] font-semibold mt-0.5" numberOfLines={1}>
-                                {item.nickname ? `@${item.nickname}` : `Friends since ${monthYear(item.friendsSince)}`}
+                                {item.nickname ? `@${item.nickname}` : t('friendsSince', { date: monthYear(item.friendsSince) })}
                             </Text>
                         </View>
                         <Pressable
@@ -207,6 +211,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
 // ═════════════════════════════════════════════════════════════════════
 
 function RequestsTab() {
+    const { t } = useTranslation('social');
     const { refresh: refreshBadges } = useBadges();
     const [subTab, setSubTab] = useState<'incoming' | 'outgoing'>('incoming');
     const [incoming, setIncoming] = useState<FriendRequest[]>([]);
@@ -289,8 +294,8 @@ function RequestsTab() {
             <View className="px-5 mb-2">
                 <PremiumTabs
                     tabs={[
-                        { value: 'incoming', label: 'Incoming', icon: 'arrow-down-circle-outline', badge: incoming.length > 0 ? incoming.length : undefined, badgeTone: 'alert' },
-                        { value: 'outgoing', label: 'Outgoing', icon: 'arrow-up-circle-outline', badge: outgoing.length > 0 ? outgoing.length : undefined },
+                        { value: 'incoming', label: t('subTabIncoming'), icon: 'arrow-down-circle-outline', badge: incoming.length > 0 ? incoming.length : undefined, badgeTone: 'alert' },
+                        { value: 'outgoing', label: t('subTabOutgoing'), icon: 'arrow-up-circle-outline', badge: outgoing.length > 0 ? outgoing.length : undefined },
                     ]}
                     activeTab={subTab}
                     onTabChange={(v) => setSubTab(v as 'incoming' | 'outgoing')}
@@ -305,7 +310,7 @@ function RequestsTab() {
                     <SearchBar
                         value={search}
                         onChange={setSearch}
-                        placeholder={`Search ${subTab} requests...`}
+                        placeholder={subTab === 'incoming' ? t('searchIncoming') : t('searchOutgoing')}
                     />
                 }
                 refreshControl={
@@ -320,10 +325,10 @@ function RequestsTab() {
                         icon="mail-open-outline"
                         title={
                             subTab === 'incoming'
-                                ? 'No incoming requests'
-                                : 'No outgoing requests'
+                                ? t('noIncoming')
+                                : t('noOutgoing')
                         }
-                        subtitle="When new requests arrive, they'll show up here"
+                        subtitle={t('requestsHint')}
                     />
                 }
                 ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -351,7 +356,7 @@ function RequestsTab() {
                                                 color={isIncoming ? '#10B981' : '#64748B'}
                                             />
                                             <Text className="text-slate-500 text-[11px] font-semibold">
-                                                {isIncoming ? 'Wants to connect' : 'Request sent'}
+                                                {isIncoming ? t('wantsToConnect') : t('requestSent')}
                                             </Text>
                                         </View>
                                     </View>
@@ -378,7 +383,7 @@ function RequestsTab() {
                                                     }}
                                                 >
                                                     <Ionicons name="checkmark-circle" size={18} color="#04130D" />
-                                                    <Text style={{ color: '#04130D', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>Accept</Text>
+                                                    <Text style={{ color: '#04130D', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>{t('accept')}</Text>
                                                 </View>
                                             </Pressable>
                                             <Pressable
@@ -394,7 +399,7 @@ function RequestsTab() {
                                                     }}
                                                 >
                                                     <Ionicons name="close-circle" size={17} color="#F87171" />
-                                                    <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>Decline</Text>
+                                                    <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>{t('decline')}</Text>
                                                 </View>
                                             </Pressable>
                                         </>
@@ -412,7 +417,7 @@ function RequestsTab() {
                                                 }}
                                             >
                                                 <Ionicons name="close-circle" size={17} color="#F87171" />
-                                                <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>Cancel request</Text>
+                                                <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>{t('cancelRequest')}</Text>
                                             </View>
                                         </Pressable>
                                     )}
@@ -431,6 +436,7 @@ function RequestsTab() {
 // ═════════════════════════════════════════════════════════════════════
 
 function ChatsTab({ navigation }: { navigation: NavProp }) {
+    const { t } = useTranslation('social');
     const { user } = useAuth();
     const queryClient = useQueryClient();
 
@@ -487,7 +493,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                 <SearchBar
                     value={search}
                     onChange={setSearch}
-                    placeholder="Search chats..."
+                    placeholder={t('searchChats')}
                 />
             }
             refreshControl={
@@ -502,8 +508,8 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
             ListEmptyComponent={
                 <EmptyState
                     icon="chatbubbles-outline"
-                    title={search ? "No chats matched" : "No chats yet"}
-                    subtitle="Open a friend's profile and tap message to get started"
+                    title={search ? t('noChatsMatched') : t('noChatsYet')}
+                    subtitle={t('chatsHint')}
                 />
             }
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -563,7 +569,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                                         className={cn('text-[12.5px] mt-1', unread ? 'text-slate-100 font-semibold' : 'text-slate-500 font-medium')}
                                         numberOfLines={1}
                                     >
-                                        {fromMe ? <Text className="text-slate-500 font-medium">You: </Text> : null}
+                                        {fromMe ? <Text className="text-slate-500 font-medium">{t('youPrefix')}</Text> : null}
                                         {item.lastMessage}
                                     </Text>
                                 ) : null}
@@ -668,21 +674,24 @@ function sortChats(chats: DirectChat[]): DirectChat[] {
 
 // Compact, chat-app style timestamp: today → time, yesterday → "Yesterday",
 // within a week → weekday, older → "27 Jun".
+// Module scope, so this reads the label off the i18n singleton rather than a hook.
+const YESTERDAY_LABEL = () => i18n.t('social:yesterday');
+
 function formatChatTime(iso: string): string {
     const d = parseUtcDate(iso);
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const dayMs = 86400000;
-    const t = d.getTime();
-    if (t >= startOfToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (t >= startOfToday - dayMs) return 'Yesterday';
-    if (t >= startOfToday - 6 * dayMs) return d.toLocaleDateString([], { weekday: 'short' });
-    return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    const ts = d.getTime();
+    if (ts >= startOfToday) return d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+    if (ts >= startOfToday - dayMs) return YESTERDAY_LABEL();
+    if (ts >= startOfToday - 6 * dayMs) return d.toLocaleDateString(i18n.language, { weekday: 'short' });
+    return d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' });
 }
 
 function monthYear(iso?: string): string {
     if (!iso) return '';
-    return parseUtcDate(iso).toLocaleDateString([], { month: 'short', year: 'numeric' });
+    return parseUtcDate(iso).toLocaleDateString(i18n.language, { month: 'short', year: 'numeric' });
 }
 
 // Premium card chrome shared across all Social rows: soft gradient, hairline

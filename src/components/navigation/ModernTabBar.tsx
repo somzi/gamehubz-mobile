@@ -10,12 +10,15 @@ import {
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+
 import { useBadges } from '../../context/BadgesContext';
 
 const { width } = Dimensions.get('window');
 const TAB_WIDTH = width / 4;
 
 export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+    const { t } = useTranslation('common');
     const insets = useSafeAreaInsets();
     const translateX = useRef(new Animated.Value(0)).current;
     const { badges } = useBadges();
@@ -99,12 +102,14 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                         }
                     };
 
+                    // Route names are the English keys, so falling through to them left the
+                    // bar in English even on a Spanish device.
                     const label =
                         options.tabBarLabel !== undefined
                             ? options.tabBarLabel
                             : options.title !== undefined
                                 ? options.title
-                                : route.name;
+                                : t(`nav.${route.name.toLowerCase()}`, { defaultValue: route.name });
 
                     const badgeCount = badgeForTab(route.name);
 

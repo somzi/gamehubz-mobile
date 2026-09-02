@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,7 +30,7 @@ const RESULT_THEME = {
         bgTo: 'rgba(16, 185, 129, 0.10)',
         tint: 'rgba(16, 185, 129, 0.12)',
         glow: '#10B981',
-        label: 'VICTORY',
+        labelKey: 'app.victory',
     },
     loss: {
         main: '#EF4444',
@@ -40,7 +41,7 @@ const RESULT_THEME = {
         bgTo: 'rgba(239, 68, 68, 0.10)',
         tint: 'rgba(239, 68, 68, 0.12)',
         glow: '#EF4444',
-        label: 'DEFEAT',
+        labelKey: 'app.defeat',
     },
     draw: {
         main: '#6366F1',
@@ -51,7 +52,7 @@ const RESULT_THEME = {
         bgTo: 'rgba(99, 102, 241, 0.10)',
         tint: 'rgba(99, 102, 241, 0.12)',
         glow: '#6366F1',
-        label: 'DRAW',
+        labelKey: 'app.drawResult',
     },
 } as const;
 
@@ -59,7 +60,7 @@ const RESULT_THEME = {
 export const MatchHistoryCard = React.memo(function MatchHistoryCard({
     tournamentName,
     hubName,
-    userName = 'Me',
+    userName,
     userAvatarUrl,
     opponentName,
     opponentAvatarUrl,
@@ -70,6 +71,7 @@ export const MatchHistoryCard = React.memo(function MatchHistoryCard({
     onPress,
     className,
 }: MatchHistoryCardProps) {
+    const { t } = useTranslation('common');
     const theme = RESULT_THEME[result];
     const hasScore = userScore !== undefined && opponentScore !== undefined;
 
@@ -180,7 +182,7 @@ export const MatchHistoryCard = React.memo(function MatchHistoryCard({
                                 >
                                     <PlayerAvatar
                                         src={userAvatarUrl}
-                                        name={userName}
+                                        name={userName ?? t('app.me')}
                                         size="md"
                                         className="rounded-[12px]"
                                     />
@@ -244,7 +246,7 @@ export const MatchHistoryCard = React.memo(function MatchHistoryCard({
                                             letterSpacing: 1.4,
                                         }}
                                     >
-                                        {theme.label}
+                                        {t(theme.labelKey)}
                                     </Text>
                                 </LinearGradient>
                             </View>

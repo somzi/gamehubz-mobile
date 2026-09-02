@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import {
     StatPill,
     PosterWordmark,
 } from './ShareCardShell';
+import i18n from '../../i18n';
 
 // Shareable hub card — same premium poster style as the player card but in the
 // hub's emerald accent: logo emblem, name + verified badge, followers ring
@@ -47,6 +49,8 @@ function HubCardPoster({ name, avatarUrl, isVerified, isPublic, ownerName, stats
     stats: HubCardStats;
     width: number;
 }) {
+    const { t } = useTranslation('common');
+    const { t: tHub } = useTranslation('hub');
     const initial = (name || 'H').trim().charAt(0).toUpperCase() || 'H';
     // ~100dp box captured at ~3x pixel ratio → ask Cloudinary for ~300px so the PNG stays sharp.
     const optimizedAvatar = avatarUrl ? getOptimizedCloudinaryUrl(avatarUrl, 300) : '';
@@ -90,15 +94,15 @@ function HubCardPoster({ name, avatarUrl, isVerified, isPublic, ownerName, stats
 
                 {/* Tournaments | followers ring | access */}
                 <View style={{ marginTop: 26, flexDirection: 'row', alignItems: 'center' }}>
-                    <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={stats.tournaments} label="TOURNAMENTS" valueColor="#FBBF24" />
+                    <SideStat icon="trophy" iconColor="rgba(251,191,36,0.8)" value={stats.tournaments} label={t('share.statTournaments')} valueColor="#FBBF24" />
                     <StatDivider />
-                    <StatRing value={stats.followers.toLocaleString()} label="MEMBERS" ringColors={['#34D399', '#2DD4ED']} />
+                    <StatRing value={stats.followers.toLocaleString(i18n.language)} label={t('share.statMembers')} ringColors={['#34D399', '#2DD4ED']} />
                     <StatDivider />
                     <SideStat
                         icon={isPublic ? 'globe-outline' : 'lock-closed'}
                         iconColor="rgba(52,211,153,0.75)"
-                        value={isPublic ? 'Public' : 'Private'}
-                        label="ACCESS"
+                        value={isPublic ? tHub('profile.public') : tHub('profile.private')}
+                        label={t('share.statAccess')}
                         valueSize={18}
                     />
                 </View>
@@ -107,7 +111,7 @@ function HubCardPoster({ name, avatarUrl, isVerified, isPublic, ownerName, stats
                     <View style={{ marginTop: 24, flexDirection: 'row', gap: 10 }}>
                         <StatPill
                             value={ownerName}
-                            label="HUB OWNER"
+                            label={t('app.hubOwner')}
                             background="rgba(52,211,153,0.08)"
                             border="rgba(52,211,153,0.22)"
                             valueColor="#34D399"
@@ -124,12 +128,13 @@ function HubCardPoster({ name, avatarUrl, isVerified, isPublic, ownerName, stats
 }
 
 export function ShareHubCardModal({ visible, onClose, hubId, name, avatarUrl, isVerified, isPublic, ownerName, stats }: ShareHubCardModalProps) {
+    const { t } = useTranslation('common');
     return (
         <ShareCardShell
             visible={visible}
             onClose={onClose}
-            headerTitle="Hub Card"
-            dialogTitle={`${name} — GameHubz hub`}
+            headerTitle={t('app.hubCard')}
+            dialogTitle={t('app.hubDialogTitle', { name })}
             fileName={name || 'hub'}
             onShareLink={() => shareHub(hubId, name)}
             renderPoster={(width) => (

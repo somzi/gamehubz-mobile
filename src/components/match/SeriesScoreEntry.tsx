@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -146,6 +147,7 @@ export function SeriesScoreEntry({
     onFocusInput,
     editable = true,
 }: SeriesScoreEntryProps) {
+    const { t } = useTranslation('match');
     // The raw `format` prop is fine here: the initializer runs once, so identity churn can't reach it.
     const [rows, setRows] = useState<GameRow[]>(() => buildRows(initialGames, format));
 
@@ -230,12 +232,12 @@ export function SeriesScoreEntry({
             {!isSingleGame && (
                 <View className="flex-row items-center justify-between px-1">
                     <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[2px]">
-                        Best of {stableFormat.bestOf} · {isAggregate ? 'Aggregate score' : 'Match wins'}
+                        {t('series.bestOfN', { n: stableFormat.bestOf })} · {isAggregate ? t('series.aggregateScore') : t('series.matchWins')}
                     </Text>
                     {games.length > 0 && editable && (
                         <Pressable onPress={undoLastGame} className="flex-row items-center gap-1 active:opacity-60">
                             <Ionicons name="arrow-undo-outline" size={13} color="#64748B" />
-                            <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Undo game</Text>
+                            <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('series.undoGame')}</Text>
                         </Pressable>
                     )}
                 </View>
@@ -301,7 +303,7 @@ export function SeriesScoreEntry({
                                             'text-[11px] font-bold uppercase tracking-wider',
                                             open ? 'text-primary' : 'text-slate-500',
                                         )}>
-                                            {isSingleGame ? 'Score' : `Game ${positionInSeries + 1}`}
+                                            {isSingleGame ? t('series.score') : t('series.gameN', { n: positionInSeries + 1 })}
                                         </Text>
                                     </View>
 
@@ -362,7 +364,7 @@ export function SeriesScoreEntry({
                         <Ionicons name="flash" size={18} color="#F59E0B" />
                     </View>
                     <View className="flex-1">
-                        <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">Match tied</Text>
+                        <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">{t('series.matchTied')}</Text>
                         <Text className="text-[11px] text-slate-400 mt-0.5">
                             Tap to play a tiebreak — best of {bestOfForSeries(outcome.currentSeriesNumber + 1, stableFormat)}.
                         </Text>
@@ -386,13 +388,14 @@ function SeriesSummary({
     leftName: string;
     rightName: string;
 }) {
+    const { t } = useTranslation('match');
     const { homeHeadline, awayHeadline, currentSeriesOver, isLevel, gamesInCurrentSeries, currentSeriesBestOf } = outcome;
 
     if (gamesInCurrentSeries === 0) {
         return (
             <View className="px-4 py-3 border-t border-white/[0.04]">
                 <Text className="text-[11px] text-slate-500 text-center">
-                    Enter game 1 to start the series.
+                    {t('series.enterGameOne')}
                 </Text>
             </View>
         );
@@ -415,15 +418,15 @@ function SeriesSummary({
                     isLevel ? 'text-warning' : 'text-primary',
                 )}>
                     {isLevel
-                        ? 'Series level'
-                        : `${leader} wins the series ${Math.max(homeHeadline, awayHeadline)}–${Math.min(homeHeadline, awayHeadline)}`}
-                    {clinchedEarly ? ` · ended after game ${gamesInCurrentSeries}` : ''}
+                        ? t('series.seriesLevel')
+                        : t('series.winsTheSeries', { leader, high: Math.max(homeHeadline, awayHeadline), low: Math.min(homeHeadline, awayHeadline) })}
+                    {clinchedEarly ? t('series.endedAfterGame', { n: gamesInCurrentSeries }) : ''}
                 </Text>
             ) : (
                 <Text className="text-[11px] text-slate-500 mt-1 text-center">
                     {format.condition === SeriesWinCondition.AggregateScore
-                        ? `${gamesInCurrentSeries} of ${currentSeriesBestOf} games played`
-                        : `Game ${gamesInCurrentSeries + 1} of up to ${currentSeriesBestOf}`}
+                        ? t('series.gamesPlayed', { played: gamesInCurrentSeries, total: currentSeriesBestOf })
+                        : t('series.gameOfUpTo', { n: gamesInCurrentSeries + 1, total: currentSeriesBestOf })}
                 </Text>
             )}
         </View>

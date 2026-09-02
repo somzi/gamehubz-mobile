@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
@@ -35,6 +37,7 @@ type Nav = StackNavigationProp<RootStackParamList>;
 const PAGE_SIZE = 30;
 
 export default function DirectChatScreen() {
+    const { t } = useTranslation('match');
     const route = useRoute<Route>();
     const navigation = useNavigation<Nav>();
     const { user } = useAuth();
@@ -116,7 +119,7 @@ export default function DirectChatScreen() {
                     );
                     if (!res.ok) {
                         const txt = await res.text();
-                        throw new Error(txt || 'Failed to open chat');
+                        throw new Error(txt || t('chat.openChatFailed'));
                     }
                     const resolved: DirectChat = await res.json();
                     if (cancelled) return;
@@ -124,7 +127,7 @@ export default function DirectChatScreen() {
                     setChat(resolved);
                 }
 
-                if (!chatId) throw new Error('Missing chat parameters');
+                if (!chatId) throw new Error(t('chat.missingParams'));
 
                 // Deep link / notification with only a chatId and no header seed — fetch just
                 // this one chat for the header, in parallel with the messages below.
@@ -142,7 +145,7 @@ export default function DirectChatScreen() {
                 if (cancelled) return;
 
                 if (meta) setChat(meta);
-                else if (needsMeta) throw new Error('Chat not available');
+                else if (needsMeta) throw new Error(t('chat.notAvailable'));
 
                 if (msgsRes.ok) {
                     const msgs: DirectMessage[] = await msgsRes.json();
@@ -292,7 +295,7 @@ export default function DirectChatScreen() {
 
     const showSendError = useCallback((msg: string) => {
         setSendError(msg);
-        Alert.alert('Message not sent', msg);
+        Alert.alert(t('chat.messageNotSent'), msg);
     }, []);
 
     const send = useCallback(async () => {
@@ -322,7 +325,7 @@ export default function DirectChatScreen() {
             } else {
                 const body = await res.text().catch(() => '');
                 console.log('[DM] send failed:', res.status, body);
-                showSendError(getErrorMessage(body) || 'Could not send message.');
+                showSendError(getErrorMessage(body) || t('chat.couldNotSend'));
             }
         } catch (e) {
             console.log('[DM] send threw:', e);
@@ -350,7 +353,7 @@ export default function DirectChatScreen() {
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
                     <Text className="text-red-400 mt-4 text-center font-bold">
-                        {error || 'Chat not available'}
+                        {error || t('chat.notAvailable')}
                     </Text>
                 </View>
             </SafeAreaView>
@@ -400,7 +403,7 @@ export default function DirectChatScreen() {
                                     <ActivityIndicator size="small" color="#10B981" />
                                 ) : (
                                     <Text className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
-                                        Load earlier messages
+                                        {t('chat.loadEarlier')}
                                     </Text>
                                 )}
                             </Pressable>
@@ -427,7 +430,7 @@ export default function DirectChatScreen() {
                             <View className="w-20 h-20 rounded-3xl bg-white/[0.03] items-center justify-center mb-4">
                                 <Ionicons name="chatbubble-ellipses-outline" size={36} color="#1E293B" />
                             </View>
-                            <Text className="text-white font-black text-base">Start the conversation</Text>
+                            <Text className="text-white font-black text-base">{t('chat.startConversation')}</Text>
                             <Text className="text-slate-500 text-xs text-center font-medium mt-1">
                                 Say hi to {chat.otherUsername}
                             </Text>
@@ -457,7 +460,7 @@ export default function DirectChatScreen() {
                             ref={inputRef}
                             value={input}
                             onChangeText={setInput}
-                            placeholder="Type a message..."
+                            placeholder={t('chat.typeAMessage')}
                             placeholderTextColor="#475569"
                             multiline
                             className="flex-1 text-white text-[15px] py-2 px-1"
@@ -505,6 +508,7 @@ function Header({
     chat: DirectChat | null;
     onAvatarPress?: () => void;
 }) {
+    const { t } = useTranslation('match');
     return (
         <View
             className="flex-row items-center px-3 py-3 border-b border-white/[0.04] bg-background-deep"
@@ -539,7 +543,7 @@ function Header({
                     </View>
                 </Pressable>
             ) : (
-                <Text className="text-white font-black text-lg ml-1">Chat</Text>
+                <Text className="text-white font-black text-lg ml-1">{t('chat.chat')}</Text>
             )}
         </View>
     );
@@ -557,6 +561,7 @@ const MessageBubble = React.memo(function MessageBubble({
     isMine: boolean;
     showAvatar: boolean;
 }) {
+    const { t } = useTranslation('match');
     const time = formatTime(message.sentAt);
     const { copied, copy } = useCopyToClipboard();
     return (
@@ -579,7 +584,7 @@ const MessageBubble = React.memo(function MessageBubble({
                 onLongPress={() => copy(message.content)}
                 delayLongPress={250}
                 accessibilityRole="text"
-                accessibilityHint="Long press to copy this message"
+                accessibilityHint={t('chat.longPressToCopy')}
                 className={`max-w-[78%] rounded-[18px] px-3.5 py-2 ${
                     isMine
                         ? 'bg-emerald-500 rounded-br-md'
@@ -599,7 +604,7 @@ const MessageBubble = React.memo(function MessageBubble({
                     }`}
                 >
                     {time}
-                    {isMine && message.isRead ? ' • Read' : ''}
+                    {isMine && message.isRead ? t('chat.readSuffix') : ''}
                 </Text>
                 {copied && <CopiedOverlay />}
             </Pressable>
@@ -624,7 +629,7 @@ function formatTime(iso: string): string {
         // parseUtcDate treats a tz-less backend timestamp as UTC, so toLocaleTimeString
         // renders it in the device timezone (e.g. 15:00 in RS shows as 18:30 in IN).
         const d = parseUtcDate(iso);
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
     } catch {
         return '';
     }
@@ -638,9 +643,9 @@ function formatDay(iso: string): string {
             (new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) /
                 (1000 * 60 * 60 * 24)
         );
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Yesterday';
-        return d.toLocaleDateString();
+        if (diffDays === 0) return i18n.t('match:chat.today');
+        if (diffDays === 1) return i18n.t('match:chat.yesterday');
+        return d.toLocaleDateString(i18n.language);
     } catch {
         return '';
     }

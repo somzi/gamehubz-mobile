@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Button } from '../ui/Button';
-import { TEAM_LABELS } from '../../lib/teamConstants';
 
 export interface ConfirmationModalProps {
     visible: boolean;
@@ -33,13 +33,19 @@ export function ConfirmationModal({
     onConfirm,
     title,
     message,
-    confirmText = TEAM_LABELS.CONFIRM_BUTTON,
-    cancelText = TEAM_LABELS.CANCEL_BUTTON,
+    confirmText,
+    cancelText,
     isDestructive = true,
     isLoading = false,
     stacked = false,
     overlay = false,
 }: ConfirmationModalProps) {
+    // Resolved in the body rather than as default parameters: a default is evaluated
+    // before hooks run, so it would capture whatever language was active at import.
+    const { t } = useTranslation('common');
+    const confirmLabel = confirmText ?? t('confirm');
+    const cancelLabel = cancelText ?? t('cancel');
+
     const body = (
         <View className="flex-1 bg-black/60 items-center justify-center p-6">
                 <Pressable className="absolute inset-0" onPress={onClose} />
@@ -75,7 +81,7 @@ export function ConfirmationModal({
                                     loading={isLoading}
                                     className="w-full h-14 rounded-2xl"
                                 >
-                                    {confirmText}
+                                    {confirmLabel}
                                 </Button>
                                 <Button
                                     variant="outline"
@@ -83,7 +89,7 @@ export function ConfirmationModal({
                                     disabled={isLoading}
                                     className="w-full h-14 rounded-2xl"
                                 >
-                                    {cancelText}
+                                    {cancelLabel}
                                 </Button>
                             </View>
                         ) : (
@@ -95,7 +101,7 @@ export function ConfirmationModal({
                                         disabled={isLoading}
                                         className="w-full h-14 rounded-2xl"
                                     >
-                                        {cancelText}
+                                        {cancelLabel}
                                     </Button>
                                 </View>
                                 <View className="flex-1">
@@ -105,7 +111,7 @@ export function ConfirmationModal({
                                         loading={isLoading}
                                         className="w-full h-14 rounded-2xl"
                                     >
-                                        {confirmText}
+                                        {confirmLabel}
                                     </Button>
                                 </View>
                             </View>

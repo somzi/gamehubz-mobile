@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { Alert, Platform, Share, ToastAndroid } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
@@ -28,7 +29,7 @@ function notify(message: string) {
 
 export async function copyShareLink(url: string) {
     await Clipboard.setStringAsync(url);
-    notify('Link copied to clipboard');
+    notify(i18n.t('common:linkCopied'));
 }
 
 interface ShareLinkOptions {
@@ -55,31 +56,31 @@ export async function shareLink({ title, description, url }: ShareLinkOptions) {
         try {
             await copyShareLink(url);
         } catch {
-            notify('Could not share the link');
+            notify(i18n.t('common:couldNotShare'));
         }
     }
 }
 
 export function shareTournament(id: string, name?: string) {
     return shareLink({
-        title: name || 'Tournament',
-        description: name ? `Join ${name} on GameHubz.` : 'Join this tournament on GameHubz.',
+        title: name || i18n.t('common:shareLinks.tournament'),
+        description: name ? i18n.t('common:shareLinks.joinTournament', { name }) : i18n.t('common:shareLinks.joinTournamentGeneric'),
         url: buildShareUrl('tournament', id),
     });
 }
 
 export function shareHub(id: string, name?: string) {
     return shareLink({
-        title: name || 'Hub',
-        description: name ? `Check out ${name} on GameHubz.` : 'Check out this hub on GameHubz.',
+        title: name || i18n.t('common:shareLinks.hub'),
+        description: name ? i18n.t('common:shareLinks.checkOutHub', { name }) : i18n.t('common:shareLinks.checkOutHubGeneric'),
         url: buildShareUrl('hub', id),
     });
 }
 
 export function shareUser(id: string, name?: string) {
     return shareLink({
-        title: name || 'Player Profile',
-        description: name ? `View ${name} on GameHubz.` : 'View this player on GameHubz.',
+        title: name || i18n.t('common:shareLinks.playerProfile'),
+        description: name ? i18n.t('common:shareLinks.viewPlayer', { name }) : i18n.t('common:shareLinks.viewPlayerGeneric'),
         url: buildShareUrl('player', id),
     });
 }
@@ -87,7 +88,7 @@ export function shareUser(id: string, name?: string) {
 export function shareTeam(id: string, name?: string) {
     return shareLink({
         title: name || 'Team',
-        description: name ? `Join ${name} on GameHubz.` : 'Join this team on GameHubz.',
+        description: name ? i18n.t('common:shareLinks.joinTournament', { name }) : i18n.t('common:shareLinks.joinTeamGeneric'),
         url: buildShareUrl('team', id),
     });
 }

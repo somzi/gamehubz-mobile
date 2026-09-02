@@ -6,7 +6,9 @@ import { COLORS } from '../../lib/theme';
 import { PressableScale } from './PressableScale';
 
 interface MenuItemProps {
-    icon: keyof typeof Ionicons.glyphMap;
+    icon?: keyof typeof Ionicons.glyphMap;
+    /** Leading glyph rendered in place of `icon` — e.g. a flag in the language picker. */
+    emoji?: string;
     label: string;
     onPress: () => void;
     destructive?: boolean;
@@ -21,6 +23,7 @@ interface MenuItemProps {
  *  grouped glassy card (the SettingsScreen pattern). */
 export function MenuItem({
     icon,
+    emoji,
     label,
     onPress,
     destructive = false,
@@ -46,7 +49,11 @@ export function MenuItem({
                             : "bg-white/[0.04] border-white/[0.06]"
                     )}
                 >
-                    <Ionicons name={icon} size={17} color={destructive ? COLORS.destructive : COLORS.slate300} />
+                    {emoji ? (
+                        <Text className="text-[17px]">{emoji}</Text>
+                    ) : icon ? (
+                        <Ionicons name={icon} size={17} color={destructive ? COLORS.destructive : COLORS.slate300} />
+                    ) : null}
                 </View>
                 <Text
                     className={cn("font-semibold text-[15px] flex-shrink", destructive ? "text-red-400" : "text-white")}

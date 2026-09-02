@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ interface SearchInputProps {
 }
 
 export function SearchInput({ value, onChange, onSubmit, placeholder, className }: SearchInputProps) {
+    const { t } = useTranslation('common');
     return (
         <View className={cn("relative flex-row items-center", className)}>
             <View className="absolute left-3 z-10">
@@ -22,7 +24,7 @@ export function SearchInput({ value, onChange, onSubmit, placeholder, className 
                 value={value}
                 onChangeText={onChange}
                 onSubmitEditing={onSubmit}
-                placeholder={placeholder || "Search..."}
+                placeholder={placeholder || t('ui.searchPlaceholder')}
                 placeholderTextColor="#71717A"
                 className="flex-1 bg-secondary text-foreground py-3 pl-10 pr-12 rounded-xl border border-border/30"
                 returnKeyType="search"

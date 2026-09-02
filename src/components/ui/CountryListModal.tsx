@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, Pressable, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +14,9 @@ interface CountryListModalProps {
 }
 
 /** Read-only, scrollable list of countries — used to expand a "+N countries" summary. */
-export function CountryListModal({ visible, onClose, codes, title = 'Eligible Countries' }: CountryListModalProps) {
+export function CountryListModal({ visible, onClose, codes, title }: CountryListModalProps) {
+    const { t } = useTranslation('common');
+    const resolvedTitle = title ?? t('ui.eligibleCountries');
     const [catalog, setCatalog] = useState<Country[]>([]);
     const [search, setSearch] = useState('');
 
@@ -68,7 +71,7 @@ export function CountryListModal({ visible, onClose, codes, title = 'Eligible Co
                                 <TextInput
                                     value={search}
                                     onChangeText={setSearch}
-                                    placeholder="Search country..."
+                                    placeholder={t('ui.searchCountry')}
                                     placeholderTextColor="#64748B"
                                     autoCorrect={false}
                                     className="flex-1 ml-2 text-white text-[15px]"
@@ -95,7 +98,7 @@ export function CountryListModal({ visible, onClose, codes, title = 'Eligible Co
                             </View>
                         )}
                         ListEmptyComponent={
-                            <Text className="text-slate-500 text-center mt-8 font-medium">No countries</Text>
+                            <Text className="text-slate-500 text-center mt-8 font-medium">{t('ui.noCountries')}</Text>
                         }
                     />
                 </Pressable>

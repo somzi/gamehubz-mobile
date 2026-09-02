@@ -164,6 +164,9 @@ export const ENDPOINTS = {
     EXPORT_TOURNAMENT_CSV: (id: string, dataset: 'standings' | 'matches') =>
         `${API_BASE_URL}/api/tournament/${id}/export/csv?dataset=${dataset}`,
     PUSH_TOKEN: `${API_BASE_URL}/api/user/push-token`,
+    // Stored on the profile because push notifications and e-mails are written in the
+    // RECIPIENT's language, long after the request that triggered them.
+    SET_LANGUAGE: `${API_BASE_URL}/api/user/language`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
 
     // ─── Match streaming ────────────────────────────────────────────────
@@ -223,6 +226,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import i18n, { getRequestLanguage } from '../i18n';
 
 // Sent on every request so server-side ErrorLog rows record which app build/platform hit
 // the bug — set once at startup.
@@ -254,6 +258,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(async (config) => {
     config.headers['X-App-Version'] = APP_VERSION;
     config.headers['X-Platform'] = APP_PLATFORM;
+    config.headers['Language'] = getRequestLanguage();
     try {
         // Prefer the in-memory token. It's kept current on bootstrap, login and refresh,
         // so we avoid an encrypted-keystore read (SecureStore) on every single request —
@@ -367,6 +372,9 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
                 delete h['Content-Type'];
                 h['X-App-Version'] = APP_VERSION;
                 h['X-Platform'] = APP_PLATFORM;
+                // This path bypasses the axios interceptor (raw fetch, for the FormData
+                // boundary), so every header the interceptor sets has to be repeated here.
+                h['Language'] = getRequestLanguage();
                 if (token) h['Authorization'] = `Bearer ${token}`;
                 return h;
             };
@@ -480,7 +488,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
  * Extract a human-readable error message from an API error
  */
 export function getErrorMessage(error: any): string {
-    if (!error) return 'An unexpected error occurred';
+    if (!error) return i18n.t('common:unexpectedError');
 
     // If it's a string, try to parse it as JSON first
     if (typeof error === 'string') {
@@ -586,7 +594,8 @@ function extractErrorId(data: any): string | null {
  * message only — never a stack trace or raw JSON — with the support reference appended
  * when the server provides one.
  */
-export function getApiErrorMessage(data: any, fallback = 'An unexpected error occurred'): string {
+export function getApiErrorMessage(data: any, fallback?: string): string {
+    fallback = fallback ?? i18n.t('common:unexpectedError');
     let message: string;
     try { message = getErrorMessage(data); } catch { message = fallback; }
 

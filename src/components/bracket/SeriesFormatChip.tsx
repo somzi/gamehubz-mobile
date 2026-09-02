@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import { SeriesWinCondition, SeriesWinConditionValue, seriesFormatFrom, seriesGamesFrom } from '../../lib/series';
 
@@ -76,7 +77,8 @@ export function SeriesFormatChip({
     isTeamTournament?: boolean;
     style?: StyleProp<ViewStyle>;
 }) {
-    const criterion = format.condition === SeriesWinCondition.AggregateScore ? 'TOTAL SCORE' : 'GAMES WON';
+    const { t } = useTranslation('bracket');
+    const criterion = format.condition === SeriesWinCondition.AggregateScore ? t('card.totalScore') : t('card.gamesWon');
 
     return (
         <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 5 }, style]}>
@@ -89,7 +91,7 @@ export function SeriesFormatChip({
                 </Text>
             </View>
             <Text style={{ fontSize: 9, fontWeight: '700', color: '#64748B', letterSpacing: 1 }} numberOfLines={1}>
-                {criterion}{isTeamTournament ? ' · PER GAME' : ''}
+                {criterion}{isTeamTournament ? t('card.perGame') : ''}
             </Text>
         </View>
     );

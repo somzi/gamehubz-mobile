@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
@@ -62,16 +63,18 @@ export function MatchFormatPicker({
     onTiebreakBestOfChange,
     hasKnockout,
     hasSeparateKnockoutPhase = false,
-    firstPhaseLabel = 'Group Stage',
+    firstPhaseLabel,
     knockoutBestOf = null,
     onKnockoutBestOfChange,
     isTeamTournament = false,
     disabled = false,
 }: MatchFormatPickerProps) {
+    const { t } = useTranslation('match');
     const isSeries = bestOf > 1;
     // With two phases the first control no longer speaks for the whole tournament, so it says
     // which half it governs.
-    const primaryLabel = hasSeparateKnockoutPhase ? `${firstPhaseLabel} Format` : 'Match Format';
+    const phaseLabel = firstPhaseLabel ?? t('formatPicker.groupStage');
+    const primaryLabel = hasSeparateKnockoutPhase ? t('formatPicker.phaseFormat', { phase: phaseLabel }) : t('formatPicker.matchFormat');
     // The length the knockout actually plays, whether it was chosen or inherited.
     const effectiveKnockoutBestOf = knockoutBestOf ?? bestOf;
 
@@ -87,7 +90,7 @@ export function MatchFormatPicker({
 
                 {isTeamTournament && (
                     <Text className={FIELD_HINT}>
-                        Applies to every individual game inside a tie — the tie itself is still decided by
+                        {t('formatPicker.appliesToEveryGame')}
                         its own win condition.
                     </Text>
                 )}
@@ -96,11 +99,11 @@ export function MatchFormatPicker({
             {/* ── Win condition — only meaningful with more than one game to compare ── */}
             {isSeries && (
                 <View>
-                    <Text className={FIELD_LABEL}>Series Decided By</Text>
+                    <Text className={FIELD_LABEL}>{t('formatPicker.seriesDecidedBy')}</Text>
                     <SegmentedToggle
                         options={[
-                            { value: String(SeriesWinCondition.MatchWins), label: 'Games Won' },
-                            { value: String(SeriesWinCondition.AggregateScore), label: 'Total Score' },
+                            { value: String(SeriesWinCondition.MatchWins), label: t('formatPicker.gamesWon') },
+                            { value: String(SeriesWinCondition.AggregateScore), label: t('formatPicker.totalScore') },
                         ]}
                         value={String(winCondition)}
                         onChange={v => onWinConditionChange(v === '1' ? SeriesWinCondition.AggregateScore : SeriesWinCondition.MatchWins)}
@@ -108,8 +111,8 @@ export function MatchFormatPicker({
                     />
                     <Text className={FIELD_HINT}>
                         {winCondition === SeriesWinCondition.AggregateScore
-                            ? 'Every game is played and the scores are added up — the higher total wins. Useful for two-legged ties.'
-                            : 'Whoever wins more games wins the series, and it ends as soon as the lead is out of reach.'}
+                            ? t('formatPicker.aggregateHint')
+                            : t('formatPicker.matchWinsHint')}
                     </Text>
                 </View>
             )}
@@ -117,12 +120,12 @@ export function MatchFormatPicker({
             {/* ── Knockout format ────────────────────────────────────────── */}
             {hasSeparateKnockoutPhase && onKnockoutBestOfChange && (
                 <View>
-                    <Text className={FIELD_LABEL}>Knockout Format</Text>
+                    <Text className={FIELD_LABEL}>{t('formatPicker.knockoutFormat')}</Text>
 
                     <SegmentedToggle
                         options={[
-                            { value: 'same', label: `Same as ${firstPhaseLabel}` },
-                            { value: 'custom', label: 'Different' },
+                            { value: 'same', label: t('formatPicker.sameAsPhase', { phase: phaseLabel }) },
+                            { value: 'custom', label: t('formatPicker.different') },
                         ]}
                         value={knockoutBestOf == null ? 'same' : 'custom'}
                         onChange={v => onKnockoutBestOfChange(v === 'same' ? null : normalizeBestOf(bestOf))}
@@ -141,7 +144,7 @@ export function MatchFormatPicker({
 
                     <Text className={FIELD_HINT}>
                         {knockoutBestOf == null
-                            ? `Knockout matches are played over the same length as the ${firstPhaseLabel.toLowerCase()}.`
+                            ? t('formatPicker.knockoutSameHint', { phase: phaseLabel.toLowerCase() })
                             : bestOfInlineDescription(effectiveKnockoutBestOf, winCondition)}
                         {' '}Each round can still be changed on its own once the bracket exists.
                     </Text>
@@ -151,13 +154,13 @@ export function MatchFormatPicker({
             {/* ── Tiebreak ───────────────────────────────────────────────── */}
             {hasKnockout && (
                 <View>
-                    <Text className={FIELD_LABEL}>Knockout Tiebreak</Text>
+                    <Text className={FIELD_LABEL}>{t('formatPicker.knockoutTiebreak')}</Text>
 
                     {/* Two mutually exclusive choices, so a toggle fits without crowding. */}
                     <SegmentedToggle
                         options={[
-                            { value: 'same', label: 'Same Format' },
-                            { value: 'custom', label: 'Different' },
+                            { value: 'same', label: t('formatPicker.sameFormat') },
+                            { value: 'custom', label: t('formatPicker.different') },
                         ]}
                         value={tiebreakBestOf == null ? 'same' : 'custom'}
                         onChange={v => onTiebreakBestOfChange(v === 'same' ? null : normalizeBestOf(effectiveKnockoutBestOf))}
@@ -181,7 +184,7 @@ export function MatchFormatPicker({
                     <View className="flex-row items-start gap-2 mt-3 px-3 py-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
                         <Ionicons name="information-circle-outline" size={15} color="#64748B" style={{ marginTop: 1 }} />
                         <Text className="flex-1 text-[11px] text-slate-500 leading-4">
-                            Individual games may be drawn, so a series can end level at any format. Knockout
+                            {t('formatPicker.tiebreakNote')}
                             matches always go to a tiebreak; league, group and Swiss matches record it as a draw.
                         </Text>
                     </View>

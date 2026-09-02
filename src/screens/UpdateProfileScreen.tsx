@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +26,8 @@ import { COLORS } from '../lib/theme';
 type UpdateProfileNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function UpdateProfileScreen() {
+    const { t } = useTranslation('profile');
+    const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<UpdateProfileNavigationProp>();
     const { user, updateProfile, refreshUser, isLoading } = useAuth();
 
@@ -61,7 +64,7 @@ export default function UpdateProfileScreen() {
         try {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (permissionResult.status !== 'granted') {
-                Alert.alert('Permission Required', 'We need access to your photos to change your avatar.');
+                Alert.alert(t('edit.permissionRequired'), t('edit.photoPermission'));
                 return;
             }
 
@@ -79,8 +82,8 @@ export default function UpdateProfileScreen() {
                 if (!isFileSizeValid(selectedAsset)) {
                     setStatusModalConfig({
                         type: 'error',
-                        title: 'File Too Large',
-                        message: `Maximum allowed image size is ${formatFileSize(MAX_FILE_SIZE)}. Your image is ${formatFileSize(selectedAsset.fileSize || 0)}.`
+                        title: t('edit.fileTooLarge'),
+                        message: t('edit.fileTooLargeMessage', { max: formatFileSize(MAX_FILE_SIZE), actual: formatFileSize(selectedAsset.fileSize || 0) })
                     });
                     setShowStatusModal(true);
                     return;
@@ -91,7 +94,7 @@ export default function UpdateProfileScreen() {
             }
         } catch (error) {
             console.error('Error picking avatar:', error);
-            Alert.alert('Error', 'Failed to pick image');
+            Alert.alert(tCommon('error'), t('edit.pickImageFailed'));
         }
     };
 
@@ -116,22 +119,22 @@ export default function UpdateProfileScreen() {
             if (response.ok) {
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Avatar Updated',
-                    message: 'Your profile picture has been updated successfully.'
+                    title: t('edit.avatarUpdated'),
+                    message: t('edit.avatarUpdatedMessage')
                 });
                 setShowStatusModal(true);
                 // Refresh user profile to get new avatar URL
                 await refreshUser();
             } else {
                 const errorText = await response.text();
-                throw new Error(errorText || 'Failed to upload avatar');
+                throw new Error(errorText || t('edit.uploadAvatarFailed'));
             }
         } catch (error: any) {
             console.error('Error uploading avatar:', error);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Upload Failed',
-                message: error.message || 'Failed to update profile picture'
+                title: t('edit.uploadFailed'),
+                message: error.message || t('edit.uploadFailedMessage')
             });
             setShowStatusModal(true);
             // Revert preview if failed
@@ -145,8 +148,8 @@ export default function UpdateProfileScreen() {
         if (!username.trim()) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Empty Username',
-                message: 'Username cannot be empty'
+                title: t('edit.emptyUsername'),
+                message: t('edit.emptyUsernameMessage')
             });
             setShowStatusModal(true);
             return;
@@ -163,16 +166,16 @@ export default function UpdateProfileScreen() {
         if (success) {
             setStatusModalConfig({
                 type: 'success',
-                title: 'Profile Updated',
-                message: 'Profile updated successfully',
+                title: t('edit.profileUpdated'),
+                message: t('edit.profileUpdatedMessage'),
                 onClose: () => navigation.goBack()
             });
             setShowStatusModal(true);
         } else {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Update Failed',
-                message: 'Failed to update profile'
+                title: t('edit.updateFailed'),
+                message: t('edit.updateFailedMessage')
             });
             setShowStatusModal(true);
         }
@@ -180,14 +183,14 @@ export default function UpdateProfileScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background">
-            <PageHeader title="Edit Profile Info" showBack />
+            <PageHeader title={t('edit.title')} showBack />
             <KeyboardAvoider>
                 <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
                     {/* Avatar Section */}
                     <View className="items-center mb-8">
                         <View className="relative">
                             <PlayerAvatar
-                                name={user?.username || 'User'}
+                                name={user?.username || t('edit.userFallback')}
                                 src={avatarUri || user?.avatarUrl}
                                 size="xl"
                                 className="w-24 h-24 border-4 border-primary/20"
@@ -204,28 +207,28 @@ export default function UpdateProfileScreen() {
                                 )}
                             </TouchableOpacity>
                         </View>
-                        <Text className="text-sm font-medium text-muted-foreground mt-3">Change Profile Photo</Text>
+                        <Text className="text-sm font-medium text-muted-foreground mt-3">{t('edit.changePhoto')}</Text>
                     </View>
 
                     <View className="mb-8 bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
-                        <SectionLabel icon="person" title="Basic Info" />
+                        <SectionLabel icon="person" title={t('edit.sectionBasicInfo')} />
                         <View className="gap-4">
                             <Input
-                                label="USERNAME"
+                                label={t('edit.usernameLabel')}
                                 value={username}
                                 onChangeText={setUsername}
-                                placeholder="Enter username"
+                                placeholder={t('edit.usernamePlaceholder')}
                                 leftIcon="person-outline"
                             />
                             <Input
-                                label="NICKNAME"
+                                label={t('edit.nicknameLabel')}
                                 value={nickName}
                                 onChangeText={setNickName}
-                                placeholder="In-game nick"
+                                placeholder={t('edit.nicknamePlaceholder')}
                                 leftIcon="id-card-outline"
                             />
                             <CountryPicker
-                                label="COUNTRY"
+                                label={t('edit.countryLabel')}
                                 value={country}
                                 onSelect={setCountry}
                                 locked={countryLocked}
@@ -250,7 +253,7 @@ export default function UpdateProfileScreen() {
                         className="h-14 rounded-2xl shadow-lg shadow-primary/30"
                     >
                         <View className="flex-row items-center justify-center gap-2">
-                            <Text className="text-primary-foreground font-black text-base">Save Changes</Text>
+                            <Text className="text-primary-foreground font-black text-base">{t('edit.saveChanges')}</Text>
                             <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
                         </View>
                     </Button>

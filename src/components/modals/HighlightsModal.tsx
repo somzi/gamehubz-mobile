@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, FlatList, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ interface HighlightsModalProps {
 }
 
 export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
+    const { t } = useTranslation('common');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [paginatedActivities, setPaginatedActivities] = useState<DashboardActivityDto[]>([]);
     const [page, setPage] = useState(0);
@@ -103,7 +105,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                                 <Ionicons name="planet-outline" size={24} color="#10B981" />
                             </View>
                             <View>
-                                <Text className="text-xl font-bold text-foreground">All Highlights</Text>
+                                <Text className="text-xl font-bold text-foreground">{t('app.allHighlights')}</Text>
                                 <Text className="text-xs text-muted-foreground mt-0.5">
                                     {paginatedActivities.length} {paginatedActivities.length === 1 ? 'activity' : 'activities'}
                                 </Text>
@@ -149,7 +151,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                             if (!hasMore && paginatedActivities.length > 0) {
                                 return (
                                     <Text className="text-center text-muted-foreground py-4 text-xs font-medium">
-                                        No more activities to load
+                                        {t('app.noMoreActivities')}
                                     </Text>
                                 );
                             }
@@ -168,9 +170,9 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                                     <View className="bg-muted/10 p-6 rounded-full mb-4">
                                         <Ionicons name="planet-outline" size={48} color="#71717A" />
                                     </View>
-                                    <Text className="text-foreground font-bold text-lg">No Highlights Yet</Text>
+                                    <Text className="text-foreground font-bold text-lg">{t('app.noHighlightsYet')}</Text>
                                     <Text className="text-muted-foreground text-sm mt-2 text-center px-8">
-                                        Hub activities and tournament updates will appear here
+                                        {t('app.noHighlightsHint')}
                                     </Text>
                                 </View>
                             );

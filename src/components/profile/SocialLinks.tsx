@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Pressable, Linking, Alert, Share } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
@@ -65,6 +66,7 @@ const platformConfig: any = {
 };
 
 export function SocialLinks({ links, className }: SocialLinksProps) {
+    const { t } = useTranslation('profile');
     if (!links || links.length === 0) return null;
 
     const handlePress = (link: SocialLink) => {
@@ -76,7 +78,7 @@ export function SocialLinks({ links, className }: SocialLinksProps) {
                 );
             } else {
                 // Plain username — share/copy
-                Share.share({ message: link.username, title: 'Discord Username' });
+                Share.share({ message: link.username, title: t('socialModal.discordUsername') });
             }
             return;
         }

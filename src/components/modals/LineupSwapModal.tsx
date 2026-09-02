@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +45,7 @@ export function LineupSwapModal({
     error,
     onConfirm,
 }: LineupSwapModalProps) {
+    const { t } = useTranslation('team');
     const insets = useSafeAreaInsets();
     const [selectedId, setSelectedId] = useState<string | null>(null);
     // Set once the captain taps the CTA — a lineup change reassigns real fixtures, so it never
@@ -97,10 +99,10 @@ export function LineupSwapModal({
                         </View>
                         <View className="flex-1">
                             <Text className="text-white text-lg font-black" numberOfLines={1}>
-                                Substitution
+                                {t('lineupSwap.title')}
                             </Text>
                             <Text className="text-slate-500 text-[11px] mt-0.5" numberOfLines={2}>
-                                Pick who comes out. The sub takes their exact game — the draw doesn't move.
+                                {t('lineupSwap.subtitle')}
                             </Text>
                         </View>
                         <Pressable
@@ -119,7 +121,7 @@ export function LineupSwapModal({
                         {reserve && (
                             <View className="px-5 pt-4">
                                 <Text className="text-[10px] font-black uppercase tracking-[1.6px] text-slate-500 mb-2.5">
-                                    Coming in
+                                    {t('lineupSwap.comingIn')}
                                 </Text>
                                 <View
                                     className="rounded-3xl overflow-hidden"
@@ -140,7 +142,7 @@ export function LineupSwapModal({
                                                 {reserve.username}
                                             </Text>
                                             <Text className="text-[10px] font-black uppercase tracking-wider mt-1" style={{ color: accent }}>
-                                                From the bench
+                                                {t('lineupSwap.fromTheBench')}
                                             </Text>
                                         </View>
                                         <Ionicons name="arrow-forward" size={18} color={accent} />
@@ -152,7 +154,7 @@ export function LineupSwapModal({
                         {/* ── Going out ──────────────────────────────────────────────────── */}
                         <View className="px-5 pt-5">
                             <Text className="text-[10px] font-black uppercase tracking-[1.6px] text-slate-500 mb-2.5">
-                                Going out
+                                {t('lineupSwap.goingOut')}
                             </Text>
 
                             {starters.length === 0 ? (
@@ -166,7 +168,7 @@ export function LineupSwapModal({
                                 >
                                     <Ionicons name="people-outline" size={32} color="#475569" />
                                     <Text className="text-slate-400 text-[13px] font-bold mt-3 text-center">
-                                        No one in the lineup yet
+                                        {t('lineupSwap.noOneInLineup')}
                                     </Text>
                                 </View>
                             ) : (
@@ -194,7 +196,7 @@ export function LineupSwapModal({
                                                         className="text-[10px] font-black uppercase tracking-wider mt-0.5"
                                                         style={{ color: starter.isCaptain ? COLORS.warning : COLORS.slate500 }}
                                                     >
-                                                        {starter.isCaptain ? 'Captain' : 'In the lineup'}
+                                                        {starter.isCaptain ? t('captainBadge') : t('lineupSwap.inTheLineup')}
                                                     </Text>
                                                 </View>
                                                 <View
@@ -266,7 +268,7 @@ export function LineupSwapModal({
                                         className="font-black text-[15px]"
                                         style={{ color: selected ? COLORS.teamForeground : '#64748B' }}
                                     >
-                                        {selected ? 'Make the swap' : 'Pick who comes out'}
+                                        {selected ? t('lineupSwap.makeTheSwap') : t('lineupSwap.pickWhoComesOut')}
                                     </Text>
                                 </>
                             )}
@@ -290,11 +292,11 @@ export function LineupSwapModal({
                     setConfirming(false);
                     onConfirm(selected.userId);
                 }}
-                title="Confirm the swap"
+                title={t('lineupSwap.confirmTitle')}
                 message={selected && reserve
-                    ? `${reserve.username} comes into the lineup and ${selected.username} goes to the bench.\n\n${reserve.username} plays ${selected.username}'s exact remaining games — the draw doesn't change. Games already played stay with ${selected.username}.`
+                    ? t('lineupSwap.confirmMessage', { incoming: reserve.username, outgoing: selected.username })
                     : ''}
-                confirmText="Make the swap"
+                confirmText={t('lineupSwap.makeTheSwap')}
                 isDestructive={false}
                 isLoading={busy}
                 stacked

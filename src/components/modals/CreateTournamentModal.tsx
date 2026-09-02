@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     View,
     Text,
@@ -17,7 +17,7 @@ import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { DateTimePickerModal } from './DateTimePickerModal';
 import { ScheduleField } from '../ui/ScheduleField';
 import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TournamentFormat, TournamentRegion } from '../../types/tournament';
-import { TEAM_LABELS } from '../../lib/teamConstants';
+import { useTranslation } from 'react-i18next';
 import { CountryPicker } from '../ui/CountryPicker';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
@@ -25,9 +25,11 @@ import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
 
+// Option arrays keep their VALUES at module scope (types below depend on them) but carry
+// i18n keys instead of labels — labels are resolved per render so a language switch applies.
 const YES_NO_OPTIONS = [
-    { value: 'no', label: 'No' },
-    { value: 'yes', label: 'Yes' },
+    { value: 'no', labelKey: 'common:no' },
+    { value: 'yes', labelKey: 'common:yes' },
 ] as const;
 
 const FIELD_LABEL = "text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2";
@@ -41,14 +43,14 @@ interface CreateTournamentModalProps {
     hubId?: string;
 }
 
-const regions = [
-    { value: 'global', label: 'Global (No Restrictions)' },
-    { value: 'europe', label: 'Europe' },
-    { value: 'north-america', label: 'North America' },
-    { value: 'south-america', label: 'South America' },
-    { value: 'asia', label: 'Asia' },
-    { value: 'africa', label: 'Africa' },
-    { value: 'oceania', label: 'Oceania' },
+const REGION_OPTIONS = [
+    { value: 'global', labelKey: 'scope.global' },
+    { value: 'europe', labelKey: 'scope.europe' },
+    { value: 'north-america', labelKey: 'scope.northAmerica' },
+    { value: 'south-america', labelKey: 'scope.southAmerica' },
+    { value: 'asia', labelKey: 'scope.asia' },
+    { value: 'africa', labelKey: 'scope.africa' },
+    { value: 'oceania', labelKey: 'scope.oceania' },
 ];
 
 const prizeCurrencies = [
@@ -58,25 +60,25 @@ const prizeCurrencies = [
     { value: '4', label: 'FCP' },
 ];
 
-const durationUnits = [
-    { value: 'Minutes', label: 'Minutes' },
-    { value: 'Hours', label: 'Hours' },
-    { value: 'Days', label: 'Days' },
+const DURATION_UNIT_OPTIONS = [
+    { value: 'Minutes', labelKey: 'duration.minutes' },
+    { value: 'Hours', labelKey: 'duration.hours' },
+    { value: 'Days', labelKey: 'duration.days' },
 ];
 
-const teamWinConditions = [
-    { value: '0', label: 'Match Wins' },
-    { value: '1', label: 'Aggregate Score' },
+const TEAM_WIN_CONDITION_OPTIONS = [
+    { value: '0', labelKey: 'teamWinCondition.matchWins' },
+    { value: '1', labelKey: 'teamWinCondition.aggregateScore' },
 ];
 
 // User-facing format groups. Single/Double Elimination collapse into one "Bracket"
 // entry — the Single/Double sub-toggle picks between them. The backend still receives
 // the full TournamentFormat (3 = SingleElim, 4 = DoubleElim).
 const FORMAT_GROUP_OPTIONS = [
-    { value: 'league', label: 'League' },
-    { value: 'bracket', label: 'Bracket' },
-    { value: 'groups-bracket', label: 'Groups + Bracket' },
-    { value: 'swiss', label: 'Swiss' },
+    { value: 'league', labelKey: 'formatGroup.league' },
+    { value: 'bracket', labelKey: 'formatGroup.bracket' },
+    { value: 'groups-bracket', labelKey: 'formatGroup.groupsBracket' },
+    { value: 'swiss', labelKey: 'formatGroup.swiss' },
 ] as const;
 
 const regionMapping: Record<string, number> = {
@@ -92,6 +94,22 @@ const regionMapping: Record<string, number> = {
 export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournamentModalProps) {
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
+    const { t } = useTranslation('tournament');
+    const { t: tTeam } = useTranslation('team');
+
+    // Labels resolved here rather than at module scope so switching language re-renders them.
+    const swissKnockoutOptions = useMemo(
+        () => SWISS_KNOCKOUT_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
+    const yesNoOptions = useMemo(
+        () => YES_NO_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
+    const regions = useMemo(
+        () => REGION_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
+    const durationUnits = useMemo(
+        () => DURATION_UNIT_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
+    const teamWinConditions = useMemo(
+        () => TEAM_WIN_CONDITION_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
+    const formatGroupOptions = useMemo(
+        () => FORMAT_GROUP_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
 
     // Form State
     const [name, setName] = useState('');
@@ -197,7 +215,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             .filter((h: any) => h.id || h.hubId) // ONLY hubs with a GUID
                             .map((h: any) => ({
                                 id: h.id || h.hubId,
-                                name: h.name || h.hubName || 'Unnamed Hub'
+                                name: h.name || h.hubName || t('form.unnamedHub')
                             }));
 
                         setHubs(formattedHubs);
@@ -234,21 +252,21 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     };
 
     const getRegionLabel = () => {
-        if (selectedRegions.includes('global')) return 'Global (No Restrictions)';
+        if (selectedRegions.includes('global')) return t('scope.global');
         if (selectedRegions.length === 1) {
-            return regions.find(r => r.value === selectedRegions[0])?.label ?? 'Region';
+            return regions.find(r => r.value === selectedRegions[0])?.label ?? t('form.region');
         }
-        return `${selectedRegions.length} Regions Selected`;
+        return t('form.regionsSelected', { count: selectedRegions.length });
     };
 
     const getHubLabel = () => {
-        if (isLoadingHubs) return 'Loading hubs...';
-        if (hubs.length === 0) return 'No hubs found';
-        return hubs.find(h => h.id === selectedHubId)?.name || 'Select Hub';
+        if (isLoadingHubs) return t('form.loadingHubs');
+        if (hubs.length === 0) return t('form.noHubsFound');
+        return hubs.find(h => h.id === selectedHubId)?.name || t('form.selectHub');
     };
 
     const getCurrencyLabel = () => {
-        return prizeCurrencies.find(c => c.value === prizeCurrency)?.label || 'Currency';
+        return prizeCurrencies.find(c => c.value === prizeCurrency)?.label || t('form.currency');
     };
 
     // Map selectedFormat (TournamentFormat) → user-facing group key.
@@ -261,7 +279,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         'bracket';
 
     const getFormatLabel = () => {
-        return FORMAT_GROUP_OPTIONS.find(f => f.value === formatGroup)?.label || 'Select Format';
+        return formatGroupOptions.find(f => f.value === formatGroup)?.label || t('form.selectFormat');
     };
 
     // The format dropdown writes a group key, which we expand back to TournamentFormat here.
@@ -297,7 +315,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // A knockout that FOLLOWS another phase is the only one worth its own length: a plain bracket
     // is a single phase, so one Best-of already describes every match it plays.
     const hasSeparateKnockoutPhase = hasKnockoutPhase && formatGroup !== 'bracket';
-    const firstPhaseLabel = formatGroup === 'swiss' ? 'Swiss Rounds' : 'Group Stage';
+    const firstPhaseLabel = formatGroup === 'swiss' ? t('form.swissRounds') : t('form.groupStage');
     const swissKnockoutSize = isSwiss ? parseInt(swissKnockout) || 0 : 0;
     // Empty direct input = every knockout slot is a direct berth (no play-in).
     const swissDirectCount = swissKnockout !== '0' && swissDirect !== ''
@@ -360,36 +378,36 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
     const handleSubmit = async () => {
         if (!name || !selectedHubId) {
-            setError('Tournament name and Hub are required');
+            setError(t('validation.nameAndHubRequired'));
             return;
         }
 
         if (!maxPlayers || isNaN(parseInt(maxPlayers)) || parseInt(maxPlayers) <= 0) {
-            setError('Valid Max Players count is required (must be greater than 0)');
+            setError(t('validation.maxPlayersRequired'));
             return;
         }
 
         if (scopeMode === 'country' && selectedCountries.length === 0) {
-            setError('Please select at least one country for a country-based tournament');
+            setError(t('validation.countryRequired'));
             return;
         }
 
         if (isTeamTournament) {
             const ts = parseInt(teamSize);
             if (!teamSize || isNaN(ts) || ts < 2 || ts > 11) {
-                setError('Team size must be between 2 and 11');
+                setError(t('validation.teamSizeRange'));
                 return;
             }
             const mp = parseInt(maxPlayers);
             if (mp < ts * 2) {
-                setError(`Max Players must be at least ${ts * 2} (Team Size × 2) to allow a minimum of 2 teams`);
+                setError(t('validation.maxPlayersForTeams', { min: ts * 2 }));
                 return;
             }
 
             if (allowReserves) {
                 const mr = parseInt(maxReserves);
                 if (!maxReserves || isNaN(mr) || mr < 1 || mr > 11) {
-                    setError('Reserves per team must be between 1 and 11');
+                    setError(t('validation.reservesRange'));
                     return;
                 }
             }
@@ -397,40 +415,40 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             const selectedFormatValue = Number(selectedFormat);
             const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
             if (!isAllowedTeamFormat) {
-                setError('Team tournaments only support Single Bracket, Double Bracket, League, or Groups + Bracket');
+                setError(t('validation.teamFormatUnsupported'));
                 return;
             }
         }
 
         if (selectedFormat === String(TournamentFormat.DoubleElimination) && participantCount > 0 && participantCount < 4) {
-            setError('Double Elimination requires at least 4 players — raise Max Players');
+            setError(t('validation.doubleElimMinPlayers'));
             return;
         }
 
         // Groups + Bracket pads the knockout up to the next power of two with byes (single- and
         // double-elimination alike), so any qualifier count >= 2 works.
         if (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers < 2) {
-            setError('Groups + Bracket needs at least 2 total qualifiers (Groups × Qualifiers/Group).');
+            setError(t('validation.groupsQualifiersMin'));
             return;
         }
 
         if (isSwiss && swissKnockoutSize > 0) {
             if (swissKnockoutSize > participantCount) {
-                setError(`Knockout qualifiers (${swissKnockoutSize}) cannot exceed Max Players (${participantCount})`);
+                setError(t('validation.knockoutExceedsPlayers', { knockout: swissKnockoutSize, players: participantCount }));
                 return;
             }
             if (isNaN(swissDirectCount) || swissDirectCount < 0 || swissDirectCount > swissKnockoutSize) {
-                setError(`Direct qualifiers must be between 0 and ${swissKnockoutSize}`);
+                setError(t('validation.directQualifiersRange', { max: swissKnockoutSize }));
                 return;
             }
             if (swissPlayInPlayers > 0 && swissDirectCount + swissPlayInPlayers > participantCount) {
-                setError(`Play-in needs ${swissDirectCount + swissPlayInPlayers} players (${swissDirectCount} direct + ${swissPlayInPlayers} play-in) but Max Players is ${participantCount}`);
+                setError(t('validation.playInNeedsPlayers', { needed: swissDirectCount + swissPlayInPlayers, direct: swissDirectCount, playIn: swissPlayInPlayers, players: participantCount }));
                 return;
             }
         }
 
         if (!startDate || !registrationDeadline) {
-            setError('Please set both Registration Deadline and Start Date');
+            setError(t('validation.scheduleRequired'));
             return;
         }
 
@@ -439,12 +457,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         const deadline = new Date(registrationDeadline.replace(' ', 'T'));
 
         if (deadline < now) {
-            setError('Registration deadline cannot be in the past');
+            setError(t('validation.deadlineInPast'));
             return;
         }
 
         if (start < deadline) {
-            setError('Start date cannot be earlier than the registration deadline');
+            setError(t('validation.startBeforeDeadline'));
             return;
         }
 
@@ -454,12 +472,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             const opensAt = new Date(registrationOpensAt.replace(' ', 'T'));
 
             if (opensAt <= now) {
-                setError('Registration opening time must be in the future');
+                setError(t('validation.opensInFuture'));
                 return;
             }
 
             if (opensAt >= deadline) {
-                setError('Registration must open before the registration deadline');
+                setError(t('validation.opensBeforeDeadline'));
                 return;
             }
         }
@@ -567,7 +585,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             if (!response.ok) {
                 const errorText = await response.text().catch(() => '');
                 console.error('Create tournament failed - Status:', response.status, '- Body:', errorText);
-                let errorMessage = 'Failed to create tournament';
+                let errorMessage = t('validation.createFailed');
                 try {
                     const parsed = JSON.parse(errorText);
                     errorMessage = parsed.message || parsed.Message || parsed.title || (parsed.errors ? JSON.stringify(parsed.errors) : null) || errorMessage;
@@ -579,7 +597,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             onClose();
         } catch (err: any) {
             console.error('Error creating tournament:', err);
-            setError(err.message || 'An unexpected error occurred');
+            setError(err.message || t('common:unexpectedError'));
         } finally {
             setIsSubmitting(false);
         }
@@ -661,27 +679,27 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
     // Collapsed-header recaps so a skimmed form still reads at a glance.
     const basicsSummary = [
-        name.trim() || 'No name yet',
+        name.trim() || t('form.summaryNoName'),
         getFormatLabel(),
-        maxPlayers ? `${maxPlayers} players` : null,
+        maxPlayers ? t('form.summaryPlayers', { count: Number(maxPlayers) }) : null,
     ].filter(Boolean).join(' · ');
-    const detailsSummary = (description.trim() || rules.trim()) ? 'Added' : 'Optional';
+    const detailsSummary = (description.trim() || rules.trim()) ? t('form.summaryAdded') : t('form.summaryOptional');
     const accessSummary = [
-        isTeamTournament ? TEAM_LABELS.MODE_TEAM : TEAM_LABELS.MODE_SOLO,
-        isTeamTournament && allowReserves && maxReserves ? `+${maxReserves} reserves` : null,
-        scopeMode === 'region' ? getRegionLabel() : `${selectedCountries.length} ${selectedCountries.length === 1 ? 'country' : 'countries'}`,
-        isExclusive ? 'Exclusive' : null,
+        isTeamTournament ? tTeam('modeTeam') : tTeam('modeSolo'),
+        isTeamTournament && allowReserves && maxReserves ? t('form.summaryReserves', { count: Number(maxReserves) }) : null,
+        scopeMode === 'region' ? getRegionLabel() : t('form.summaryCountries', { count: selectedCountries.length }),
+        isExclusive ? t('form.summaryExclusive') : null,
     ].filter(Boolean).join(' · ');
     const matchSettingsSummary = [
-        bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? 'Total score' : 'Games won'}` : 'Single game',
-        requireResultApproval ? 'Result approval' : null,
-        canShowThirdPlace && hasThirdPlaceMatch ? 'Third place' : null,
-        (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? 'Double round robin' : null,
-    ].filter(Boolean).join(' · ') || 'Defaults';
+        bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
+        requireResultApproval ? t('form.summaryResultApproval') : null,
+        canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
+        (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? t('form.summaryDoubleRoundRobin') : null,
+    ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
     const scheduleSummary = startDate && registrationDeadline
-        ? (registrationOpensAt ? `Opens ${registrationOpensAt} · Starts ${startDate}` : `Starts ${startDate}`)
-        : 'Not set yet';
-    const prizeSummary = prizePool ? `${prizePool} ${getCurrencyLabel()}` : 'Optional';
+        ? (registrationOpensAt ? t('form.summaryOpensStarts', { opens: registrationOpensAt, starts: startDate }) : t('form.summaryStarts', { starts: startDate }))
+        : t('form.summaryNotSet');
+    const prizeSummary = prizePool ? `${prizePool} ${getCurrencyLabel()}` : t('form.summaryOptional');
 
     return (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
@@ -698,8 +716,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 <View className="bg-background w-full rounded-[40px] border border-white/10 shadow-2xl overflow-hidden max-h-full">
                     <View className="flex-row justify-between items-center p-6 border-b border-white/5">
                         <View>
-                            <Text className="text-[10px] font-black uppercase tracking-[2px] text-primary mb-0.5">New Tournament</Text>
-                            <Text className="text-xl font-black text-white">Create Tournament</Text>
+                            <Text className="text-[10px] font-black uppercase tracking-[2px] text-primary mb-0.5">{t('form.newTournament')}</Text>
+                            <Text className="text-xl font-black text-white">{t('form.createTournament')}</Text>
                         </View>
                         <TouchableOpacity onPress={onClose} className="bg-white/5 p-2 rounded-full">
                             <Ionicons name="close" size={20} color="#94A3B8" />
@@ -713,10 +731,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     >
                         <View className="gap-4">
                             {/* ── Basics: hub, name, size, format ── */}
-                            <CollapsibleSection icon="trophy" title="Basic info" defaultOpen summary={basicsSummary}>
+                            <CollapsibleSection icon="trophy" title={t('form.sectionBasicInfo')} defaultOpen summary={basicsSummary}>
                                 <View className="gap-4">
                                     {renderSelectField(
-                                        'Hub',
+                                        t('form.hub'),
                                         getHubLabel(),
                                         () => hubId ? null : setShowHubPicker(true),
                                         isLoadingHubs,
@@ -725,10 +743,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     )}
 
                                     <View>
-                                        <Text className={FIELD_LABEL}>Tournament Name *</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.name')}</Text>
                                         <TextInput
                                             className={FIELD_INPUT}
-                                            placeholder="Enter tournament name"
+                                            placeholder={t('form.namePlaceholder')}
                                             placeholderTextColor="#334155"
                                             value={name}
                                             onChangeText={setName}
@@ -737,48 +755,48 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
                                     <View className="flex-row gap-3">
                                         <View className="flex-1">
-                                            <Text className={FIELD_LABEL}>Max Players *</Text>
+                                            <Text className={FIELD_LABEL}>{t('form.maxPlayers')}</Text>
                                             <TextInput
                                                 className={FIELD_INPUT}
-                                                placeholder="e.g. 16"
+                                                placeholder={t('form.egMaxPlayers')}
                                                 placeholderTextColor="#334155"
                                                 keyboardType="numeric"
                                                 value={maxPlayers}
                                                 onChangeText={setMaxPlayers}
                                             />
                                         </View>
-                                        {renderSelectField('Format', getFormatLabel(), () => setShowFormatPicker(true))}
+                                        {renderSelectField(t('form.format'), getFormatLabel(), () => setShowFormatPicker(true))}
                                     </View>
 
                                     {/* Groups + Bracket: groups count and qualifiers-per-group drive the knockout size. */}
                                     {selectedFormat === '5' && (
                                         <View className="flex-row gap-3">
                                             <View className="flex-1">
-                                                <Text className={FIELD_LABEL}>Groups Count</Text>
+                                                <Text className={FIELD_LABEL}>{t('form.groupsCount')}</Text>
                                                 <TextInput
                                                     className={FIELD_INPUT}
-                                                    placeholder="e.g. 4"
+                                                    placeholder={t('form.egGroups')}
                                                     placeholderTextColor="#334155"
                                                     keyboardType="numeric"
                                                     value={groupsCount}
                                                     onChangeText={setGroupsCount}
                                                 />
                                                 <Text className={FIELD_HINT}>
-                                                    How many groups players will be split into.
+                                                    {t('form.groupsCountHint')}
                                                 </Text>
                                             </View>
                                             <View className="flex-1">
-                                                <Text className={FIELD_LABEL}>Qualifiers / Group</Text>
+                                                <Text className={FIELD_LABEL}>{t('form.qualifiersPerGroup')}</Text>
                                                 <TextInput
                                                     className={FIELD_INPUT}
-                                                    placeholder="e.g. 2"
+                                                    placeholder={t('form.egQualifiers')}
                                                     placeholderTextColor="#334155"
                                                     keyboardType="numeric"
                                                     value={qualifiersPerGroup}
                                                     onChangeText={setQualifiersPerGroup}
                                                 />
                                                 <Text className={FIELD_HINT}>
-                                                    How many players from each group advance to the knockout bracket.
+                                                    {t('form.qualifiersPerGroupHint')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -790,10 +808,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             <View>
                                                 <View className="flex-row gap-3">
                                                     <View className="flex-1">
-                                                        <Text className={FIELD_LABEL}>Swiss Rounds</Text>
+                                                        <Text className={FIELD_LABEL}>{t('form.swissRounds')}</Text>
                                                         <TextInput
                                                             className={FIELD_INPUT}
-                                                            placeholder="Auto"
+                                                            placeholder={t('form.swissRoundsPlaceholder')}
                                                             placeholderTextColor="#334155"
                                                             keyboardType="numeric"
                                                             value={swissRounds}
@@ -801,22 +819,22 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                         />
                                                     </View>
                                                     {renderSelectField(
-                                                        'Knockout Stage',
-                                                        SWISS_KNOCKOUT_OPTIONS.find(o => o.value === swissKnockout)?.label || 'None',
+                                                        t('form.knockoutStage'),
+                                                        swissKnockoutOptions.find(o => o.value === swissKnockout)?.label || t('form.none'),
                                                         () => setShowSwissKnockoutPicker(true)
                                                     )}
                                                 </View>
                                                 <Text className={FIELD_HINT}>
-                                                    Everyone plays every round against opponents on a similar score. Leave rounds empty for the standard count.
+                                                    {t('form.swissRoundsHint')}
                                                 </Text>
                                             </View>
 
                                             {swissKnockoutSize > 0 && (
                                                 <View>
-                                                    <Text className={FIELD_LABEL}>Direct Qualifiers (optional play-in)</Text>
+                                                    <Text className={FIELD_LABEL}>{t('form.directQualifiers')}</Text>
                                                     <TextInput
                                                         className={FIELD_INPUT}
-                                                        placeholder={`All ${swissKnockoutSize} direct — enter fewer to add a play-in`}
+                                                        placeholder={t('form.directQualifiersPlaceholder', { count: swissKnockoutSize })}
                                                         placeholderTextColor="#334155"
                                                         keyboardType="numeric"
                                                         value={swissDirect}
@@ -824,8 +842,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                     />
                                                     <Text className={FIELD_HINT}>
                                                         {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
-                                                            ? `Top ${swissDirectCount} go straight to the bracket. Standings ${swissDirectCount + 1}–${swissDirectCount + swissPlayInPlayers} play one play-in round (best vs worst) for the remaining ${swissKnockoutSize - swissDirectCount} spots.`
-                                                            : `Top ${swissKnockoutSize} from the standings are seeded into the bracket (1 vs ${swissKnockoutSize}, 2 vs ${swissKnockoutSize - 1}, …).`}
+                                                            ? t('form.swissPlayInHint', { direct: swissDirectCount, from: swissDirectCount + 1, to: swissDirectCount + swissPlayInPlayers, spots: swissKnockoutSize - swissDirectCount })
+                                                            : t('form.swissDirectHint', { size: swissKnockoutSize, second: swissKnockoutSize - 1 })}
                                                     </Text>
                                                 </View>
                                             )}
@@ -835,17 +853,17 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     {/* Bracket / Groups+Bracket / Swiss: pick Single vs Double elimination for the knockout stage. */}
                                     {showKnockoutTypeToggle && (
                                         <View>
-                                            <Text className={FIELD_LABEL}>Knockout Bracket</Text>
+                                            <Text className={FIELD_LABEL}>{t('form.knockoutBracket')}</Text>
                                             <SegmentedToggle
                                                 options={[
-                                                    { value: '1', label: 'Single' },
-                                                    { value: '2', label: 'Double' },
+                                                    { value: '1', label: t('form.single') },
+                                                    { value: '2', label: t('form.double') },
                                                 ]}
                                                 value={currentElimType}
                                                 onChange={(v) => setCurrentElimType(v as '1' | '2')}
                                             />
                                             <Text className={FIELD_HINT}>
-                                                Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
+                                                {t('form.knockoutHint')}
                                             </Text>
                                         </View>
                                     )}
@@ -853,14 +871,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             </CollapsibleSection>
 
                             {/* ── Description & Rules ── */}
-                            <CollapsibleSection icon="document-text" title="Description & Rules" color="#94A3B8" summary={detailsSummary}>
+                            <CollapsibleSection icon="document-text" title={t('form.sectionDescriptionRules')} color="#94A3B8" summary={detailsSummary}>
                                 <View className="gap-4">
                                     <View>
-                                        <Text className={FIELD_LABEL}>Description</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.description')}</Text>
                                         <TextInput
                                             multiline
                                             className={FIELD_MULTILINE}
-                                            placeholder="Describe your tournament..."
+                                            placeholder={t('form.descriptionPlaceholder')}
                                             placeholderTextColor="#334155"
                                             textAlignVertical="top"
                                             value={description}
@@ -868,11 +886,11 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         />
                                     </View>
                                     <View>
-                                        <Text className={FIELD_LABEL}>Rules</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.rules')}</Text>
                                         <TextInput
                                             multiline
                                             className={FIELD_MULTILINE}
-                                            placeholder="Enter tournament rules (e.g., Best of 3...)"
+                                            placeholder={t('form.rulesPlaceholder')}
                                             placeholderTextColor="#334155"
                                             textAlignVertical="top"
                                             value={rules}
@@ -883,14 +901,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             </CollapsibleSection>
 
                             {/* ── Players & Access ── */}
-                            <CollapsibleSection icon="people" title="Players & Access" color="#818CF8" summary={accessSummary}>
+                            <CollapsibleSection icon="people" title={t('form.sectionPlayersAccess')} color="#818CF8" summary={accessSummary}>
                                 <View className="gap-4">
                                     <View>
-                                        <Text className={FIELD_LABEL}>{TEAM_LABELS.MODE_LABEL}</Text>
+                                        <Text className={FIELD_LABEL}>{tTeam('modeLabel')}</Text>
                                         <SegmentedToggle
                                             options={[
-                                                { value: 'solo', label: TEAM_LABELS.MODE_SOLO },
-                                                { value: 'team', label: TEAM_LABELS.MODE_TEAM },
+                                                { value: 'solo', label: tTeam('modeSolo') },
+                                                { value: 'team', label: tTeam('modeTeam') },
                                             ]}
                                             value={isTeamTournament ? 'team' : 'solo'}
                                             onChange={(v) => setIsTeamTournament(v === 'team')}
@@ -901,10 +919,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     {isTeamTournament && (
                                         <View className="flex-row gap-3">
                                             <View className="flex-1">
-                                                <Text className={FIELD_LABEL}>{TEAM_LABELS.TEAM_SIZE_LABEL} *</Text>
+                                                <Text className={FIELD_LABEL}>{tTeam('teamSizeLabel')} *</Text>
                                                 <TextInput
                                                     className={FIELD_INPUT}
-                                                    placeholder={TEAM_LABELS.TEAM_SIZE_PLACEHOLDER}
+                                                    placeholder={tTeam('teamSizePlaceholder')}
                                                     placeholderTextColor="#334155"
                                                     keyboardType="numeric"
                                                     value={teamSize}
@@ -912,8 +930,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 />
                                             </View>
                                             {renderSelectField(
-                                                'Win Condition',
-                                                teamWinConditions.find(c => c.value === teamWinCondition)?.label || 'Select',
+                                                t('form.winCondition'),
+                                                teamWinConditions.find(c => c.value === teamWinCondition)?.label || t('form.select'),
                                                 () => setShowTeamWinConditionPicker(true)
                                             )}
                                         </View>
@@ -923,33 +941,30 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         to trade a starter for a reserve between rounds. */}
                                     {isTeamTournament && (
                                         <View>
-                                            <Text className={FIELD_LABEL}>Allow Reserves</Text>
+                                            <Text className={FIELD_LABEL}>{t('form.allowReserves')}</Text>
                                             <SegmentedToggle
-                                                options={[...YES_NO_OPTIONS]}
+                                                options={yesNoOptions}
                                                 value={allowReserves ? 'yes' : 'no'}
                                                 onChange={(v) => setAllowReserves(v === 'yes')}
                                             />
                                             {allowReserves ? (
                                                 <View className="mt-3">
-                                                    <Text className={FIELD_LABEL}>Reserves Per Team *</Text>
+                                                    <Text className={FIELD_LABEL}>{t('form.reservesPerTeam')}</Text>
                                                     <TextInput
                                                         className={FIELD_INPUT}
-                                                        placeholder="e.g. 2"
+                                                        placeholder={t('form.egQualifiers')}
                                                         placeholderTextColor="#334155"
                                                         keyboardType="numeric"
                                                         value={maxReserves}
                                                         onChangeText={setMaxReserves}
                                                     />
                                                     <Text className={FIELD_HINT}>
-                                                        Extra squad slots on top of the {teamSize || 'lineup'} players who
-                                                        play. Teams can fill anywhere from 0 up to this many — the bench is
-                                                        optional. Captains swap a reserve in for a starter between rounds,
-                                                        and the reserve always takes that player's exact game.
+                                                        {t('form.reservesDetailHint', { lineup: teamSize || t('form.lineupWord') })}
                                                     </Text>
                                                 </View>
                                             ) : (
                                                 <Text className={FIELD_HINT}>
-                                                    When OFF, the roster is the lineup — every member plays.
+                                                    {t('form.reservesHint')}
                                                 </Text>
                                             )}
                                         </View>
@@ -957,21 +972,21 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
                                     {/* Tournament Scope: region-based or country-based */}
                                     <View>
-                                        <Text className={FIELD_LABEL}>Tournament Scope</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.tournamentScope')}</Text>
                                         <SegmentedToggle
                                             options={[
-                                                { value: 'region', label: 'By Region' },
-                                                { value: 'country', label: 'By Country' },
+                                                { value: 'region', label: t('form.byRegion') },
+                                                { value: 'country', label: t('form.byCountry') },
                                             ]}
                                             value={scopeMode}
                                             onChange={(v) => setScopeMode(v as 'region' | 'country')}
                                         />
                                         <View className="mt-3">
                                             {scopeMode === 'region' ? (
-                                                renderSelectField('Region', getRegionLabel(), () => setShowRegionPicker(true), false, false, true)
+                                                renderSelectField(t('form.region'), getRegionLabel(), () => setShowRegionPicker(true), false, false, true)
                                             ) : (
                                                 <CountryPicker
-                                                    placeholder="Select countries"
+                                                    placeholder={t('form.selectCountries')}
                                                     multiple
                                                     values={selectedCountries}
                                                     onToggle={toggleCountry}
@@ -982,21 +997,21 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
                                     {/* Exclusive members only */}
                                     <View>
-                                        <Text className={FIELD_LABEL}>Exclusive Members Only</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.exclusiveOnly')}</Text>
                                         <SegmentedToggle
-                                            options={[...YES_NO_OPTIONS]}
+                                            options={yesNoOptions}
                                             value={isExclusive ? 'yes' : 'no'}
                                             onChange={(v) => setIsExclusive(v === 'yes')}
                                         />
                                         <Text className={FIELD_HINT}>
-                                            When ON, only hub members with the Exclusive role (or admins/owner) can see and join this tournament.
+                                            {t('form.exclusiveHint')}
                                         </Text>
                                     </View>
                                 </View>
                             </CollapsibleSection>
 
                             {/* ── Match Settings ── */}
-                            <CollapsibleSection icon="options" title="Match Settings" color="#38BDF8" summary={matchSettingsSummary}>
+                            <CollapsibleSection icon="options" title={t('form.sectionMatchSettings')} color="#38BDF8" summary={matchSettingsSummary}>
                                 <View className="gap-4">
                                     {/* How a single match is played — the format everything else in
                                         this section builds on, so it comes first. */}
@@ -1016,28 +1031,28 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     />
 
                                     <View>
-                                        <Text className={FIELD_LABEL}>Require Result Approval</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.requireApproval')}</Text>
                                         <SegmentedToggle
-                                            options={[...YES_NO_OPTIONS]}
+                                            options={yesNoOptions}
                                             value={requireResultApproval ? 'yes' : 'no'}
                                             onChange={(v) => setRequireResultApproval(v === 'yes')}
                                         />
                                         <Text className={FIELD_HINT}>
-                                            When ON, the opposing participant must confirm a reported result. The hub owner or admin can override.
+                                            {t('form.requireApprovalHint')}
                                         </Text>
                                     </View>
 
                                     {/* Third Place Match — hidden for League, double-elim brackets, and pure Swiss */}
                                     {canShowThirdPlace && (
                                         <View>
-                                            <Text className={FIELD_LABEL}>Third Place Match</Text>
+                                            <Text className={FIELD_LABEL}>{t('form.thirdPlaceMatch')}</Text>
                                             <SegmentedToggle
-                                                options={[...YES_NO_OPTIONS]}
+                                                options={yesNoOptions}
                                                 value={hasThirdPlaceMatch ? 'yes' : 'no'}
                                                 onChange={(v) => setHasThirdPlaceMatch(v === 'yes')}
                                             />
                                             <Text className={FIELD_HINT}>
-                                                Adds a third place match between the semi-final losers. Skipped if the bracket ends up with fewer than 4 entrants.
+                                                {t('form.thirdPlaceHint')}
                                             </Text>
                                         </View>
                                     )}
@@ -1045,26 +1060,26 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                     {/* Double round robin — every pair plays twice (home + away). Shown for League and Groups+Bracket. */}
                                     {(selectedFormat === '0' || selectedFormat === '5') && (
                                         <View>
-                                            <Text className={FIELD_LABEL}>Double Round Robin</Text>
+                                            <Text className={FIELD_LABEL}>{t('form.doubleRoundRobin')}</Text>
                                             <SegmentedToggle
-                                                options={[...YES_NO_OPTIONS]}
+                                                options={yesNoOptions}
                                                 value={doubleRoundRobin ? 'yes' : 'no'}
                                                 onChange={(v) => setDoubleRoundRobin(v === 'yes')}
                                             />
                                             <Text className={FIELD_HINT}>
-                                                Every pair plays twice — one home leg and one away leg. Doubles the match count.
+                                                {t('form.doubleRoundRobinHint')}
                                             </Text>
                                         </View>
                                     )}
 
                                     {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
                                         <View>
-                                            <Text className={FIELD_LABEL}>Round Duration (optional)</Text>
+                                            <Text className={FIELD_LABEL}>{t('form.roundDuration')}</Text>
                                             <View className="flex-row gap-3">
                                                 <View className="flex-1">
                                                     <TextInput
                                                         className={FIELD_INPUT}
-                                                        placeholder="e.g. 2"
+                                                        placeholder={t('form.egQualifiers')}
                                                         placeholderTextColor="#334155"
                                                         keyboardType="numeric"
                                                         value={roundDurationValue}
@@ -1080,7 +1095,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 </TouchableOpacity>
                                             </View>
                                             <Text className={FIELD_HINT}>
-                                                How long each round stays open before results are due.
+                                                {t('form.roundDurationHint')}
                                             </Text>
                                         </View>
                                     )}
@@ -1088,20 +1103,20 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             </CollapsibleSection>
 
                             {/* ── Schedule ── */}
-                            <CollapsibleSection icon="calendar" title="Schedule" defaultOpen summary={scheduleSummary}>
+                            <CollapsibleSection icon="calendar" title={t('form.sectionSchedule')} defaultOpen summary={scheduleSummary}>
                                 <View className="flex-row gap-3">
                                     <ScheduleField
-                                        label="Reg. Deadline *"
+                                        label={t('form.regDeadline')}
                                         value={registrationDeadline}
-                                        placeholder="Select"
+                                        placeholder={t('form.select')}
                                         iconName="time-outline"
                                         iconColor={COLORS.warning}
                                         onPress={() => setShowRegDeadlinePicker(true)}
                                     />
                                     <ScheduleField
-                                        label="Start Date *"
+                                        label={t('form.startDate')}
                                         value={startDate}
-                                        placeholder="Select"
+                                        placeholder={t('form.select')}
                                         iconName="calendar-outline"
                                         iconColor={COLORS.primary}
                                         onPress={() => setShowStartDatePicker(true)}
@@ -1109,28 +1124,27 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                 </View>
                                 <View className="mt-3">
                                     <ScheduleField
-                                        label="Registration Opens"
+                                        label={t('form.registrationOpens')}
                                         value={registrationOpensAt}
-                                        placeholder="Immediately"
+                                        placeholder={t('form.immediately')}
                                         iconName="lock-open-outline"
                                         iconColor={COLORS.info}
                                         onPress={() => setShowRegOpensPicker(true)}
                                     />
                                     <Text className="text-[11px] text-slate-500 mt-2 leading-4">
-                                        Leave empty and sign-ups open right away. Pick a time and the tournament
-                                        stays closed until then — everyone is notified the moment it opens.
+                                        {t('form.scheduleHint')}
                                     </Text>
                                 </View>
                             </CollapsibleSection>
 
                             {/* ── Prize Pool ── */}
-                            <CollapsibleSection icon="cash" title="Prize Pool" color={COLORS.warning} summary={prizeSummary}>
+                            <CollapsibleSection icon="cash" title={t('form.sectionPrizePool')} color={COLORS.warning} summary={prizeSummary}>
                                 <View className="flex-row gap-3">
                                     <View className="flex-1">
-                                        <Text className={FIELD_LABEL}>Amount</Text>
+                                        <Text className={FIELD_LABEL}>{t('form.amount')}</Text>
                                         <TextInput
                                             className={FIELD_INPUT}
-                                            placeholder="e.g. 500"
+                                            placeholder={t('form.egPrize')}
                                             placeholderTextColor="#334155"
                                             keyboardType="numeric"
                                             value={prizePool}
@@ -1138,7 +1152,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         />
                                     </View>
                                     <View className="w-32">
-                                        {renderSelectField('Currency', getCurrencyLabel(), () => setShowCurrencyPicker(true))}
+                                        {renderSelectField(t('form.currency'), getCurrencyLabel(), () => setShowCurrencyPicker(true))}
                                     </View>
                                 </View>
                             </CollapsibleSection>
@@ -1155,7 +1169,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             loading={isSubmitting}
                             className="w-full h-14 rounded-2xl"
                         >
-                            Create Tournament
+                            {t('form.createTournament')}
                         </Button>
                     </View>
                     {renderOptionsModal(
@@ -1183,7 +1197,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     {renderOptionsModal(
                         showFormatPicker,
                         () => setShowFormatPicker(false),
-                        FORMAT_GROUP_OPTIONS.map(o => ({ value: o.value, label: o.label })),
+                        formatGroupOptions,
                         formatGroup,
                         handleFormatGroupChange
                     )}
@@ -1204,7 +1218,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     {renderOptionsModal(
                         showSwissKnockoutPicker,
                         () => setShowSwissKnockoutPicker(false),
-                        SWISS_KNOCKOUT_OPTIONS,
+                        swissKnockoutOptions,
                         swissKnockout,
                         setSwissKnockout
                     )}
@@ -1212,14 +1226,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         visible={showStartDatePicker}
                         onClose={() => setShowStartDatePicker(false)}
                         onConfirm={setStartDate}
-                        title="Tournament Start"
+                        title={t('form.tournamentStart')}
                         initialValue={startDate}
                     />
                     <DateTimePickerModal
                         visible={showRegDeadlinePicker}
                         onClose={() => setShowRegDeadlinePicker(false)}
                         onConfirm={setRegistrationDeadline}
-                        title="Registration Deadline"
+                        title={t('form.registrationDeadline')}
                         initialValue={registrationDeadline}
                     />
                     <DateTimePickerModal
@@ -1227,8 +1241,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         onClose={() => setShowRegOpensPicker(false)}
                         onConfirm={setRegistrationOpensAt}
                         onClear={() => setRegistrationOpensAt('')}
-                        clearText="Open immediately"
-                        title="Registration Opens"
+                        clearText={t('form.openImmediately')}
+                        title={t('form.registrationOpens')}
                         initialValue={registrationOpensAt}
                     />
                 </View>

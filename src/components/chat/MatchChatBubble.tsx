@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { JSX, useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +25,7 @@ export function MatchChatBubble({
   content,
   isMyComment,
 }: MatchChatBubbleProps): JSX.Element {
+    const { t } = useTranslation('common');
   const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [translatedLang, setTranslatedLang] = useState<Language | null>(null);
   const [showOriginal, setShowOriginal] = useState<boolean>(false);
@@ -89,7 +91,7 @@ export function MatchChatBubble({
       onLongPress={copyToClipboard}
       delayLongPress={250}
       accessibilityRole="text"
-      accessibilityHint="Long press to copy this message"
+      accessibilityHint={t('app.longPressToCopy')}
       className={cn(
         'px-4 py-3 rounded-[20px]',
         isMyComment
@@ -123,7 +125,7 @@ export function MatchChatBubble({
                 isMyComment ? 'text-slate-900' : 'text-primary',
               )}
             >
-              Show Original
+              {t('app.showOriginal')}
             </Text>
           </Pressable>
         </View>
@@ -178,7 +180,7 @@ export function MatchChatBubble({
             onPress={openLanguagePicker}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="Translate message"
+            accessibilityLabel={t('app.translateMessage')}
             style={{ opacity: 0.7 }}
           >
             <Ionicons name="language" size={18} color="#5F6E89" />

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,20 +15,22 @@ import { StatusModal } from '../components/modals/StatusModal';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { COLORS } from '../lib/theme';
 
-const friendlyForgotError = (raw: string): string => {
+const friendlyForgotError = (raw: string, t: (k: string) => string): string => {
     const msg = raw.toLowerCase();
 
     if (msg.includes('userentity') || msg.includes('not found') || msg.includes('does not exist')) {
-        return 'We could not find an account with that email address.';
+        return t('forgot.accountNotFound');
     }
     if (msg.includes('email') && msg.includes('empty')) {
-        return 'Please enter your email address.';
+        return t('forgot.emailEmpty');
     }
 
-    return 'Could not send the reset code. Please check the email and try again.';
+    return t('forgot.sendFailed');
 };
 
 export default function ForgotPasswordScreen() {
+    const { t } = useTranslation('auth');
+    const friendlyForgotError2 = (raw: string) => friendlyForgotError(raw, t);
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -37,17 +40,17 @@ export default function ForgotPasswordScreen() {
         type: 'success' | 'error' | 'info';
         title: string;
         message: string;
-    }>({ type: 'error', title: 'Error', message: '' });
+    }>({ type: 'error' as const, title: '', message: '' });
 
     const handleSendCode = async () => {
         if (!email.trim()) {
-            setError('Please enter your email address');
+            setError(t('forgot.enterEmail'));
             return;
         }
         
         // Basic email regex
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            setError('Please enter a valid email address');
+            setError(t('forgot.enterValidEmail'));
             return;
         }
 
@@ -71,16 +74,16 @@ export default function ForgotPasswordScreen() {
                 const parsed = getErrorMessage(text);
                 setStatusModalConfig({
                     type: 'error',
-                    title: 'Request Failed',
-                    message: friendlyForgotError(parsed)
+                    title: t('forgot.requestFailed'),
+                    message: friendlyForgotError2(parsed)
                 });
                 setShowStatusModal(true);
             }
         } catch (err: any) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Network Error',
-                message: 'Failed to connect to the server. Please try again later.'
+                title: t('networkError'),
+                message: t('networkErrorMessage')
             });
             setShowStatusModal(true);
         } finally {
@@ -117,16 +120,16 @@ export default function ForgotPasswordScreen() {
                             <Ionicons name="mail-unread-outline" size={30} color={COLORS.primary} />
                         </View>
 
-                        <Text className="text-3xl font-black text-white mb-2 text-center tracking-tight">Reset password</Text>
+                        <Text className="text-3xl font-black text-white mb-2 text-center tracking-tight">{t('forgot.title')}</Text>
                         <Text className="text-slate-400 text-center px-6 text-[13px] leading-5">
-                            Enter your email address and we'll send you a 6-digit code to reset your password.
+                            {t('forgot.subtitle')}
                         </Text>
                     </View>
 
                     <View className="w-full max-w-sm self-center bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5 gap-4">
                         <Input
-                            label="EMAIL ADDRESS"
-                            placeholder="your@email.com"
+                            label={t('emailAddress')}
+                            placeholder={t('forgot.emailPlaceholder')}
                             value={email}
                             onChangeText={(text) => { setEmail(text); setError(undefined); }}
                             autoCapitalize="none"
@@ -142,7 +145,7 @@ export default function ForgotPasswordScreen() {
                             size="lg"
                         >
                             <View className="flex-row items-center justify-center gap-2">
-                                <Text className="text-primary-foreground font-black text-base">Send Reset Code</Text>
+                                <Text className="text-primary-foreground font-black text-base">{t('forgot.sendResetCode')}</Text>
                                 <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
                             </View>
                         </Button>

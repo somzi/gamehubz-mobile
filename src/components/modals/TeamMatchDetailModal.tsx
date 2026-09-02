@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { StatusModal } from './StatusModal';
-import { TEAM_LABELS } from '../../lib/teamConstants';
+import { useTranslation } from 'react-i18next';
 import {
     getMatchDetails,
     getTieBreakStatus,
@@ -105,23 +105,24 @@ function deriveSubState(sm: SubMatchDto, approvalRequired: boolean): SubState {
 function paletteFor(state: TeamState | SubState) {
     switch (state) {
         case 'completed':
-            return { accent: C.emerald, soft: C.emeraldSoft, ring: C.emeraldRing, label: 'Completed' };
+            return { accent: C.emerald, soft: C.emeraldSoft, ring: C.emeraldRing, labelKey: 'status.completed' };
         case 'live':
-            return { accent: C.emerald, soft: C.emeraldSoft, ring: C.emeraldRing, label: 'Live' };
+            return { accent: C.emerald, soft: C.emeraldSoft, ring: C.emeraldRing, labelKey: 'status.live' };
         case 'tieBreak':
-            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Tie-Break' };
+            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, labelKey: 'status.tieBreak' };
         case 'awaitingApproval':
-            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Awaiting Approval' };
+            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, labelKey: 'status.awaitingApproval' };
         case 'noShow':
             // Administratively closed, nobody played — muted slate so it reads as "void", not progress.
-            return { accent: '#64748B', soft: 'rgba(100,116,139,0.10)', ring: 'rgba(100,116,139,0.28)', label: 'No Show' };
+            return { accent: '#64748B', soft: 'rgba(100,116,139,0.10)', ring: 'rgba(100,116,139,0.28)', labelKey: 'status.noShow' };
         default:
-            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, label: 'Pending' };
+            return { accent: C.amber, soft: C.amberSoft, ring: C.amberRing, labelKey: 'status.pending' };
     }
 }
 
 // Pill with state dot — tightened typography and a slightly larger dot for legibility at glance.
 function StatusPill({ state, size = 'md' }: { state: TeamState | SubState; size?: 'sm' | 'md' }) {
+    const { t } = useTranslation('match');
     const p = paletteFor(state);
     const isSm = size === 'sm';
     return (
@@ -141,7 +142,7 @@ function StatusPill({ state, size = 'md' }: { state: TeamState | SubState; size?
         >
             <View style={{ width: isSm ? 5 : 6, height: isSm ? 5 : 6, borderRadius: 999, backgroundColor: p.accent }} />
             <Text style={{ color: p.accent, fontSize: isSm ? 8 : 9, fontWeight: '900', letterSpacing: 1.6, textTransform: 'uppercase' }}>
-                {p.label}
+                {t(p.labelKey)}
             </Text>
         </View>
     );
@@ -211,6 +212,7 @@ function TeamCrest({
     teamName?: string;
     isWinner: boolean;
 }) {
+    const { t: tCommon } = useTranslation('common');
     const SIZE = 58;
     return (
         <View style={{ alignItems: 'center', flex: 1 }}>
@@ -258,7 +260,7 @@ function TeamCrest({
                     paddingHorizontal: 4,
                 }}
             >
-                {teamName || 'Unknown'}
+                {teamName || tCommon('unknown')}
             </Text>
         </View>
     );
@@ -277,6 +279,8 @@ export function TeamMatchDetailModal({
 }: TeamMatchDetailModalProps) {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const insets = useSafeAreaInsets();
+    const { t } = useTranslation('team');
+    const { t: tCommon } = useTranslation('common');
 
     const [data, setData] = useState<TeamMatchDetailsDto | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -530,7 +534,7 @@ export function TeamMatchDetailModal({
             // render behind it — which reads as "nothing happened" when a pick is rejected.
             setPendingRep(null);
             setShowRepPicker(false);
-            setStatusConfig({ type: 'error', title: 'Error', message });
+            setStatusConfig({ type: 'error', title: t('common:error'), message });
             setShowStatusModal(true);
         } finally {
             setIsSubmittingRep(false);
@@ -574,13 +578,13 @@ export function TeamMatchDetailModal({
 
         const home = {
             side: 'home' as const,
-            teamName: data.homeTeam?.teamName || TEAM_LABELS.HOME_REPRESENTATIVE,
+            teamName: data.homeTeam?.teamName || t('homeRepresentative'),
             members: data.homeTeam?.members || [],
             currentRepId: tieBreakStatus?.homeRepresentative?.userId,
         };
         const away = {
             side: 'away' as const,
-            teamName: data.awayTeam?.teamName || TEAM_LABELS.AWAY_REPRESENTATIVE,
+            teamName: data.awayTeam?.teamName || t('awayRepresentative'),
             members: data.awayTeam?.members || [],
             currentRepId: tieBreakStatus?.awayRepresentative?.userId,
         };
@@ -712,10 +716,10 @@ export function TeamMatchDetailModal({
                     </Pressable>
                     <View style={{ alignItems: 'center' }}>
                         <Text style={{ fontSize: 10, fontWeight: '900', color: C.textFaint, letterSpacing: 3, textTransform: 'uppercase' }}>
-                            Team Match
+                            {t('matchModal.eyebrow')}
                         </Text>
                         <Text style={{ fontSize: 14, fontWeight: '900', color: C.text, letterSpacing: 0.4, marginTop: 2 }}>
-                            Match Details
+                            {t('matchModal.title')}
                         </Text>
                     </View>
                     <View style={{ width: 40 }} />
@@ -725,16 +729,16 @@ export function TeamMatchDetailModal({
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                         <ActivityIndicator size="large" color={C.emerald} />
                         <Text style={{ marginTop: 16, color: C.textDim, fontWeight: '800', letterSpacing: 2, fontSize: 10, textTransform: 'uppercase' }}>
-                            Loading match data
+                            {t('matchModal.loading')}
                         </Text>
                     </View>
                 ) : error || !data ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
                         <Ionicons name="alert-circle-outline" size={48} color={C.red} />
                         <Text style={{ marginTop: 16, color: C.red, textAlign: 'center', fontWeight: '600' }}>
-                            {error || 'Match data unavailable'}
+                            {error || t('matchModal.unavailable')}
                         </Text>
-                        <Button onPress={fetchData} className="mt-6">Retry</Button>
+                        <Button onPress={fetchData} className="mt-6">{t('common:retry')}</Button>
                     </View>
                 ) : (
                     <ScrollView
@@ -785,7 +789,7 @@ export function TeamMatchDetailModal({
                                             }}
                                         >
                                             <Text style={{ fontSize: 8, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                                Best of {totalSubs || '—'}
+                                                {t('match:series.bestOfN', { n: totalSubs || '—' })}
                                             </Text>
                                         </View>
                                         {winCondition !== null && (
@@ -800,7 +804,7 @@ export function TeamMatchDetailModal({
                                                 }}
                                             >
                                                 <Text style={{ fontSize: 8, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                                    {isAggregateCondition ? 'Aggregate Score' : 'Match Wins'}
+                                                    {isAggregateCondition ? t('matchModal.aggregateScore') : t('matchModal.matchWins')}
                                                 </Text>
                                             </View>
                                         )}
@@ -878,7 +882,7 @@ export function TeamMatchDetailModal({
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                         <Ionicons name="stats-chart" size={11} color={C.textFaint} />
                                         <Text style={{ fontSize: 9, fontWeight: '900', color: C.textFaint, letterSpacing: 2, textTransform: 'uppercase' }}>
-                                            {isAggregateCondition ? 'Match Wins' : 'Aggregate'}
+                                            {isAggregateCondition ? t('matchModal.matchWins') : t('matchModal.aggregate')}
                                         </Text>
                                         <Text style={{ fontSize: 11, fontWeight: '900', color: C.textDim, marginLeft: 2 }}>
                                             {isAggregateCondition ? homeWins : homeTotal}
@@ -926,12 +930,12 @@ export function TeamMatchDetailModal({
                                             </View>
                                             <View style={{ flex: 1 }}>
                                                 <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>
-                                                    Tie-Break Required
+                                                    {t('matchModal.tieBreakRequired')}
                                                 </Text>
                                                 <Text style={{ fontSize: 12, fontWeight: '800', color: C.text }}>
                                                     {tieBreakStatus.homeRepresentative && tieBreakStatus.awayRepresentative
-                                                        ? TEAM_LABELS.TIE_BREAK_IN_PROGRESS
-                                                        : TEAM_LABELS.TIE_BREAK_BANNER}
+                                                        ? t('tieBreakInProgress')
+                                                        : t('tieBreakBanner')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -950,18 +954,18 @@ export function TeamMatchDetailModal({
                                         >
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                                                 <Text style={{ fontSize: 10, fontWeight: '800', color: C.textDim, letterSpacing: 0.5 }}>
-                                                    {TEAM_LABELS.HOME_REPRESENTATIVE}
+                                                    {t('homeRepresentative')}
                                                 </Text>
                                                 <Text style={{ fontSize: 11, fontWeight: '900', color: tieBreakStatus.homeRepresentative ? C.text : C.textFaint }}>
-                                                    {tieBreakStatus.homeRepresentative?.username || TEAM_LABELS.WAITING_LABEL}
+                                                    {tieBreakStatus.homeRepresentative?.username || t('waitingLabel')}
                                                 </Text>
                                             </View>
                                             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                                                 <Text style={{ fontSize: 10, fontWeight: '800', color: C.textDim, letterSpacing: 0.5 }}>
-                                                    {TEAM_LABELS.AWAY_REPRESENTATIVE}
+                                                    {t('awayRepresentative')}
                                                 </Text>
                                                 <Text style={{ fontSize: 11, fontWeight: '900', color: tieBreakStatus.awayRepresentative ? C.text : C.textFaint }}>
-                                                    {tieBreakStatus.awayRepresentative?.username || TEAM_LABELS.WAITING_LABEL}
+                                                    {tieBreakStatus.awayRepresentative?.username || t('waitingLabel')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -983,8 +987,8 @@ export function TeamMatchDetailModal({
                                                 ) : (
                                                     <Text style={{ fontSize: 10, fontWeight: '900', color: '#0F172A', letterSpacing: 1.6, textTransform: 'uppercase' }}>
                                                         {isManagerPicker
-                                                            ? `Admin: ${TEAM_LABELS.SELECT_REPRESENTATIVES}`
-                                                            : hasSubmittedRep ? 'Change Representative' : String(TEAM_LABELS.SELECT_REPRESENTATIVE)}
+                                                            ? t('matchModal.adminSelectRepresentatives')
+                                                            : hasSubmittedRep ? t('matchModal.changeRepresentative') : t('selectRepresentative')}
                                                     </Text>
                                                 )}
                                             </Pressable>
@@ -992,7 +996,7 @@ export function TeamMatchDetailModal({
 
                                         {isCaptainOfEitherTeam && hasSubmittedRep && (
                                             <Text style={{ fontSize: 10, fontWeight: '800', color: C.amber, textAlign: 'center', marginTop: 8, letterSpacing: 0.5 }}>
-                                                {TEAM_LABELS.WAITING_FOR_OPPONENT}
+                                                {t('waitingForOpponent')}
                                             </Text>
                                         )}
                                     </View>
@@ -1004,7 +1008,7 @@ export function TeamMatchDetailModal({
                         <View style={{ paddingHorizontal: 16 }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 }}>
                                 <Text style={{ fontSize: 10, fontWeight: '900', color: C.textFaint, letterSpacing: 2.5, textTransform: 'uppercase' }}>
-                                    Individual Games
+                                    {t('matchModal.individualGames')}
                                 </Text>
                                 <View
                                     style={{
@@ -1100,14 +1104,14 @@ export function TeamMatchDetailModal({
                                                     <Avatar url={sm.homePlayer?.avatarUrl} name={sm.homePlayer?.username || '?'} size={24} ring={homeWinner} />
                                                 </Pressable>
                                                 <Text numberOfLines={1} style={{ flex: 1, fontSize: 12, fontWeight: '800', color: homeWinner ? C.emerald : C.text }}>
-                                                    {sm.homePlayer?.username || 'Unknown'}
+                                                    {sm.homePlayer?.username || tCommon('unknown')}
                                                 </Text>
                                             </View>
 
                                             {/* Center — game label + score / state */}
                                             <View style={{ width: 60, alignItems: 'center', paddingHorizontal: 2 }}>
                                                 <Text style={{ fontSize: 7.5, fontWeight: '900', color: sm.isTieBreakMatch ? C.amber : C.textFaint, letterSpacing: 1.3, textTransform: 'uppercase', marginBottom: 2 }}>
-                                                    {sm.isTieBreakMatch ? TEAM_LABELS.TIE_BREAK_LABEL : `Game ${idx + 1}`}
+                                                    {sm.isTieBreakMatch ? t('tieBreakLabel') : t('matchModal.game', { number: idx + 1 })}
                                                     {subBestOf > 1 ? ` · BO${subBestOf}` : ''}
                                                 </Text>
                                                 {hasScore ? (
@@ -1134,7 +1138,7 @@ export function TeamMatchDetailModal({
                                             {/* Away player */}
                                             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
                                                 <Text numberOfLines={1} style={{ flex: 1, textAlign: 'right', fontSize: 12, fontWeight: '800', color: awayWinner ? C.emerald : C.text }}>
-                                                    {sm.awayPlayer?.username || 'Unknown'}
+                                                    {sm.awayPlayer?.username || tCommon('unknown')}
                                                 </Text>
                                                 <Pressable
                                                     onPress={() => {
@@ -1196,7 +1200,7 @@ export function TeamMatchDetailModal({
                                             <StatusPill state={subState} size="sm" />
                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                                 <Text style={{ fontSize: 10, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
-                                                    See Details
+                                                    {t('matchModal.seeDetails')}
                                                 </Text>
                                                 <Ionicons name="chevron-forward" size={14} color={C.emerald} />
                                             </View>
@@ -1232,10 +1236,10 @@ export function TeamMatchDetailModal({
                                     </View>
                                     <View style={{ flex: 1 }}>
                                         <Text style={{ fontSize: 11, fontWeight: '900', color: '#94A3B8', letterSpacing: 1.6, textTransform: 'uppercase', marginBottom: 3 }}>
-                                            Match Voided — No Show
+                                            {t('matchModal.voidedTitle')}
                                         </Text>
                                         <Text style={{ fontSize: 11, fontWeight: '600', color: C.textFaint, lineHeight: 15 }}>
-                                            No game was played. Nothing was awarded to either team.
+                                            {t('matchModal.voidedBody')}
                                         </Text>
                                     </View>
                                 </View>
@@ -1246,7 +1250,7 @@ export function TeamMatchDetailModal({
                                     const isTie = winnerSide === null;
                                     const winnerIsHome = winnerSide === 'home';
 
-                                    const winningTeamName = isTie ? 'Match Draw' : (winnerIsHome ? data?.homeTeam?.teamName : data?.awayTeam?.teamName);
+                                    const winningTeamName = isTie ? t('matchModal.matchDraw') : (winnerIsHome ? data?.homeTeam?.teamName : data?.awayTeam?.teamName);
                                     const winningWins = winnerIsHome ? homeWins : awayWins;
                                     const losingWins = winnerIsHome ? awayWins : homeWins;
                                     const winningTotal = winnerIsHome ? homeTotal : awayTotal;
@@ -1295,7 +1299,7 @@ export function TeamMatchDetailModal({
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={{ fontSize: 9, fontWeight: '900', color: 'rgba(16,185,129,0.7)', letterSpacing: 2.2, textTransform: 'uppercase', marginBottom: 4 }}>
-                                                        {isTie ? 'Result' : 'Match Winner'}
+                                                        {isTie ? t('matchModal.result') : t('matchModal.matchWinner')}
                                                     </Text>
                                                     <Text
                                                         numberOfLines={1}
@@ -1320,10 +1324,10 @@ export function TeamMatchDetailModal({
                                                         />
                                                         <Text style={{ fontSize: 9, fontWeight: '900', color: C.emerald, letterSpacing: 1.4, textTransform: 'uppercase' }}>
                                                             {isTie
-                                                                ? `Draw · ${isAggregateCondition ? `${winningTotal} – ${losingTotal}` : `${winningWins} – ${losingWins}`}`
+                                                                ? t('matchModal.drawWith', { score: isAggregateCondition ? `${winningTotal} – ${losingTotal}` : `${winningWins} – ${losingWins}` })
                                                                 : decidedByAggregate
-                                                                    ? `Aggregate Win · ${winningTotal} – ${losingTotal}`
-                                                                    : `${isBigWin ? 'Dominant Win' : 'Match Wins'} · ${winningWins} – ${losingWins}`}
+                                                                    ? t('matchModal.aggregateWin', { score: `${winningTotal} – ${losingTotal}` })
+                                                                    : t(isBigWin ? 'matchModal.dominantWin' : 'matchModal.matchWinsWith', { score: `${winningWins} – ${losingWins}` })}
                                                         </Text>
                                                     </View>
                                                 </View>
@@ -1352,7 +1356,7 @@ export function TeamMatchDetailModal({
                                         <Ionicons name="flash" size={16} color={C.amber} />
                                     </View>
                                     <Text style={{ flex: 1, fontSize: 11, fontWeight: '900', color: C.amber, letterSpacing: 1.6, textTransform: 'uppercase' }}>
-                                        {TEAM_LABELS.TIE_BREAK_BANNER}
+                                        {t('tieBreakBanner')}
                                     </Text>
                                 </View>
                             ) : null /* Pending — progress is already shown by the "X / N DONE" line + aggregate in the hero card up top, no need to repeat it as a footer strip. */}
@@ -1390,10 +1394,10 @@ export function TeamMatchDetailModal({
                                 <>
                                     <View style={{ padding: 22, borderBottomWidth: 1, borderBottomColor: C.border }}>
                                         <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 4 }}>
-                                            Tie-Break
+                                            {t('tieBreakLabel')}
                                         </Text>
                                         <Text style={{ fontSize: 16, fontWeight: '900', color: C.text, textAlign: 'center' }}>
-                                            {TEAM_LABELS.CONFIRM_REPRESENTATIVE}
+                                            {t('confirmRepresentative')}
                                         </Text>
                                     </View>
 
@@ -1403,7 +1407,7 @@ export function TeamMatchDetailModal({
                                             {pendingRep.member.username}
                                         </Text>
                                         <Text style={{ fontSize: 12, fontWeight: '700', color: C.textDim, marginTop: 6, textAlign: 'center', lineHeight: 18 }}>
-                                            {TEAM_LABELS.WILL_PLAY_TIE_BREAK_FOR}
+                                            {t('willPlayTieBreakFor')}
                                         </Text>
                                         <Text style={{ fontSize: 13, fontWeight: '900', color: C.amber, marginTop: 2, textAlign: 'center' }} numberOfLines={2}>
                                             {pendingRep.teamName}
@@ -1422,7 +1426,7 @@ export function TeamMatchDetailModal({
                                             >
                                                 <Ionicons name="warning" size={14} color={C.amber} />
                                                 <Text style={{ flex: 1, fontSize: 11, fontWeight: '700', color: C.textDim, lineHeight: 16 }}>
-                                                    {TEAM_LABELS.TIE_BREAK_LOCK_WARNING}
+                                                    {t('tieBreakLockWarning')}
                                                 </Text>
                                             </View>
                                         )}
@@ -1436,7 +1440,7 @@ export function TeamMatchDetailModal({
                                                 disabled={isSubmittingRep}
                                                 className="w-full"
                                             >
-                                                {TEAM_LABELS.BACK_BUTTON}
+                                                {t('common:back')}
                                             </Button>
                                         </View>
                                         <View style={{ flex: 1 }}>
@@ -1446,7 +1450,7 @@ export function TeamMatchDetailModal({
                                                 loading={isSubmittingRep}
                                                 className="w-full"
                                             >
-                                                {TEAM_LABELS.CONFIRM_BUTTON}
+                                                {t('common:confirm')}
                                             </Button>
                                         </View>
                                     </View>
@@ -1456,16 +1460,16 @@ export function TeamMatchDetailModal({
                         <>
                             <View style={{ padding: 22, borderBottomWidth: 1, borderBottomColor: C.border }}>
                                 <Text style={{ fontSize: 9, fontWeight: '900', color: C.amber, letterSpacing: 2, textTransform: 'uppercase', textAlign: 'center', marginBottom: 4 }}>
-                                    Tie-Break
+                                    {t('tieBreakLabel')}
                                 </Text>
                                 <Text style={{ fontSize: 16, fontWeight: '900', color: C.text, textAlign: 'center' }}>
                                     {isManagerPicker
-                                        ? TEAM_LABELS.SELECT_REPRESENTATIVES
-                                        : TEAM_LABELS.SELECT_REPRESENTATIVE}
+                                        ? t('selectRepresentatives')
+                                        : t('selectRepresentative')}
                                 </Text>
                                 {isManagerPicker && (
                                     <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, textAlign: 'center', marginTop: 6 }}>
-                                        {TEAM_LABELS.MANAGER_PICK_HINT}
+                                        {t('managerPickHint')}
                                     </Text>
                                 )}
                             </View>
@@ -1546,7 +1550,7 @@ export function TeamMatchDetailModal({
                                     onPress={() => setShowRepPicker(false)}
                                     className="w-full"
                                 >
-                                    {TEAM_LABELS.CANCEL_BUTTON}
+                                    {t('common:cancel')}
                                 </Button>
                             </View>
                         </>

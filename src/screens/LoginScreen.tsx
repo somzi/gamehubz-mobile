@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Platform, ScrollView, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { Image } from 'expo-image';
@@ -16,6 +17,7 @@ import { RootStackParamList } from '../types/navigation';
 import { StatusModal } from '../components/modals/StatusModal';
 
 export default function LoginScreen() {
+    const { t } = useTranslation('auth');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { login, isLoading } = useAuth();
 
@@ -28,12 +30,12 @@ export default function LoginScreen() {
         type: 'success' | 'error' | 'info';
         title: string;
         message: string;
-    }>({ type: 'error', title: 'Login Failed', message: '' });
+    }>({ type: 'error' as const, title: '', message: '' });
 
     const validate = () => {
         const newErrors: { email?: string; password?: string } = {};
-        if (!email) newErrors.email = 'Email is required';
-        if (!password) newErrors.password = 'Password is required';
+        if (!email) newErrors.email = t('login.emailRequired');
+        if (!password) newErrors.password = t('login.passwordRequired');
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -46,8 +48,8 @@ export default function LoginScreen() {
         if (!result.success) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Login Failed',
-                message: result.message || 'Please check your credentials and try again.'
+                title: t('login.failedTitle'),
+                message: result.message || t('login.failedMessage')
             });
             setShowStatusModal(true);
         }
@@ -89,20 +91,20 @@ export default function LoginScreen() {
                             </View>
 
                             <Text className="text-3xl font-black text-white mb-1 tracking-tight">
-                                Welcome Back!
+                                {t('login.welcomeBack')}
                             </Text>
 
                             <Text className="text-slate-400 text-center px-10 text-xs leading-4">
                                 Sign in to continue your gaming journey with{' '}
-                                <Text className="text-primary font-bold">GameHubz</Text>
+                                <Text className="text-primary font-bold">{t('brand')}</Text>
                             </Text>
                         </View>
 
                         {/* ── Form card ── */}
                         <View className="w-full max-w-sm self-center bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5 gap-4">
                             <Input
-                                label="EMAIL ADDRESS"
-                                placeholder="entered@email.com"
+                                label={t('emailAddress')}
+                                placeholder={t('login.emailPlaceholder')}
                                 value={email}
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
@@ -112,7 +114,7 @@ export default function LoginScreen() {
                             />
 
                             <Input
-                                label="PASSWORD"
+                                label={t('passwordLabel')}
                                 placeholder="••••••••"
                                 value={password}
                                 onChangeText={setPassword}
@@ -129,7 +131,7 @@ export default function LoginScreen() {
                                 hitSlop={8}
                             >
                                 <Text className="text-primary text-xs font-black uppercase tracking-wide">
-                                    Forgot Password?
+                                    {t('login.forgotPassword')}
                                 </Text>
                             </TouchableOpacity>
 
@@ -140,7 +142,7 @@ export default function LoginScreen() {
                                 size="lg"
                             >
                                 <View className="flex-row items-center justify-center gap-2">
-                                    <Text className="text-primary-foreground font-black text-lg">Log In</Text>
+                                    <Text className="text-primary-foreground font-black text-lg">{t('login.logIn')}</Text>
                                     <Ionicons name="chevron-forward" size={18} color={COLORS.primaryForeground} />
                                 </View>
                             </Button>
@@ -148,9 +150,9 @@ export default function LoginScreen() {
 
                         {/* ── Footer ── */}
                         <View className="flex-row items-center justify-center mt-8">
-                            <Text className="text-slate-500">Don't have an account? </Text>
+                            <Text className="text-slate-500">{t('login.noAccount')}</Text>
                             <TouchableOpacity onPress={() => navigation.navigate('Register' as any)} hitSlop={8}>
-                                <Text className="text-primary font-black">Sign Up</Text>
+                                <Text className="text-primary font-black">{t('login.signUp')}</Text>
                             </TouchableOpacity>
                         </View>
                     </ScrollView>

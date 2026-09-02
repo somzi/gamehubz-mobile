@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
@@ -23,16 +24,22 @@ interface DateTimePickerModalProps {
     minDate?: string; // Optional minimum date string in ISO format (or similar Parseable)
 }
 
-const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-];
+// Month and weekday names come from Intl in the active language instead of a
+// hardcoded English table.
+const monthName = (index: number, locale: string) =>
+    new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(2000, index, 1));
+const shortWeekdays = (locale: string) => {
+    // 2024-01-01 was a Monday, matching the Mo-first calendar grid below.
+    const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short' });
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 1 + i)).slice(0, 2));
+};
 
 // Hour strip metrics: pill width + gap = the horizontal snap/scroll pitch.
 const HOUR_PILL = 56;
 const HOUR_GAP = 8;
 
 export function DateTimePickerModal({ visible, onClose, onConfirm, title, initialValue, onClear, clearText, minDate }: DateTimePickerModalProps) {
+    const { t, i18n } = useTranslation('tournament');
     const now = new Date();
 
     const parseInitial = (): Date => {
@@ -116,7 +123,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
             const selectedTime = new Date(formattedDate.replace(' ', 'T')).getTime();
             const minTime = new Date(minDate).getTime();
             if (selectedTime < minTime) {
-                Alert.alert("Invalid Time", "Deadline cannot be set before the round opens.");
+                Alert.alert(t('datePicker.invalidTime'), t('datePicker.deadlineBeforeOpen'));
                 return; // Prevent closing and confirming
             }
         }
@@ -153,7 +160,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
             calendarDays.push(i);
         }
 
-        const weekDays = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+        const weekDays = shortWeekdays(i18n.language);
 
         return (
             <View className="gap-y-4">
@@ -163,7 +170,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                         <Ionicons name="chevron-back" size={20} color="#10B981" />
                     </TouchableOpacity>
                     <Text className="text-white font-bold text-lg">
-                        {months[viewMonth]} {viewYear}
+                        {monthName(viewMonth, i18n.language)} {viewYear}
                     </Text>
                     <TouchableOpacity onPress={() => changeMonth(1)} className="p-2 bg-white/5 rounded-full">
                         <Ionicons name="chevron-forward" size={20} color="#10B981" />
@@ -265,7 +272,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                             <View className="flex-row items-center">
                                 <Ionicons name="time-outline" size={16} color="#10B981" style={{ marginRight: 6 }} />
                                 <Text className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                    Hour
+                                    {t('datePicker.hour')}
                                 </Text>
                             </View>
                             <TouchableOpacity
@@ -277,7 +284,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                                 className="flex-row items-center px-3 py-1.5 rounded-full bg-white/5 border border-white/5"
                             >
                                 <Ionicons name="flash-outline" size={12} color="#10B981" style={{ marginRight: 4 }} />
-                                <Text className="text-primary font-semibold text-xs">Now</Text>
+                                <Text className="text-primary font-semibold text-xs">{t('datePicker.now')}</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -316,7 +323,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                             onPress={handleConfirm}
                             className="w-full py-4 rounded-2xl bg-primary items-center shadow-lg shadow-primary/30"
                         >
-                            <Text className="text-background font-bold text-lg">Confirm Schedule</Text>
+                            <Text className="text-background font-bold text-lg">{t('datePicker.confirmSchedule')}</Text>
                         </TouchableOpacity>
 
                         {onClear && (
@@ -327,7 +334,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                                 }}
                                 className="w-full py-3 rounded-2xl bg-destructive/10 border border-destructive/20 items-center mt-3"
                             >
-                                <Text className="text-destructive font-bold text-base">{clearText || 'Clear Schedule'}</Text>
+                                <Text className="text-destructive font-bold text-base">{clearText || t('datePicker.clearSchedule')}</Text>
                             </TouchableOpacity>
                         )}
                     </View>

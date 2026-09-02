@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useRef, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, Alert, StyleSheet, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ interface ShareCardShellProps {
 }
 
 export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fileName, onShareLink, renderPoster }: ShareCardShellProps) {
+    const { t } = useTranslation('common');
     const posterRef = useRef<View>(null);
     const [isSharing, setIsSharing] = useState(false);
     const { width: windowWidth } = useWindowDimensions();
@@ -64,7 +66,7 @@ export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fil
             }
         } catch (error) {
             console.error('Share card error:', error);
-            Alert.alert('Share failed', 'Could not generate the card image. Please try again.');
+            Alert.alert(t('share.shareFailed'), t('share.shareFailedHint'));
         } finally {
             setIsSharing(false);
         }
@@ -85,7 +87,7 @@ export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fil
                                 onPress={onClose}
                                 className="w-9 h-9 rounded-full bg-white/10 items-center justify-center"
                                 hitSlop={8}
-                                accessibilityLabel="Close"
+                                accessibilityLabel={t('close')}
                             >
                                 <Ionicons name="close" size={18} color="#FAFAFA" />
                             </Pressable>
@@ -101,14 +103,14 @@ export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fil
 
                         <View style={{ width: posterWidth }} className="mt-4">
                             <Button onPress={shareAsImage} loading={isSharing} disabled={isSharing} className="w-full">
-                                Share Card
+                                {t('share.shareCard')}
                             </Button>
                             <Pressable
                                 onPress={() => onShareLink()}
                                 className="mt-3 py-3 rounded-lg border border-white/10 bg-white/5 flex-row items-center justify-center active:opacity-60"
                             >
                                 <Ionicons name="link-outline" size={16} color="#94A3B8" />
-                                <Text className="text-slate-300 font-bold text-sm ml-2">Share Link</Text>
+                                <Text className="text-slate-300 font-bold text-sm ml-2">{t('share.shareLink')}</Text>
                             </Pressable>
                         </View>
                     </Pressable>

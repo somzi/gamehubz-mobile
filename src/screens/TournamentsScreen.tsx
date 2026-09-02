@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +49,9 @@ const TAB_TO_STATUS: Record<string, number> = {
 const EMPTY_TOURNAMENTS: any[] = [];
 
 export default function TournamentsScreen() {
+    const { t } = useTranslation('tournament');
+    const { t: tCommon } = useTranslation('common');
+    const { t: tAuth } = useTranslation('auth');
     const navigation = useNavigation<TournamentsScreenNavigationProp>();
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -70,7 +74,7 @@ export default function TournamentsScreen() {
             const response = await authenticatedFetch(url);
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No body');
-                throw new Error(`Failed to fetch tournaments (${response.status}): ${text}`);
+                throw new Error(t('list.fetchFailed', { status: response.status, text }));
             }
             const data = await response.json();
             // Backend response has been through several revisions — this accepts each
@@ -119,14 +123,14 @@ export default function TournamentsScreen() {
 
     const getRegionName = (region?: number) => {
         switch (region) {
-            case TournamentRegion.NorthAmerica: return 'North America';
-            case TournamentRegion.Europe: return 'Europe';
-            case TournamentRegion.Asia: return 'Asia';
-            case TournamentRegion.SouthAmerica: return 'South America';
-            case TournamentRegion.Africa: return 'Africa';
-            case TournamentRegion.Oceania: return 'Oceania';
+            case TournamentRegion.NorthAmerica: return tAuth('region.northAmerica');
+            case TournamentRegion.Europe: return tAuth('region.europe');
+            case TournamentRegion.Asia: return tAuth('region.asia');
+            case TournamentRegion.SouthAmerica: return tAuth('region.southAmerica');
+            case TournamentRegion.Africa: return tAuth('region.africa');
+            case TournamentRegion.Oceania: return tAuth('region.oceania');
             case TournamentRegion.Global:
-            default: return 'Global';
+            default: return t('details.regionGlobal');
         }
     };
 
@@ -145,10 +149,10 @@ export default function TournamentsScreen() {
     };
 
     const tabs: PremiumTabItem[] = [
-        { label: 'Live', value: 'live', icon: 'radio' },
-        { label: 'Upcoming', value: 'upcoming', icon: 'time' },
-        { label: 'Open', value: 'open', icon: 'add-circle' },
-        { label: 'Completed', value: 'completed', icon: 'checkmark-circle' },
+        { label: t('list.tabLive'), value: 'live', icon: 'radio' },
+        { label: t('list.tabUpcoming'), value: 'upcoming', icon: 'time' },
+        { label: t('list.tabOpen'), value: 'open', icon: 'add-circle' },
+        { label: t('list.tabCompleted'), value: 'completed', icon: 'checkmark-circle' },
     ];
 
     // Stable so FlatList's PureComponent doesn't invalidate on unrelated parent
@@ -193,8 +197,8 @@ export default function TournamentsScreen() {
             <View className="px-6 pt-4 pb-2">
                 <View className="flex-row items-center justify-between">
                     <View>
-                        <Text className="text-2xl font-black text-white tracking-tight">Tournaments</Text>
-                        <Text className="text-xs text-slate-600 font-medium mt-0.5">Compete & Conquer</Text>
+                        <Text className="text-2xl font-black text-white tracking-tight">{t('common:nav.tournaments')}</Text>
+                        <Text className="text-xs text-slate-600 font-medium mt-0.5">{t('list.competeConquer')}</Text>
                     </View>
                     <View className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 items-center justify-center">
                         <Ionicons name="trophy" size={18} color="#818CF8" />
@@ -216,22 +220,22 @@ export default function TournamentsScreen() {
                     <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
                         <ActivityIndicator size="small" color="#818CF8" />
                     </View>
-                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading tournaments...</Text>
+                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">{t('list.loading')}</Text>
                 </View>
             ) : tournamentsQuery.isError && tournaments.length === 0 ? (
                 <View className="flex-1 items-center justify-center px-6">
                     <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
                         <Ionicons name="alert-circle" size={28} color="#EF4444" />
                     </View>
-                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
+                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">{t('list.somethingWentWrong')}</Text>
                     <Text className="text-xs text-slate-600 text-center mb-5">
-                        {(tournamentsQuery.error as Error)?.message ?? 'An unexpected error occurred'}
+                        {(tournamentsQuery.error as Error)?.message ?? tCommon('unexpectedError')}
                     </Text>
                     <Pressable
                         onPress={() => tournamentsQuery.refetch()}
                         className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                     >
-                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
+                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">{t('list.tryAgain')}</Text>
                     </Pressable>
                 </View>
             ) : (
@@ -252,8 +256,8 @@ export default function TournamentsScreen() {
                             variant="plain"
                             icon="trophy-outline"
                             color={COLORS.info}
-                            title="No tournaments found"
-                            description="Check back later for new events"
+                            title={t('list.noneFound')}
+                            description={t('list.noneFoundHint')}
                         />
                     }
                     ListFooterComponent={

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,28 +15,30 @@ import { StatusModal } from '../components/modals/StatusModal';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { COLORS } from '../lib/theme';
 
-const friendlyResetError = (raw: string): string => {
+const friendlyResetError = (raw: string, t: (k: string) => string): string => {
     const msg = raw.toLowerCase();
 
     if (msg.includes('forgot password token') || msg.includes('not found')) {
-        return 'The code you entered is invalid. Double-check it or request a new one.';
+        return t('reset.codeInvalid');
     }
     if (msg.includes('expired') || msg.includes('invalidforgotpassword')) {
-        return 'This code has expired. Please go back and request a new one.';
+        return t('reset.codeExpired');
     }
     if (msg.includes('password') && msg.includes('match')) {
-        return 'Passwords do not match. Please re-enter them.';
+        return t('reset.passwordsMismatchRetry');
     }
     if (msg.includes('password')) {
-        return 'Your new password does not meet the requirements.';
+        return t('reset.passwordRequirements');
     }
 
-    return 'We could not reset your password. The code might be invalid or expired — please try again.';
+    return t('reset.genericFailure');
 };
 
 type ResetPasswordRouteProp = RouteProp<RootStackParamList, 'ResetPassword'>;
 
 export default function ResetPasswordScreen() {
+    const { t } = useTranslation('auth');
+    const friendlyResetError2 = (raw: string) => friendlyResetError(raw, t);
     const route = useRoute<ResetPasswordRouteProp>();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { email } = route.params;
@@ -59,31 +62,31 @@ export default function ResetPasswordScreen() {
         title: string;
         message: string;
         onClose?: () => void;
-    }>({ type: 'error', title: 'Error', message: '' });
+    }>({ type: 'error' as const, title: '', message: '' });
 
     const validate = () => {
         const newErrors: typeof errors = {};
         
         if (!otpCode) {
-            newErrors.otpCode = 'Code is required';
+            newErrors.otpCode = t('reset.codeRequired');
         } else if (otpCode.length !== 6) {
-            newErrors.otpCode = 'Code must be exactly 6 digits';
+            newErrors.otpCode = t('reset.codeSixDigits');
         }
 
         if (!password) {
-            newErrors.password = 'Password is required';
+            newErrors.password = t('reset.passwordRequired');
         } else if (password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
+            newErrors.password = t('reset.passwordMinLength');
         } else if (!/(?=.*[a-z])/.test(password)) {
-            newErrors.password = 'Password requires lowercase letter';
+            newErrors.password = t('reset.passwordNeedsLowercase');
         } else if (!/(?=.*[A-Z])/.test(password)) {
-            newErrors.password = 'Password requires uppercase letter';
+            newErrors.password = t('reset.passwordNeedsUppercase');
         } else if (!/(?=.*\d)/.test(password)) {
-            newErrors.password = 'Password requires number';
+            newErrors.password = t('reset.passwordNeedsNumber');
         }
 
         if (password !== confirmPassword) {
-            newErrors.confirmPassword = 'Passwords do not match';
+            newErrors.confirmPassword = t('reset.passwordsDoNotMatch');
         }
 
         setErrors(newErrors);
@@ -114,8 +117,8 @@ export default function ResetPasswordScreen() {
             if (response.ok) {
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Password Reset',
-                    message: 'Your password has been successfully reset. You can now log in with your new password.',
+                    title: t('reset.successTitle'),
+                    message: t('reset.successMessage'),
                     onClose: () => {
                         setShowStatusModal(false);
                         navigation.navigate('Login');
@@ -127,16 +130,16 @@ export default function ResetPasswordScreen() {
                 const parsed = getErrorMessage(text);
                 setStatusModalConfig({
                     type: 'error',
-                    title: 'Reset Failed',
-                    message: friendlyResetError(parsed)
+                    title: t('reset.failedTitle'),
+                    message: friendlyResetError2(parsed)
                 });
                 setShowStatusModal(true);
             }
         } catch (err: any) {
             setStatusModalConfig({
                 type: 'error',
-                title: 'Network Error',
-                message: 'Failed to connect to the server. Please try again later.'
+                title: t('networkError'),
+                message: t('networkErrorMessage')
             });
             setShowStatusModal(true);
         } finally {
@@ -173,7 +176,7 @@ export default function ResetPasswordScreen() {
                             <Ionicons name="key-outline" size={30} color={COLORS.primary} />
                         </View>
 
-                        <Text className="text-3xl font-black text-white mb-2 text-center tracking-tight">New password</Text>
+                        <Text className="text-3xl font-black text-white mb-2 text-center tracking-tight">{t('reset.title')}</Text>
                         <Text className="text-slate-400 text-center px-6 text-[13px] leading-5">
                             Enter the 6-digit code sent to <Text className="text-white font-bold">{email}</Text> and your new password.
                         </Text>
@@ -181,7 +184,7 @@ export default function ResetPasswordScreen() {
 
                     <View className="w-full max-w-sm self-center bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5 gap-4">
                         <Input
-                            label="6-DIGIT CODE"
+                            label={t('reset.codeLabel')}
                             placeholder="000000"
                             value={otpCode}
                             onChangeText={(text) => {
@@ -195,7 +198,7 @@ export default function ResetPasswordScreen() {
                         />
 
                         <Input
-                            label="NEW PASSWORD"
+                            label={t('reset.newPasswordLabel')}
                             placeholder="••••••••"
                             value={password}
                             onChangeText={(text) => {
@@ -210,7 +213,7 @@ export default function ResetPasswordScreen() {
                         />
 
                         <Input
-                            label="CONFIRM NEW PASSWORD"
+                            label={t('reset.confirmNewPasswordLabel')}
                             placeholder="••••••••"
                             value={confirmPassword}
                             onChangeText={(text) => {
@@ -231,7 +234,7 @@ export default function ResetPasswordScreen() {
                             size="lg"
                         >
                             <View className="flex-row items-center justify-center gap-2">
-                                <Text className="text-primary-foreground font-black text-base">Reset Password</Text>
+                                <Text className="text-primary-foreground font-black text-base">{t('reset.resetPassword')}</Text>
                                 <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
                             </View>
                         </Button>

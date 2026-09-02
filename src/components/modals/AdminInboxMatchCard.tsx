@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,15 +36,16 @@ const TONES = {
 } as const;
 
 function SideColumn({ side }: { side: InboxCardSide }) {
+    const { t } = useTranslation('common');
     return (
         <View className="flex-1 items-center px-1">
             <PlayerAvatar
                 src={side.avatarUrl || undefined}
-                name={side.username || 'Player'}
+                name={side.username || t('player')}
                 size="md"
             />
             <Text className="text-[13px] font-bold text-white mt-2 text-center" numberOfLines={1}>
-                {side.username || 'TBD'}
+                {side.username || t('app.tbd')}
             </Text>
             {side.teamName ? (
                 <Text className="text-[10px] font-semibold text-slate-500 mt-0.5 text-center" numberOfLines={1}>
@@ -72,6 +74,7 @@ export function AdminInboxMatchCard({
     ctaLabel,
     onPress,
 }: AdminInboxMatchCardProps) {
+    const { t: tr } = useTranslation('common');
     const t = TONES[tone];
 
     return (
@@ -108,7 +111,7 @@ export function AdminInboxMatchCard({
                             </Text>
                         </View>
                         <Text className={`text-[8px] font-black uppercase tracking-widest mt-1.5 ${t.ctaText}`}>
-                            Proposed
+                            {tr('app.proposed')}
                         </Text>
                     </View>
                 ) : (

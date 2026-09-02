@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ export function AdminHelpRequestsModal({
     isLoading,
     onSelect,
 }: AdminHelpRequestsModalProps) {
+    const { t } = useTranslation('tournament');
     return (
         <Modal
             visible={visible}
@@ -74,11 +76,11 @@ export function AdminHelpRequestsModal({
                                 <Ionicons name="hand-left" size={18} color="#F59E0B" />
                             </View>
                             <View>
-                                <Text className="text-base font-black text-white tracking-tight">Help Requests</Text>
+                                <Text className="text-base font-black text-white tracking-tight">{t('inbox.helpRequests')}</Text>
                                 <Text className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                                     {requests.length === 0
-                                        ? 'All clear'
-                                        : `${requests.length} ${requests.length === 1 ? 'match needs' : 'matches need'} attention`}
+                                        ? t('inbox.allClear')
+                                        : t('inbox.needsAttention', { count: requests.length })}
                                 </Text>
                             </View>
                         </View>
@@ -104,9 +106,9 @@ export function AdminHelpRequestsModal({
                                 <View className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                                     <Ionicons name="checkmark-done" size={26} color="#10B981" />
                                 </View>
-                                <Text className="text-sm font-black text-white uppercase tracking-widest">No Help Requests</Text>
+                                <Text className="text-sm font-black text-white uppercase tracking-widest">{t('inbox.noHelpRequests')}</Text>
                                 <Text className="text-xs text-slate-500 mt-2 text-center px-8">
-                                    All matches are running smoothly. You'll get a push notification when a player asks for help.
+                                    {t('inbox.noHelpRequestsHint')}
                                 </Text>
                             </View>
                         ) : (
@@ -114,9 +116,9 @@ export function AdminHelpRequestsModal({
                                 <AdminInboxMatchCard
                                     key={item.matchId}
                                     tone="warning"
-                                    eyebrow={[item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+                                    eyebrow={[item.groupName, item.roundNumber ? t('inbox.roundN', { n: item.roundNumber }) : null]
                                         .filter(Boolean)
-                                        .join(' · ') || 'Match'}
+                                        .join(' · ') || t('inbox.match')}
                                     meta={formatLocalDateTime(item.requestedOn)}
                                     home={{
                                         username: item.homeUsername,
@@ -129,9 +131,9 @@ export function AdminHelpRequestsModal({
                                         teamName: item.awayTeamName,
                                     }}
                                     footerIcon="hand-left"
-                                    footerLabel="Requested by"
-                                    footerName={item.requestedByUsername || 'a player'}
-                                    ctaLabel="Open"
+                                    footerLabel={t('inbox.requestedBy')}
+                                    footerName={item.requestedByUsername || t('inbox.aPlayer')}
+                                    ctaLabel={t('inbox.open')}
                                     onPress={() => onSelect(item)}
                                 />
                             ))

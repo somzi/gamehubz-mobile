@@ -1,3 +1,4 @@
+import i18n, { STORAGE_KEY_LANGUAGE, getRequestLanguage, isSupportedLanguage, setLanguage } from '../i18n';
 import React, { createContext, useContext, useState, ReactNode, useMemo, useEffect, useCallback, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,6 +7,7 @@ import { User, AuthResponse, UserSocial } from '../types/auth';
 import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToLogout } from '../lib/api';
 import * as SecureStore from 'expo-secure-store';
 import { usePushNotifications, STORAGE_KEY_LAST_SYNCED_TOKEN } from '../hooks/usePushNotifications';
+import { syncLanguageWithServer, STORAGE_KEY_LAST_SYNCED_LANGUAGE } from '../lib/languageSync';
 
 
 interface AuthContextType {
@@ -109,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAuthToken(null);
             SecureStore.deleteItemAsync('user_meta').catch(() => { });
             SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN).catch(() => { });
+            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE).catch(() => { });
         });
 
         return () => unsubscribe();
@@ -184,6 +187,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [user, token, isAppReady, checkAndSync, requestAndSync]);
 
+    // ─── Language on authentication ────────────────────────────────
+    // Sync runs in whichever direction this device has something to say:
+    //
+    //  • No stored choice — a fresh install, or a reinstall. The profile is the only
+    //    record of what this person picked, so adopt it. Pushing the local default
+    //    instead would quietly reset a Spanish account to English on every reinstall.
+    //  • A stored choice — push it, forced, because the "already synced" marker was
+    //    cleared with the previous session and may be stale against this account.
+    useEffect(() => {
+        if (!user || !token) return;
+
+        void (async () => {
+            const stored = await AsyncStorage.getItem(STORAGE_KEY_LANGUAGE).catch(() => null);
+
+            if (!isSupportedLanguage(stored) && isSupportedLanguage(user.language)) {
+                await setLanguage(user.language);
+                return;
+            }
+
+            void syncLanguageWithServer(true);
+        })();
+    }, [user, token]);
+
     // ─── AppState listener for push notification recovery ──────────
     // When the user toggles back from System Settings → App, we
     // re-check permissions silently. This covers the scenario where
@@ -257,6 +283,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    // Auth calls bypass apiClient, so its interceptor never adds this. Without
+                    // it the server answers in its own default and a Spanish user reads an
+                    // English validation error — and on register, the language chosen on the
+                    // form would never reach the profile that notifications are written from.
+                    'Language': getRequestLanguage(),
                 },
                 body: JSON.stringify({ email, password }),
             });
@@ -268,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 data = JSON.parse(text);
             } catch (e) {
                 console.error('Failed to parse login response:', text);
-                return { success: false, message: 'Invalid server response' };
+                return { success: false, message: i18n.t('common:app.invalidServerResponse') };
             }
 
             if (data.isSuccessful && data.accessToken?.token) {
@@ -289,7 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: true };
             } else {
                 // Determine error message from body
-                let msg = 'Invalid credentials';
+                let msg = i18n.t('common:app.invalidCredentials');
                 if (Array.isArray(data) && data.length > 0) {
                     msg = data[0];
                 } else if (data && typeof data === 'object') {
@@ -308,7 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         } catch (error: any) {
             console.error('Login error:', error);
-            return { success: false, message: error.message || 'Network error' };
+            return { success: false, message: error.message || i18n.t('common:app.networkError') };
         } finally {
             setIsLoading(false);
         }
@@ -321,6 +352,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    // Stamps the new account: RegisterUser reads this header into User.Language.
+                    'Language': getRequestLanguage(),
                 },
                 body: JSON.stringify(formData),
             });
@@ -504,6 +537,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_meta');
         await SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN);
+        await SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE);
 
         setUser(null);
         setToken(null);

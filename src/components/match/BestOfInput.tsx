@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +23,9 @@ interface BestOfInputProps {
  * something the server accepts, so clearing the field to type "8" is not fought halfway through
  * (normalising per keystroke turned that into "18", then clamped it to 15).
  */
-export function BestOfInput({ value, onChange, label = 'Best of', disabled = false }: BestOfInputProps) {
+export function BestOfInput({ value, onChange, label, disabled = false }: BestOfInputProps) {
+    const { t } = useTranslation('common');
+    const resolvedLabel = label ?? t('app.bestOf');
     const [text, setText] = useState(String(value));
 
     // Re-sync when the value changes from elsewhere (a reset, a loaded tournament, a step). A value

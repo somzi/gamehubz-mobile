@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { JSX } from 'react';
 import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ const OVERHANG = 60;
 /** Transient "Copied" pill drawn over a chat bubble after a long-press copy.
  *  Absolutely positioned, so the flash never reflows the message list. */
 export function CopiedOverlay(): JSX.Element {
+  const { t } = useTranslation('common');
   return (
     <View
       className="absolute items-center justify-center"
@@ -27,7 +29,7 @@ export function CopiedOverlay(): JSX.Element {
           numberOfLines={1}
           className="text-[10px] font-black uppercase tracking-widest text-white"
         >
-          Copied
+          {t('app.copied')}
         </Text>
       </View>
     </View>

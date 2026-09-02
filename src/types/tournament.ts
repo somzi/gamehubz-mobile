@@ -15,43 +15,48 @@ export const TEAM_TOURNAMENT_FORMATS = [
     TournamentFormat.GroupStageWithKnockout,
 ] as const;
 
+// Values live here; labels are i18n keys resolved by the consuming component so a
+// language switch re-renders them (see CreateTournamentModal for the useMemo pattern).
 export const TOURNAMENT_FORMAT_OPTIONS = [
-    { value: String(TournamentFormat.League), label: 'League' },
-    { value: String(TournamentFormat.SingleElimination), label: 'Single Bracket' },
-    { value: String(TournamentFormat.DoubleElimination), label: 'Double Bracket' },
-    { value: String(TournamentFormat.GroupStageWithKnockout), label: 'Groups + Bracket' },
-    { value: String(TournamentFormat.Swiss), label: 'Swiss' },
+    { value: String(TournamentFormat.League), labelKey: 'format.league' },
+    { value: String(TournamentFormat.SingleElimination), labelKey: 'format.singleBracket' },
+    { value: String(TournamentFormat.DoubleElimination), labelKey: 'format.doubleBracket' },
+    { value: String(TournamentFormat.GroupStageWithKnockout), labelKey: 'format.groupsBracket' },
+    { value: String(TournamentFormat.Swiss), labelKey: 'format.swiss' },
 ] as const;
 
 // Knockout bracket sizes selectable after the Swiss rounds. 'None' = pure Swiss
 // (the standings leader wins the tournament outright).
 export const SWISS_KNOCKOUT_OPTIONS = [
-    { value: '0', label: 'None (winner by standings)' },
-    { value: '2', label: 'Top 2 (final)' },
-    { value: '4', label: 'Top 4' },
-    { value: '8', label: 'Top 8' },
-    { value: '16', label: 'Top 16' },
-    { value: '32', label: 'Top 32' },
+    { value: '0', labelKey: 'swissKnockout.none' },
+    { value: '2', labelKey: 'swissKnockout.top2' },
+    { value: '4', labelKey: 'swissKnockout.top4' },
+    { value: '8', labelKey: 'swissKnockout.top8' },
+    { value: '16', labelKey: 'swissKnockout.top16' },
+    { value: '32', labelKey: 'swissKnockout.top32' },
 ] as const;
 
-export function getTournamentFormatLabel(format?: number | null) {
+type TFn = (key: string) => string;
+
+export function getTournamentFormatLabel(format?: number | null, t?: TFn) {
+    const tr = t ?? ((k: string) => k);
     switch (format) {
         case TournamentFormat.League:
-            return 'League';
+            return tr('format.league');
         case TournamentFormat.GroupsThenSingleElimination:
-            return 'Groups + Single Elimination';
+            return tr('format.groupsSingleElim');
         case TournamentFormat.GroupsThenDoubleElimination:
-            return 'Groups + Double Elimination';
+            return tr('format.groupsDoubleElim');
         case TournamentFormat.SingleElimination:
-            return 'Single Bracket';
+            return tr('format.singleBracket');
         case TournamentFormat.DoubleElimination:
-            return 'Double Elimination';
+            return tr('format.doubleElimination');
         case TournamentFormat.GroupStageWithKnockout:
-            return 'Groups + Bracket';
+            return tr('format.groupsBracket');
         case TournamentFormat.Swiss:
-            return 'Swiss';
+            return tr('format.swiss');
         default:
-            return 'Unknown';
+            return tr('format.unknown');
     }
 }
 
@@ -64,17 +69,18 @@ export enum BracketSeedingMode {
     Pots = 4,
 }
 
-export function getBracketSeedingModeLabel(mode?: number | null) {
+export function getBracketSeedingModeLabel(mode?: number | null, t?: TFn) {
+    const tr = t ?? ((k: string) => k);
     switch (mode) {
         case BracketSeedingMode.Manual:
-            return 'Manual draw';
+            return tr('seedingMode.manual');
         case BracketSeedingMode.Seeded:
-            return 'Seeded draw';
+            return tr('seedingMode.seeded');
         case BracketSeedingMode.Pots:
-            return 'Pot draw';
+            return tr('seedingMode.pots');
         case BracketSeedingMode.Random:
         default:
-            return 'Random draw';
+            return tr('seedingMode.random');
     }
 }
 

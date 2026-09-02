@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
@@ -41,7 +42,7 @@ export function usePushNotifications() {
     const ensureAndroidChannel = useCallback(async () => {
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
-                name: 'Default',
+                name: i18n.t('common:app.notificationChannel'),
                 importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#10B981',
@@ -81,7 +82,7 @@ export function usePushNotifications() {
             return token;
         } catch (e) {
             console.warn('[Push] Token fetch FAILED:', e);
-            setError('Failed to retrieve push token. Are you on a physical device?');
+            setError(i18n.t('common:app.pushTokenFailed'));
             return null;
         }
     }, []);
@@ -112,7 +113,7 @@ export function usePushNotifications() {
      */
     const checkAndSync = useCallback(async (force = false): Promise<PushPermissionState> => {
         if (!Device.isDevice) {
-            setError('Push notifications require a physical device.');
+            setError(i18n.t('common:app.physicalDeviceRequired'));
             console.warn('[Push] Must use physical device for push notifications');
             return {
                 status: 'denied',
@@ -154,7 +155,7 @@ export function usePushNotifications() {
      */
     const requestAndSync = useCallback(async (): Promise<boolean> => {
         if (!Device.isDevice) {
-            setError('Push notifications require a physical device.');
+            setError(i18n.t('common:app.physicalDeviceRequired'));
             console.warn('[Push] Must use physical device for push notifications');
             return false;
         }
@@ -166,7 +167,7 @@ export function usePushNotifications() {
         console.log(`[Push] Permission request result: ${status}`);
 
         if (status !== 'granted') {
-            setError('Notification permission not granted.');
+            setError(i18n.t('common:app.permissionNotGranted'));
             console.log('[Push] User denied notification permissions');
             return false;
         }

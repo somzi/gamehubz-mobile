@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +46,7 @@ export function PendingApprovalsModal({
     isLoading,
     onSelect,
 }: PendingApprovalsModalProps) {
+    const { t } = useTranslation('tournament');
     return (
         <Modal
             visible={visible}
@@ -70,11 +72,11 @@ export function PendingApprovalsModal({
                                 <Ionicons name="checkmark-done" size={18} color="#10B981" />
                             </View>
                             <View>
-                                <Text className="text-base font-black text-white tracking-tight">Pending Approvals</Text>
+                                <Text className="text-base font-black text-white tracking-tight">{t('inbox.pendingApprovals')}</Text>
                                 <Text className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                                     {items.length === 0
-                                        ? 'All clear'
-                                        : `${items.length} ${items.length === 1 ? 'result needs' : 'results need'} review`}
+                                        ? t('inbox.allClear')
+                                        : t('inbox.needsReview', { count: items.length })}
                                 </Text>
                             </View>
                         </View>
@@ -100,9 +102,9 @@ export function PendingApprovalsModal({
                                 <View className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                                     <Ionicons name="checkmark-done" size={26} color="#10B981" />
                                 </View>
-                                <Text className="text-sm font-black text-white uppercase tracking-widest">No Pending Approvals</Text>
+                                <Text className="text-sm font-black text-white uppercase tracking-widest">{t('inbox.noPendingApprovals')}</Text>
                                 <Text className="text-xs text-slate-500 mt-2 text-center px-8">
-                                    No reported results are waiting for review. You'll get a notification when a player submits one.
+                                    {t('inbox.noPendingApprovalsHint')}
                                 </Text>
                             </View>
                         ) : (
@@ -110,9 +112,9 @@ export function PendingApprovalsModal({
                                 <AdminInboxMatchCard
                                     key={item.matchId}
                                     tone="primary"
-                                    eyebrow={[item.groupName, item.roundNumber ? `Round ${item.roundNumber}` : null]
+                                    eyebrow={[item.groupName, item.roundNumber ? t('inbox.roundN', { n: item.roundNumber }) : null]
                                         .filter(Boolean)
-                                        .join(' · ') || 'Match'}
+                                        .join(' · ') || t('inbox.match')}
                                     home={{
                                         username: item.homeUsername,
                                         avatarUrl: item.homeAvatarUrl,
@@ -128,9 +130,9 @@ export function PendingApprovalsModal({
                                         away: item.proposedAwayScore ?? null,
                                     }}
                                     footerIcon="flag"
-                                    footerLabel="Reported by"
-                                    footerName={item.proposedByUsername || 'a player'}
-                                    ctaLabel="Review"
+                                    footerLabel={t('inbox.reportedBy')}
+                                    footerName={item.proposedByUsername || t('inbox.aPlayer')}
+                                    ctaLabel={t('inbox.review')}
                                     onPress={() => onSelect(item)}
                                 />
                             ))

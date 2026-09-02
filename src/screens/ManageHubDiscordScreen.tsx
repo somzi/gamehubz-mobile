@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,13 +39,13 @@ const DEFAULT_DISCORD_SETTINGS: DiscordNotificationSettings = {
     tournamentFinished: true,
 };
 
-const DISCORD_EVENTS: { key: keyof DiscordNotificationSettings; label: string; description: string }[] = [
-    { key: 'registrationOpened', label: 'Registration Opened', description: 'A new tournament opens registration' },
-    { key: 'registrationClosed', label: 'Registration Closed', description: 'Registration closes, participants locked in' },
-    { key: 'tournamentStarted', label: 'Tournament Started', description: 'The bracket is drawn and play begins' },
-    { key: 'matchApproved', label: 'Match Approved', description: 'A match result is confirmed' },
-    { key: 'matchReverted', label: 'Match Reverted', description: 'A result is removed or a walkover applied' },
-    { key: 'tournamentFinished', label: 'Tournament Finished', description: 'The champion is decided' },
+const DISCORD_EVENTS: { key: keyof DiscordNotificationSettings; labelKey: string; descKey: string }[] = [
+    { key: 'registrationOpened', labelKey: 'discord.eventRegistrationOpened', descKey: 'discord.eventRegistrationOpenedDesc' },
+    { key: 'registrationClosed', labelKey: 'discord.eventRegistrationClosed', descKey: 'discord.eventRegistrationClosedDesc' },
+    { key: 'tournamentStarted', labelKey: 'discord.eventTournamentStarted', descKey: 'discord.eventTournamentStartedDesc' },
+    { key: 'matchApproved', labelKey: 'discord.eventMatchApproved', descKey: 'discord.eventMatchApprovedDesc' },
+    { key: 'matchReverted', labelKey: 'discord.eventMatchReverted', descKey: 'discord.eventMatchRevertedDesc' },
+    { key: 'tournamentFinished', labelKey: 'discord.eventTournamentFinished', descKey: 'discord.eventTournamentFinishedDesc' },
 ];
 
 const DISCORD_WEBHOOK_URL_PATTERN = /^https:\/\/(ptb\.|canary\.)?discord(app)?\.com\/api\/webhooks\//i;
@@ -59,6 +60,8 @@ function parseDiscordSettings(json?: string | null): DiscordNotificationSettings
 }
 
 export default function ManageHubDiscordScreen() {
+    const { t } = useTranslation('hub');
+    const { t: tCommon } = useTranslation('common');
     const route = useRoute<ManageHubDiscordRouteProp>();
     const { hubId } = route.params;
 
@@ -112,7 +115,7 @@ export default function ManageHubDiscordScreen() {
 
         const trimmed = webhookUrl.trim();
         if (trimmed && !DISCORD_WEBHOOK_URL_PATTERN.test(trimmed)) {
-            setWebhookUrlError('Must start with https://discord.com/api/webhooks/');
+            setWebhookUrlError(t('discord.webhookMustStartWith'));
             return;
         }
         setWebhookUrlError(null);
@@ -135,16 +138,16 @@ export default function ManageHubDiscordScreen() {
             if (response.ok) {
                 setStatusModalConfig({
                     type: 'success',
-                    title: 'Settings Saved',
+                    title: t('discord.settingsSaved'),
                     message: trimmed
-                        ? 'Tournament announcements will be posted to your Discord channel.'
-                        : 'Discord integration is turned off.',
+                        ? t('discord.savedOn')
+                        : t('discord.savedOff'),
                 });
             } else {
                 setStatusModalConfig({
                     type: 'error',
-                    title: 'Save Failed',
-                    message: 'Failed to save Discord settings. Please try again.',
+                    title: t('discord.saveFailed'),
+                    message: t('discord.saveFailedMessage'),
                 });
             }
             setShowStatusModal(true);
@@ -152,8 +155,8 @@ export default function ManageHubDiscordScreen() {
             console.error('Error saving Discord settings:', error);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
-                message: 'An unexpected error occurred.',
+                title: tCommon('error'),
+                message: tCommon('unexpectedError'),
             });
             setShowStatusModal(true);
         } finally {
@@ -164,7 +167,7 @@ export default function ManageHubDiscordScreen() {
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <PageHeader title="Discord Integration" showBack />
+                <PageHeader title={t('discord.title')} showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color={DISCORD_BLURPLE} />
                 </View>
@@ -174,7 +177,7 @@ export default function ManageHubDiscordScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Discord Integration" showBack />
+            <PageHeader title={t('discord.title')} showBack />
             {/* Screen is edges={['top']}, so the nav-bar strip is ours to add. */}
             <KeyboardAvoider bottomInset="none">
                 <ScrollView
@@ -190,9 +193,9 @@ export default function ManageHubDiscordScreen() {
                                 <Ionicons name="logo-discord" size={24} color={DISCORD_BLURPLE} />
                             </View>
                             <View className="flex-1">
-                                <Text className="text-white font-black text-base">Hub Announcements</Text>
+                                <Text className="text-white font-black text-base">{t('discord.hubAnnouncements')}</Text>
                                 <Text className="text-slate-400 text-xs mt-0.5 leading-4">
-                                    Post tournament updates from this hub straight into your Discord server.
+                                    {t('discord.hubAnnouncementsHint')}
                                 </Text>
                             </View>
                         </View>
@@ -200,9 +203,9 @@ export default function ManageHubDiscordScreen() {
 
                     {/* Webhook */}
                     <View className="mb-6">
-                        <SectionLabel icon="link" title="Webhook" color={DISCORD_BLURPLE} />
+                        <SectionLabel icon="link" title={t('discord.sectionWebhook')} color={DISCORD_BLURPLE} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-4">
-                            <Text className="text-white font-bold text-sm mb-1">Webhook URL</Text>
+                            <Text className="text-white font-bold text-sm mb-1">{t('discord.webhookUrl')}</Text>
                             <Text className="text-slate-500 text-xs mb-3 leading-4">
                                 In Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy URL.
                             </Text>
@@ -226,7 +229,7 @@ export default function ManageHubDiscordScreen() {
                                 <Text className="text-red-400 text-xs mt-1.5">{webhookUrlError}</Text>
                             )}
                             <Text className="text-slate-600 text-[11px] mt-2.5">
-                                Clear the field and save to turn the integration off.
+                                {t('discord.clearToDisable')}
                             </Text>
                         </View>
                     </View>
@@ -234,7 +237,7 @@ export default function ManageHubDiscordScreen() {
                     {/* Events */}
                     {webhookUrl.trim().length > 0 && (
                         <View className="mb-6">
-                            <SectionLabel icon="notifications" title="Events" color={DISCORD_BLURPLE} />
+                            <SectionLabel icon="notifications" title={t('discord.sectionEvents')} color={DISCORD_BLURPLE} />
                             <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl px-4 py-1">
                                 {DISCORD_EVENTS.map((event, index) => (
                                     <View
@@ -245,8 +248,8 @@ export default function ManageHubDiscordScreen() {
                                         )}
                                     >
                                         <View className="flex-1 pr-3">
-                                            <Text className="text-white font-semibold text-sm">{event.label}</Text>
-                                            <Text className="text-slate-500 text-xs mt-0.5">{event.description}</Text>
+                                            <Text className="text-white font-semibold text-sm">{t(event.labelKey)}</Text>
+                                            <Text className="text-slate-500 text-xs mt-0.5">{t(event.descKey)}</Text>
                                         </View>
                                         <Toggle
                                             size="sm"
@@ -265,7 +268,7 @@ export default function ManageHubDiscordScreen() {
                         loading={isSaving}
                         className="w-full h-14 rounded-2xl"
                     >
-                        Save Changes
+                        {t('discord.saveChanges')}
                     </Button>
                 </ScrollView>
             </KeyboardAvoider>

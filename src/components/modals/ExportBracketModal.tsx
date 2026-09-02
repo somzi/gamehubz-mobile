@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,6 +96,7 @@ export function ExportBracketModal({
     showScheduleOption = true,
     showStandingsOption = true,
 }: ExportBracketModalProps) {
+    const { t } = useTranslation('tournament');
     const insets = useSafeAreaInsets();
 
     const choose = (choice: ExportChoice) => {
@@ -126,10 +128,10 @@ export function ExportBracketModal({
                         </View>
                         <View className="flex-1">
                             <Text className="text-white text-lg font-black" numberOfLines={1}>
-                                Export tournament
+                                {t('export.title')}
                             </Text>
                             <Text className="text-slate-500 text-xs mt-0.5" numberOfLines={1}>
-                                Pick a format and what to include
+                                {t('export.subtitle')}
                             </Text>
                         </View>
                     </View>
@@ -137,12 +139,12 @@ export function ExportBracketModal({
                     {/* The option list can outgrow a short screen once both formats are offered,
                         so it scrolls while the header and Cancel stay put. */}
                     <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-                        <SectionLabel text="PDF REPORT" />
+                        <SectionLabel text={t('export.pdfReport')} />
 
                         <ExportOption
                             icon="podium-outline"
-                            title="Standings & bracket"
-                            subtitle="Final tables and the bracket diagram"
+                            title={t('export.standingsBracket')}
+                            subtitle={t('export.standingsBracketSub')}
                             accent="#94A3B8"
                             accentBg="rgba(255,255,255,0.02)"
                             accentBorder="rgba(255,255,255,0.08)"
@@ -152,8 +154,8 @@ export function ExportBracketModal({
                         {showScheduleOption && (
                             <ExportOption
                                 icon="calendar-outline"
-                                title="With schedule"
-                                subtitle="Adds every round's fixtures, deadlines & results"
+                                title={t('export.withSchedule')}
+                                subtitle={t('export.withScheduleSub')}
                                 accent="#10B981"
                                 accentBg="rgba(16,185,129,0.06)"
                                 accentBorder="rgba(16,185,129,0.22)"
@@ -163,14 +165,14 @@ export function ExportBracketModal({
                         )}
 
                         <View className="mt-2">
-                            <SectionLabel text="CSV DATA" />
+                            <SectionLabel text={t('export.csvData')} />
                         </View>
 
                         {showStandingsOption && (
                             <ExportOption
                                 icon="list-outline"
-                                title="Rankings (CSV)"
-                                subtitle="One row per player: position, points, W/D/L, goals"
+                                title={t('export.rankingsCsv')}
+                                subtitle={t('export.rankingsCsvSub')}
                                 accent="#38BDF8"
                                 accentBg="rgba(56,189,248,0.06)"
                                 accentBorder="rgba(56,189,248,0.22)"
@@ -181,8 +183,8 @@ export function ExportBracketModal({
 
                         <ExportOption
                             icon="git-compare-outline"
-                            title="Results (CSV)"
-                            subtitle="One row per match: opponents, score, winner, time"
+                            title={t('export.resultsCsv')}
+                            subtitle={t('export.resultsCsvSub')}
                             accent="#38BDF8"
                             accentBg="rgba(56,189,248,0.06)"
                             accentBorder="rgba(56,189,248,0.22)"
@@ -195,7 +197,7 @@ export function ExportBracketModal({
                         onPress={onClose}
                         className="h-14 rounded-2xl bg-white/[0.05] border border-white/[0.08] items-center justify-center mt-1"
                     >
-                        <Text className="text-white font-bold text-[15px]">Cancel</Text>
+                        <Text className="text-white font-bold text-[15px]">{t('common:cancel')}</Text>
                     </PressableScale>
                 </View>
             </View>

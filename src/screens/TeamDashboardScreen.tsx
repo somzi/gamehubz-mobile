@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
-import { TEAM_LABELS } from '../lib/teamConstants';
+import { useTranslation } from 'react-i18next';
 import {
     renameTeam,
     kickMember,
@@ -43,6 +43,7 @@ export default function TeamDashboardScreen() {
     const route = useRoute<TeamDashboardRouteProp>();
     const { teamId, tournamentId, tournamentStatus } = route.params;
     const { user } = useAuth();
+    const { t } = useTranslation('team');
 
     const [team, setTeam] = useState<TeamDto | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -97,13 +98,14 @@ export default function TeamDashboardScreen() {
         try {
             const url = `${API_BASE_URL}/api/tournament/${tournamentId}/myTeam`;
             const response = await authenticatedFetch(url);
-            if (!response.ok) throw new Error('Team not found');
+            if (!response.ok) throw new Error(t('dashboard.teamNotFound'));
             const teamData = await response.json();
             if (Array.isArray(teamData)) {
-                const myTeam = teamData.find(t => {
-                    const captainId = t.captainUserId || t.CaptainUserId;
+                // Named `candidate`, not `t` — `t` is the translation function in this scope now.
+                const myTeam = teamData.find(candidate => {
+                    const captainId = candidate.captainUserId || candidate.CaptainUserId;
                     if (captainId?.toLowerCase() === user?.id?.toLowerCase()) return true;
-                    const members = t.members || t.Members || [];
+                    const members = candidate.members || candidate.Members || [];
                     return members.some((m: any) => (m.userId || m.UserId)?.toLowerCase() === user?.id?.toLowerCase());
                 }) || teamData[0];
                 setTeam(myTeam);
@@ -111,12 +113,12 @@ export default function TeamDashboardScreen() {
                 setTeam(teamData);
             }
         } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : TEAM_LABELS.ERROR_FETCH_TEAMS;
+            const message = err instanceof Error ? err.message : t('errors.fetchTeams');
             setError(message);
         } finally {
             setIsLoading(false);
         }
-    }, [tournamentId, user?.id]);
+    }, [tournamentId, user?.id, t]);
 
     const fetchRequests = useCallback(async (tid: string) => {
         setIsLoadingRequests(true);
@@ -166,7 +168,7 @@ export default function TeamDashboardScreen() {
         const id = m.userId || m.UserId;
         return {
             userId: id,
-            username: m.username || m.Username || 'Player',
+            username: m.username || m.Username || t('dashboard.player'),
             avatarUrl: m.avatarUrl || m.AvatarUrl,
             isCaptain: m.isCaptain || m.IsCaptain || id?.toLowerCase() === captainId?.toLowerCase(),
         };
@@ -194,7 +196,7 @@ export default function TeamDashboardScreen() {
             setTeam(updated);
             setIsEditingName(false);
         } catch (err: unknown) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
         } finally {
             setIsSavingName(false);
@@ -204,8 +206,8 @@ export default function TeamDashboardScreen() {
     const handleLeaveTeam = () => {
         setConfirmModal({
             visible: true,
-            title: TEAM_LABELS.CONFIRM_LEAVE_TITLE,
-            message: TEAM_LABELS.CONFIRM_LEAVE_MESSAGE,
+            title: t('confirmLeaveTitle'),
+            message: t('confirmLeaveMessage'),
             isDestructive: true,
             isLoading: false,
             onConfirm: async () => {
@@ -217,7 +219,7 @@ export default function TeamDashboardScreen() {
                     navigation.goBack();
                 } catch (err: unknown) {
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
-                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
                     setShowStatusModal(true);
                 }
             },
@@ -227,8 +229,8 @@ export default function TeamDashboardScreen() {
     const handleKickMember = (userId: string, username: string) => {
         setConfirmModal({
             visible: true,
-            title: TEAM_LABELS.CONFIRM_KICK_TITLE,
-            message: `${TEAM_LABELS.CONFIRM_KICK_MESSAGE}\n\nPlayer: ${username}`,
+            title: t('confirmKickTitle'),
+            message: t('dashboard.confirmKickWithPlayer', { username }),
             isDestructive: true,
             isLoading: false,
             onConfirm: async () => {
@@ -240,7 +242,7 @@ export default function TeamDashboardScreen() {
                     fetchTeam();
                 } catch (err: unknown) {
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
-                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
                     setShowStatusModal(true);
                 }
             },
@@ -268,8 +270,8 @@ export default function TeamDashboardScreen() {
     const handleDeleteTeam = () => {
         setConfirmModal({
             visible: true,
-            title: TEAM_LABELS.CONFIRM_DELETE_TITLE,
-            message: TEAM_LABELS.CONFIRM_DELETE_MESSAGE,
+            title: t('confirmDeleteTitle'),
+            message: t('confirmDeleteMessage'),
             isDestructive: true,
             isLoading: false,
             onConfirm: async () => {
@@ -281,7 +283,7 @@ export default function TeamDashboardScreen() {
                     navigation.goBack();
                 } catch (err: unknown) {
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
-                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
                     setShowStatusModal(true);
                 }
             },
@@ -297,7 +299,7 @@ export default function TeamDashboardScreen() {
             });
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.message || TEAM_LABELS.ERROR_REGISTER_TEAM);
+                throw new Error(errData.message || t('errors.registerTeam'));
             }
             // Refresh so isAlreadyRegistered flips to true and the "Registered – Pending"
             // banner replaces the Register button immediately (in case the user stays on /
@@ -305,15 +307,15 @@ export default function TeamDashboardScreen() {
             await fetchTeam();
             setStatusModalConfig({
                 type: 'success',
-                title: 'Team Registered!',
-                message: 'Your team has been successfully registered for the tournament.',
+                title: t('dashboard.teamRegisteredTitle'),
+                message: t('dashboard.teamRegisteredMessage'),
                 onClose: () => {
                     navigation.navigate('TournamentDetails', { id: tournamentId });
                 }
             });
             setShowStatusModal(true);
         } catch (err: unknown) {
-            setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+            setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
         } finally {
             setIsRegistering(false);
@@ -326,10 +328,12 @@ export default function TeamDashboardScreen() {
         const landsOnBench = allowReserves && isLineupFull;
         setConfirmModal({
             visible: true,
-            title: 'Add this player?',
-            message: `${username} joins the team${allowReserves
-                ? landsOnBench ? ' on the bench — the lineup is already full.' : ' in the lineup.'
-                : '.'}`,
+            title: t('dashboard.approveTitle'),
+            message: !allowReserves
+                ? t('dashboard.approveMessagePlain', { username })
+                : landsOnBench
+                    ? t('dashboard.approveMessageBench', { username })
+                    : t('dashboard.approveMessageLineup', { username }),
             isDestructive: false,
             isLoading: false,
             onConfirm: async () => {
@@ -337,13 +341,13 @@ export default function TeamDashboardScreen() {
                 try {
                     await approveJoinRequest(requestId);
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
-                    setStatusModalConfig({ type: 'success', title: 'Success', message: 'Player approved and added to the team!' });
+                    setStatusModalConfig({ type: 'success', title: t('common:success'), message: t('dashboard.approveSuccess') });
                     setShowStatusModal(true);
                     fetchTeam();
                     if (team?.teamId) fetchRequests(team.teamId);
                 } catch (err: unknown) {
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
-                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
                     setShowStatusModal(true);
                 }
             },
@@ -353,8 +357,8 @@ export default function TeamDashboardScreen() {
     const handleRejectRequest = (requestId: string, username: string) => {
         setConfirmModal({
             visible: true,
-            title: 'Decline this request?',
-            message: `${username} won't join the team. They can ask again later.`,
+            title: t('dashboard.declineTitle'),
+            message: t('dashboard.declineMessage', { username }),
             isDestructive: true,
             isLoading: false,
             onConfirm: async () => {
@@ -365,7 +369,7 @@ export default function TeamDashboardScreen() {
                     if (team?.teamId) fetchRequests(team.teamId);
                 } catch (err: unknown) {
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
-                    setStatusModalConfig({ type: 'error', title: 'Error', message: getErrorMessage(err) });
+                    setStatusModalConfig({ type: 'error', title: t('common:error'), message: getErrorMessage(err) });
                     setShowStatusModal(true);
                 }
             },
@@ -377,10 +381,10 @@ export default function TeamDashboardScreen() {
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title={TEAM_LABELS.TEAM_DASHBOARD_TITLE} showBack />
+                <PageHeader title={t('dashboardTitle')} showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#00E5A0" />
-                    <Text className="text-slate-400 mt-4">Loading team...</Text>
+                    <Text className="text-slate-400 mt-4">{t('dashboard.loadingTeam')}</Text>
                 </View>
             </SafeAreaView>
         );
@@ -389,11 +393,11 @@ export default function TeamDashboardScreen() {
     if (error || !team) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title={TEAM_LABELS.TEAM_DASHBOARD_TITLE} showBack />
+                <PageHeader title={t('dashboardTitle')} showBack />
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-                    <Text className="text-red-400 mt-4 text-center font-medium">{error || 'Team not found'}</Text>
-                    <Button onPress={fetchTeam} className="mt-6">Retry</Button>
+                    <Text className="text-red-400 mt-4 text-center font-medium">{error || t('dashboard.teamNotFound')}</Text>
+                    <Button onPress={fetchTeam} className="mt-6">{t('common:retry')}</Button>
                 </View>
             </SafeAreaView>
         );
@@ -411,13 +415,13 @@ export default function TeamDashboardScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader
-                title={TEAM_LABELS.TEAM_DASHBOARD_TITLE}
+                title={t('dashboardTitle')}
                 showBack
                 rightElement={
                     <Pressable
                         onPress={() => shareTeam(team.teamId, team.teamName)}
                         className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
-                        accessibilityLabel="Share team"
+                        accessibilityLabel={t('dashboard.shareTeam')}
                     >
                         <Ionicons name="share-outline" size={20} color="#FAFAFA" />
                     </Pressable>
@@ -491,7 +495,7 @@ export default function TeamDashboardScreen() {
                                                 className="text-[11px] font-black uppercase tracking-widest"
                                                 style={{ color: isCaptain ? '#F59E0B' : '#64748B' }}
                                             >
-                                                {isCaptain ? 'Captain' : 'Member'}
+                                                {isCaptain ? t('captainBadge') : t('dashboard.member')}
                                             </Text>
                                         </View>
                                     </View>
@@ -514,7 +518,7 @@ export default function TeamDashboardScreen() {
                                         <View className="flex-row items-center gap-1.5">
                                             <Ionicons name="people" size={13} color="#64748B" />
                                             <Text className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                {allowReserves ? 'Lineup' : 'Roster'}
+                                                {allowReserves ? t('dashboard.lineup') : t('dashboard.roster')}
                                             </Text>
                                         </View>
                                         <Text className="text-[13px] font-black">
@@ -543,11 +547,11 @@ export default function TeamDashboardScreen() {
                                                 <View className="flex-row items-center gap-1.5">
                                                     <Ionicons name="reorder-four-outline" size={13} color="#64748B" />
                                                     <Text className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                        Bench
+                                                        {t('dashboard.bench')}
                                                     </Text>
                                                     <View className="px-1.5 py-[1px] rounded-full bg-white/[0.06]">
                                                         <Text className="text-[8px] font-black uppercase tracking-wider text-slate-400">
-                                                            Optional
+                                                            {t('dashboard.optional')}
                                                         </Text>
                                                     </View>
                                                 </View>
@@ -585,12 +589,12 @@ export default function TeamDashboardScreen() {
                         {isRegistrationAccepted ? (
                             <View className="w-full bg-primary/10 p-4 rounded-2xl border border-primary/20 flex-row justify-center gap-2 items-center">
                                 <Ionicons name="shield-checkmark" size={20} color="#10B981" />
-                                <Text className="text-primary font-black uppercase tracking-widest text-sm">Accepted</Text>
+                                <Text className="text-primary font-black uppercase tracking-widest text-sm">{t('dashboard.accepted')}</Text>
                             </View>
                         ) : isAlreadyRegistered ? (
                             <View className="w-full bg-warning/10 p-4 rounded-2xl border border-warning/20 flex-row justify-center gap-2 items-center">
                                 <Ionicons name="hourglass-outline" size={20} color="#F59E0B" />
-                                <Text className="text-warning font-black uppercase tracking-widest text-sm">Registered – Pending Approval</Text>
+                                <Text className="text-warning font-black uppercase tracking-widest text-sm">{t('dashboard.registeredPending')}</Text>
                             </View>
                         ) : (
                             <Pressable
@@ -615,7 +619,7 @@ export default function TeamDashboardScreen() {
                                     ) : (
                                         <>
                                             <Ionicons name="rocket" size={18} color="#06251D" />
-                                            <Text className="text-team-foreground font-black text-[15px]">{TEAM_LABELS.REGISTER_TEAM_BUTTON}</Text>
+                                            <Text className="text-team-foreground font-black text-[15px]">{t('registerTeamButton')}</Text>
                                         </>
                                     )}
                                 </LinearGradient>
@@ -628,10 +632,10 @@ export default function TeamDashboardScreen() {
                 <View className="px-5 pb-3">
                     <PremiumTabs
                         tabs={[
-                            { value: 'members', label: 'Members', icon: 'people-outline' } as PremiumTabItem,
+                            { value: 'members', label: t('membersLabel'), icon: 'people-outline' } as PremiumTabItem,
                             ...(showRequestsTab ? [{
                                 value: 'requests',
-                                label: 'Requests',
+                                label: t('dashboard.requests'),
                                 icon: 'hourglass-outline' as const,
                                 badge: joinRequests.length > 0 ? joinRequests.length : undefined,
                             }] : []),
@@ -660,7 +664,7 @@ export default function TeamDashboardScreen() {
                                 return (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={40} color="#71717A" />
-                                        <Text className="text-slate-400 mt-3 text-center">No members yet</Text>
+                                        <Text className="text-slate-400 mt-3 text-center">{t('dashboard.noMembers')}</Text>
                                     </View>
                                 );
                             }
@@ -698,7 +702,7 @@ export default function TeamDashboardScreen() {
                                                 <Text className="font-bold text-[15px] text-white">{memberUsername}</Text>
                                                 {isCurrentUser && (
                                                     <View className="bg-white/10 px-2 py-0.5 rounded-full">
-                                                        <Text className="text-[9px] text-slate-300 font-black uppercase tracking-wider">You</Text>
+                                                        <Text className="text-[9px] text-slate-300 font-black uppercase tracking-wider">{t('dashboard.you')}</Text>
                                                     </View>
                                                 )}
                                                 {onBench && (
@@ -707,7 +711,7 @@ export default function TeamDashboardScreen() {
                                                         style={{ backgroundColor: 'rgba(129,140,248,0.14)', borderWidth: 1, borderColor: 'rgba(129,140,248,0.28)' }}
                                                     >
                                                         <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: '#A5B4FC' }}>
-                                                            Reserve
+                                                            {t('dashboard.reserve')}
                                                         </Text>
                                                     </View>
                                                 )}
@@ -716,12 +720,12 @@ export default function TeamDashboardScreen() {
                                                 <View className="flex-row items-center gap-1 mt-1">
                                                     <Ionicons name="shield-checkmark" size={11} color="#F59E0B" />
                                                     <Text className="text-[10px] font-black text-warning uppercase tracking-wider">
-                                                        {TEAM_LABELS.CAPTAIN_BADGE}
+                                                        {t('captainBadge')}
                                                     </Text>
                                                 </View>
                                             ) : (
                                                 <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                                                    {onBench ? 'Not playing' : allowReserves ? 'In the lineup' : 'Player'}
+                                                    {onBench ? t('dashboard.notPlaying') : allowReserves ? t('dashboard.inTheLineup') : t('dashboard.player')}
                                                 </Text>
                                             )}
                                         </View>
@@ -738,7 +742,7 @@ export default function TeamDashboardScreen() {
                                             >
                                                 <Ionicons name="repeat" size={15} color="#00E5A0" />
                                                 <Text className="text-[11px] font-black uppercase tracking-wider" style={{ color: '#00E5A0' }}>
-                                                    Sub in
+                                                    {t('dashboard.subIn')}
                                                 </Text>
                                             </Pressable>
                                         )}
@@ -790,23 +794,23 @@ export default function TeamDashboardScreen() {
                             if (!allowReserves) {
                                 return [
                                     ...captainFirst(allMembers).map((m: any) => renderMemberCard(m, false)),
-                                    ...renderOpenSlots(actualTeamSize - allMembers.length, 'empty', 'Open slot'),
+                                    ...renderOpenSlots(actualTeamSize - allMembers.length, 'empty', t('dashboard.openSlot')),
                                 ];
                             }
 
                             return [
-                                sectionHeader('football-outline', 'Lineup', '#00E5A0', `${starterCount}/${actualTeamSize}`),
+                                sectionHeader('football-outline', t('dashboard.lineup'), '#00E5A0', `${starterCount}/${actualTeamSize}`),
                                 ...captainFirst(starterMembers).map((m: any) => renderMemberCard(m, false)),
-                                ...renderOpenSlots(actualTeamSize - starterCount, 'empty-starter', 'Open lineup slot'),
+                                ...renderOpenSlots(actualTeamSize - starterCount, 'empty-starter', t('dashboard.openLineupSlot')),
 
                                 sectionHeader(
                                     'reorder-four-outline',
-                                    'Bench',
+                                    t('dashboard.bench'),
                                     '#818CF8',
                                     maxReserves > 0 ? `${reserveMembers.length}/${maxReserves}` : undefined,
                                 ),
                                 ...captainFirst(reserveMembers).map((m: any) => renderMemberCard(m, true)),
-                                ...renderOpenSlots(maxReserves - reserveMembers.length, 'empty-bench', 'Open bench slot'),
+                                ...renderOpenSlots(maxReserves - reserveMembers.length, 'empty-bench', t('dashboard.openBenchSlot')),
                             ];
                         })()}
                     </View>
@@ -820,12 +824,12 @@ export default function TeamDashboardScreen() {
                         ) : joinRequests.length === 0 ? (
                             <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                 <Ionicons name="mail-unread-outline" size={40} color="#71717A" />
-                                <Text className="text-slate-400 mt-3 text-center">No join requests yet</Text>
+                                <Text className="text-slate-400 mt-3 text-center">{t('dashboard.noJoinRequests')}</Text>
                             </View>
                         ) : (
                             joinRequests.map((req, idx) => {
                                 const requestId = req.requestId || req.RequestId || idx.toString();
-                                const reqUsername = req.username || req.Username || 'Unknown';
+                                const reqUsername = req.username || req.Username || t('dashboard.unknown');
                                 const reqAvatar = req.avatarUrl || req.AvatarUrl;
 
                                 return (
@@ -838,7 +842,7 @@ export default function TeamDashboardScreen() {
                                             <Text className="font-bold text-base text-white">{reqUsername}</Text>
                                             <View className="flex-row items-center gap-1 mt-0.5">
                                                 <Ionicons name="person-add-outline" size={11} color="#F59E0B" />
-                                                <Text className="text-[10px] text-warning font-bold">Wants to join</Text>
+                                                <Text className="text-[10px] text-warning font-bold">{t('dashboard.wantsToJoin')}</Text>
                                             </View>
                                         </View>
                                         <View className="flex-row items-center gap-2">
@@ -866,7 +870,7 @@ export default function TeamDashboardScreen() {
                 {Number(tournamentStatus) === 1 && !isAlreadyRegistered && !isRegistrationAccepted && (
                     <View className="px-5 mt-7">
                         <Text className="text-[10px] font-black uppercase tracking-[2px] text-slate-600 mb-3 ml-1">
-                            Danger Zone
+                            {t('dashboard.dangerZone')}
                         </Text>
                         <View className="gap-2.5">
                             <Pressable
@@ -874,7 +878,7 @@ export default function TeamDashboardScreen() {
                                 className="flex-row items-center justify-center gap-2 h-[52px] rounded-2xl border border-white/10 bg-white/[0.03] active:opacity-70"
                             >
                                 <Ionicons name="exit-outline" size={18} color="#94A3B8" />
-                                <Text className="text-slate-200 font-bold text-[15px]">{TEAM_LABELS.LEAVE_TEAM_BUTTON}</Text>
+                                <Text className="text-slate-200 font-bold text-[15px]">{t('leaveTeamButton')}</Text>
                             </Pressable>
 
                             {isCaptain && (
@@ -883,7 +887,7 @@ export default function TeamDashboardScreen() {
                                     className="flex-row items-center justify-center gap-2 h-[52px] rounded-2xl bg-destructive/10 border border-destructive/25 active:opacity-70"
                                 >
                                     <Ionicons name="trash-outline" size={18} color="#F87171" />
-                                    <Text className="text-red-400 font-bold text-[15px]">{TEAM_LABELS.DELETE_TEAM_BUTTON}</Text>
+                                    <Text className="text-red-400 font-bold text-[15px]">{t('deleteTeamButton')}</Text>
                                 </Pressable>
                             )}
                         </View>

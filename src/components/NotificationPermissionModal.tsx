@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +14,7 @@ export function NotificationPermissionModal({
     onAllow,
     onDismiss,
 }: NotificationPermissionModalProps) {
+    const { t } = useTranslation('common');
     const insets = useSafeAreaInsets();
 
     return (
@@ -40,11 +42,11 @@ export function NotificationPermissionModal({
                     </View>
 
                     {/* Title */}
-                    <Text style={styles.title}>Stay in the Game!</Text>
+                    <Text style={styles.title}>{t('app.stayInTheGame')}</Text>
 
                     {/* Description */}
                     <Text style={styles.description}>
-                        Get instant updates about upcoming tournaments, match results, and activity
+                        {t('app.notifPitch')}
                         in your hubs. Don't miss a beat!
                     </Text>
 
@@ -56,7 +58,7 @@ export function NotificationPermissionModal({
                         ]}
                         onPress={onAllow}
                     >
-                        <Text style={styles.allowText}>Allow</Text>
+                        <Text style={styles.allowText}>{t('app.allow')}</Text>
                     </Pressable>
 
                     {/* Maybe Later */}
@@ -67,7 +69,7 @@ export function NotificationPermissionModal({
                         ]}
                         onPress={onDismiss}
                     >
-                        <Text style={styles.laterText}>Maybe Later</Text>
+                        <Text style={styles.laterText}>{t('app.maybeLater')}</Text>
                     </Pressable>
                 </View>
             </View>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -47,6 +48,7 @@ interface HubsPage {
 }
 
 export default function HubsScreen() {
+    const { t } = useTranslation('hub');
     const navigation = useNavigation<HubsScreenNavigationProp>();
     const { user } = useAuth();
     const { hubApprovals } = useBadges();
@@ -92,12 +94,12 @@ export default function HubsScreen() {
                 : ENDPOINTS.GET_DISCOVERY_HUBS(uid, page, debouncedSearch);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
-                throw new Error(`Failed to fetch hubs: ${response.status}`);
+                throw new Error(t('list.fetchFailed', { status: response.status }));
             }
             const data = await response.json();
             const resultData = data.result || data;
             const list: Hub[] = Array.isArray(resultData) ? resultData : (resultData.items || []);
-            if (!Array.isArray(list)) throw new Error('Invalid items format received from server');
+            if (!Array.isArray(list)) throw new Error(t('list.invalidFormat'));
             return {
                 items: list,
                 nextPage: list.length === PAGE_SIZE ? page + 1 : undefined,
@@ -160,7 +162,7 @@ export default function HubsScreen() {
 
     const handleCreateHub = async () => {
         if (!hubName.trim()) {
-            setCreateHubError('Hub name is required');
+            setCreateHubError(t('list.nameRequired'));
             return;
         }
 
@@ -181,7 +183,7 @@ export default function HubsScreen() {
                 const text = await response.text();
 
                 // Try to extract a meaningful message from the response
-                let errorMessage = 'Failed to create hub';
+                let errorMessage = t('list.createFailed');
                 try {
                     const parsed = JSON.parse(text);
                     if (typeof parsed === 'string') {
@@ -208,8 +210,8 @@ export default function HubsScreen() {
                 if (isAlreadyOwns) {
                     setIsModalOpen(false);
                     setErrorModal({
-                        title: 'Hub Limit Reached',
-                        message: 'You already own a hub. Each player can only manage one hub at a time.',
+                        title: t('list.limitTitle'),
+                        message: t('list.limitMessage'),
                     });
                 } else {
                     setCreateHubError(errorMessage);
@@ -225,7 +227,7 @@ export default function HubsScreen() {
             queryClient.invalidateQueries({ queryKey: ['hubs'] });
         } catch (err: any) {
             console.error('Create hub error:', err);
-            setCreateHubError(err.message || 'Failed to create hub');
+            setCreateHubError(err.message || t('list.createFailed'));
         } finally {
             setIsCreating(false);
         }
@@ -239,8 +241,8 @@ export default function HubsScreen() {
     };
 
     const tabs: PremiumTabItem[] = [
-        { label: 'Joined', value: 'joined', icon: 'checkmark-circle' },
-        { label: 'Discovery', value: 'discovery', icon: 'compass' },
+        { label: t('list.tabJoined'), value: 'joined', icon: 'checkmark-circle' },
+        { label: t('list.tabDiscovery'), value: 'discovery', icon: 'compass' },
     ];
 
     return (
@@ -249,15 +251,15 @@ export default function HubsScreen() {
             <View className="px-6 pt-4 pb-2">
                 <View className="flex-row items-center justify-between">
                     <View>
-                        <Text className="text-2xl font-black text-white tracking-tight">Hubs</Text>
-                        <Text className="text-xs text-slate-600 font-medium mt-0.5">Your Communities</Text>
+                        <Text className="text-2xl font-black text-white tracking-tight">{t('common:nav.hubs')}</Text>
+                        <Text className="text-xs text-slate-600 font-medium mt-0.5">{t('list.yourCommunities')}</Text>
                     </View>
                     <Pressable
                         onPress={() => setIsModalOpen(true)}
                         className="flex-row items-center px-4 py-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                     >
                         <Ionicons name="add" size={16} color="#818CF8" />
-                        <Text className="text-xs font-bold text-indigo-400 ml-1.5">Create</Text>
+                        <Text className="text-xs font-bold text-indigo-400 ml-1.5">{t('list.create')}</Text>
                     </Pressable>
                 </View>
             </View>
@@ -268,7 +270,7 @@ export default function HubsScreen() {
                     value={searchQuery}
                     onChange={setSearchQuery}
                     onSubmit={handleSearch}
-                    placeholder="Search hubs..."
+                    placeholder={t('list.searchHubs')}
                 />
             </View>
 
@@ -287,20 +289,20 @@ export default function HubsScreen() {
                     <View className="w-14 h-14 rounded-2xl bg-indigo-500/10 items-center justify-center mb-4">
                         <ActivityIndicator size="small" color="#818CF8" />
                     </View>
-                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">Loading hubs...</Text>
+                    <Text className="text-sm font-semibold text-slate-500 tracking-wide">{t('list.loadingHubs')}</Text>
                 </View>
             ) : hubsQuery.isError && hubs.length === 0 ? (
                 <View className="flex-1 items-center justify-center px-6">
                     <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center mb-4">
                         <Ionicons name="alert-circle" size={28} color="#EF4444" />
                     </View>
-                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">Something went wrong</Text>
-                    <Text className="text-xs text-slate-600 text-center mb-5">Failed to load hubs. Please check your connection.</Text>
+                    <Text className="text-sm text-red-400 text-center font-semibold mb-1">{t('list.somethingWentWrong')}</Text>
+                    <Text className="text-xs text-slate-600 text-center mb-5">{t('list.loadFailed')}</Text>
                     <Pressable
                         onPress={() => hubsQuery.refetch()}
                         className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                     >
-                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">Try Again</Text>
+                        <Text className="text-xs font-bold text-indigo-400 tracking-wide">{t('list.tryAgain')}</Text>
                     </Pressable>
                 </View>
             ) : (
@@ -326,17 +328,17 @@ export default function HubsScreen() {
                             icon="people-outline"
                             color={COLORS.info}
                             title={activeTab === 'joined'
-                                ? "You haven't joined any hubs yet"
-                                : "No hubs found"}
+                                ? t('list.noneJoined')
+                                : t('list.noHubsFound')}
                             description={activeTab === 'joined'
-                                ? "Discover communities to join"
-                                : "Try a different search"}
+                                ? t('list.discoverHint')
+                                : t('list.tryDifferentSearch')}
                             action={activeTab === 'joined' ? (
                                 <Pressable
                                     onPress={() => setActiveTab('discovery')}
                                     className="px-5 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 active:opacity-70"
                                 >
-                                    <Text className="text-xs font-bold text-indigo-400 tracking-wide">Browse Hubs</Text>
+                                    <Text className="text-xs font-bold text-indigo-400 tracking-wide">{t('list.browseHubs')}</Text>
                                 </Pressable>
                             ) : undefined}
                         />
@@ -370,7 +372,7 @@ export default function HubsScreen() {
                             onPress={(e) => e.stopPropagation()}
                         >
                             <View className="flex-row justify-between items-center mb-5">
-                                <Text className="text-xl font-black text-white">Create New Hub</Text>
+                                <Text className="text-xl font-black text-white">{t('list.createNewHub')}</Text>
                                 <Pressable onPress={() => setIsModalOpen(false)} className="w-8 h-8 rounded-xl bg-white/[0.05] items-center justify-center">
                                     <Ionicons name="close" size={18} color="#64748B" />
                                 </Pressable>
@@ -379,10 +381,10 @@ export default function HubsScreen() {
                             {createHubError && <Text className="text-red-400 text-sm font-medium mb-3">{createHubError}</Text>}
 
                             <View className="mb-4">
-                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Hub Name</Text>
+                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('list.hubName')}</Text>
                                 <TextInput
                                     className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm"
-                                    placeholder="e.g. Pro Players Guild"
+                                    placeholder={t('list.hubNamePlaceholder')}
                                     placeholderTextColor="#334155"
                                     value={hubName}
                                     onChangeText={setHubName}
@@ -390,10 +392,10 @@ export default function HubsScreen() {
                             </View>
 
                             <View className="mb-5">
-                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Description</Text>
+                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('list.description')}</Text>
                                 <TextInput
                                     className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm h-24"
-                                    placeholder="Describe your community..."
+                                    placeholder={t('list.descriptionPlaceholder')}
                                     placeholderTextColor="#334155"
                                     multiline
                                     value={hubDescription}
@@ -403,7 +405,7 @@ export default function HubsScreen() {
 
                             <View className="h-[1px] bg-white/5 mb-5" />
 
-                            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Privacy</Text>
+                            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('list.privacy')}</Text>
                             <View className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06]">
                                 <View className="flex-row items-center justify-between">
                                     <View className="flex-row items-center gap-3 flex-1">
@@ -419,12 +421,12 @@ export default function HubsScreen() {
                                         </View>
                                         <View className="flex-1">
                                             <Text className="text-white font-bold text-sm">
-                                                {hubIsPublic ? "Public Hub" : "Private Hub"}
+                                                {hubIsPublic ? t('list.publicHub') : t('list.privateHub')}
                                             </Text>
                                             <Text className="text-slate-500 text-xs mt-0.5">
                                                 {hubIsPublic
-                                                    ? "Anyone can follow this hub"
-                                                    : "Members need approval to join"}
+                                                    ? t('list.publicHint')
+                                                    : t('list.privateHint')}
                                             </Text>
                                         </View>
                                     </View>
@@ -443,7 +445,7 @@ export default function HubsScreen() {
                                 loading={isCreating}
                                 disabled={!hubName.trim()}
                             >
-                                <Text className="text-white font-bold">Create Hub</Text>
+                                <Text className="text-white font-bold">{t('list.createHub')}</Text>
                             </Button>
                         </Pressable>
                     </Pressable>
@@ -457,7 +459,7 @@ export default function HubsScreen() {
                 type="error"
                 title={errorModal?.title ?? ''}
                 message={errorModal?.message ?? ''}
-                buttonText="Got It"
+                buttonText={t('list.gotIt')}
             />
         </SafeAreaView>
     );

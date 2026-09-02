@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +21,7 @@ interface SelectInputProps {
 
 export function SelectInput({
     label,
-    placeholder = 'Select an option',
+    placeholder,
     value,
     options,
     onSelect,
@@ -28,6 +29,7 @@ export function SelectInput({
     leftIcon,
     className
 }: SelectInputProps) {
+    const { t } = useTranslation('common');
     const [modalVisible, setModalVisible] = useState(false);
 
     const selectedOption = options.find(opt => opt.value === value);
@@ -99,7 +101,7 @@ export function SelectInput({
 
                         <View className="px-6 py-4 flex-row justify-between items-center bg-card/50">
                             <Text className="text-xl font-black text-white tracking-tight">
-                                {label || 'Select Option'}
+                                {label || t('ui.selectOption')}
                             </Text>
                             <TouchableOpacity 
                                 onPress={() => setModalVisible(false)}

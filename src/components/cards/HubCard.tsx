@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text } from 'react-native';
 import { PressableScale } from '../ui/PressableScale';
@@ -41,6 +42,7 @@ export const HubCard = React.memo(function HubCard({
     index = 0,
     badgeCount = 0,
 }: HubCardProps) {
+    const { t } = useTranslation('common');
     const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
 
     // Joined hubs get an emerald-tinted gradient; non-joined get a subtle neutral indigo
@@ -160,7 +162,7 @@ export const HubCard = React.memo(function HubCard({
                                         className="text-[10px] font-black uppercase text-emerald-300"
                                         style={{ letterSpacing: 1.4 }}
                                     >
-                                        Joined
+                                        {t('app.joined')}
                                     </Text>
                                 </LinearGradient>
                             </View>
@@ -189,7 +191,7 @@ export const HubCard = React.memo(function HubCard({
                             >
                                 <Ionicons name="people-outline" size={13} color="#34D399" />
                                 <Text className="text-[11px] font-black text-slate-300 ml-1.5">
-                                    {numberOfUsers} <Text className="text-slate-500 font-bold">Fans</Text>
+                                    {numberOfUsers} <Text className="text-slate-500 font-bold">{t('app.fans')}</Text>
                                 </Text>
                             </View>
                             <View
@@ -202,7 +204,7 @@ export const HubCard = React.memo(function HubCard({
                             >
                                 <Ionicons name="trophy-outline" size={13} color="#A5B4FC" />
                                 <Text className="text-[11px] font-black text-slate-300 ml-1.5">
-                                    {numberOfTournaments} <Text className="text-slate-500 font-bold">Tournaments</Text>
+                                    {numberOfTournaments} <Text className="text-slate-500 font-bold">{t('common:nav.tournaments')}</Text>
                                 </Text>
                             </View>
                         </View>

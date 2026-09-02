@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +35,8 @@ export function MatchStreamPanel({
     initialStreams,
     onStreamsChange,
 }: MatchStreamPanelProps) {
+    const { t } = useTranslation('match');
+    const { t: tCommon } = useTranslation('common');
     const { user, refreshUser } = useAuth();
 
     const [streams, setStreams] = useState<MatchStream[]>(initialStreams ?? []);
@@ -96,7 +99,7 @@ export function MatchStreamPanel({
     const startStream = async (chosenPlatform: SocialType, chosenHandle?: string) => {
         // Guard: a temporarily disabled platform (e.g. Twitch pending 2FA) can't be streamed yet.
         if (DISABLED_STREAMING_PLATFORMS.includes(chosenPlatform)) {
-            setError(`${getPlatformMeta(chosenPlatform).name} streaming is temporarily unavailable.`);
+            setError(t('stream.unavailable', { platform: getPlatformMeta(chosenPlatform).name }));
             return;
         }
         setSubmitting(true);
@@ -138,12 +141,12 @@ export function MatchStreamPanel({
 
     const deleteStream = async (streamerUserId: string) => {
         Alert.alert(
-            'Delete stream?',
-            'This removes the stream link and replay. You can start a new one after.',
+            t('stream.deleteTitle'),
+            t('stream.deleteMessage'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tCommon('cancel'), style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: tCommon('delete'),
                     style: 'destructive',
                     onPress: async () => {
                         setSubmitting(true);
@@ -268,7 +271,7 @@ export function MatchStreamPanel({
                                 className="flex-row items-center justify-center gap-2 py-3 rounded-2xl bg-primary/10 border border-primary/20 active:opacity-70"
                             >
                                 <Ionicons name="videocam" size={16} color="#10B981" />
-                                <Text className="text-xs font-black text-primary uppercase tracking-widest">Stream your own POV</Text>
+                                <Text className="text-xs font-black text-primary uppercase tracking-widest">{t('stream.streamYourPov')}</Text>
                             </Pressable>
                         )
                     )}
@@ -297,6 +300,7 @@ function StreamCard({
     onSubmitVod: () => void;
     onDelete: () => void;
 }) {
+    const { t } = useTranslation('match');
     const meta = getPlatformMeta(stream.platform);
     const live = stream.status === MatchStreamStatus.Live;
     const hasReplay = !live && !!stream.vodUrl;
@@ -341,7 +345,7 @@ function StreamCard({
                                 style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)' }}
                             >
                                 <Text className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">
-                                    You
+                                    {t('stream.you')}
                                 </Text>
                             </View>
                         )}
@@ -353,16 +357,16 @@ function StreamCard({
                             <View className="flex-row items-center" style={{ gap: 5 }}>
                                 <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
                                 <Text className="text-[10.5px] font-black text-red-400 uppercase" style={{ letterSpacing: 1.4 }}>
-                                    Live
+                                    {t('stream.live')}
                                 </Text>
                             </View>
                         ) : hasReplay ? (
                             <Text className="text-[10.5px] font-black text-slate-400 uppercase" style={{ letterSpacing: 1.4 }}>
-                                Replay
+                                {t('stream.replay')}
                             </Text>
                         ) : (
                             <Text className="text-[10.5px] font-black text-amber-300 uppercase" style={{ letterSpacing: 1.4 }}>
-                                Pending
+                                {t('stream.pending')}
                             </Text>
                         )}
                         <Text className="text-[11px] font-bold text-slate-600">·</Text>
@@ -398,7 +402,7 @@ function StreamCard({
                 {live ? (
                     <StreamPlayer
                         source={getLiveEmbed(stream.platform, stream.channelHandle)}
-                        title="Watch live"
+                        title={t('stream.watchLive')}
                         platform={stream.platform}
                         live
                         isPlaying={isPlaying}
@@ -407,7 +411,7 @@ function StreamCard({
                 ) : hasReplay ? (
                     <StreamPlayer
                         source={getVodEmbed(stream.platform, stream.vodUrl!)}
-                        title="Watch replay"
+                        title={t('stream.watchReplay')}
                         platform={stream.platform}
                         isPlaying={isPlaying}
                         onPlayPress={onPlay}
@@ -449,7 +453,7 @@ function StreamCard({
                                             className="text-[11px] font-black text-red-300 uppercase"
                                             style={{ letterSpacing: 1.4 }}
                                         >
-                                            End Stream
+                                            {t('stream.endStream')}
                                         </Text>
                                     </>
                                 )}
@@ -469,7 +473,7 @@ function StreamCard({
                                     className="text-[10px] font-black text-slate-400 uppercase"
                                     style={{ letterSpacing: 1.4 }}
                                 >
-                                    Paste the replay link
+                                    {t('stream.pasteReplayLink')}
                                 </Text>
                                 <Input
                                     placeholder="https://..."
@@ -483,7 +487,7 @@ function StreamCard({
                                     disabled={!vodInput.trim()}
                                     size="sm"
                                 >
-                                    <Text className="text-white font-bold">Save replay link</Text>
+                                    <Text className="text-white font-bold">{t('stream.saveReplayLink')}</Text>
                                 </Button>
                             </View>
                         )}
@@ -499,7 +503,7 @@ function StreamCard({
                                 className="text-[10px] font-bold text-slate-500 uppercase"
                                 style={{ letterSpacing: 1.2 }}
                             >
-                                Delete stream
+                                {t('stream.deleteStream')}
                             </Text>
                         </Pressable>
                     </View>
@@ -516,6 +520,7 @@ function StreamCard({
 // Visible only when the stream has an Ended archive URL with an extractable video id; if the
 // VOD is already a highlight or has been deleted, the button gracefully won't appear.
 function TwitchHighlighterButton({ stream }: { stream: MatchStream }) {
+    const { t } = useTranslation('match');
     if (stream.platform !== SocialType.Twitch || stream.status !== MatchStreamStatus.Ended) return null;
     if (!stream.vodUrl) return null;
 
@@ -534,13 +539,14 @@ function TwitchHighlighterButton({ stream }: { stream: MatchStream }) {
         >
             <Ionicons name="bookmark-outline" size={13} color="#A472FF" />
             <Text className="text-[11px] font-black uppercase tracking-widest" style={{ color: '#A472FF' }}>
-                Make replay permanent
+                {t('stream.makeReplayPermanent')}
             </Text>
         </Pressable>
     );
 }
 
 function PendingReplay({ channelUrl }: { channelUrl?: string | null }) {
+    const { t } = useTranslation('match');
     return (
         <View
             className="rounded-2xl border border-white/[0.06] bg-background-deep items-center justify-center px-5"
@@ -549,14 +555,14 @@ function PendingReplay({ channelUrl }: { channelUrl?: string | null }) {
             <View className="w-12 h-12 rounded-2xl bg-yellow-500/10 items-center justify-center mb-3">
                 <Ionicons name="hourglass-outline" size={22} color="#EAB308" />
             </View>
-            <Text className="text-sm font-bold text-white text-center">Replay not available yet</Text>
+            <Text className="text-sm font-bold text-white text-center">{t('stream.replayNotAvailable')}</Text>
             <Text className="text-xs text-slate-500 text-center mt-1">
-                The platform hasn't published the VOD, or it couldn't be found automatically.
+                {t('stream.replayNotAvailableHint')}
             </Text>
             {!!channelUrl && (
                 <Pressable onPress={() => Linking.openURL(channelUrl)} className="mt-3 flex-row items-center gap-1.5">
                     <Ionicons name="open-outline" size={13} color="#10B981" />
-                    <Text className="text-[11px] font-bold text-primary uppercase tracking-wider">Open channel</Text>
+                    <Text className="text-[11px] font-bold text-primary uppercase tracking-wider">{t('stream.openChannel')}</Text>
                 </Pressable>
             )}
         </View>
@@ -577,11 +583,12 @@ function StartArea({
     onStart: (p: SocialType, h?: string) => void;
     onCancel?: () => void;
 }) {
+    const { t } = useTranslation('match');
     const showForm = forceForm || savedChannels.length === 0;
 
     return (
         <View className="gap-3">
-            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Stream this match</Text>
+            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{t('stream.streamThisMatch')}</Text>
 
             {DISABLED_STREAMING_PLATFORMS.length > 0 && (
                 <View className="flex-row items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/[0.08] border border-amber-500/20">
@@ -616,14 +623,14 @@ function StartArea({
                     })}
                     <Pressable onPress={onForceForm} className="flex-row items-center justify-center gap-2 py-3 active:opacity-60">
                         <Ionicons name="add" size={16} color="#64748B" />
-                        <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider" numberOfLines={1}>Use another channel</Text>
+                        <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider" numberOfLines={1}>{t('stream.useAnotherChannel')}</Text>
                     </Pressable>
                 </View>
             ) : (
                 <View className="p-4 rounded-2xl bg-card border border-white/[0.06] gap-3">
-                    <SelectInput placeholder="Select platform" options={platformOptions} value={platform} onSelect={setPlatform} />
+                    <SelectInput placeholder={t('stream.selectPlatform')} options={platformOptions} value={platform} onSelect={setPlatform} />
                     {platform !== undefined && (
-                        <Input placeholder="Your channel / handle" value={handle} onChangeText={setHandle} autoCapitalize="none" />
+                        <Input placeholder={t('stream.yourChannelHandle')} value={handle} onChangeText={setHandle} autoCapitalize="none" />
                     )}
                     <Button
                         onPress={() => platform !== undefined && onStart(platform, handle)}
@@ -632,30 +639,31 @@ function StartArea({
                     >
                         <View className="flex-row items-center gap-2">
                             <Ionicons name="videocam" size={16} color="white" />
-                            <Text className="text-white font-bold">Go live</Text>
+                            <Text className="text-white font-bold">{t('stream.goLive')}</Text>
                         </View>
                     </Button>
                     {!!onCancel && (
                         <Pressable onPress={onCancel} className="items-center py-1 active:opacity-60">
-                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider w-full text-center" numberOfLines={1}>Cancel</Text>
+                            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('common:cancel')}</Text>
                         </Pressable>
                     )}
                 </View>
             )}
 
             <Text className="text-[11px] text-slate-500 px-1">
-                Your channel is saved to your profile for next time. When you end the stream we save the replay link automatically.
+                {t('stream.channelSavedHint')}
             </Text>
         </View>
     );
 }
 
 function EmptyState() {
+    const { t } = useTranslation('match');
     return (
         <EmptyStateBase
             icon="videocam-outline"
-            title="No stream for this match"
-            description="Check back when a player goes live."
+            title={t('stream.noStream')}
+            description={t('stream.noStreamHint')}
         />
     );
 }

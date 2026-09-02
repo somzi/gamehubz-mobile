@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,13 +50,13 @@ const BadgesContext = createContext<BadgesContextType | undefined>(undefined);
 
 async function fetchBadges(): Promise<BadgeCounts> {
     const res = await authenticatedFetch(ENDPOINTS.GET_BADGES);
-    if (!res.ok) throw new Error('Failed to load badges');
+    if (!res.ok) throw new Error(i18n.t('common:app.loadBadgesFailed'));
     return (await res.json()) as BadgeCounts;
 }
 
 async function fetchApprovals(): Promise<ApprovalsBreakdown> {
     const res = await authenticatedFetch(ENDPOINTS.GET_BADGE_APPROVALS);
-    if (!res.ok) throw new Error('Failed to load approvals');
+    if (!res.ok) throw new Error(i18n.t('common:app.loadApprovalsFailed'));
     return (await res.json()) as ApprovalsBreakdown;
 }
 

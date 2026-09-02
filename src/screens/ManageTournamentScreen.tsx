@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +18,8 @@ type ManageTournamentScreenRouteProp = RouteProp<RootStackParamList, 'ManageTour
 type ManageTournamentScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ManageTournamentScreen() {
+    const { t } = useTranslation('tournament');
+    const { t: tCommon } = useTranslation('common');
     const route = useRoute<ManageTournamentScreenRouteProp>();
     const navigation = useNavigation<ManageTournamentScreenNavigationProp>();
     const { id } = route.params as { id: string };
@@ -58,15 +61,15 @@ export default function ManageTournamentScreen() {
                 });
             } else if (response.status === 404) {
                 setTournament(null);
-                setLoadError('This tournament no longer exists. It may have been deleted.');
+                setLoadError(t('manage.notExists'));
             } else {
                 setTournament(null);
-                setLoadError('Failed to load tournament details. Please try again.');
+                setLoadError(t('manage.loadFailed'));
             }
         } catch (error) {
             console.error('Error fetching tournament details:', error);
             setTournament(null);
-            setLoadError('Could not reach the server. Check your connection and try again.');
+            setLoadError(t('manage.noServer'));
         } finally {
             setIsLoading(false);
         }
@@ -74,11 +77,11 @@ export default function ManageTournamentScreen() {
 
     const promptCancelTournament = () => {
         Alert.alert(
-            "Cancel Tournament",
-            "Are you sure you want to cancel this tournament?",
+            t('manage.cancelTitle'),
+            t('manage.cancelMessage'),
             [
-                { text: "No", style: "cancel" },
-                { text: "Yes, Cancel", style: "destructive", onPress: handleCancelTournament }
+                { text: tCommon('no'), style: 'cancel' },
+                { text: t('manage.yesCancel'), style: 'destructive', onPress: handleCancelTournament }
             ]
         );
     };
@@ -92,13 +95,13 @@ export default function ManageTournamentScreen() {
 
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No response body');
-                throw new Error(`Failed to cancel tournament: ${text}`);
+                throw new Error(t('manage.cancelFailedWith', { text }));
             }
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'Tournament cancelled successfully!'
+                title: tCommon('success'),
+                message: t('manage.cancelled')
             });
             setShowStatusModal(true);
             fetchTournamentDetails();
@@ -106,8 +109,8 @@ export default function ManageTournamentScreen() {
             console.error('Cancel tournament error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
-                message: err.message || 'Failed to cancel tournament'
+                title: tCommon('error'),
+                message: err.message || t('manage.cancelFailed')
             });
             setShowStatusModal(true);
         } finally {
@@ -117,11 +120,11 @@ export default function ManageTournamentScreen() {
 
     const promptDeleteTournament = () => {
         Alert.alert(
-            "Delete Tournament",
-            "Are you sure you want to permanently delete this tournament?",
+            t('manage.deleteTitle'),
+            t('manage.deleteMessage'),
             [
-                { text: "No", style: "cancel" },
-                { text: "Yes, Delete", style: "destructive", onPress: handleDeleteTournament }
+                { text: tCommon('no'), style: 'cancel' },
+                { text: t('manage.yesDelete'), style: 'destructive', onPress: handleDeleteTournament }
             ]
         );
     };
@@ -135,13 +138,13 @@ export default function ManageTournamentScreen() {
 
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No response body');
-                throw new Error(`Failed to delete tournament: ${text}`);
+                throw new Error(t('manage.deleteFailedWith', { text }));
             }
 
             setStatusModalConfig({
                 type: 'success',
-                title: 'Success',
-                message: 'Tournament deleted successfully!'
+                title: tCommon('success'),
+                message: t('manage.deleted')
             });
             setShowStatusModal(true);
             setTimeout(() => {
@@ -151,8 +154,8 @@ export default function ManageTournamentScreen() {
             console.error('Delete tournament error:', err);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Error',
-                message: err.message || 'Failed to delete tournament'
+                title: tCommon('error'),
+                message: err.message || t('manage.deleteFailed')
             });
             setShowStatusModal(true);
             setIsLoading(false);
@@ -162,7 +165,7 @@ export default function ManageTournamentScreen() {
     if (isLoading && !tournament) {
         return (
             <SafeAreaView className="flex-1 bg-background">
-                <PageHeader title="Manage Tournament" showBack />
+                <PageHeader title={t('manage.title')} showBack />
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#10B981" />
                 </View>
@@ -176,27 +179,27 @@ export default function ManageTournamentScreen() {
     if (!tournament) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <PageHeader title="Manage Tournament" showBack />
+                <PageHeader title={t('manage.title')} showBack />
                 <View className="flex-1 items-center justify-center px-8">
                     <View className="w-16 h-16 rounded-3xl bg-red-500/10 items-center justify-center border border-red-500/20 mb-4">
                         <Ionicons name="alert-circle-outline" size={32} color="#EF4444" />
                     </View>
-                    <Text className="text-white font-black text-lg text-center">Can't load tournament</Text>
+                    <Text className="text-white font-black text-lg text-center">{t('manage.cantLoad')}</Text>
                     <Text className="text-slate-400 text-sm text-center mt-2 font-medium">
-                        {loadError || 'Tournament not found.'}
+                        {loadError || t('manage.notFound')}
                     </Text>
                     <View className="flex-row gap-3 mt-6">
                         <Pressable
                             onPress={fetchTournamentDetails}
                             className="bg-emerald-500 px-5 py-3 rounded-2xl active:opacity-80"
                         >
-                            <Text className="text-primary-foreground font-black text-sm uppercase tracking-wider">Retry</Text>
+                            <Text className="text-primary-foreground font-black text-sm uppercase tracking-wider">{tCommon('retry')}</Text>
                         </Pressable>
                         <Pressable
                             onPress={() => navigation.goBack()}
                             className="bg-white/5 border border-white/10 px-5 py-3 rounded-2xl active:opacity-80"
                         >
-                            <Text className="text-slate-300 font-black text-sm uppercase tracking-wider">Go Back</Text>
+                            <Text className="text-slate-300 font-black text-sm uppercase tracking-wider">{t('manage.goBack')}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -206,7 +209,7 @@ export default function ManageTournamentScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Manage Tournament" showBack />
+            <PageHeader title={t('manage.title')} showBack />
 
             <ScrollView className="flex-1 px-6">
                 <View className="items-center py-8 mb-2">
@@ -215,21 +218,21 @@ export default function ManageTournamentScreen() {
                     </View>
                     <Text className="text-2xl font-black text-white text-center">{tournament?.name}</Text>
                     <Text className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">
-                        {tournament?.status === 0 ? (tournament?.registrationOpensAt ? 'Scheduled' : 'Open') : 
-                         tournament?.status === 1 ? 'Upcoming' :
-                         tournament?.status === 2 ? 'Reg. Closed' :
-                         tournament?.status === 3 ? 'Live' :
-                         tournament?.status === 4 ? 'Completed' : 'IDLE'}
+                        {tournament?.status === 0 ? (tournament?.registrationOpensAt ? t('manage.statusScheduled') : t('details.statusOpen')) : 
+                         tournament?.status === 1 ? t('details.statusUpcoming') :
+                         tournament?.status === 2 ? t('details.statusRegClosed') :
+                         tournament?.status === 3 ? t('details.statusLive') :
+                         tournament?.status === 4 ? t('details.statusCompleted') : t('details.statusIdle')}
                     </Text>
                 </View>
 
                 <View className="gap-5">
                     <View>
-                        <SectionLabel icon="trophy" title="Tournament" />
+                        <SectionLabel icon="trophy" title={t('manage.sectionTournament')} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
                                 icon="create-outline"
-                                label="Edit Tournament Info"
+                                label={t('manage.editInfo')}
                                 onPress={() => setShowEditModal(true)}
                                 isLast
                             />
@@ -239,12 +242,12 @@ export default function ManageTournamentScreen() {
                     {(tournament?.status === 3 ||
                         tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
                         <View>
-                            <SectionLabel icon="exit-outline" title="Admin Actions" color={COLORS.destructive} />
+                            <SectionLabel icon="exit-outline" title={t('manage.sectionAdminActions')} color={COLORS.destructive} />
                             <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                                 {tournament?.status === 3 && (
                                     <MenuItem
                                         icon="stop-circle-outline"
-                                        label="Cancel Tournament"
+                                        label={t('manage.cancelTitle')}
                                         onPress={promptCancelTournament}
                                         destructive
                                         showChevron={false}
@@ -254,7 +257,7 @@ export default function ManageTournamentScreen() {
                                 {(tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
                                     <MenuItem
                                         icon="trash-outline"
-                                        label="Delete Tournament"
+                                        label={t('manage.deleteTitle')}
                                         onPress={promptDeleteTournament}
                                         destructive
                                         showChevron={false}

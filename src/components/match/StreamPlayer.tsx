@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { View, Text, Pressable, Linking, ActivityIndicator, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -20,7 +21,9 @@ interface StreamPlayerProps {
     onPlayPress?: () => void;
 }
 
-export function StreamPlayer({ source, title = 'Open stream', platform, live, isPlaying, onPlayPress }: StreamPlayerProps) {
+export function StreamPlayer({ source, title, platform, live, isPlaying, onPlayPress }: StreamPlayerProps) {
+    const { t } = useTranslation('match');
+    const resolvedTitle = title ?? t('player.openStream');
     // Uncontrolled fallback: internal "started" state when the parent doesn't pass isPlaying.
     const [internalStarted, setInternalStarted] = useState(false);
     const controlled = isPlaying !== undefined;
@@ -35,7 +38,7 @@ export function StreamPlayer({ source, title = 'Open stream', platform, live, is
                 <View className="w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center mb-3">
                     <Ionicons name="open-outline" size={22} color="#10B981" />
                 </View>
-                <Text className="text-sm font-bold text-white text-center">Can't play in-app</Text>
+                <Text className="text-sm font-bold text-white text-center">{t('player.cantPlayInApp')}</Text>
                 {!!source.reason && (
                     <Text className="text-xs text-slate-500 text-center mt-1">{source.reason}</Text>
                 )}
@@ -112,7 +115,7 @@ export function StreamPlayer({ source, title = 'Open stream', platform, live, is
                 {live && (
                     <View className="absolute top-3 right-3 flex-row items-center gap-1 bg-red-500/20 border border-red-500/40 px-2 py-1 rounded-md">
                         <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        <Text className="text-[9px] font-black text-red-300 uppercase tracking-widest">Live</Text>
+                        <Text className="text-[9px] font-black text-red-300 uppercase tracking-widest">{t('player.live')}</Text>
                     </View>
                 )}
             </Pressable>

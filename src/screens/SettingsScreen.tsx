@@ -2,12 +2,14 @@ import React from 'react';
 import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { StatusModal } from '../components/modals/StatusModal';
+import { ActionSheetModal } from '../components/modals/ActionSheetModal';
 import Constants from 'expo-constants';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
@@ -15,6 +17,7 @@ import { MenuItem } from '../components/ui/MenuItem';
 import { Toggle } from '../components/ui/Toggle';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { NotificationSettings } from '../types/social';
+import { useLanguage } from '../i18n/useLanguage';
 
 type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -23,7 +26,11 @@ type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 export default function SettingsScreen() {
     const { logout, deleteAccount } = useAuth();
     const navigation = useNavigation<SettingsNavigationProp>();
+    const { t } = useTranslation('settings');
+    const { t: tc } = useTranslation('common');
+    const { current, options, language, change } = useLanguage();
 
+    const [showLanguageSheet, setShowLanguageSheet] = React.useState(false);
     const [showStatusModal, setShowStatusModal] = React.useState(false);
     const [statusModalConfig, setStatusModalConfig] = React.useState<{
         type: 'success' | 'error' | 'info';
@@ -67,8 +74,8 @@ export default function SettingsScreen() {
             setNotificationSettings(previous);
             setStatusModalConfig({
                 type: 'error',
-                title: 'Could not save',
-                message: 'Your notification setting was not updated. Try again in a moment.',
+                title: t('notifications.saveFailedTitle'),
+                message: t('notifications.saveFailedMessage'),
             });
             setShowStatusModal(true);
         } finally {
@@ -78,38 +85,38 @@ export default function SettingsScreen() {
 
     const handleLogout = () => {
         Alert.alert(
-            'Log Out',
-            'Are you sure you want to log out?',
+            t('logOutConfirm.title'),
+            t('logOutConfirm.message'),
             [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Log Out', style: 'destructive', onPress: () => logout() }
+                { text: tc('cancel'), style: 'cancel' },
+                { text: t('logOut'), style: 'destructive', onPress: () => logout() }
             ]
         );
     };
 
     const handleDeleteAccount = () => {
         Alert.alert(
-            'Delete Account',
-            'Are you sure you want to delete your account? This action is permanent and cannot be undone.',
+            t('deleteConfirm.title'),
+            t('deleteConfirm.message'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: tc('cancel'), style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: tc('delete'),
                     style: 'destructive',
                     onPress: async () => {
                         const success = await deleteAccount();
                         if (success) {
                             setStatusModalConfig({
                                 type: 'success',
-                                title: 'Account Deleted',
-                                message: 'Your account has been successfully deleted.'
+                                title: t('deleteSuccess.title'),
+                                message: t('deleteSuccess.message')
                             });
                             setShowStatusModal(true);
                         } else {
                             setStatusModalConfig({
                                 type: 'error',
-                                title: 'Delete Failed',
-                                message: 'Failed to delete your account. Please try again later.'
+                                title: t('deleteFailed.title'),
+                                message: t('deleteFailed.message')
                             });
                             setShowStatusModal(true);
                         }
@@ -121,27 +128,27 @@ export default function SettingsScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <PageHeader title="Settings" showBack />
+            <PageHeader title={t('title')} showBack />
 
             <ScrollView className="flex-1 px-6">
                 {/* Settings Menu — grouped cards */}
                 <View className="gap-5 pt-4">
                     <View>
-                        <SectionLabel icon="person" title="Account" />
+                        <SectionLabel icon="person" title={t('sections.account')} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
                                 icon="person-outline"
-                                label="Edit Profile Info"
+                                label={t('editProfile')}
                                 onPress={() => navigation.navigate('UpdateProfile')}
                             />
                             <MenuItem
                                 icon="share-social-outline"
-                                label="Manage Socials"
+                                label={t('manageSocials')}
                                 onPress={() => navigation.navigate('ManageUserSocials')}
                             />
                             <MenuItem
                                 icon="lock-closed-outline"
-                                label="Password & Security"
+                                label={t('passwordSecurity')}
                                 onPress={() => navigation.navigate('ChangePassword')}
                                 isLast
                             />
@@ -150,7 +157,7 @@ export default function SettingsScreen() {
 
                     {notificationSettings && (
                         <View>
-                            <SectionLabel icon="notifications" title="Notifications" color={COLORS.warning} />
+                            <SectionLabel icon="notifications" title={t('sections.notifications')} color={COLORS.warning} />
                             <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                                 <View className="flex-row items-center justify-between py-3.5 px-4">
                                     <View className="flex-row items-center gap-3 flex-1 pr-3">
@@ -158,10 +165,9 @@ export default function SettingsScreen() {
                                             <Ionicons name="shield-checkmark-outline" size={17} color={COLORS.slate300} />
                                         </View>
                                         <View className="flex-1">
-                                            <Text className="font-semibold text-[15px] text-white">Chats I moderate</Text>
+                                            <Text className="font-semibold text-[15px] text-white">{t('notifications.moderatedChats')}</Text>
                                             <Text className="text-xs text-slate-500 mt-0.5">
-                                                Alert me when players reply in a match chat I joined as an organizer.
-                                                Chats on your own matches are never silenced by this.
+                                                {t('notifications.moderatedChatsHint')}
                                             </Text>
                                         </View>
                                     </View>
@@ -174,27 +180,44 @@ export default function SettingsScreen() {
                                 </View>
                             </View>
                             <Text className="text-[11px] text-slate-600 mt-2 px-1 leading-4">
-                                To silence one specific match instead, open its chat and tap Muted.
+                                {t('notifications.perMatchHint')}
                             </Text>
                         </View>
                     )}
 
                     <View>
-                        <SectionLabel icon="help-buoy" title="Support" color={COLORS.info} />
+                        <SectionLabel icon="options" title={t('sections.preferences')} color={COLORS.highlight} />
+                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                            <MenuItem
+                                icon="language-outline"
+                                label={t('language')}
+                                onPress={() => setShowLanguageSheet(true)}
+                                isLast
+                                rightElement={
+                                    <Text className="text-slate-400 text-[13px] font-semibold" numberOfLines={1}>
+                                        {current.flag}  {current.label}
+                                    </Text>
+                                }
+                            />
+                        </View>
+                    </View>
+
+                    <View>
+                        <SectionLabel icon="help-buoy" title={t('sections.support')} color={COLORS.info} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
                                 icon="help-circle-outline"
-                                label="Help Center"
+                                label={t('helpCenter')}
                                 onPress={() => navigation.navigate('HelpCenter')}
                             />
                             <MenuItem
                                 icon="mail-outline"
-                                label="Contact Us"
+                                label={t('contactUs')}
                                 onPress={() => navigation.navigate('ContactUs')}
                             />
                             <MenuItem
                                 icon="information-circle-outline"
-                                label="About Us"
+                                label={t('aboutUs')}
                                 onPress={() => navigation.navigate('AboutUs')}
                                 isLast
                             />
@@ -202,18 +225,18 @@ export default function SettingsScreen() {
                     </View>
 
                     <View>
-                        <SectionLabel icon="exit-outline" title="Account Actions" color={COLORS.destructive} />
+                        <SectionLabel icon="exit-outline" title={t('sections.accountActions')} color={COLORS.destructive} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
                                 icon="log-out-outline"
-                                label="Log Out"
+                                label={t('logOut')}
                                 onPress={handleLogout}
                                 destructive
                                 showChevron={false}
                             />
                             <MenuItem
                                 icon="trash-outline"
-                                label="Delete Account"
+                                label={t('deleteAccount')}
                                 onPress={handleDeleteAccount}
                                 destructive
                                 showChevron={false}
@@ -224,9 +247,24 @@ export default function SettingsScreen() {
                 </View>
 
                 <View className="py-12 items-center opacity-30">
-                    <Text className="text-white text-xs">GameHubz Mobile v{Constants.expoConfig?.version || '1.0.0'}</Text>
+                    <Text className="text-white text-xs">
+                        {t('version', { version: Constants.expoConfig?.version || '1.0.0' })}
+                    </Text>
                 </View>
             </ScrollView>
+
+            <ActionSheetModal
+                visible={showLanguageSheet}
+                onClose={() => setShowLanguageSheet(false)}
+                title={t('languagePicker.title')}
+                subtitle={t('languagePicker.subtitle')}
+                actions={options.map(option => ({
+                    label: option.label,
+                    emoji: option.flag,
+                    selected: option.code === language,
+                    onPress: () => { void change(option.code); },
+                }))}
+            />
 
             <StatusModal
                 visible={showStatusModal}

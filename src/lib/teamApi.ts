@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { apiClient, API_BASE_URL, authenticatedFetch } from './api';
 import type {
     TeamDto,
@@ -49,7 +50,7 @@ export async function requestJoinTeam(teamId: string): Promise<void> {
         method: 'POST'
     });
     if (!response.ok) {
-        const text = await response.text().catch(() => 'Failed to request join');
+        const text = await response.text().catch(() => i18n.t('team:errors.requestJoin'));
         throw new Error(text);
     }
 }
@@ -65,7 +66,7 @@ export async function approveJoinRequest(requestId: string): Promise<void> {
         method: 'PUT'
     });
     if (!response.ok) {
-        const text = await response.text().catch(() => 'Failed to approve request');
+        const text = await response.text().catch(() => i18n.t('team:errors.approveRequest'));
         throw new Error(text);
     }
 }
@@ -75,7 +76,7 @@ export async function rejectJoinRequest(requestId: string): Promise<void> {
         method: 'PUT'
     });
     if (!response.ok) {
-        const text = await response.text().catch(() => 'Failed to reject request');
+        const text = await response.text().catch(() => i18n.t('team:errors.rejectRequest'));
         throw new Error(text);
     }
 }
@@ -92,7 +93,7 @@ export async function deleteTeam(teamId: string): Promise<void> {
         method: 'DELETE'
     });
     if (!response.ok) {
-        const text = await response.text().catch(() => 'Failed to delete team');
+        const text = await response.text().catch(() => i18n.t('team:errors.deleteTeamApi'));
         throw new Error(text);
     }
 }
@@ -104,7 +105,7 @@ export async function kickMember(teamId: string, userId: string): Promise<void> 
         method: 'DELETE'
     });
     if (!response.ok) {
-        const text = await response.text().catch(() => 'Failed to kick member');
+        const text = await response.text().catch(() => i18n.t('team:errors.kickMemberApi'));
         throw new Error(text);
     }
 }
@@ -131,7 +132,7 @@ export async function leaveTeam(teamId: string): Promise<void> {
         method: 'DELETE'
     });
     if (!response.ok) {
-        const text = await response.text().catch(() => 'Failed to leave team');
+        const text = await response.text().catch(() => i18n.t('team:errors.leaveTeamApi'));
         throw new Error(text);
     }
 }

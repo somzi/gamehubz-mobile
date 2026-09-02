@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -80,6 +82,7 @@ interface TournamentGroupsProps {
 }
 
 export function TournamentGroups({ groups, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, qualificationZones, totalRounds, isTeamTournament }: TournamentGroupsProps) {
+    const { t } = useTranslation('bracket');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [selectedRounds, setSelectedRounds] = useState<Record<string, number>>({});
 
@@ -95,7 +98,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
             if (match.home?.userId === userId) return match.home.username;
             if (match.away?.userId === userId) return match.away.username;
         }
-        return 'Unknown';
+        return i18n.t('common:unknown');
     };
 
     const handleTabPress = (groupId: string, roundNum: number, isLocked: boolean) => {
@@ -142,18 +145,18 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                     <View className="min-w-full">
                                         <View className="flex-row bg-white/[0.03] py-3 px-4 border-b border-white/[0.04]">
                                             <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">#</Text>
-                                            <Text className="w-32 text-[10px] font-black text-slate-500 ml-2 uppercase tracking-wider">Player</Text>
-                                            <Text className="w-12 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">Pts</Text>
+                                            <Text numberOfLines={1} className="w-32 text-[10px] font-black text-slate-500 ml-2 uppercase tracking-wider">{t('card.player')}</Text>
+                                            <Text numberOfLines={1} className="w-12 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('card.pts')}</Text>
                                             {showBuchholz && (
-                                                <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">OPP</Text>
+                                                <Text numberOfLines={1} className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('common:app.opp')}</Text>
                                             )}
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">P</Text>
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">W</Text>
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">D</Text>
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">L</Text>
-                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GF</Text>
-                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GA</Text>
-                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">GD</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.played')}</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.won')}</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.drawn')}</Text>
+                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.lost')}</Text>
+                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.goalsFor')}</Text>
+                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.goalsAgainst')}</Text>
+                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.goalDiff')}</Text>
                                         </View>
                                         {group.standings.map((standing, index) => {
                                             const isMe = (!!currentUserId && !!standing.userId && standing.userId.toLowerCase() === currentUserId.toLowerCase())
@@ -207,7 +210,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                         </Text>
                                                         {isMe && (
                                                             <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
-                                                                <Text className="text-[8px] font-black uppercase tracking-wider text-emerald-300">You</Text>
+                                                                <Text numberOfLines={1} className="text-[8px] font-black uppercase tracking-wider text-emerald-300">{t('card.you')}</Text>
                                                             </View>
                                                         )}
                                                     </View>
@@ -235,7 +238,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
 
                         <View>
                             <View className="flex-row items-center justify-between mb-4">
-                                <Text className="text-xs font-black text-slate-500 uppercase tracking-widest">Matches</Text>
+                                <Text numberOfLines={1} className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('card.matches')}</Text>
                                 {totalRounds != null && totalRounds > 0 && (
                                     <Text className="text-[11px] font-bold text-slate-500">
                                         Round {activeRound} of {totalRounds}
@@ -296,7 +299,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 <View className="flex-row items-center gap-1.5">
                                                     <Ionicons name="time-outline" size={11} color="#EF4444" />
                                                     <Text className="text-[10px] text-red-400 font-semibold">
-                                                        {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString()} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString(i18n.language)} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}
                                                     </Text>
                                                 </View>
                                             ) : <View />}
@@ -306,8 +309,8 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                     className="flex-row items-center gap-1 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 active:opacity-70"
                                                 >
                                                     <Ionicons name="calendar-outline" size={10} color="#818CF8" />
-                                                    <Text className="text-[9px] font-bold text-indigo-400 uppercase tracking-[1.5px]">
-                                                        Edit Schedule
+                                                    <Text numberOfLines={1} className="text-[9px] font-bold text-indigo-400 uppercase tracking-[1.5px]">
+                                                        {t('card.editSchedule')}
                                                     </Text>
                                                 </Pressable>
                                             )}

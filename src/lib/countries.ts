@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { ENDPOINTS } from './api';
 import { Country, RegionType } from '../types/auth';
 
@@ -32,12 +33,12 @@ export async function getCountries(): Promise<Country[]> {
 /** Region name for a numeric RegionType — shared by profile screens and pickers. */
 export function getRegionName(region?: number | null): string {
     switch (region) {
-        case RegionType.NA: return 'North America';
-        case RegionType.EUROPE: return 'Europe';
-        case RegionType.ASIA: return 'Asia';
-        case RegionType.SA: return 'South America';
-        case RegionType.AFRICA: return 'Africa';
-        case RegionType.OCEANIA: return 'Oceania';
-        default: return 'Global';
+        case RegionType.NA: return i18n.t('auth:region.northAmerica');
+        case RegionType.EUROPE: return i18n.t('auth:region.europe');
+        case RegionType.ASIA: return i18n.t('auth:region.asia');
+        case RegionType.SA: return i18n.t('auth:region.southAmerica');
+        case RegionType.AFRICA: return i18n.t('auth:region.africa');
+        case RegionType.OCEANIA: return i18n.t('auth:region.oceania');
+        default: return i18n.t('profile:regionGlobal');
     }
 }

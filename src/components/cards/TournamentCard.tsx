@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React from 'react';
 import { View, Text } from 'react-native';
 import { PressableScale } from '../ui/PressableScale';
@@ -79,6 +80,7 @@ export const TournamentCard = React.memo(function TournamentCard({
     hubAvatarUrl,
     badgeCount = 0,
 }: TournamentCardProps) {
+    const { t } = useTranslation('common');
     const theme = STATUS_THEME[status] || STATUS_THEME.upcoming;
     const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
 
@@ -168,7 +170,7 @@ export const TournamentCard = React.memo(function TournamentCard({
                                     style={{ color: '#34D399' }}
                                     numberOfLines={2}
                                 >
-                                    {hubName || 'Official Hub'}
+                                    {hubName || t('app.officialHub')}
                                 </Text>
                             </View>
                         </View>
@@ -198,7 +200,7 @@ export const TournamentCard = React.memo(function TournamentCard({
                                     className="text-[10px] font-black uppercase"
                                     style={{ color: theme.text, letterSpacing: 1.4 }}
                                 >
-                                    {status}
+                                    {t(`status.${status}`)}
                                 </Text>
                             </LinearGradient>
                         </View>
@@ -243,7 +245,7 @@ export const TournamentCard = React.memo(function TournamentCard({
                                     color={status === 'scheduled' ? '#818CF8' : '#A5B4FC'}
                                 />
                                 <Text className="text-[11px] font-black text-slate-300 ml-1.5">
-                                    {status === 'scheduled' ? `Opens ${date}` : date}
+                                    {status === 'scheduled' ? t('app.opensOn', { date }) : date}
                                 </Text>
                             </View>
                         </View>

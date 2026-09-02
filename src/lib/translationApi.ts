@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { apiClient } from './api'; // Uvozimo tvoju konfigurisanu instancu sa tokenima
 
 export interface TranslateResponse {
@@ -42,7 +43,7 @@ export async function translateMessage(
     '';
 
   if (!translated) {
-    throw new Error('Translation response did not contain translated text.');
+    throw new Error(i18n.t('common:translationEmpty'));
   }
 
   return translated;

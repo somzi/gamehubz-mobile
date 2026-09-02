@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
+import i18n from '../../i18n';
 
 interface HourlyAvailabilityPickerProps {
     matchId: string;
@@ -19,12 +21,12 @@ interface HourlyAvailabilityPickerProps {
 // Generate hours from 00:00 to 23:00
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-const formatDate = (date: Date, format: string) => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    if (format === 'EEE') return days[date.getDay()];
-    if (format === 'MMM d') return `${months[date.getMonth()]} ${date.getDate()}`;
+// Weekday/month names come from Intl in the active language rather than a hardcoded
+// English table, so they follow the locale automatically. 'yyyy-MM-dd' stays ISO — it is
+// used as a slot key, not shown to the user.
+const formatDate = (date: Date, format: string, locale = 'en') => {
+    if (format === 'EEE') return new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date);
+    if (format === 'MMM d') return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(date);
     if (format === 'yyyy-MM-dd') {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -64,6 +66,7 @@ export function HourlyAvailabilityPicker({
     onSubmit,
     onMarkScheduled,
 }: HourlyAvailabilityPickerProps) {
+    const { t, i18n } = useTranslation('match');
     const insets = useSafeAreaInsets();
 
     const initialKeys = useMemo(() => {
@@ -103,9 +106,9 @@ export function HourlyAvailabilityPicker({
 
     const displayDeadline = useMemo(() => {
         if (!deadlineDate) return deadline;
-        return deadlineDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) +
+        return deadlineDate.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' }) +
             ', ' +
-            deadlineDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+            deadlineDate.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
     }, [deadlineDate, deadline]);
 
     useEffect(() => {
@@ -142,8 +145,8 @@ export function HourlyAvailabilityPicker({
             if (deadlineDate && date > deadlineDate) break;
             availableDays.push({
                 date,
-                label: formatDate(date, 'EEE'),
-                fullLabel: formatDate(date, 'MMM d'),
+                label: formatDate(date, 'EEE', i18n.language),
+                fullLabel: formatDate(date, 'MMM d', i18n.language),
                 key: formatDate(date, 'yyyy-MM-dd'),
             });
         }
@@ -205,7 +208,7 @@ export function HourlyAvailabilityPicker({
             <View className="flex-1 items-center justify-center p-8 bg-slate-900/40 rounded-3xl border border-slate-800/20">
                 <Ionicons name="time-outline" size={48} color="#475569" />
                 <Text className="text-slate-400 font-bold text-center mt-4">
-                    Availability selection is closed (Deadline Passed).
+                    {t('schedule.closedDeadlinePassed')}
                 </Text>
             </View>
         );
@@ -221,7 +224,7 @@ export function HourlyAvailabilityPicker({
                     <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-[10px] font-black text-indigo-300/70 uppercase tracking-[2px]">Opponent</Text>
+                    <Text className="text-[10px] font-black text-indigo-300/70 uppercase tracking-[2px]">{t('schedule.opponent')}</Text>
                     <Text className="text-[17px] font-black text-white mt-0.5" numberOfLines={1}>{opponentName}</Text>
                 </View>
                 <View className="bg-white/[0.05] border border-white/[0.08] rounded-xl px-2.5 py-1.5">
@@ -235,7 +238,7 @@ export function HourlyAvailabilityPicker({
                     <Ionicons name="calendar-outline" size={16} color="#FBBF24" />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[2px]">Deadline</Text>
+                    <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[2px]">{t('schedule.deadline')}</Text>
                     <Text className="text-sm text-slate-200 font-bold mt-0.5">{displayDeadline}</Text>
                 </View>
             </View>
@@ -246,7 +249,7 @@ export function HourlyAvailabilityPicker({
                     <View className="w-14 h-14 rounded-2xl bg-emerald-500/15 items-center justify-center mb-3">
                         <Ionicons name="checkmark-done" size={28} color="#10B981" />
                     </View>
-                    <Text className="text-white font-black text-base uppercase tracking-tight w-full text-center" numberOfLines={1}>Availability Sent</Text>
+                    <Text className="text-white font-black text-base uppercase tracking-tight w-full text-center" numberOfLines={1}>{t('schedule.availabilitySent')}</Text>
                     <Text className="text-xs text-slate-400 mt-1 text-center">
                         Waiting for {opponentName} to confirm
                     </Text>
@@ -255,11 +258,11 @@ export function HourlyAvailabilityPicker({
                     <View className="flex-row gap-2.5 mt-4 w-full">
                         <View className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 items-center">
                             <Text className="text-2xl font-black text-indigo-300">{selectedSlots.size}</Text>
-                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>Slots</Text>
+                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>{t('schedule.slots')}</Text>
                         </View>
                         <View className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 items-center">
                             <Text className="text-2xl font-black text-emerald-400">{mutualCount}</Text>
-                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>Mutual</Text>
+                            <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>{t('schedule.mutual')}</Text>
                         </View>
                     </View>
 
@@ -269,7 +272,7 @@ export function HourlyAvailabilityPicker({
                         className="mt-4 w-full h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex-row items-center justify-center gap-2"
                     >
                         <Ionicons name="create-outline" size={16} color="#94A3B8" />
-                        <Text className="text-xs font-black text-slate-300 uppercase tracking-widest" numberOfLines={1}>Edit Slots</Text>
+                        <Text className="text-xs font-black text-slate-300 uppercase tracking-widest" numberOfLines={1}>{t('schedule.editSlots')}</Text>
                     </Pressable>
 
                     {/* Even after availability is sent, let the user break the "waiting for opponent"
@@ -278,7 +281,7 @@ export function HourlyAvailabilityPicker({
                         <>
                             <View className="flex-row items-center w-full" style={{ marginVertical: 12 }}>
                                 <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">OR</Text>
+                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">{t('common:or')}</Text>
                                 <View className="flex-1 h-[1px] bg-white/[0.06]" />
                             </View>
 
@@ -292,10 +295,10 @@ export function HourlyAvailabilityPicker({
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[13px] font-black text-white leading-tight">
-                                        Already agreed on a time?
+                                        {t('schedule.alreadyAgreed')}
                                     </Text>
                                     <Text className="text-[11px] text-slate-400 mt-0.5">
-                                        Schedule now without waiting and report directly
+                                        {t('schedule.scheduleNowHint')}
                                     </Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={16} color="#64748B" />
@@ -307,7 +310,7 @@ export function HourlyAvailabilityPicker({
                 /* ───────── Choice cards ───────── */
                 <>
                     <Text className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] mb-3 ml-1">
-                        How do you want to schedule?
+                        {t('schedule.howToSchedule')}
                     </Text>
 
                     {/* Already agreed outside app */}
@@ -322,10 +325,10 @@ export function HourlyAvailabilityPicker({
                             </View>
                             <View className="flex-1">
                                 <Text className="text-[15px] font-black text-white leading-tight">
-                                    Already agreed on a time?
+                                    {t('schedule.alreadyAgreed')}
                                 </Text>
                                 <Text className="text-[12px] text-slate-400 mt-0.5">
-                                    Skip scheduling and report directly
+                                    {t('schedule.skipSchedulingHint')}
                                 </Text>
                             </View>
                             <Ionicons name="chevron-forward" size={16} color="#64748B" />
@@ -336,7 +339,7 @@ export function HourlyAvailabilityPicker({
                     {onMarkScheduled && (
                         <View className="flex-row items-center" style={{ marginVertical: 14 }}>
                             <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">OR</Text>
+                            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">{t('common:or')}</Text>
                             <View className="flex-1 h-[1px] bg-white/[0.06]" />
                         </View>
                     )}
@@ -360,7 +363,7 @@ export function HourlyAvailabilityPicker({
                         </View>
                         <View className="flex-1">
                             <Text className="text-[15px] font-black text-white leading-tight">
-                                Set your availability
+                                {t('schedule.setYourAvailability')}
                             </Text>
                             <Text className="text-[12px] text-slate-300/80 mt-0.5" numberOfLines={1}>
                                 Pick times you can play vs {opponentName}
@@ -399,8 +402,8 @@ export function HourlyAvailabilityPicker({
                             {/* Header */}
                             <View className="flex-row items-start justify-between mb-3">
                                 <View className="flex-1 mr-3">
-                                    <Text className="text-xl font-black text-white tracking-tight">Set availability</Text>
-                                    <Text className="text-[12px] text-slate-500 mt-0.5">Tap the hours you're free to play</Text>
+                                    <Text className="text-xl font-black text-white tracking-tight">{t('schedule.setAvailability')}</Text>
+                                    <Text className="text-[12px] text-slate-500 mt-0.5">{t('schedule.tapHoursHint')}</Text>
                                 </View>
                                 <Pressable
                                     onPress={closePicker}
@@ -421,7 +424,7 @@ export function HourlyAvailabilityPicker({
                                 />
                                 <View className="flex-1">
                                     <Text className="text-[9px] font-black text-indigo-300/70 uppercase tracking-[2px]">
-                                        You're scheduling against
+                                        {t('schedule.schedulingAgainst')}
                                     </Text>
                                     <Text className="text-[16px] font-black text-white" numberOfLines={1}>
                                         {opponentName}
@@ -517,7 +520,7 @@ export function HourlyAvailabilityPicker({
                                                         <View className="items-center justify-center">
                                                             <Ionicons name="checkmark-done" size={14} color="#10B981" />
                                                             <Text className="text-[9px] text-emerald-300 uppercase font-black tracking-tighter -mt-0.5">
-                                                                Mutual
+                                                                {t('schedule.mutual')}
                                                             </Text>
                                                         </View>
                                                         <View className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -551,15 +554,15 @@ export function HourlyAvailabilityPicker({
                             <View className="bg-white/[0.03] rounded-xl px-4 py-2 flex-row items-center justify-center gap-4 flex-wrap mt-3">
                                 <View className="flex-row items-center gap-1.5">
                                     <View className="w-2.5 h-2.5 rounded-sm bg-indigo-600/80 border border-indigo-400/30" />
-                                    <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Your Choice</Text>
+                                    <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{t('schedule.yourChoice')}</Text>
                                 </View>
                                 <View className="flex-row items-center gap-1.5">
                                     <View className="w-2.5 h-2.5 rounded-sm bg-amber-500/15 border border-amber-500/20" />
-                                    <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Opponent</Text>
+                                    <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{t('schedule.opponent')}</Text>
                                 </View>
                                 <View className="flex-row items-center gap-1.5">
                                     <View className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20 border border-emerald-500/30" />
-                                    <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">Mutual Slot</Text>
+                                    <Text className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{t('schedule.mutualSlot')}</Text>
                                 </View>
                             </View>
 
@@ -587,8 +590,8 @@ export function HourlyAvailabilityPicker({
                                     draftSlots.size > 0 ? "text-white" : "text-slate-600"
                                 )}>
                                     {draftMutualCount > 0
-                                        ? `Confirm (${draftSlots.size} · ${draftMutualCount} mutual)`
-                                        : `Confirm Availability (${draftSlots.size})`}
+                                        ? t('schedule.confirmWithMutual', { count: draftSlots.size, mutual: draftMutualCount })
+                                        : t('schedule.confirmAvailability', { count: draftSlots.size })}
                                 </Text>
                             </Pressable>
                         </ScrollView>
