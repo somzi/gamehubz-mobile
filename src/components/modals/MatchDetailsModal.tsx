@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { MatchChatPanel } from '../match/MatchChatPanel';
 import { useMatchChatMute } from '../../hooks/useMatchChatMute';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
+import { AdminAvailabilityPanel, type AdminAvailability } from '../match/AdminAvailabilityPanel';
 import { ConfirmationModal } from './ConfirmationModal';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { Button } from '../ui/Button';
@@ -86,6 +87,10 @@ export interface MatchResultDetailDto {
      *  the tie itself is voided only if NO game ends up played. */
     isTeamSub?: boolean;
 }
+
+/** Whether one side of a fixture submitted availability, for the Schedule tab's alert dot. */
+const sideAnswered = (side?: { slots?: string[] | null; hasSubmitted?: boolean }) =>
+    side?.hasSubmitted ?? (side?.slots?.length ?? 0) > 0;
 
 interface MatchDetailsModalProps {
     visible: boolean;
@@ -165,6 +170,9 @@ export function MatchDetailsModal({
     // Availability state
     const [mySlots, setMySlots] = useState<string[]>(myAvailability);
     const [opponentSlots, setOpponentSlots] = useState<string[]>(opponentAvailability);
+    // Both sides named, sent only to a caller who can manage the tournament. Distinct from the
+    // pair above, which is relative to whoever is asking and says nothing to a non-participant.
+    const [adminAvailability, setAdminAvailability] = useState<AdminAvailability | null>(null);
     const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
     const [confirmedTime, setConfirmedTime] = useState<string | undefined>(scheduledTime);
     // Raw backend timestamp behind confirmedTime — the timing strip formats it itself
@@ -255,7 +263,7 @@ export function MatchDetailsModal({
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
     // same matchId still honors the host's intent.
-    const [activeTab, setActiveTab] = useState<'match' | 'chat' | 'stream'>(defaultTab);
+    const [activeTab, setActiveTab] = useState<'match' | 'chat' | 'stream' | 'schedule'>(defaultTab);
 
     // Streams for this match — drives the Stream tab (live POVs + replays) and its LIVE dot.
     const [streams, setStreams] = useState<MatchStream[]>([]);
@@ -379,6 +387,9 @@ export function MatchDetailsModal({
                 const data = envelope?.details ?? envelope?.Details ?? envelope;
                 const inlineStreams = envelope?.streams ?? envelope?.Streams;
                 if (Array.isArray(inlineStreams)) setStreams(inlineStreams);
+                // Assigned unconditionally: the modal is reused across matches, and a stale
+                // organizer panel from the previous fixture would be worse than none.
+                setAdminAvailability(envelope?.adminAvailability ?? envelope?.AdminAvailability ?? null);
                 const inlineAvailability = envelope?.availability ?? envelope?.Availability;
                 if (inlineAvailability) {
                     if (inlineAvailability.mySlots) setMySlots(inlineAvailability.mySlots);
@@ -1049,6 +1060,31 @@ export function MatchDetailsModal({
     // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
     const showStreamTab = effectiveStatus !== 'pending_availability';
+    // Organizer-only tab: who answered the scheduler. Nothing to referee once the match is
+    // played, and the payload itself only reaches a caller who can manage the tournament.
+    const showScheduleTab = isPrivileged && !!adminAvailability && effectiveStatus !== 'completed';
+    // Dot on the tab for the one case an organizer has to act on — one side answered and the
+    // other never did. "Both answered, no shared hour" is not an alert: nobody is at fault, and
+    // flagging it would train organizers to punish it. Slots are what say a side answered; the
+    // timestamp is absent on matches older than the column.
+    const scheduleNeedsAttention = !!adminAvailability
+        && !adminAvailability.confirmedTime
+        && sideAnswered(adminAvailability.home) !== sideAnswered(adminAvailability.away);
+
+    // Four tabs share the row an organizer sees; two or three is the common case. Rather than let
+    // the widest label ellipsise (Spanish runs longer than English at the same weight), the whole
+    // bar steps down a size once the fourth tab is in play.
+    const tabCount = 1 + (showChatTab ? 1 : 0) + (showStreamTab ? 1 : 0) + (showScheduleTab ? 1 : 0);
+    const tabLabelClass = tabCount >= 4
+        ? 'text-[10px] font-black uppercase tracking-wider'
+        : 'text-xs font-black uppercase tracking-widest';
+
+    // The Schedule tab is gated on a payload that arrives after the modal opens and can go away
+    // again (a refetch that settles the match). Leaving it selected would render nothing.
+    useEffect(() => {
+        if (activeTab === 'schedule' && !showScheduleTab) setActiveTab('match');
+    }, [activeTab, showScheduleTab]);
+
     const hasLiveStream = streams.some(s => s.status === MatchStreamStatus.Live);
     // Completed matches keep the conversation visible but block new messages. A no-show stays
     // writable: it's the state players contest ("I was there, they weren't") and the admin can
@@ -1944,9 +1980,11 @@ export function MatchDetailsModal({
                     )}
                 </View>
 
-                {/* Match / Chat / Stream tabs. The bar appears if chat OR stream is available;
-                    Match is always present, the other two are gated (showChatTab / showStreamTab). */}
-                {(showChatTab || showStreamTab) && (
+                {/* Match / Chat / Schedule / Stream tabs. The bar appears if any of the three
+                    optional ones is available; Match is always present. A fourth tab has to share
+                    the same row, so the labels drop a size rather than truncate — Spanish runs
+                    longer than English and would lose characters at the original size. */}
+                {(showChatTab || showStreamTab || showScheduleTab) && (
                     <View className="flex-row mx-6 mt-3 mb-2 rounded-2xl p-1 bg-card border border-white/[0.04]">
                         <Pressable
                             onPress={() => setActiveTab('match')}
@@ -1956,7 +1994,7 @@ export function MatchDetailsModal({
                             )}
                         >
                             <Text numberOfLines={1} className={cn(
-                                "text-xs font-black uppercase tracking-widest w-full text-center",
+                                tabLabelClass, "w-full text-center",
                                 activeTab === 'match' ? "text-primary" : "text-slate-500"
                             )}>{t('tournament:details.match')}</Text>
                         </Pressable>
@@ -1975,10 +2013,29 @@ export function MatchDetailsModal({
                                     color={activeTab === 'chat' ? '#10B981' : '#64748B'}
                                 />
                                 <Text numberOfLines={1} className={cn(
-                                    "text-xs font-black uppercase tracking-widest",
+                                    tabLabelClass,
                                     activeTab === 'chat' ? "text-primary" : "text-slate-500"
                                 )}>{t('match:chat.chat')}</Text>
                                 {adminHelpRequested && (
+                                    <View className="w-1.5 h-1.5 rounded-full bg-warning" />
+                                )}
+                            </View>
+                        </Pressable>
+                        )}
+                        {showScheduleTab && (
+                        <Pressable
+                            onPress={() => setActiveTab('schedule')}
+                            className={cn(
+                                "flex-1 py-2.5 items-center rounded-xl",
+                                activeTab === 'schedule' ? "bg-primary/15" : "bg-transparent"
+                            )}
+                        >
+                            <View className="flex-row items-center gap-1.5">
+                                <Text numberOfLines={1} className={cn(
+                                    tabLabelClass,
+                                    activeTab === 'schedule' ? "text-primary" : "text-slate-500"
+                                )}>{t('match:adminAvailability.tab')}</Text>
+                                {scheduleNeedsAttention && (
                                     <View className="w-1.5 h-1.5 rounded-full bg-warning" />
                                 )}
                             </View>
@@ -1994,7 +2051,7 @@ export function MatchDetailsModal({
                         >
                             <View className="flex-row items-center gap-1.5">
                                 <Text numberOfLines={1} className={cn(
-                                    "text-xs font-black uppercase tracking-widest",
+                                    tabLabelClass,
                                     activeTab === 'stream' ? "text-primary" : "text-slate-500"
                                 )}>{t('common:stream')}</Text>
                                 {hasLiveStream && (
@@ -2015,7 +2072,15 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {activeTab === 'stream' && showStreamTab ? (
+                {activeTab === 'schedule' && showScheduleTab && adminAvailability ? (
+                    <ScrollView
+                        className="flex-1 px-6 pt-2"
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 32 }}
+                    >
+                        <AdminAvailabilityPanel availability={adminAvailability} />
+                    </ScrollView>
+                ) : activeTab === 'stream' && showStreamTab ? (
                     <View className="flex-1 px-6 pt-2">
                         <MatchStreamPanel
                             matchId={matchId}
@@ -2076,6 +2141,13 @@ export function MatchDetailsModal({
                                                     method: 'POST',
                                                     body: JSON.stringify(payload),
                                                 });
+                                                // A rejected submit has to reach the picker so it can
+                                                // undo its optimistic state — swallowing it left the
+                                                // player sure they had answered when nothing was saved.
+                                                if (!response.ok) {
+                                                    const text = await response.text().catch(() => '');
+                                                    throw new Error(text || t('match:schedule.submitFailed'));
+                                                }
                                                 if (response.ok) {
                                                     const result = await response.json();
                                                     if (result.data?.confirmedTime) {
@@ -2090,6 +2162,7 @@ export function MatchDetailsModal({
                                                 }
                                             } catch (error) {
                                                 console.error('Error submitting availability:', error);
+                                                throw error;
                                             } finally {
                                                 setIsSubmitting(false);
                                             }

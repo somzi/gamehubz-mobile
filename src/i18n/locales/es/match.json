@@ -134,7 +134,8 @@
     "yourChoice": "Tu elección",
     "mutualSlot": "Horario en común",
     "confirmWithMutual": "Confirmar ({{count}} · {{mutual}} en común)",
-    "confirmAvailability": "Confirmar disponibilidad ({{count}})"
+    "confirmAvailability": "Confirmar disponibilidad ({{count}})",
+    "submitFailed": "No se pudo guardar tu disponibilidad. Inténtalo de nuevo."
   },
   "card": {
     "approveFailed": "No se pudo aprobar el resultado",
@@ -288,6 +289,25 @@
     "requesterView": "Se avisó a los administradores — pueden entrar al chat de tu partido.",
     "otherView": "Se ha llamado a un administrador a este partido.",
     "markResolved": "Marcar como resuelta"
+  },
+  "adminAvailability": {
+    "tab": "Horario",
+    "title": "Programación",
+    "subtitle": "Quién indicó su disponibilidad",
+    "noResponse": "Sin respuesta",
+    "slotsCount_one": "{{count}} hora propuesta",
+    "slotsCount_other": "{{count}} horas propuestas",
+    "timeUnknown": "hora desconocida",
+    "sharedHours_one": "{{count}} en común",
+    "sharedHours_other": "{{count}} en común",
+    "opponent": "el rival",
+    "scheduledFor": "Programado automáticamente para {{time}}",
+    "noOverlap": "Ambos respondieron: ninguna hora en común",
+    "noOverlapHint": "Aquí no hay culpables. Mueve la fecha límite o acuerda una hora con ellos en el chat.",
+    "waitingOne": "{{name}} no ha respondido",
+    "waitingOneHint": "Un lado propuso horas y no recibió nada a cambio.",
+    "waitingBoth": "Ningún jugador ha respondido",
+    "waitingBothHint": "Todavía nadie ha abierto el programador de este partido."
   },
   "chatPanel": {
     "loadEarlier": "Cargar mensajes anteriores",

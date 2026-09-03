@@ -3,7 +3,9 @@ import { View, Text, Pressable, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { PressableScale } from '../ui/PressableScale';
 import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
+import { compareGroupNames } from '../../lib/groups';
 import { COLORS } from '../../lib/theme';
 
 // Backend MatchStatus: 1 Pending, 2 Scheduled, 3 Live, 4 Completed, 5 NoShow, 6 TieBreakRequired.
@@ -57,8 +59,8 @@ interface RoundProgressModalProps {
     /** The v3 structure the bracket tab already holds — no extra round-trip. */
     stages: any[];
     isTeamTournament?: boolean;
-    /** Opens the fixture in the match modal on the requested tab. */
-    onOpenMatch: (match: any, tab: 'match' | 'chat') => void;
+    /** Opens the fixture in the match modal — chat is one tap further in, inside it. */
+    onOpenMatch: (match: any) => void;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -179,12 +181,13 @@ function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[
                     });
                 }
 
-                // Chase the stuck ones first: overdue, then by group so the list reads like the
-                // groups tab, then by the pairing.
+                // Read like the groups tab: group order first (the shared comparator keeps
+                // "Group 2" ahead of "Group 18" — plain alphabetical does not), then the
+                // pairing. Overdue is a property of the round's deadline, so every fixture in
+                // this bucket shares it and it can't be a tiebreaker here.
                 outstanding.sort(
                     (a, b) =>
-                        Number(b.overdue) - Number(a.overdue) ||
-                        a.groupName.localeCompare(b.groupName) ||
+                        compareGroupNames(a.groupName, b.groupName) ||
                         a.homeName.localeCompare(b.homeName),
                 );
 
@@ -235,59 +238,114 @@ function ProgressBar({ done, total, height = 6 }: { done: number; total: number;
     );
 }
 
-function FixtureRow({
-    fixture,
-    showChat,
-    onOpen,
-}: {
-    fixture: Fixture;
-    showChat: boolean;
-    onOpen: (tab: 'match' | 'chat') => void;
-}) {
+/**
+ * Each name gets roughly 80pt beside its avatar — about eleven characters at the base size.
+ * Rather than cutting "ardakaygusuz" off, the pair steps down a point at a time until it
+ * fits. Both sides take the size the LONGER name needs, so the matchup stays symmetric
+ * instead of pairing a 13pt name with a 10pt one; past ~16 characters the ellipsis takes
+ * over again, since anything smaller stops being readable on a phone.
+ */
+function nameFontSize(home: string, away: string): number {
+    const longest = Math.max(home.length, away.length);
+    if (longest <= 11) return 13;
+    if (longest <= 12) return 12;
+    if (longest <= 14) return 11;
+    if (longest <= 16) return 10;
+    return 9;
+}
+
+/**
+ * One outstanding fixture. The two sides are mirrored around the "vs" chip so each avatar
+ * sits against the name it belongs to, the group and the state ride in the eyebrow, and a
+ * tinted rail down the left edge carries the state colour at a glance. The whole card opens
+ * the match — chat lives one tap deeper, inside the match modal, where the organizer can
+ * also see the score, the deadline and the evidence before writing anything.
+ */
+function FixtureRow({ fixture, onOpen }: { fixture: Fixture; onOpen: () => void }) {
     const { t } = useTranslation('tournament');
     const meta = STATE_META[fixture.state];
     const openable = fixture.state !== 'tbd';
 
+    // Overdue outranks "not played": it is the reason the organizer opened this list.
+    const late = fixture.overdue && fixture.state === 'awaiting';
+    const accent = late ? COLORS.destructive : meta.color;
+    const fontSize = nameFontSize(fixture.homeName, fixture.awayName);
+
     return (
-        <View className="flex-row items-center bg-white/[0.02] border border-white/[0.06] rounded-2xl px-3 py-2.5 mb-2">
-            <Pressable
-                onPress={() => openable && onOpen('match')}
-                disabled={!openable}
-                className="flex-1 flex-row items-center active:opacity-70"
-            >
-                <PlayerAvatar src={fixture.homeAvatarUrl || undefined} name={fixture.homeName} size="sm" />
-                <View className="flex-1 mx-2.5">
-                    <Text className="text-[13px] font-bold text-white" numberOfLines={1}>
-                        {fixture.homeName} <Text className="text-slate-600 font-black text-[10px]">VS</Text>{' '}
-                        {fixture.awayName}
-                    </Text>
-                    <View className="flex-row items-center gap-1.5 mt-0.5">
-                        <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
-                        <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color: meta.color }}>
-                            {t(meta.labelKey)}
-                        </Text>
-                        {fixture.overdue && fixture.state === 'awaiting' && (
-                            <Text className="text-[9px] font-black uppercase tracking-wider text-destructive">
-                                · {t('progress.overdue')}
+        <PressableScale
+            onPress={onOpen}
+            disabled={!openable}
+            containerStyle={{ marginBottom: 8 }}
+            className={cn(
+                'rounded-2xl border overflow-hidden bg-white/[0.03]',
+                late ? 'border-destructive/20' : 'border-white/[0.07]',
+                !openable && 'opacity-60',
+            )}
+        >
+            {/* State rail */}
+            <View
+                className="absolute left-0 top-0 bottom-0"
+                style={{ width: 3, backgroundColor: accent, opacity: late ? 1 : 0.7 }}
+            />
+
+            <View className="pl-4 pr-3.5 py-2.5">
+                {/* Eyebrow: which group it belongs to, and why it is still open. */}
+                <View className="flex-row items-center justify-between mb-2">
+                    {fixture.groupName ? (
+                        <View className="bg-white/[0.05] border border-white/[0.07] rounded-md px-1.5 py-[3px] flex-shrink mr-2">
+                            <Text
+                                className="text-[9px] font-black uppercase tracking-widest text-slate-300"
+                                numberOfLines={1}
+                            >
+                                {fixture.groupName}
                             </Text>
-                        )}
+                        </View>
+                    ) : (
+                        <View />
+                    )}
+
+                    <View className="flex-row items-center gap-1.5">
+                        <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
+                        <Text
+                            className="text-[9px] font-black uppercase tracking-wider"
+                            style={{ color: accent }}
+                            numberOfLines={1}
+                        >
+                            {late ? t('progress.overdue') : t(meta.labelKey)}
+                        </Text>
                     </View>
                 </View>
-                <PlayerAvatar src={fixture.awayAvatarUrl || undefined} name={fixture.awayName} size="sm" />
-            </Pressable>
 
-            {/* Straight into the conversation — the whole reason an organizer opens this list is
-                to ask the two players why the fixture has not happened yet. */}
-            {showChat && openable && (
-                <Pressable
-                    onPress={() => onOpen('chat')}
-                    hitSlop={8}
-                    className="ml-2.5 w-8 h-8 rounded-full bg-info/10 border border-info/25 items-center justify-center active:opacity-60"
-                >
-                    <Ionicons name="chatbubble-ellipses" size={14} color={COLORS.info} />
-                </Pressable>
-            )}
-        </View>
+                {/* Matchup — mirrored columns, avatar always beside its own name. */}
+                <View className="flex-row items-center">
+                    <View className="flex-1 flex-row items-center">
+                        <PlayerAvatar src={fixture.homeAvatarUrl || undefined} name={fixture.homeName} size="sm" />
+                        <Text
+                            className="flex-1 ml-2 font-bold text-white"
+                            style={{ fontSize }}
+                            numberOfLines={1}
+                        >
+                            {fixture.homeName}
+                        </Text>
+                    </View>
+
+                    <View className="px-2 py-1 mx-1 rounded-lg bg-white/[0.04]">
+                        <Text className="text-[9px] font-black text-slate-500 uppercase tracking-wider">vs</Text>
+                    </View>
+
+                    <View className="flex-1 flex-row items-center justify-end">
+                        <Text
+                            className="flex-1 mr-2 font-bold text-white text-right"
+                            style={{ fontSize }}
+                            numberOfLines={1}
+                        >
+                            {fixture.awayName}
+                        </Text>
+                        <PlayerAvatar src={fixture.awayAvatarUrl || undefined} name={fixture.awayName} size="sm" />
+                    </View>
+                </View>
+            </View>
+        </PressableScale>
     );
 }
 
@@ -295,30 +353,17 @@ function RoundCard({
     round,
     expanded,
     onToggle,
-    showChat,
     onOpenMatch,
 }: {
     round: RoundBucket;
     expanded: boolean;
     onToggle: () => void;
-    showChat: boolean;
-    onOpenMatch: (match: any, tab: 'match' | 'chat') => void;
+    onOpenMatch: (match: any) => void;
 }) {
     const { t } = useTranslation('tournament');
     const remaining = round.total - round.done;
     const complete = remaining === 0;
     const overdue = !!round.deadline && !complete && parseUtcDate(round.deadline).getTime() < Date.now();
-
-    // Fixtures are listed under their group heading — with 32 groups a flat list is unreadable.
-    const byGroup = useMemo(() => {
-        const map = new Map<string, Fixture[]>();
-        for (const fixture of round.outstanding) {
-            const key = fixture.groupName || '';
-            if (!map.has(key)) map.set(key, []);
-            map.get(key)!.push(fixture);
-        }
-        return [...map.entries()];
-    }, [round.outstanding]);
 
     return (
         <View
@@ -390,27 +435,17 @@ function RoundCard({
                 )}
             </Pressable>
 
+            {/* The fixtures come pre-sorted by group, so the cards read as runs per group
+                without spending a whole row on a heading each time — with one fixture left in
+                each of thirty groups, those headings were half the list. */}
             {expanded && !complete && (
-                <View className="px-3 pb-3 pt-1 border-t border-white/[0.06]">
-                    {byGroup.map(([groupName, fixtures]) => (
-                        <View key={groupName || 'ungrouped'} className="mt-2.5">
-                            {groupName ? (
-                                <View className="flex-row items-center justify-between mb-1.5 px-1">
-                                    <Text className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                        {groupName}
-                                    </Text>
-                                    <Text className="text-[9px] font-black text-slate-600">{fixtures.length}</Text>
-                                </View>
-                            ) : null}
-                            {fixtures.map((fixture) => (
-                                <FixtureRow
-                                    key={fixture.matchId}
-                                    fixture={fixture}
-                                    showChat={showChat}
-                                    onOpen={(tab) => onOpenMatch(fixture.match, tab)}
-                                />
-                            ))}
-                        </View>
+                <View className="px-3 pb-1 pt-3 border-t border-white/[0.06]">
+                    {round.outstanding.map((fixture) => (
+                        <FixtureRow
+                            key={fixture.matchId}
+                            fixture={fixture}
+                            onOpen={() => onOpenMatch(fixture.match)}
+                        />
                     ))}
                 </View>
             )}
@@ -422,7 +457,7 @@ function RoundCard({
  * Organizer view of "who still owes a game". A 32-group league hides its four missing
  * fixtures behind 32 group tabs; this collapses the whole tournament into one row per
  * round and, when a round is opened, lists exactly which pairings are outstanding — each
- * one a tap away from its match page or its chat.
+ * one a tap away from its match page.
  */
 export function RoundProgressModal({
     visible,
@@ -567,9 +602,6 @@ export function RoundProgressModal({
                                     onToggle={() =>
                                         setExpandedRound((current) => (current === round.key ? null : round.key))
                                     }
-                                    // Team fixtures open the team overview modal, which has no chat of
-                                    // its own — the shortcut would land nowhere.
-                                    showChat={!isTeamTournament}
                                     onOpenMatch={onOpenMatch}
                                 />
                             ))

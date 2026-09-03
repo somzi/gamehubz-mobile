@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
-import { MatchTimingStrip } from './MatchTimingStrip';
+import { MatchTimingStrip, MatchDeadlineBar } from './MatchTimingStrip';
 import { PlayerIdentity, hasNickname } from './PlayerIdentity';
 import { EvidenceSection } from './EvidenceSection';
 import { Button } from '../ui/Button';
@@ -600,6 +600,12 @@ export function MatchScheduleCard({
                 body: JSON.stringify(payload),
             });
 
+            // Rethrown below so the picker rolls back its optimistic "Availability sent".
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                throw new Error(text || t('schedule.submitFailed'));
+            }
+
             if (response.ok) {
                 const result = await response.json();
 
@@ -620,6 +626,7 @@ export function MatchScheduleCard({
             }
         } catch (error) {
             console.error('Error submitting availability:', error);
+            throw error;
         } finally {
             setIsSubmitting(false);
         }
@@ -835,7 +842,7 @@ export function MatchScheduleCard({
             case 'pending_availability':
                 return (
                     <View
-                        className="flex-row items-center gap-1.5 self-start px-2.5 py-1 rounded-lg"
+                        className="flex-row items-center gap-1.5 self-start px-2 py-[3px] rounded-lg"
                         style={{
                             backgroundColor: 'rgba(245, 158, 11, 0.12)',
                             borderWidth: 1,
@@ -851,7 +858,7 @@ export function MatchScheduleCard({
             case 'scheduled':
                 return (
                     <View
-                        className="flex-row items-center gap-1.5 self-start px-2.5 py-1 rounded-lg"
+                        className="flex-row items-center gap-1.5 self-start px-2 py-[3px] rounded-lg"
                         style={{
                             backgroundColor: 'rgba(16, 185, 129, 0.12)',
                             borderWidth: 1,
@@ -867,7 +874,7 @@ export function MatchScheduleCard({
             case 'ready_phase':
                 return (
                     <View
-                        className="flex-row items-center gap-1.5 self-start px-2.5 py-1 rounded-lg"
+                        className="flex-row items-center gap-1.5 self-start px-2 py-[3px] rounded-lg"
                         style={{
                             backgroundColor: 'rgba(99, 102, 241, 0.12)',
                             borderWidth: 1,
@@ -1003,8 +1010,8 @@ export function MatchScheduleCard({
                         style={{
                             position: 'absolute',
                             left: 0,
-                            top: 14,
-                            bottom: 14,
+                            top: 12,
+                            bottom: 12,
                             width: 3,
                             backgroundColor: statusColor,
                             borderTopRightRadius: 3,
@@ -1016,9 +1023,9 @@ export function MatchScheduleCard({
                         }}
                     />
 
-                    <View className="p-4 pl-5">
+                    <View className="pt-3 pb-3 pr-3.5 pl-4">
                         {/* Top row: hub badge + tournament */}
-                        <View className="flex-row items-center justify-between mb-3.5">
+                        <View className="flex-row items-center justify-between mb-2.5">
                             <View className="flex-row items-center gap-1.5 flex-1 mr-2">
                                 <View
                                     style={{
@@ -1056,22 +1063,22 @@ export function MatchScheduleCard({
                             >
                                 <View
                                     style={{
-                                        borderWidth: 1.5,
+                                        borderWidth: 1,
                                         borderColor: statusColor + '55',
-                                        borderRadius: 16,
-                                        padding: 2,
+                                        borderRadius: 13,
+                                        padding: 1.5,
                                     }}
                                 >
                                     <PlayerAvatar
                                         src={opponentAvatarUrl}
                                         name={opponentName}
-                                        size="md"
-                                        className="rounded-[12px]"
+                                        size="sm"
+                                        className="rounded-[10px]"
                                     />
                                 </View>
                             </View>
 
-                            <View className="flex-1 ml-3.5 min-w-0">
+                            <View className="flex-1 ml-3 min-w-0">
                                 <View className="flex-row items-baseline gap-1.5">
                                     <Text
                                         className="text-[11px] font-black uppercase tracking-widest"
@@ -1086,14 +1093,14 @@ export function MatchScheduleCard({
                                         {opponentName}
                                     </Text>
                                 </View>
-                                <View className="flex-row items-center mt-2">
+                                <View className="flex-row items-center mt-1.5">
                                     {getStatusContent()}
                                 </View>
                             </View>
 
                             {showUnreadBadge && (
                                 <View
-                                    className="flex-row items-center gap-1 ml-2 px-2 h-6 rounded-full"
+                                    className="flex-row items-center gap-1 ml-1.5 px-2 h-5 rounded-full"
                                     style={{ backgroundColor: '#EF4444' }}
                                 >
                                     <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
@@ -1104,16 +1111,26 @@ export function MatchScheduleCard({
                             )}
 
                             <View
-                                className="w-8 h-8 rounded-full items-center justify-center ml-2"
+                                className="w-7 h-7 rounded-full items-center justify-center ml-1.5"
                                 style={{
                                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                     borderWidth: 1,
                                     borderColor: 'rgba(255, 255, 255, 0.07)',
                                 }}
                             >
-                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
+                                <Ionicons name="chevron-forward" size={12} color="#94A3B8" />
                             </View>
                         </View>
+
+                        {/* Round deadline. It only lived inside the modal, so nothing on a list
+                            told a player which of their open matches was about to time out.
+                            Renders nothing without a deadline, and is meaningless once played. */}
+                        {currentStatus !== 'completed' && (
+                            <MatchDeadlineBar
+                                deadline={localDeadline}
+                                className="mt-2 pt-2 border-t border-white/[0.05]"
+                            />
+                        )}
                     </View>
                 </View>
             </Pressable>

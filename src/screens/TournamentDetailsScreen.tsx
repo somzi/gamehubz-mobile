@@ -3813,13 +3813,13 @@ export default function TournamentDetailsScreen() {
                 onClose={() => setShowProgressModal(false)}
                 stages={stages}
                 isTeamTournament={tournament?.isTeamTournament}
-                onOpenMatch={(match, tab) => {
+                onOpenMatch={(match) => {
                     // Hand the fixture to the same handlers the bracket uses, so the guards
                     // (round locked, missing participants) and the team / solo split stay in
                     // one place. Closing first keeps the two sheets from stacking.
                     setShowProgressModal(false);
                     if (tournament?.isTeamTournament) handleTeamMatchPress(match);
-                    else handleMatchPress(match, tab);
+                    else handleMatchPress(match);
                 }}
             />
 

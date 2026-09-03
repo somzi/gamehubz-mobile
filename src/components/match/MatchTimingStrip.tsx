@@ -35,6 +35,13 @@ const CHIP_TEXT: Record<Tone, string> = {
     good: 'text-primary',
 };
 
+const TONE_ICON: Record<Tone, string> = {
+    danger: COLORS.destructive,
+    warning: COLORS.warning,
+    calm: COLORS.slate400,
+    good: COLORS.primary,
+};
+
 // A timestamp we can actually work with, or null for 'TBD' / missing / junk input.
 function toDate(value?: string | null): Date | null {
     if (!value || value === 'TBD') return null;
@@ -44,6 +51,10 @@ function toDate(value?: string | null): Date | null {
 
 const formatClock = (d: Date) => d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
 const formatDay = (d: Date) => d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
+
+// Day + clock on one line, for places too tight for the two-line strip.
+const formatShortStamp = (d: Date) =>
+    `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}, ${formatClock(d)}`;
 
 const dayDelta = (d: Date, now: number) => {
     const startOfToday = new Date(now);
@@ -167,6 +178,55 @@ export function MatchTimingStrip({
                     </>
                 )}
                 {remaining && <TimingChip label={remaining.label} tone={remaining.tone} />}
+            </View>
+        </View>
+    );
+}
+
+
+/**
+ * One-line "when is this due" bar for a collapsed match card.
+ *
+ * The full strip only lives inside the match modal, so a player scrolling Home had no way to
+ * tell which of their open matches was about to run out of time without opening each one.
+ * Renders nothing when the round carries no deadline, so cards without one look untouched.
+ */
+export function MatchDeadlineBar({
+    deadline,
+    className,
+}: {
+    deadline?: string | null;
+    className?: string;
+}) {
+    const { t } = useTranslation('match');
+    const deadlineDate = useMemo(() => toDate(deadline), [deadline]);
+
+    // Same 60s tick as the strip: the label is measured in minutes at its finest.
+    const [now, setNow] = useState(() => Date.now());
+    const hasDeadline = !!deadlineDate;
+    useEffect(() => {
+        if (!hasDeadline) return;
+        const id = setInterval(() => setNow(Date.now()), 60000);
+        return () => clearInterval(id);
+    }, [hasDeadline]);
+
+    if (!deadlineDate) return null;
+
+    const remaining = describeRemaining(deadlineDate, now, t);
+
+    return (
+        <View className={cn('flex-row items-center gap-1.5', className)}>
+            <Ionicons name="hourglass-outline" size={11} color={TONE_ICON[remaining.tone]} />
+            <Text numberOfLines={1} className="text-[9px] font-black uppercase tracking-[1.5px] text-slate-500">
+                {t('timing.deadline')}
+            </Text>
+            <Text numberOfLines={1} className="flex-1 text-[11px] font-bold text-slate-300">
+                {formatShortStamp(deadlineDate)}
+            </Text>
+            <View className={cn('px-2 py-0.5 rounded-md border', CHIP_BG[remaining.tone])}>
+                <Text numberOfLines={1} className={cn('text-[9px] font-black uppercase tracking-wider', CHIP_TEXT[remaining.tone])}>
+                    {remaining.label}
+                </Text>
             </View>
         </View>
     );

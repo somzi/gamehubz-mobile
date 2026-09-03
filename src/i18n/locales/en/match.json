@@ -134,7 +134,8 @@
     "yourChoice": "Your Choice",
     "mutualSlot": "Mutual Slot",
     "confirmWithMutual": "Confirm ({{count}} · {{mutual}} mutual)",
-    "confirmAvailability": "Confirm Availability ({{count}})"
+    "confirmAvailability": "Confirm Availability ({{count}})",
+    "submitFailed": "Could not save your availability. Please try again."
   },
   "card": {
     "approveFailed": "Failed to approve result",
@@ -288,6 +289,25 @@
     "requesterView": "Admins have been notified — they can join your match chat.",
     "otherView": "An admin has been called to this match.",
     "markResolved": "Mark Resolved"
+  },
+  "adminAvailability": {
+    "tab": "Schedule",
+    "title": "Scheduling",
+    "subtitle": "Who set their availability",
+    "noResponse": "No response",
+    "slotsCount_one": "{{count}} hour offered",
+    "slotsCount_other": "{{count}} hours offered",
+    "timeUnknown": "time unknown",
+    "sharedHours_one": "{{count}} shared",
+    "sharedHours_other": "{{count}} shared",
+    "opponent": "the opponent",
+    "scheduledFor": "Auto-scheduled for {{time}}",
+    "noOverlap": "Both answered — no shared hour",
+    "noOverlapHint": "Neither player is at fault here. Move the deadline or agree a time with them in chat.",
+    "waitingOne": "{{name}} has not responded",
+    "waitingOneHint": "One side offered times and got nothing back.",
+    "waitingBoth": "Neither player has responded",
+    "waitingBothHint": "Nobody has opened the scheduler for this match yet."
   },
   "chatPanel": {
     "loadEarlier": "Load earlier messages",

@@ -42,7 +42,7 @@ interface MatchOverviewDto {
     bestOf?: number;
 }
 
-const SECTION_GAP = 28;
+const SECTION_GAP = 22;
 
 // Stable fallbacks used when a query is still loading. Reusing the same array
 // reference keeps the useMemo below from re-computing on every render before
@@ -51,6 +51,22 @@ const EMPTY_MATCHES: MatchOverviewDto[] = [];
 const EMPTY_ACTIVITIES: DashboardActivityDto[] = [];
 
 type SectionKey = 'attention' | 'active' | 'highlights';
+
+// Rounds without a deadline sink to the bottom instead of pretending to be due at the
+// epoch — Home only renders the top three, so this is what decides WHICH three a player
+// is shown, and a deadline-less match must never push out one that is about to expire.
+const deadlineMs = (m: MatchOverviewDto) => {
+    if (!m.roundDeadline) return Number.POSITIVE_INFINITY;
+    const time = parseUtcDate(m.roundDeadline).getTime();
+    return isNaN(time) ? Number.POSITIVE_INFINITY : time;
+};
+
+const byDeadline = (a: MatchOverviewDto, b: MatchOverviewDto) => {
+    const ta = deadlineMs(a);
+    const tb = deadlineMs(b);
+    // Guards Infinity - Infinity, which is NaN and would make the sort unstable.
+    return ta === tb ? 0 : ta - tb;
+};
 
 export default function HomeScreen() {
     const { t } = useTranslation('home');
@@ -133,7 +149,8 @@ export default function HomeScreen() {
     const { actionRequiredMatches, myMatches } = useMemo(() => {
         const openMatches = allMatches.filter((m) => !m.isRoundLocked);
         return {
-            actionRequiredMatches: openMatches.filter((m) => !m.scheduledTime),
+            // filter() already hands back a fresh array, so sorting it in place is safe.
+            actionRequiredMatches: openMatches.filter((m) => !m.scheduledTime).sort(byDeadline),
             myMatches: openMatches.filter((m) => m.scheduledTime),
         };
     }, [allMatches]);
@@ -190,7 +207,9 @@ export default function HomeScreen() {
         return [...myMatches].sort((a, b) => {
             const da = a.scheduledTime ? parseUtcDate(a.scheduledTime).getTime() : 0;
             const db = b.scheduledTime ? parseUtcDate(b.scheduledTime).getTime() : 0;
-            return da - db;
+            // Kick-off is what these cards show, so it stays the primary key; the round
+            // deadline breaks ties (and orders anything the API sent without a time).
+            return da === db ? byDeadline(a, b) : da - db;
         });
     }, [myMatches]);
 
@@ -239,7 +258,7 @@ export default function HomeScreen() {
                 </View>
 
                 {/* ── Greeting hero ── */}
-                <View className="px-5 pt-4 pb-7 flex-row items-start">
+                <View className="px-5 pt-3 pb-5 flex-row items-start">
                     <View className="flex-1 mr-4">
                         <Text className="text-slate-500 text-sm font-medium mb-1">
                             {greeting},
@@ -251,7 +270,7 @@ export default function HomeScreen() {
                         >
                             {user?.username || user?.nickName || tCommon('player')}
                         </Text>
-                        <Text className="text-slate-400 text-[13px] font-medium mt-3 leading-5">
+                        <Text className="text-slate-400 text-[13px] font-medium mt-2 leading-5">
                             {subtitle}
                         </Text>
                     </View>
@@ -274,12 +293,13 @@ export default function HomeScreen() {
                                 iconBorder="rgba(245, 158, 11, 0.1)"
                                 title={t('needsAttention')}
                                 subtitle={t('needsAttentionSub')}
+                                count={actionRequiredMatches.length}
                                 onSeeAll={() => navigation.navigate('MyMatches')}
                                 collapsed={collapsed.attention}
                                 onToggle={() => toggleSection('attention')}
                             />
                             {!collapsed.attention && (
-                            <Animated.View entering={FadeIn.duration(150)} style={{ gap: 12 }}>
+                            <Animated.View entering={FadeIn.duration(150)} style={{ gap: 10 }}>
                                 {actionRequiredMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
                                         key={match.id || match.matchId}
@@ -315,6 +335,7 @@ export default function HomeScreen() {
                             iconBorder="rgba(16, 185, 129, 0.1)"
                             title={t('activeMatches')}
                             subtitle={t('activeMatchesSub')}
+                            count={sortedActiveMatches.length}
                             onSeeAll={() => navigation.navigate('MyMatches')}
                             collapsed={collapsed.active}
                             onToggle={() => toggleSection('active')}
@@ -323,7 +344,7 @@ export default function HomeScreen() {
                         {!collapsed.active && (
                         <Animated.View entering={FadeIn.duration(150)}>
                         {sortedActiveMatches.length > 0 ? (
-                            <View className="gap-3">
+                            <View className="gap-2.5">
                                 {sortedActiveMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
                                         key={match.id || match.matchId}
@@ -432,6 +453,8 @@ interface SectionHeaderProps {
     iconBorder: string;
     title: string;
     subtitle: string;
+    /** How many items the section holds in total — the list itself only shows the top few. */
+    count?: number;
     onSeeAll?: () => void;
     collapsed?: boolean;
     onToggle?: () => void;
@@ -444,34 +467,59 @@ function SectionHeader({
     iconBorder,
     title,
     subtitle,
+    count,
     onSeeAll,
     collapsed,
     onToggle,
 }: SectionHeaderProps) {
     const { t } = useTranslation('home');
     return (
-        <View className="flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center justify-between mb-3">
             {/* Tapping the title cluster collapses/expands the section. */}
             <Pressable
                 onPress={onToggle}
                 disabled={!onToggle}
-                className="flex-row items-center gap-3 flex-1 active:opacity-70"
+                className="flex-row items-center gap-2.5 flex-1 active:opacity-70"
                 hitSlop={8}
             >
                 <View
-                    className="w-10 h-10 rounded-2xl items-center justify-center"
+                    className="w-9 h-9 rounded-[14px] items-center justify-center"
                     style={{
                         backgroundColor: iconBg,
                         borderWidth: 1,
                         borderColor: iconBorder,
                     }}
                 >
-                    <Ionicons name={icon} size={18} color={iconColor} />
+                    <Ionicons name={icon} size={16} color={iconColor} />
                 </View>
                 <View className="flex-1">
-                    <Text className="text-white font-black text-base tracking-tight">
-                        {title}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <Text
+                            className="text-white font-black text-base tracking-tight flex-shrink"
+                            numberOfLines={1}
+                        >
+                            {title}
+                        </Text>
+                        {/* Only three cards ever render per section, so the tally says how much
+                            is actually waiting behind "See All". */}
+                        {!!count && count > 0 && (
+                            <View
+                                className="min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center"
+                                style={{
+                                    backgroundColor: iconColor + '22',
+                                    borderWidth: 1,
+                                    borderColor: iconColor + '4D',
+                                }}
+                            >
+                                <Text
+                                    className="text-[10px] font-black"
+                                    style={{ color: iconColor }}
+                                >
+                                    {count > 99 ? '99+' : count}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                     <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-[1.5px] mt-0.5">
                         {subtitle}
                     </Text>

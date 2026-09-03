@@ -94,6 +94,8 @@ export function HourlyAvailabilityPicker({
     // Working selection used only inside the picker modal
     const [draftSlots, setDraftSlots] = useState<Set<string>>(initialKeys);
     const [pickerVisible, setPickerVisible] = useState(false);
+    /** Set when the server rejected the submit — the selection has been rolled back. */
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [selectedDateIndex, setSelectedDateIndex] = useState(0);
 
     const hasSubmitted = selectedSlots.size > 0;
@@ -192,9 +194,23 @@ export function HourlyAvailabilityPicker({
         if (draftSlots.size === 0) return;
         const committed = new Set(draftSlots);
         const dateTimeSlots = buildDateTimeSlots(committed);
+
+        // Flip to the summary straight away — the round-trip is otherwise a visible stall — but
+        // remember what was on screen first. A rejected submit used to keep the optimistic
+        // "Availability sent" forever while the server had stored nothing, so the player believed
+        // they had answered and the organizer saw them as silent.
+        const previous = selectedSlots;
         setSelectedSlots(committed);
         setPickerVisible(false);
-        await onSubmit(Array.from(committed), dateTimeSlots);
+        setSubmitError(null);
+
+        try {
+            await onSubmit(Array.from(committed), dateTimeSlots);
+        } catch (error: any) {
+            console.error('[HourlyAvailabilityPicker] Submit failed:', error);
+            setSelectedSlots(previous);
+            setSubmitError(error?.message || t('schedule.submitFailed'));
+        }
     };
 
     const formatHour = (hour: number) => `${hour.toString().padStart(2, '0')}:00`;
@@ -242,6 +258,13 @@ export function HourlyAvailabilityPicker({
                     <Text className="text-sm text-slate-200 font-bold mt-0.5">{displayDeadline}</Text>
                 </View>
             </View>
+
+            {submitError && (
+                <View className="mb-3 rounded-2xl bg-destructive/[0.08] border border-destructive/25 px-4 py-3 flex-row items-center gap-2.5">
+                    <Ionicons name="alert-circle" size={16} color="#EF4444" />
+                    <Text className="flex-1 text-[11px] font-bold text-red-400">{submitError}</Text>
+                </View>
+            )}
 
             {hasSubmitted ? (
                 /* ───────── Submitted summary ───────── */
