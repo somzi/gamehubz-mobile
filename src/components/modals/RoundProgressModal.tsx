@@ -541,10 +541,16 @@ export function RoundProgressModal({
                         </View>
                     )}
 
-                    {/* Stage picker — only when the tournament actually has more than one. */}
+                    {/* Stage picker — only when the tournament actually has more than one.
+
+                        grow-0/shrink-0 is load-bearing: React Native gives every ScrollView
+                        flexGrow: 1, so this one-row horizontal strip sat in the sheet's column
+                        and grew to eat half its height, squeezing the round list into the
+                        bottom of the sheet with a blank gap above it. */}
                     {data.length > 1 && (
                         <ScrollView
                             horizontal
+                            className="grow-0 shrink-0"
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 14 }}
                         >
