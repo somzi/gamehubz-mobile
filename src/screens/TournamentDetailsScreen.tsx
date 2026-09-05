@@ -3821,6 +3821,10 @@ export default function TournamentDetailsScreen() {
                     if (tournament?.isTeamTournament) handleTeamMatchPress(match);
                     else handleMatchPress(match);
                 }}
+                canManage={canManage}
+                // Silent: the sheet stays open on the round that was just closed, and re-reading
+                // the structure is what turns it green — a loading flash would hide the outcome.
+                onRefresh={() => fetchBracket(true)}
             />
 
             {/* Shared team link → confirm before joining / requesting. */}
