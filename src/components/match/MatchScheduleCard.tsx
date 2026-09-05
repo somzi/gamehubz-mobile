@@ -19,8 +19,20 @@ import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
+import { PendingEvidenceStrip } from './PendingEvidenceStrip';
+import { EvidenceThumb } from './EvidenceThumb';
+import { EvidencePreviewModal } from './EvidencePreviewModal';
+import {
+    EvidenceItem,
+    PreparedEvidence,
+    normalizeEvidenceItems,
+    pickEvidenceAssets,
+    prepareEvidenceForUpload,
+    isImageWithinLimit,
+    MAX_VIDEO_DURATION_SECONDS,
+} from '../../lib/evidence';
 import { MatchComment } from '../../types/auth';
-import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize, getOptimizedCloudinaryUrl } from '../../lib/image';
+import { MAX_FILE_SIZE, formatFileSize } from '../../lib/image';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { mergeMessagesById } from '../../lib/mergeMessages';
 import { AdminHelpSection } from './AdminHelpSection';
@@ -131,7 +143,8 @@ export function MatchScheduleCard({
     const [proposedAwayScore, setProposedAwayScore] = useState<number | null>(null);
     const [proposedByUserId, setProposedByUserId] = useState<string | null>(null);
     const [hubOwnerUserId, setHubOwnerUserId] = useState<string | null>(null);
-    const [existingEvidences, setExistingEvidences] = useState<string[]>([]);
+    const [existingEvidences, setExistingEvidences] = useState<EvidenceItem[]>([]);
+    const [previewItem, setPreviewItem] = useState<EvidenceItem | null>(null);
     const [adminHelpRequested, setAdminHelpRequested] = useState(false);
     const [adminHelpRequestedByUserId, setAdminHelpRequestedByUserId] = useState<string | null>(null);
     const [isApproving, setIsApproving] = useState(false);
@@ -184,7 +197,10 @@ export function MatchScheduleCard({
     // What the entry form opens with. Editing a pending proposal has nothing in `reportedGames`
     // yet — it used to open blank and silently drop every game the reporter had entered.
     const visualEntrySeedGames = visualReportedGames.length > 0 ? visualReportedGames : visualProposedGames;
-    const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+    // Upload-ready files, not raw picks: clips are transcoded when chosen so the send is a
+    // plain POST. Mirrors MatchDetailsModal, which feeds the same endpoint.
+    const [selectedImages, setSelectedImages] = useState<PreparedEvidence[]>([]);
+    const [isPreparingMedia, setIsPreparingMedia] = useState(false);
 
     // Comments state
     const [comments, setComments] = useState<MatchComment[]>([]);
@@ -356,7 +372,10 @@ export function MatchScheduleCard({
                 let proposedHome = data.proposedHomeScore ?? data.ProposedHomeScore ?? null;
                 let proposedAway = data.proposedAwayScore ?? data.ProposedAwayScore ?? null;
                 let proposedBy = data.proposedByUserId ?? data.ProposedByUserId ?? null;
-                let evidences = data.evidences || data.Evidences || [];
+                let evidences = normalizeEvidenceItems(
+                    data.evidenceItems || data.EvidenceItems,
+                    data.evidences || data.Evidences,
+                );
 
                 // Series format + games. On a team sub-match these live on the sub-match row, and
                 // the win condition on the parent DTO, so both are re-read in the sub-match branch.
@@ -383,7 +402,13 @@ export function MatchScheduleCard({
                         proposedHome = sub.proposedHomeScore ?? sub.ProposedHomeScore ?? proposedHome;
                         proposedAway = sub.proposedAwayScore ?? sub.ProposedAwayScore ?? proposedAway;
                         proposedBy = sub.proposedByUserId ?? sub.ProposedByUserId ?? proposedBy;
-                        evidences = sub.evidences || sub.Evidences || evidences;
+                        // Unconditional: this card is showing one game of the tie, so its evidence
+                        // is the sub-match's. Falling back to the parent when the sub has none
+                        // would show the other games' screenshots under this one.
+                        evidences = normalizeEvidenceItems(
+                            sub.evidenceItems || sub.EvidenceItems,
+                            sub.evidences || sub.Evidences,
+                        );
                         // Each individual game of a tie is its own series, reported on the sub-match.
                         bestOf = sub.bestOf ?? sub.BestOf ?? bestOf;
                         tiebreakBestOf = sub.tiebreakBestOf ?? sub.TiebreakBestOf ?? tiebreakBestOf;
@@ -670,32 +695,50 @@ export function MatchScheduleCard({
                 return;
             }
 
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsMultipleSelection: true,
-                quality: 0.8,
-            });
+            const assets = await pickEvidenceAssets();
+            if (!assets) return;
 
-            if (!result.canceled) {
-                // File size check for multiple selections
-                const oversized = result.assets.filter(asset => !isFileSizeValid(asset));
+            // Only stills are judged on picked size. A clip is about to shrink by an order of
+            // magnitude, so rejecting it here would throw away files that end up perfectly fine.
+            const oversized = assets.filter(asset => !isImageWithinLimit(asset));
+            const usable = assets.filter(asset => isImageWithinLimit(asset));
 
-                if (oversized.length > 0) {
-                    const oversizedNames = oversized.map(a => a.fileName || t('card.imageFallbackName')).join(', ');
-                    setError(t('card.imagesTooLarge', { names: oversizedNames, max: formatFileSize(MAX_FILE_SIZE) }));
+            if (oversized.length > 0) {
+                const oversizedNames = oversized.map(a => a.fileName || t('card.imageFallbackName')).join(', ');
+                setError(t('card.imagesTooLarge', { names: oversizedNames, max: formatFileSize(MAX_FILE_SIZE) }));
+            }
 
-                    // Only add the valid ones
-                    const validAssets = result.assets.filter(asset => isFileSizeValid(asset));
-                    if (validAssets.length > 0) {
-                        setSelectedImages(prev => [...prev, ...validAssets]);
-                    }
-                    return;
+            if (usable.length === 0) return;
+
+            if (usable.some(a => a.type === 'video')) setIsPreparingMedia(true);
+
+            try {
+                const { prepared, rejected } = await prepareEvidenceForUpload(usable);
+
+                if (rejected.length > 0) {
+                    const tooLong = rejected.filter(r => r.reason === 'tooLong');
+                    const unsupported = rejected.filter(r => r.reason === 'unsupported');
+                    setError(
+                        tooLong.length > 0
+                            ? t('card.videoTooLong', {
+                                names: tooLong.map(r => r.name).join(', '),
+                                seconds: MAX_VIDEO_DURATION_SECONDS,
+                            })
+                            : unsupported.length > 0
+                                ? t('card.videoNotSupportedHere')
+                                : t('card.videoPrepareFailed', {
+                                    names: rejected.map(r => r.name).join(', '),
+                                }));
                 }
 
-                setSelectedImages(prev => [...prev, ...result.assets]);
+                if (prepared.length > 0) {
+                    setSelectedImages(prev => [...prev, ...prepared]);
+                }
+            } finally {
+                setIsPreparingMedia(false);
             }
         } catch (err) {
-            console.error('Error picking images:', err);
+            console.error('Error picking evidence:', err);
             setError(t('card.pickImagesFailed'));
         }
     };
@@ -794,12 +837,11 @@ export function MatchScheduleCard({
 
             if (selectedImages.length > 0) {
                 const formData = new FormData();
-                selectedImages.forEach((img, index) => {
-                    const filename = img.uri.split('/').pop() || `evidence-${index}.jpg`;
-                    const match = /\.(\w+)$/.exec(filename);
-                    const type = match ? `image/${match[1]}` : `image/jpeg`;
+                selectedImages.forEach(file => {
+                    // Honest content type: the server whitelists on it to tell a screenshot from
+                    // a clip and route the upload accordingly.
                     // @ts-ignore
-                    formData.append('files', { uri: img.uri, name: filename, type });
+                    formData.append('files', { uri: file.uri, name: file.name, type: file.type });
                 });
 
                 await authenticatedFetch(ENDPOINTS.UPLOAD_MATCH_EVIDENCE(matchId), {
@@ -1136,6 +1178,11 @@ export function MatchScheduleCard({
             </Pressable>
 
             {renderModal()}
+
+            {/* Fullscreen evidence preview. Mounted beside the report modal rather than
+                inside it: a nested Modal over another Modal is the arrangement that
+                glitches on iOS. */}
+            <EvidencePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
         </>
     );
 
@@ -1725,15 +1772,15 @@ export function MatchScheduleCard({
                                                         <View className="mb-3">
                                                             <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{t('card.uploaded')}</Text>
                                                             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                                                {existingEvidences.map((url, idx) => (
-                                                                    <View key={idx} className="mr-2.5">
-                                                                        <Image
-                                                                            source={{ uri: getOptimizedCloudinaryUrl(url, 320) }}
-                                                                            style={{ width: 96, height: 128, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
-                                                                            contentFit="cover"
-                                                                            cachePolicy="memory-disk"
-                                                                        />
-                                                                    </View>
+                                                                {existingEvidences.map((item, idx) => (
+                                                                    <EvidenceThumb
+                                                                        key={idx}
+                                                                        item={item}
+                                                                        width={96}
+                                                                        height={128}
+                                                                        className="mr-2.5"
+                                                                        onPress={() => setPreviewItem(item)}
+                                                                    />
                                                                 ))}
                                                             </ScrollView>
                                                         </View>
@@ -1751,17 +1798,13 @@ export function MatchScheduleCard({
                                                         </View>
                                                     )}
 
-                                                    {selectedImages.length > 0 ? (
-                                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-                                                            {selectedImages.map((img, index) => (
-                                                                <View key={img.uri + index} className="mr-3 mb-2">
-                                                                    <Image source={{ uri: img.uri }} style={isPremium ? { width: 80, height: 80, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' } : { width: 80, height: 80, borderRadius: 16 }} />
-                                                                    <Pressable onPress={() => removeImage(img.uri)} className={cn("absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full items-center justify-center", isPremium ? "bg-destructive" : "bg-destructive")}>
-                                                                        <Ionicons name="close" size={12} color="white" />
-                                                                    </Pressable>
-                                                                </View>
-                                                            ))}
-                                                        </ScrollView>
+                                                    {isPreparingMedia ? (
+                                                        <View className={cn("h-20 border border-dashed rounded-2xl items-center justify-center", isPremium ? "border-white/[0.08] bg-white/[0.01]" : "border-border/20 bg-muted/5")}>
+                                                            <ActivityIndicator size="small" color="#818CF8" />
+                                                            <Text className="font-semibold tracking-wider mt-1.5 text-[10px] text-slate-500">{t('card.compressingVideo')}</Text>
+                                                        </View>
+                                                    ) : selectedImages.length > 0 ? (
+                                                        <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
                                                     ) : (
                                                         <Pressable onPress={pickImages} className={cn("h-20 border border-dashed rounded-2xl items-center justify-center", isPremium ? "border-white/[0.08] bg-white/[0.01]" : "border-border/20 bg-muted/5")}
                                                             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
@@ -1778,12 +1821,9 @@ export function MatchScheduleCard({
                                                             onPress={async () => {
                                                                 if (!matchId || selectedImages.length === 0) return;
                                                                 const formData = new FormData();
-                                                                selectedImages.forEach((img, index) => {
-                                                                    const filename = img.uri.split('/').pop() || `evidence-${index}.jpg`;
-                                                                    const m = /\.(\w+)$/.exec(filename);
-                                                                    const type = m ? `image/${m[1]}` : `image/jpeg`;
+                                                                selectedImages.forEach(file => {
                                                                     // @ts-ignore
-                                                                    formData.append('files', { uri: img.uri, name: filename, type });
+                                                                    formData.append('files', { uri: file.uri, name: file.name, type: file.type });
                                                                 });
                                                                 try {
                                                                     setIsSubmitting(true);

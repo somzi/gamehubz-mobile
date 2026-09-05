@@ -7,6 +7,9 @@ import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchTimingStrip } from '../match/MatchTimingStrip';
 import { PlayerIdentity, hasNickname } from '../match/PlayerIdentity';
 import { EvidenceSection } from '../match/EvidenceSection';
+import { EvidenceThumb } from '../match/EvidenceThumb';
+import { EvidencePreviewModal } from '../match/EvidencePreviewModal';
+import { PendingEvidenceStrip } from '../match/PendingEvidenceStrip';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { useMatchChatMute } from '../../hooks/useMatchChatMute';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
@@ -18,7 +21,16 @@ import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { getOptimizedCloudinaryUrl, MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../../lib/image';
+import { MAX_FILE_SIZE, formatFileSize } from '../../lib/image';
+import {
+    EvidenceItem,
+    PreparedEvidence,
+    normalizeEvidenceItems,
+    pickEvidenceAssets,
+    prepareEvidenceForUpload,
+    isImageWithinLimit,
+    MAX_VIDEO_DURATION_SECONDS,
+} from '../../lib/evidence';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
@@ -61,6 +73,8 @@ export interface MatchResultDetailDto {
     homeUserScore: number;
     awayUserScore: number;
     evidences: string[];
+    /** Typed evidence. Absent on an older API, in which case `evidences` is read as images. */
+    evidenceItems?: EvidenceItem[];
     hubOwnerId?: string;
     scheduledTime?: string;
     homeUserAvatarUrl?: string;
@@ -191,7 +205,11 @@ export function MatchDetailsModal({
     const [seriesOutcome, setSeriesOutcome] = useState<SeriesOutcome | null>(null);
     const [isSeriesComplete, setIsSeriesComplete] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+    // Holds files that are already upload-ready: clips are transcoded at pick time, not at
+    // send time, so the pending strip shows what will actually be sent and the upload itself
+    // is a plain POST with no surprise minute of encoding in the middle.
+    const [selectedImages, setSelectedImages] = useState<PreparedEvidence[]>([]);
+    const [isPreparingMedia, setIsPreparingMedia] = useState(false);
 
     // Details for completed matches
     const [matchDetails, setMatchDetails] = useState<MatchResultDetailDto | null>(null);
@@ -233,7 +251,7 @@ export function MatchDetailsModal({
     const entrySeedGames = reportedGames.length > 0 ? reportedGames : proposedGames;
 
     // Image preview state
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewItem, setPreviewItem] = useState<EvidenceItem | null>(null);
 
     // Edit mode state
     const [isEditMode, setIsEditMode] = useState(false);
@@ -351,6 +369,10 @@ export function MatchDetailsModal({
             homeUserScore: sub?.homeScore ?? sub?.HomeScore ?? 0,
             awayUserScore: sub?.awayScore ?? sub?.AwayScore ?? 0,
             evidences: sub?.evidences || sub?.Evidences || [],
+            evidenceItems: normalizeEvidenceItems(
+                sub?.evidenceItems || sub?.EvidenceItems,
+                sub?.evidences || sub?.Evidences,
+            ),
             scheduledTime: data.scheduledTime || data.ScheduledTime,
             homeUserAvatarUrl: formatAvatarUrl(hp?.avatarUrl || hp?.AvatarUrl),
             awayUserAvatarUrl: formatAvatarUrl(ap?.avatarUrl || ap?.AvatarUrl),
@@ -423,6 +445,10 @@ export function MatchDetailsModal({
                         homeUserScore: data.homeUserScore ?? data.HomeUserScore ?? 0,
                         awayUserScore: data.awayUserScore ?? data.AwayUserScore ?? 0,
                         evidences: data.evidences || data.Evidences || [],
+                        evidenceItems: normalizeEvidenceItems(
+                            data.evidenceItems || data.EvidenceItems,
+                            data.evidences || data.Evidences,
+                        ),
                         scheduledTime: data.scheduledTime || data.ScheduledTime,
                         homeUserAvatarUrl: formatAvatarUrl(data.homeUserAvatarUrl || data.HomeUserAvatarUrl),
                         awayUserAvatarUrl: formatAvatarUrl(data.awayUserAvatarUrl || data.AwayUserAvatarUrl),
@@ -491,30 +517,55 @@ export function MatchDetailsModal({
                 return;
             }
 
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
-                allowsMultipleSelection: true,
-                quality: 0.8,
-            });
+            const assets = await pickEvidenceAssets();
+            if (!assets) return;
 
-            if (!result.canceled) {
-                const oversized = result.assets.filter(asset => !isFileSizeValid(asset));
+            // Stills are gated on their own size; clips are not, because compression is about to
+            // shrink them by an order of magnitude and judging them at picked size would reject
+            // files that end up perfectly fine.
+            const oversized = assets.filter(asset => !isImageWithinLimit(asset));
+            const usable = assets.filter(asset => isImageWithinLimit(asset));
 
-                if (oversized.length > 0) {
-                    const oversizedNames = oversized.map(a => a.fileName || t('details.imageFallbackName')).join(', ');
-                    setError(t('details.imagesTooLarge', { names: oversizedNames, max: formatFileSize(MAX_FILE_SIZE) }));
+            if (oversized.length > 0) {
+                const oversizedNames = oversized.map(a => a.fileName || t('details.imageFallbackName')).join(', ');
+                setError(t('details.imagesTooLarge', { names: oversizedNames, max: formatFileSize(MAX_FILE_SIZE) }));
+            }
 
-                    const validAssets = result.assets.filter(asset => isFileSizeValid(asset));
-                    if (validAssets.length > 0) {
-                        setSelectedImages(prev => [...prev, ...validAssets]);
-                    }
-                    return;
+            if (usable.length === 0) return;
+
+            const hasVideo = usable.some(a => a.type === 'video');
+            if (hasVideo) setIsPreparingMedia(true);
+
+            try {
+                const { prepared, rejected } = await prepareEvidenceForUpload(usable);
+
+                if (rejected.length > 0) {
+                    // One message covering the batch: listing every clip separately turns a
+                    // two-file mistake into a paragraph. Ordered by how actionable the reason is,
+                    // so a fixable problem is what the user is told about.
+                    const tooLong = rejected.filter(r => r.reason === 'tooLong');
+                    const unsupported = rejected.filter(r => r.reason === 'unsupported');
+                    setError(
+                        tooLong.length > 0
+                            ? t('details.videoTooLong', {
+                                names: tooLong.map(r => r.name).join(', '),
+                                seconds: MAX_VIDEO_DURATION_SECONDS,
+                            })
+                            : unsupported.length > 0
+                                ? t('details.videoNotSupportedHere')
+                                : t('details.videoPrepareFailed', {
+                                    names: rejected.map(r => r.name).join(', '),
+                                }));
                 }
 
-                setSelectedImages(prev => [...prev, ...result.assets]);
+                if (prepared.length > 0) {
+                    setSelectedImages(prev => [...prev, ...prepared]);
+                }
+            } finally {
+                setIsPreparingMedia(false);
             }
         } catch (err) {
-            console.error('Error picking images:', err);
+            console.error('Error picking evidence:', err);
             setError(t('details.pickImagesFailed'));
         }
     };
@@ -533,12 +584,11 @@ export function MatchDetailsModal({
 
         try {
             const formData = new FormData();
-            selectedImages.forEach((img, index) => {
-                const filename = img.uri.split('/').pop() || `evidence-${index}.jpg`;
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : `image/jpeg`;
+            selectedImages.forEach(file => {
+                // The content type has to be honest: the server whitelists on it to tell a
+                // screenshot from a clip, and routes the upload accordingly.
                 // @ts-ignore
-                formData.append('files', { uri: img.uri, name: filename, type });
+                formData.append('files', { uri: file.uri, name: file.name, type: file.type });
             });
 
             const response = await authenticatedFetch(ENDPOINTS.UPLOAD_MATCH_EVIDENCE(matchId), {
@@ -1268,27 +1318,21 @@ export function MatchDetailsModal({
                 {/* Evidence Gallery — same collapsed row as the reporting view. */}
                 <EvidenceSection
                     className="mx-5 mb-5"
-                    uploadedCount={matchDetails.evidences?.length ?? 0}
+                    uploadedCount={matchDetails.evidenceItems?.length ?? 0}
                     open={isEvidenceOpen}
                     onToggle={setIsEvidenceOpen}
                 >
-                    {matchDetails.evidences && matchDetails.evidences.length > 0 ? (
+                    {matchDetails.evidenceItems && matchDetails.evidenceItems.length > 0 ? (
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {matchDetails.evidences.map((url, idx) => (
-                                <Pressable
+                            {matchDetails.evidenceItems.map((item, idx) => (
+                                <EvidenceThumb
                                     key={idx}
+                                    item={item}
+                                    width={144}
+                                    height={192}
                                     className="mr-3"
-                                    onPress={() => setPreviewImage(url)}
-                                >
-                                    <View className="rounded-2xl overflow-hidden border border-white/5">
-                                        <Image
-                                            source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                            style={{ width: 144, height: 192, backgroundColor: '#1E293B' }}
-                                            contentFit="cover"
-                                            cachePolicy="memory-disk"
-                                        />
-                                    </View>
-                                </Pressable>
+                                    onPress={() => setPreviewItem(item)}
+                                />
                             ))}
                         </ScrollView>
                     ) : (
@@ -1456,19 +1500,13 @@ export function MatchDetailsModal({
                             <Text className="text-[10px] font-black text-primary ml-1.5 uppercase tracking-wider" numberOfLines={1}>{t('details.addEvidence')}</Text>
                         </Pressable>
                     </View>
-                    {selectedImages.length > 0 ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {selectedImages.map((img, index) => (
-                                <View key={img.uri + index} className="mr-3 mb-2">
-                                    <View className="rounded-2xl overflow-hidden border border-white/5">
-                                        <Image source={{ uri: img.uri }} style={{ width: 80, height: 80 }} />
-                                    </View>
-                                    <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-background-deep shadow-sm">
-                                        <Ionicons name="close" size={10} color="white" />
-                                    </Pressable>
-                                </View>
-                            ))}
-                        </ScrollView>
+                    {isPreparingMedia ? (
+                        <View className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
+                            <ActivityIndicator size="small" color="#818CF8" />
+                            <Text className="text-[10px] text-slate-500 mt-1.5 font-bold">{t('details.compressingVideo')}</Text>
+                        </View>
+                    ) : selectedImages.length > 0 ? (
+                        <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
                     ) : (
                         <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                             <Ionicons name="images-outline" size={22} color="#334155" />
@@ -1630,7 +1668,8 @@ export function MatchDetailsModal({
 
         // Spectators still get the evidence section (read-only) — only the pickers are gated.
         const canAttachEvidence = isParticipant || isPrivileged;
-        const uploadedEvidenceCount = matchDetails?.evidences?.length ?? 0;
+        const uploadedEvidence = matchDetails?.evidenceItems ?? [];
+        const uploadedEvidenceCount = uploadedEvidence.length;
 
         // While a proposal is pending we hide the manual submit form so the proposal card alone
         // drives the decision. Anyone with the right to act (proposer, opponent, admin/owner)
@@ -1870,35 +1909,25 @@ export function MatchDetailsModal({
                             <View className={cn(canAttachEvidence && "mb-4")}>
                                 <Text className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{t('details.uploaded')}</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    {matchDetails!.evidences.map((url, idx) => (
-                                        <Pressable key={idx} className="mr-3" onPress={() => setPreviewImage(url)}>
-                                            <View className="rounded-2xl overflow-hidden border border-white/5">
-                                                <Image
-                                                    source={{ uri: getOptimizedCloudinaryUrl(url, 400) }}
-                                                    style={{ width: 112, height: 160, backgroundColor: '#1E293B' }}
-                                                    contentFit="cover"
-                                                    cachePolicy="memory-disk"
-                                                />
-                                            </View>
-                                        </Pressable>
+                                    {uploadedEvidence.map((item, idx) => (
+                                        <EvidenceThumb
+                                            key={idx}
+                                            item={item}
+                                            className="mr-3"
+                                            onPress={() => setPreviewItem(item)}
+                                        />
                                     ))}
                                 </ScrollView>
                             </View>
                         )}
 
-                        {canAttachEvidence && (selectedImages.length > 0 ? (
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                {selectedImages.map((img, index) => (
-                                    <View key={img.uri + index} className="mr-3 mb-2">
-                                        <View className="rounded-2xl overflow-hidden border border-white/5">
-                                            <Image source={{ uri: img.uri }} style={{ width: 80, height: 80 }} />
-                                        </View>
-                                        <Pressable onPress={() => removeImage(img.uri)} className="absolute -top-1.5 -right-1.5 bg-red-500 w-5 h-5 rounded-full items-center justify-center border-2 border-background-deep shadow-sm">
-                                            <Ionicons name="close" size={10} color="white" />
-                                        </Pressable>
-                                    </View>
-                                ))}
-                            </ScrollView>
+                        {canAttachEvidence && (isPreparingMedia ? (
+                            <View className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
+                                <ActivityIndicator size="small" color="#818CF8" />
+                                <Text className="text-[10px] text-slate-500 mt-1.5 font-bold">{t('details.compressingVideo')}</Text>
+                            </View>
+                        ) : selectedImages.length > 0 ? (
+                            <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
                         ) : (
                             <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                                 <Ionicons name="images-outline" size={22} color="#334155" />
@@ -2211,31 +2240,8 @@ export function MatchDetailsModal({
                 stacked
             />
 
-            {/* Fullscreen Image Preview */}
-            <Modal
-                visible={!!previewImage}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setPreviewImage(null)}
-            >
-                <View className="flex-1 bg-black/95 items-center justify-center p-4">
-                    <Pressable
-                        className="absolute top-12 right-6 z-10 w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/20"
-                        onPress={() => setPreviewImage(null)}
-                    >
-                        <Ionicons name="close" size={24} color="white" />
-                    </Pressable>
-
-                    {previewImage && (
-                        <Image
-                            source={{ uri: previewImage }}
-                            style={{ width: '100%', height: '100%' }}
-                            contentFit="contain"
-                            cachePolicy="memory-disk"
-                        />
-                    )}
-                </View>
-            </Modal>
+            {/* Fullscreen evidence preview — image or clip. */}
+            <EvidencePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
         </Modal>
     );
 }

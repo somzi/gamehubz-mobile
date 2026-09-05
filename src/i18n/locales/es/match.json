@@ -76,7 +76,7 @@
     "fixYourScore": "Corrige tu marcador",
     "evidence": "Evidencia",
     "addEvidence": "Agregar",
-    "noPhotosSelected": "No hay fotos seleccionadas",
+    "noPhotosSelected": "Ningún archivo seleccionado",
     "awaitingApprovalHeading": "Pendiente de aprobación",
     "resultReported": "Resultado informado",
     "opponentMustConfirm": "Tu rival debe confirmarlo antes de que el partido sea definitivo.",
@@ -101,7 +101,7 @@
     "dwHintElimination": "Ninguno de los jugadores se presentó — el partido se cierra sin ganador y su rival avanza automáticamente.",
     "dwHintDefault": "Ninguno de los jugadores se presentó — el partido se cierra como incomparecencia. Sin puntos para ninguno de los jugadores (no es un empate).",
     "uploaded": "Subidas",
-    "tapToAddScreenshots": "Toca para agregar capturas del resultado",
+    "tapToAddScreenshots": "Toca para agregar capturas o un clip",
     "uploadEvidence": "Subir evidencia",
     "liveBadge": "En vivo",
     "schedulingNotSupported": "Aquí no se admite la programación",
@@ -113,7 +113,12 @@
     "saveChangesTitle": "¿Guardar los cambios?",
     "updatesResultBody": "Esto actualiza el resultado. El ganador no cambia, así que el resto del cuadro no se ve afectado.",
     "doubleWalkoverTitle": "¿Doble incomparecencia?",
-    "homeSide": "Local"
+    "homeSide": "Local",
+    "compressingVideo": "Comprimiendo video...",
+    "videoTooLong": "El video es demasiado largo: {{names}}. La duración máxima es de {{seconds}} segundos.",
+    "videoPrepareFailed": "No se pudo preparar el video: {{names}}. Prueba con un clip más corto.",
+    "videoNotSupportedHere": "El video requiere la última versión de la app. Actualízala para adjuntar clips.",
+    "videoPlaybackUnavailable": "La reproducción de video requiere la última versión de la app."
   },
   "schedule": {
     "closedDeadlinePassed": "La selección de disponibilidad está cerrada (venció el plazo).",
@@ -174,7 +179,7 @@
     "submitResult": "Enviar resultado",
     "uploaded": "Subidas",
     "clear": "Borrar",
-    "tapToUpload": "Toca para subir",
+    "tapToUpload": "Toca para agregar capturas o un clip",
     "uploadEvidence": "Subir evidencia",
     "completed": "Finalizado",
     "resultsRecorded": "Los resultados quedaron registrados",
@@ -182,7 +187,11 @@
     "noMessagesYet": "Aún no hay mensajes",
     "admin": "Admin",
     "chatReadOnly": "Partido finalizado — el chat es de solo lectura",
-    "typeAMessage": "Escribe un mensaje..."
+    "typeAMessage": "Escribe un mensaje...",
+    "compressingVideo": "Comprimiendo video...",
+    "videoTooLong": "El video es demasiado largo: {{names}}. Duración máxima: {{seconds}} segundos.",
+    "videoPrepareFailed": "No se pudo preparar el video: {{names}}. Prueba con un clip más corto.",
+    "videoNotSupportedHere": "El video requiere la última versión de la app. Actualízala para adjuntar clips."
   },
   "myMatches": {
     "title": "Mis partidos",
@@ -348,9 +357,9 @@
   },
   "evidence": {
     "readyToUpload": "{{count}} listas para subir",
-    "attached_one": "{{count}} captura adjunta",
-    "attached_other": "{{count}} capturas adjuntas",
-    "addScreenshots": "Agrega capturas del resultado",
+    "attached_one": "{{count}} archivo adjunto",
+    "attached_other": "{{count}} archivos adjuntos",
+    "addScreenshots": "Agrega capturas o un clip del resultado",
     "evidence": "Evidencia",
     "add": "Agregar"
   },

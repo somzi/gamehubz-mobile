@@ -3,7 +3,7 @@
     "name": "GameHubz",
     "scheme": "gamehubz",
     "slug": "gamehubz-mobile",
-    "version": "2.15.2",
+    "version": "2.16.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -100,7 +100,9 @@
           "icon": "./assets/notification-icon.png",
           "color": "#10B981"
         }
-      ]
+      ],
+      "react-native-compressor",
+      "expo-video"
     ]
   }
 }

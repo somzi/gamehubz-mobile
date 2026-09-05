@@ -76,7 +76,7 @@
     "fixYourScore": "Fix Your Score",
     "evidence": "Evidence",
     "addEvidence": "Add",
-    "noPhotosSelected": "No photos selected",
+    "noPhotosSelected": "No files selected",
     "awaitingApprovalHeading": "Awaiting Approval",
     "resultReported": "Result Reported",
     "opponentMustConfirm": "Your opponent needs to confirm before this match is final.",
@@ -101,7 +101,7 @@
     "dwHintElimination": "Both players failed to play — closes this match with no winner and advances their opponent automatically.",
     "dwHintDefault": "Both players failed to play — closes this match as a no-show. No points for either player (not a draw).",
     "uploaded": "Uploaded",
-    "tapToAddScreenshots": "Tap to add result screenshots",
+    "tapToAddScreenshots": "Tap to add screenshots or a clip",
     "uploadEvidence": "Upload Evidence",
     "liveBadge": "Live",
     "schedulingNotSupported": "Scheduling Not Supported Here",
@@ -113,7 +113,12 @@
     "saveChangesTitle": "Save changes?",
     "updatesResultBody": "This updates the result. The winner stays the same, so the rest of the bracket is unaffected.",
     "doubleWalkoverTitle": "Double walkover?",
-    "homeSide": "Home"
+    "homeSide": "Home",
+    "compressingVideo": "Compressing video...",
+    "videoTooLong": "Video is too long: {{names}}. Maximum length is {{seconds}} seconds.",
+    "videoPrepareFailed": "Could not prepare video: {{names}}. Try a shorter clip.",
+    "videoNotSupportedHere": "Video needs the latest version of the app. Update to attach clips.",
+    "videoPlaybackUnavailable": "Video playback needs the latest version of the app."
   },
   "schedule": {
     "closedDeadlinePassed": "Availability selection is closed (Deadline Passed).",
@@ -174,7 +179,7 @@
     "submitResult": "Submit Result",
     "uploaded": "Uploaded",
     "clear": "Clear",
-    "tapToUpload": "Tap to upload",
+    "tapToUpload": "Tap to add screenshots or a clip",
     "uploadEvidence": "Upload Evidence",
     "completed": "Completed",
     "resultsRecorded": "Results have been recorded",
@@ -182,7 +187,11 @@
     "noMessagesYet": "No messages yet",
     "admin": "Admin",
     "chatReadOnly": "Match completed — chat is read-only",
-    "typeAMessage": "Type a message..."
+    "typeAMessage": "Type a message...",
+    "compressingVideo": "Compressing video...",
+    "videoTooLong": "Video is too long: {{names}}. Max length is {{seconds}} seconds.",
+    "videoPrepareFailed": "Could not prepare video: {{names}}. Try a shorter clip.",
+    "videoNotSupportedHere": "Video needs the latest version of the app. Update to attach clips."
   },
   "myMatches": {
     "title": "My Matches",
@@ -348,9 +357,9 @@
   },
   "evidence": {
     "readyToUpload": "{{count}} ready to upload",
-    "attached_one": "{{count}} screenshot attached",
-    "attached_other": "{{count}} screenshots attached",
-    "addScreenshots": "Add screenshots of the result",
+    "attached_one": "{{count}} file attached",
+    "attached_other": "{{count}} files attached",
+    "addScreenshots": "Add screenshots or a clip of the result",
     "evidence": "Evidence",
     "add": "Add"
   },
