@@ -118,7 +118,8 @@
     "videoTooLong": "El video es demasiado largo: {{names}}. La duración máxima es de {{seconds}} segundos.",
     "videoPrepareFailed": "No se pudo preparar el video: {{names}}. Prueba con un clip más corto.",
     "videoNotSupportedHere": "El video requiere la última versión de la app. Actualízala para adjuntar clips.",
-    "videoPlaybackUnavailable": "La reproducción de video requiere la última versión de la app."
+    "videoPlaybackUnavailable": "La reproducción de video requiere la última versión de la app.",
+    "compressingVideoProgress": "Comprimiendo video... {{percent}}%"
   },
   "schedule": {
     "closedDeadlinePassed": "La selección de disponibilidad está cerrada (venció el plazo).",
@@ -191,7 +192,8 @@
     "compressingVideo": "Comprimiendo video...",
     "videoTooLong": "El video es demasiado largo: {{names}}. Duración máxima: {{seconds}} segundos.",
     "videoPrepareFailed": "No se pudo preparar el video: {{names}}. Prueba con un clip más corto.",
-    "videoNotSupportedHere": "El video requiere la última versión de la app. Actualízala para adjuntar clips."
+    "videoNotSupportedHere": "El video requiere la última versión de la app. Actualízala para adjuntar clips.",
+    "compressingVideoProgress": "Comprimiendo video... {{percent}}%"
   },
   "myMatches": {
     "title": "Mis partidos",
@@ -316,7 +318,13 @@
     "waitingOne": "{{name}} no ha respondido",
     "waitingOneHint": "Un lado propuso horas y no recibió nada a cambio.",
     "waitingBoth": "Ningún jugador ha respondido",
-    "waitingBothHint": "Todavía nadie ha abierto el programador de este partido."
+    "waitingBothHint": "Todavía nadie ha abierto el programador de este partido.",
+    "clearSchedule": "Cancelar el horario",
+    "clearScheduleHint": "Borra la hora de inicio y las horas propuestas por ambos jugadores: tendrán que elegir de nuevo.",
+    "clearScheduleTitle": "¿Cancelar el horario?",
+    "clearScheduleBody": "{{home}} vs {{away}} vuelve a quedar sin programar y se borran las horas propuestas por ambos jugadores. Tendrán que elegir su disponibilidad de nuevo.",
+    "clearScheduleConfirm": "Cancelar horario",
+    "clearScheduleFailed": "No se pudo cancelar el horario."
   },
   "chatPanel": {
     "loadEarlier": "Cargar mensajes anteriores",

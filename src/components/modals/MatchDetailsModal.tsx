@@ -210,6 +210,9 @@ export function MatchDetailsModal({
     // is a plain POST with no surprise minute of encoding in the middle.
     const [selectedImages, setSelectedImages] = useState<PreparedEvidence[]>([]);
     const [isPreparingMedia, setIsPreparingMedia] = useState(false);
+    // Transcoding a 40s screen recording takes tens of seconds. A bare spinner for that long
+    // reads as a hang, so the encoder's own progress is surfaced instead.
+    const [compressionProgress, setCompressionProgress] = useState(0);
 
     // Details for completed matches
     const [matchDetails, setMatchDetails] = useState<MatchResultDetailDto | null>(null);
@@ -269,6 +272,9 @@ export function MatchDetailsModal({
 
     // Double-walkover state — admin closes an unplayed match with no winner so the opponent advances.
     const [isApplyingWalkover, setIsApplyingWalkover] = useState(false);
+
+    // Clear-schedule state — admin cancels a confirmed kick-off and sends the pair back to the scheduler.
+    const [isClearingSchedule, setIsClearingSchedule] = useState(false);
 
     // Follow-up prompt shown to an admin who just settled a match that still has an open help
     // request — entering the result is usually the answer to it, so we offer to close it too.
@@ -534,10 +540,16 @@ export function MatchDetailsModal({
             if (usable.length === 0) return;
 
             const hasVideo = usable.some(a => a.type === 'video');
-            if (hasVideo) setIsPreparingMedia(true);
+            if (hasVideo) {
+                setCompressionProgress(0);
+                setIsPreparingMedia(true);
+            }
 
             try {
-                const { prepared, rejected } = await prepareEvidenceForUpload(usable);
+                const { prepared, rejected } = await prepareEvidenceForUpload(
+                    usable,
+                    (_index, progress) => setCompressionProgress(progress),
+                );
 
                 if (rejected.length > 0) {
                     // One message covering the batch: listing every clip separately turns a
@@ -1016,6 +1028,56 @@ export function MatchDetailsModal({
             [
                 { text: tCommon('cancel'), style: 'cancel' },
                 { text: t('details.doubleWalkover'), style: 'destructive', onPress: submitDoubleWalkover },
+            ],
+        );
+    };
+
+    const submitClearSchedule = async () => {
+        if (!matchId) return;
+        setIsClearingSchedule(true);
+        setError(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.CLEAR_MATCH_SCHEDULE(matchId), { method: 'POST' });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || t('adminAvailability.clearScheduleFailed'));
+            }
+
+            // Cleared locally first: fetchMatchDetails only ever SETS a confirmed time (it has no
+            // "and otherwise forget it" branch), so without this the hero would keep showing the
+            // kick-off that no longer exists.
+            setConfirmedTime(undefined);
+            setConfirmedTimeIso(undefined);
+            setCurrentStatus('pending_availability');
+            setMySlots([]);
+            setOpponentSlots([]);
+
+            await fetchMatchDetails();
+            if (onMatchUpdate) onMatchUpdate();
+        } catch (err: any) {
+            console.error('Clear schedule error:', err);
+            setError(err.message || t('adminAvailability.clearScheduleFailed'));
+        } finally {
+            setIsClearingSchedule(false);
+        }
+    };
+
+    // Destructive for the players (their offered hours go with the time), so it is confirmed and
+    // spells out the consequence. Backend re-checks the manage permission and that the match is
+    // still Scheduled.
+    const handleClearSchedule = () => {
+        const homeName = home?.username || matchDetails?.homeUser || t('details.player1');
+        const awayName = away?.username || matchDetails?.awayUser || t('details.player2');
+        Alert.alert(
+            t('adminAvailability.clearScheduleTitle'),
+            t('adminAvailability.clearScheduleBody', { home: homeName, away: awayName }),
+            [
+                { text: tCommon('cancel'), style: 'cancel' },
+                {
+                    text: t('adminAvailability.clearScheduleConfirm'),
+                    style: 'destructive',
+                    onPress: submitClearSchedule,
+                },
             ],
         );
     };
@@ -1503,7 +1565,9 @@ export function MatchDetailsModal({
                     {isPreparingMedia ? (
                         <View className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                             <ActivityIndicator size="small" color="#818CF8" />
-                            <Text className="text-[10px] text-slate-500 mt-1.5 font-bold">{t('details.compressingVideo')}</Text>
+                            <Text className="text-[10px] text-slate-500 mt-1.5 font-bold">
+                                {t('details.compressingVideoProgress', { percent: Math.round(compressionProgress * 100) })}
+                            </Text>
                         </View>
                     ) : selectedImages.length > 0 ? (
                         <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
@@ -1924,7 +1988,9 @@ export function MatchDetailsModal({
                         {canAttachEvidence && (isPreparingMedia ? (
                             <View className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                                 <ActivityIndicator size="small" color="#818CF8" />
-                                <Text className="text-[10px] text-slate-500 mt-1.5 font-bold">{t('details.compressingVideo')}</Text>
+                                <Text className="text-[10px] text-slate-500 mt-1.5 font-bold">
+                                    {t('details.compressingVideoProgress', { percent: Math.round(compressionProgress * 100) })}
+                                </Text>
                             </View>
                         ) : selectedImages.length > 0 ? (
                             <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
@@ -2107,7 +2173,18 @@ export function MatchDetailsModal({
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 32 }}
                     >
-                        <AdminAvailabilityPanel availability={adminAvailability} />
+                        {/* Every other error banner lives in the result tab, which is not on screen
+                            here — a failed cancel would otherwise fail silently. */}
+                        {error && (
+                            <View className="bg-red-500/10 p-3 rounded-2xl mb-3 border border-red-500/20">
+                                <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
+                            </View>
+                        )}
+                        <AdminAvailabilityPanel
+                            availability={adminAvailability}
+                            onClearSchedule={handleClearSchedule}
+                            isClearingSchedule={isClearingSchedule}
+                        />
                     </ScrollView>
                 ) : activeTab === 'stream' && showStreamTab ? (
                     <View className="flex-1 px-6 pt-2">

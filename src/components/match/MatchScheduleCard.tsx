@@ -201,6 +201,8 @@ export function MatchScheduleCard({
     // plain POST. Mirrors MatchDetailsModal, which feeds the same endpoint.
     const [selectedImages, setSelectedImages] = useState<PreparedEvidence[]>([]);
     const [isPreparingMedia, setIsPreparingMedia] = useState(false);
+    // See MatchDetailsModal: a silent spinner through a 30s transcode reads as a hang.
+    const [compressionProgress, setCompressionProgress] = useState(0);
 
     // Comments state
     const [comments, setComments] = useState<MatchComment[]>([]);
@@ -710,10 +712,16 @@ export function MatchScheduleCard({
 
             if (usable.length === 0) return;
 
-            if (usable.some(a => a.type === 'video')) setIsPreparingMedia(true);
+            if (usable.some(a => a.type === 'video')) {
+                setCompressionProgress(0);
+                setIsPreparingMedia(true);
+            }
 
             try {
-                const { prepared, rejected } = await prepareEvidenceForUpload(usable);
+                const { prepared, rejected } = await prepareEvidenceForUpload(
+                    usable,
+                    (_index, progress) => setCompressionProgress(progress),
+                );
 
                 if (rejected.length > 0) {
                     const tooLong = rejected.filter(r => r.reason === 'tooLong');
@@ -1801,7 +1809,9 @@ export function MatchScheduleCard({
                                                     {isPreparingMedia ? (
                                                         <View className={cn("h-20 border border-dashed rounded-2xl items-center justify-center", isPremium ? "border-white/[0.08] bg-white/[0.01]" : "border-border/20 bg-muted/5")}>
                                                             <ActivityIndicator size="small" color="#818CF8" />
-                                                            <Text className="font-semibold tracking-wider mt-1.5 text-[10px] text-slate-500">{t('card.compressingVideo')}</Text>
+                                                            <Text className="font-semibold tracking-wider mt-1.5 text-[10px] text-slate-500">
+                                                                {t('card.compressingVideoProgress', { percent: Math.round(compressionProgress * 100) })}
+                                                            </Text>
                                                         </View>
                                                     ) : selectedImages.length > 0 ? (
                                                         <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />

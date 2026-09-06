@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -169,7 +169,16 @@ const VERDICT_META: Record<Verdict, { icon: keyof typeof Ionicons.glyphMap; colo
  * from the outside: one player ignored the match, versus both answered and never shared an hour.
  * The second is nobody's fault and must not be settled as a no-show.
  */
-export function AdminAvailabilityPanel({ availability }: { availability: AdminAvailability }) {
+export function AdminAvailabilityPanel({
+    availability,
+    onClearSchedule,
+    isClearingSchedule = false,
+}: {
+    availability: AdminAvailability;
+    /** Organizer-only undo of the confirmed kick-off. Omitted where the action must not be offered. */
+    onClearSchedule?: () => void;
+    isClearingSchedule?: boolean;
+}) {
     const { t } = useTranslation('match');
     const [expandedSide, setExpandedSide] = useState<'home' | 'away' | null>(null);
 
@@ -254,6 +263,35 @@ export function AdminAvailabilityPanel({ availability }: { availability: AdminAv
                     )}
                 </View>
             </View>
+
+            {/* Undo. Only ever on a match that actually has a time — there is nothing to cancel
+                otherwise — and only for callers that pass the handler, which is the organizer view. */}
+            {onClearSchedule && verdict === 'scheduled' && (
+                <View className="px-4 pt-3 pb-4 border-t border-white/[0.06]">
+                    <PressableScale
+                        onPress={onClearSchedule}
+                        disabled={isClearingSchedule}
+                        className="flex-row items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/[0.09] py-3"
+                    >
+                        {isClearingSchedule ? (
+                            <ActivityIndicator size="small" color={COLORS.destructive} />
+                        ) : (
+                            <>
+                                <Ionicons name="close-circle-outline" size={15} color={COLORS.destructive} />
+                                <Text
+                                    className="ml-2 text-[12px] font-black uppercase tracking-wider text-destructive"
+                                    numberOfLines={1}
+                                >
+                                    {t('adminAvailability.clearSchedule')}
+                                </Text>
+                            </>
+                        )}
+                    </PressableScale>
+                    <Text className="text-[10px] text-slate-500 font-semibold mt-2 leading-4 text-center">
+                        {t('adminAvailability.clearScheduleHint')}
+                    </Text>
+                </View>
+            )}
         </View>
     );
 }

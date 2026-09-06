@@ -171,6 +171,9 @@ export const ENDPOINTS = {
     // RECIPIENT's language, long after the request that triggered them.
     SET_LANGUAGE: `${API_BASE_URL}/api/user/language`,
     SET_MATCH_SCHEDULED: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule`,
+    // Organizer-only undo of a confirmed kick-off: clears the time AND both sides' offered
+    // hours, so the match goes back to Pending instead of instantly re-confirming the old overlap.
+    CLEAR_MATCH_SCHEDULE: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule/clear`,
 
     // ─── Match streaming ────────────────────────────────────────────────
     GET_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream`,

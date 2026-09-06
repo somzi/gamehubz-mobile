@@ -118,7 +118,8 @@
     "videoTooLong": "Video is too long: {{names}}. Maximum length is {{seconds}} seconds.",
     "videoPrepareFailed": "Could not prepare video: {{names}}. Try a shorter clip.",
     "videoNotSupportedHere": "Video needs the latest version of the app. Update to attach clips.",
-    "videoPlaybackUnavailable": "Video playback needs the latest version of the app."
+    "videoPlaybackUnavailable": "Video playback needs the latest version of the app.",
+    "compressingVideoProgress": "Compressing video... {{percent}}%"
   },
   "schedule": {
     "closedDeadlinePassed": "Availability selection is closed (Deadline Passed).",
@@ -191,7 +192,8 @@
     "compressingVideo": "Compressing video...",
     "videoTooLong": "Video is too long: {{names}}. Max length is {{seconds}} seconds.",
     "videoPrepareFailed": "Could not prepare video: {{names}}. Try a shorter clip.",
-    "videoNotSupportedHere": "Video needs the latest version of the app. Update to attach clips."
+    "videoNotSupportedHere": "Video needs the latest version of the app. Update to attach clips.",
+    "compressingVideoProgress": "Compressing video... {{percent}}%"
   },
   "myMatches": {
     "title": "My Matches",
@@ -316,7 +318,13 @@
     "waitingOne": "{{name}} has not responded",
     "waitingOneHint": "One side offered times and got nothing back.",
     "waitingBoth": "Neither player has responded",
-    "waitingBothHint": "Nobody has opened the scheduler for this match yet."
+    "waitingBothHint": "Nobody has opened the scheduler for this match yet.",
+    "clearSchedule": "Cancel scheduled time",
+    "clearScheduleHint": "Clears the kick-off and both players' offered hours — they pick availability again.",
+    "clearScheduleTitle": "Cancel scheduled time?",
+    "clearScheduleBody": "{{home}} vs {{away}} goes back to unscheduled and both players' offered hours are cleared. They will have to pick their availability again.",
+    "clearScheduleConfirm": "Cancel time",
+    "clearScheduleFailed": "Could not cancel the scheduled time."
   },
   "chatPanel": {
     "loadEarlier": "Load earlier messages",
