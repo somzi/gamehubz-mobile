@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, Modal, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
@@ -7,6 +7,7 @@ import { PressableScale } from '../ui/PressableScale';
 import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
 import { compareGroupNames } from '../../lib/groups';
 import { COLORS } from '../../lib/theme';
+import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
 
 // Backend MatchStatus: 1 Pending, 2 Scheduled, 3 Live, 4 Completed, 5 NoShow, 6 TieBreakRequired.
 // A fixture counts as settled when it has a recorded outcome — a completed match or a double
@@ -18,6 +19,13 @@ const STATUS_TIEBREAK = 6;
 // League round deadlines can carry a year-9999 sentinel meaning "opens after the previous round"
 // rather than a real play-by date. Same guard the PDF / CSV exports apply.
 const SENTINEL_YEAR = 9000;
+
+// Backend StageType: 1 GroupStage, 2 League, 3 SingleElim, 4 DE Winners, 5 DE Losers, 6 Swiss,
+// 7 PlayIn. Only the shape matters here: a bracket walkover advances the surviving opponent,
+// a group/league/Swiss one just closes the fixture, and a play-in slot must always produce a
+// qualifier — so the server refuses to void one and the round action stays hidden there.
+const STAGE_ELIMINATION = [3, 4, 5];
+const STAGE_PLAY_IN = 7;
 
 type FixtureState = 'awaiting' | 'proposed' | 'tiebreak' | 'locked' | 'tbd';
 
@@ -31,10 +39,13 @@ interface Fixture {
     awayAvatarUrl?: string | null;
     state: FixtureState;
     overdue: boolean;
+    /** Eligible for the round-wide walkover — see canWalkover. */
+    closable: boolean;
 }
 
 interface RoundBucket {
     key: string;
+    stageId: string;
     round: number;
     label: string;
     deadline: string | null;
@@ -43,11 +54,18 @@ interface RoundBucket {
     outstanding: Fixture[];
     /** Distinct groups with at least one fixture still owed. */
     groupsIncomplete: number;
+    /** Outstanding fixtures the round-wide walkover would close, and the ones it must not. */
+    closable: number;
+    skipped: number;
 }
 
 interface StageBucket {
     stageId: string;
     name: string;
+    /** Hides the round-wide walkover on play-in stages, which the server refuses outright. */
+    canCloseRounds: boolean;
+    /** Bracket stage: a walkover here advances the surviving opponent instead of just closing. */
+    isElimination: boolean;
     rounds: RoundBucket[];
     total: number;
     done: number;
@@ -61,6 +79,10 @@ interface RoundProgressModalProps {
     isTeamTournament?: boolean;
     /** Opens the fixture in the match modal — chat is one tap further in, inside it. */
     onOpenMatch: (match: any) => void;
+    /** Hub owner / admin: unlocks the round-wide walkover on rounds whose deadline has passed. */
+    canManage?: boolean;
+    /** Re-reads the structure after a round is closed, so the sheet updates in place. */
+    onRefresh?: () => void;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -96,6 +118,24 @@ function fixtureState(match: any, home: any, away: any): FixtureState {
     return 'awaiting';
 }
 
+/**
+ * Mirrors the server's round-walkover gate so the button promises exactly what it delivers.
+ * "Nothing was reported here" is the whole rule: `awaiting` and `locked` are the two states with
+ * both sides set and no result on the row, while `proposed` (a score waiting for approval) and
+ * `tiebreak` (a series that finished level) mean somebody DID play — the organizer approves or
+ * resolves those one by one, a bulk action must never bin them. `tbd` has nobody to forfeit.
+ * Elimination fixtures additionally need somewhere to advance the survivor, which the final has not.
+ *
+ * Solo tournaments only. A team fixture is a tie of several games, each with its own walkover in the
+ * match modal, so closing a whole tie from here is a different decision — the server refuses it too.
+ */
+function canWalkover(match: any, state: FixtureState, isElimination: boolean, isTeam: boolean): boolean {
+    if (isTeam) return false;
+    if (state !== 'awaiting' && state !== 'locked') return false;
+    if (!isElimination) return true;
+    return !!norm(match, 'nextMatchId', 'NextMatchId') || !!norm(match, 'nextMatchLoserBracketId', 'NextMatchLoserBracketId');
+}
+
 const STATE_META: Record<FixtureState, { labelKey: string; color: string }> = {
     awaiting: { labelKey: 'progress.state.awaiting', color: COLORS.slate500 },
     proposed: { labelKey: 'progress.state.proposed', color: COLORS.primary },
@@ -111,6 +151,8 @@ function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[
     for (const stage of stages ?? []) {
         const stageId = String(norm(stage, 'stageId', 'StageId') ?? norm(stage, 'name', 'Name') ?? result.length);
         const stageName = norm(stage, 'name', 'Name') || t('progress.stage');
+        const stageType = Number(norm(stage, 'type', 'Type'));
+        const isElimination = STAGE_ELIMINATION.includes(stageType);
         const byRound = new Map<
             number,
             { label: string; matches: { match: any; groupName: string }[]; deadline: string | null }
@@ -166,6 +208,7 @@ function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[
 
                     const home = norm(match, 'home', 'Home');
                     const away = norm(match, 'away', 'Away');
+                    const state = fixtureState(match, home, away);
                     if (groupName) incompleteGroups.add(groupName);
 
                     outstanding.push({
@@ -176,8 +219,9 @@ function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[
                         homeAvatarUrl: home ? norm(home, 'avatarUrl', 'AvatarUrl') : null,
                         awayName: sideName(away, isTeam, t),
                         awayAvatarUrl: away ? norm(away, 'avatarUrl', 'AvatarUrl') : null,
-                        state: fixtureState(match, home, away),
+                        state,
                         overdue: !!bucket.deadline && parseUtcDate(bucket.deadline).getTime() < now,
+                        closable: canWalkover(match, state, isElimination, isTeam),
                     });
                 }
 
@@ -191,8 +235,11 @@ function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[
                         a.homeName.localeCompare(b.homeName),
                 );
 
+                const closable = outstanding.filter((f) => f.closable).length;
+
                 return {
                     key: `${stageId}-${round}`,
+                    stageId,
                     round,
                     label: bucket.label,
                     deadline: bucket.deadline,
@@ -200,12 +247,16 @@ function buildStages(stages: any[], isTeam: boolean, t: Translate): StageBucket[
                     done,
                     outstanding,
                     groupsIncomplete: incompleteGroups.size,
+                    closable,
+                    skipped: outstanding.length - closable,
                 };
             });
 
         result.push({
             stageId,
             name: stageName,
+            canCloseRounds: stageType !== STAGE_PLAY_IN,
+            isElimination,
             rounds,
             total: rounds.reduce((sum, r) => sum + r.total, 0),
             done: rounds.reduce((sum, r) => sum + r.done, 0),
@@ -354,16 +405,24 @@ function RoundCard({
     expanded,
     onToggle,
     onOpenMatch,
+    onCloseRound,
+    closing,
 }: {
     round: RoundBucket;
     expanded: boolean;
     onToggle: () => void;
     onOpenMatch: (match: any) => void;
+    /** Null when the round-wide walkover isn't on offer here (not staff, or nothing to close). */
+    onCloseRound: (() => void) | null;
+    closing: boolean;
 }) {
     const { t } = useTranslation('tournament');
     const remaining = round.total - round.done;
     const complete = remaining === 0;
     const overdue = !!round.deadline && !complete && parseUtcDate(round.deadline).getTime() < Date.now();
+    // Offered only once the deadline is behind us: before that the players still have time, and a
+    // bulk forfeit is exactly the wrong button to leave lying around.
+    const canClose = !!onCloseRound && overdue && round.closable > 0;
 
     return (
         <View
@@ -440,6 +499,37 @@ function RoundCard({
                 each of thirty groups, those headings were half the list. */}
             {expanded && !complete && (
                 <View className="px-3 pb-1 pt-3 border-t border-white/[0.06]">
+                    {/* Sits ABOVE the list on purpose: the organizer reads what the button is about
+                        to close before pressing it, and the fixtures below are exactly that set. */}
+                    {canClose && (
+                        <PressableScale
+                            onPress={onCloseRound!}
+                            disabled={closing}
+                            containerStyle={{ marginBottom: 10 }}
+                            className="rounded-2xl border border-warning/25 bg-warning/10 overflow-hidden"
+                        >
+                            <View className="flex-row items-center px-3.5 py-3">
+                                <View className="w-9 h-9 rounded-xl bg-warning/15 items-center justify-center mr-3">
+                                    {closing ? (
+                                        <ActivityIndicator size="small" color={COLORS.warning} />
+                                    ) : (
+                                        <Ionicons name="play-skip-forward-outline" size={17} color={COLORS.warning} />
+                                    )}
+                                </View>
+                                <View className="flex-1 pr-2">
+                                    <Text className="text-[12px] font-black text-warning uppercase tracking-wider">
+                                        {t('progress.closeRound.action')}
+                                    </Text>
+                                    <Text className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                        {t('progress.closeRound.subtitle', { count: round.closable })}
+                                        {round.skipped > 0 ? ` · ${t('progress.closeRound.kept', { count: round.skipped })}` : ''}
+                                    </Text>
+                                </View>
+                                {!closing && <Ionicons name="chevron-forward" size={15} color={COLORS.warning} />}
+                            </View>
+                        </PressableScale>
+                    )}
+
                     {round.outstanding.map((fixture) => (
                         <FixtureRow
                             key={fixture.matchId}
@@ -465,8 +555,11 @@ export function RoundProgressModal({
     stages,
     isTeamTournament,
     onOpenMatch,
+    canManage,
+    onRefresh,
 }: RoundProgressModalProps) {
     const { t } = useTranslation('tournament');
+    const { t: tCommon } = useTranslation('common');
     const data = useMemo(
         () => buildStages(stages ?? [], !!isTeamTournament, t),
         [stages, isTeamTournament, t],
@@ -474,20 +567,90 @@ export function RoundProgressModal({
 
     const [stageIndex, setStageIndex] = useState(0);
     const [expandedRound, setExpandedRound] = useState<string | null>(null);
+    const [closingRound, setClosingRound] = useState<string | null>(null);
+    const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+    // The sheet no longer always opens on the first chip, and a groups + double-elim tournament
+    // can push four of them past the edge — so the picker scrolls the selected one into view as
+    // it lays out, otherwise the strip would open looking as if nothing were selected.
+    const stripRef = useRef<ScrollView>(null);
+    const stageIndexRef = useRef(0);
+    stageIndexRef.current = stageIndex;
 
     const stage = data[Math.min(stageIndex, Math.max(data.length - 1, 0))];
 
-    // Opening the sheet should answer the question straight away, so the first round that
-    // still owes fixtures starts expanded instead of making the organizer hunt for it.
+    // Opening the sheet should answer the question straight away, so it lands on the stage that
+    // still owes fixtures — a finished group stage is history, the knockout is the live one —
+    // with that stage's first incomplete round already expanded. When everything is played there
+    // is nothing owed anywhere, so the latest stage (the one the tournament ended on) wins.
     // Deliberately keyed on `visible` alone: a background bracket refetch swaps `data` for a
     // fresh array, and re-running on that would snap an open round shut under the reader.
     useEffect(() => {
         if (!visible) return;
-        setStageIndex(0);
-        const firstIncomplete = data[0]?.rounds.find((r) => r.done < r.total);
+        setNotice(null);
+        const withFixtures = data.map((s, index) => ({ s, index })).filter(({ s }) => s.total > 0);
+        const target =
+            withFixtures.find(({ s }) => s.done < s.total) ??
+            withFixtures[withFixtures.length - 1];
+        const index = target?.index ?? 0;
+        setStageIndex(index);
+        const firstIncomplete = data[index]?.rounds.find((r) => r.done < r.total);
         setExpandedRound(firstIncomplete?.key ?? null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visible]);
+
+    /**
+     * Round-wide walkover. The confirm has to be exact, because it is the organizer's only view of
+     * the consequences: how many fixtures close, what closing means for THIS format (a bracket
+     * walkover advances the opponent; a group / league / Swiss one awards nothing to either side),
+     * what is deliberately left alone, and that a single fixture can be reopened afterwards by
+     * deleting its result. The server re-checks every fixture and answers with what it really did.
+     */
+    const closeRound = (round: RoundBucket, isElimination: boolean) => {
+        const consequence = isElimination
+            ? t('progress.closeRound.bodyElimination', { count: round.closable })
+            : t('progress.closeRound.bodyGroup', { count: round.closable });
+        const kept = round.skipped > 0
+            ? `\n\n${t('progress.closeRound.bodyKept', { count: round.skipped })}`
+            : '';
+
+        Alert.alert(
+            t('progress.closeRound.title', { round: round.label }),
+            `${consequence}${kept}\n\n${t('progress.closeRound.bodyUndo')}`,
+            [
+                { text: tCommon('cancel'), style: 'cancel' },
+                {
+                    text: t('progress.closeRound.confirm'),
+                    style: 'destructive',
+                    onPress: () => submitCloseRound(round),
+                },
+            ],
+        );
+    };
+
+    const submitCloseRound = async (round: RoundBucket) => {
+        setClosingRound(round.key);
+        setNotice(null);
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.ROUND_WALKOVER, {
+                method: 'POST',
+                body: JSON.stringify({ StageId: round.stageId, RoundNumber: round.round }),
+            });
+            if (!response.ok) throw new Error((await response.text()) || t('progress.closeRound.failed'));
+
+            // The count comes from the server: it re-validates every fixture, so a result reported
+            // between opening the sheet and confirming is reflected here rather than assumed away.
+            const body = await response.json().catch(() => null);
+            const closed = body?.closed ?? body?.Closed ?? round.closable;
+            setNotice({ tone: 'ok', text: t('progress.closeRound.done', { count: closed }) });
+            onRefresh?.();
+        } catch (err: any) {
+            console.error('Round walkover error:', err);
+            setNotice({ tone: 'error', text: err?.message || t('progress.closeRound.failed') });
+        } finally {
+            setClosingRound(null);
+        }
+    };
 
     const totals = useMemo(
         () => ({
@@ -541,6 +704,36 @@ export function RoundProgressModal({
                         </View>
                     )}
 
+                    {/* Outcome of the last round-wide walkover — it stays put while the list
+                        underneath re-reads itself, so the organizer sees what the button did
+                        instead of watching a round quietly turn green. Tap to dismiss. */}
+                    {notice && (
+                        <Pressable onPress={() => setNotice(null)} className="px-5 pb-3 active:opacity-70">
+                            <View
+                                className={cn(
+                                    'flex-row items-center gap-2.5 rounded-2xl border px-3.5 py-2.5',
+                                    notice.tone === 'ok'
+                                        ? 'bg-primary/10 border-primary/25'
+                                        : 'bg-destructive/10 border-destructive/25',
+                                )}
+                            >
+                                <Ionicons
+                                    name={notice.tone === 'ok' ? 'checkmark-circle' : 'alert-circle'}
+                                    size={16}
+                                    color={notice.tone === 'ok' ? COLORS.primary : COLORS.destructive}
+                                />
+                                <Text
+                                    className={cn(
+                                        'flex-1 text-[11px] font-bold',
+                                        notice.tone === 'ok' ? 'text-primary' : 'text-destructive',
+                                    )}
+                                >
+                                    {notice.text}
+                                </Text>
+                            </View>
+                        </Pressable>
+                    )}
+
                     {/* Stage picker — only when the tournament actually has more than one.
 
                         grow-0/shrink-0 is load-bearing: React Native gives every ScrollView
@@ -549,6 +742,7 @@ export function RoundProgressModal({
                         bottom of the sheet with a blank gap above it. */}
                     {data.length > 1 && (
                         <ScrollView
+                            ref={stripRef}
                             horizontal
                             className="grow-0 shrink-0"
                             showsHorizontalScrollIndicator={false}
@@ -559,6 +753,12 @@ export function RoundProgressModal({
                                 return (
                                     <Pressable
                                         key={s.stageId}
+                                        onLayout={(e) => {
+                                            const { x } = e.nativeEvent.layout;
+                                            if (x > 0 && index === stageIndexRef.current) {
+                                                stripRef.current?.scrollTo({ x: x - 20, animated: false });
+                                            }
+                                        }}
                                         onPress={() => {
                                             setStageIndex(index);
                                             setExpandedRound(s.rounds.find((r) => r.done < r.total)?.key ?? null);
@@ -609,6 +809,12 @@ export function RoundProgressModal({
                                         setExpandedRound((current) => (current === round.key ? null : round.key))
                                     }
                                     onOpenMatch={onOpenMatch}
+                                    onCloseRound={
+                                        canManage && stage.canCloseRounds
+                                            ? () => closeRound(round, stage.isElimination)
+                                            : null
+                                    }
+                                    closing={closingRound === round.key}
                                 />
                             ))
                         )}

@@ -81,6 +81,9 @@ export const ENDPOINTS = {
     REVERT_MATCH_RESULT: `${API_BASE_URL}/api/tournament/matchResult/revert`,
     CASCADE_REVERT_PREVIEW: `${API_BASE_URL}/api/tournament/matchResult/cascadePreview`,
     DOUBLE_WALKOVER: `${API_BASE_URL}/api/tournament/matchResult/doubleWalkover`,
+    // Bulk sibling of the above: closes every still-unplayed fixture of ONE round (scoped to its
+    // stage) as a double walkover, so a passed deadline doesn't have to be cleared match by match.
+    ROUND_WALKOVER: `${API_BASE_URL}/api/tournament/matchResult/roundWalkover`,
     GET_HUB_TOURNAMENTS: (hubId: string, status: number, page: number, pageSize: number = 10) =>
         `${API_BASE_URL}/api/Hub/${hubId}/tournaments?Status=${status}&Page=${page}&PageSize=${pageSize}`,
     FOLLOW_HUB: `${API_BASE_URL}/api/userHub`,
