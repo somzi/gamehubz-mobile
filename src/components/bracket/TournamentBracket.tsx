@@ -36,6 +36,8 @@ interface Participant {
     score: number | null;
     isWinner: boolean;
     seed: number;
+    /** Profile photo of the player behind the slot; absent on team slots and on older backends. */
+    avatarUrl?: string | null;
 }
 
 interface Match {

@@ -15,6 +15,8 @@ interface Participant {
     score: number | null;
     isWinner: boolean;
     seed: number;
+    /** Profile photo of the player behind the slot; absent on team slots and on older backends. */
+    avatarUrl?: string | null;
 }
 
 /** Running state of a team fixture while its individual games are still being played. */
@@ -140,7 +142,12 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                         <Ionicons name="people" size={13} color={isWinner ? '#34D399' : '#475569'} />
                     </View>
                 ) : (
-                    <PlayerAvatar name={participant.username} size="sm" className={isWinner ? "border-emerald-400/70" : "border-white/10"} />
+                    <PlayerAvatar
+                        name={participant.username}
+                        src={participant.avatarUrl ?? (participant as any).AvatarUrl ?? undefined}
+                        size="sm"
+                        className={isWinner ? "border-emerald-400/70" : "border-white/10"}
+                    />
                 )}
 
                 <Text
