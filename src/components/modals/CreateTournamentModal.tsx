@@ -169,6 +169,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Result approval — when on, reported scores need opponent (or admin) confirmation.
     const [requireResultApproval, setRequireResultApproval] = useState(false);
 
+    // Ready check — when on, a match with an agreed time asks both sides to confirm they are
+    // there, and the side that shows up alone wins by walkover once the grace runs out.
+    const [requireMatchCheckIn, setRequireMatchCheckIn] = useState(false);
+    // Kept as text so the field can be emptied while typing; blank means "server default".
+    const [checkInGraceMinutes, setCheckInGraceMinutes] = useState('10');
+
     // Series format: how many games a single match is played over, how those games decide the
     // match, and what settles a level knockout series. 1 = one game, the pre-series default.
     const [bestOf, setBestOf] = useState(1);
@@ -559,6 +565,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 KnockoutBestOf: hasSeparateKnockoutPhase ? knockoutBestOf : null,
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
+                RequireMatchCheckIn: requireMatchCheckIn,
+                // Null with the check on = the server's own default window.
+                CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
                 IsExclusive: isExclusive,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
             };
@@ -693,6 +702,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const matchSettingsSummary = [
         bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
         requireResultApproval ? t('form.summaryResultApproval') : null,
+        requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
         canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? t('form.summaryDoubleRoundRobin') : null,
     ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
@@ -1041,6 +1051,46 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             {t('form.requireApprovalHint')}
                                         </Text>
                                     </View>
+
+                                    {/* Ready check — both sides confirm they turned up for the time
+                                        they agreed on; the one who shows up alone takes the match. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.readyCheck')}</Text>
+                                        <SegmentedToggle
+                                            options={yesNoOptions}
+                                            value={requireMatchCheckIn ? 'yes' : 'no'}
+                                            onChange={(v) => setRequireMatchCheckIn(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            {t('form.readyCheckHint')}
+                                        </Text>
+                                    </View>
+
+                                    {/* Only meaningful with the check on, so it appears with it
+                                        rather than sitting greyed out above it. */}
+                                    {requireMatchCheckIn && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>{t('form.checkInGrace')}</Text>
+                                            <View className="flex-row items-center gap-3">
+                                                <View className="flex-1">
+                                                    <TextInput
+                                                        className={FIELD_INPUT}
+                                                        placeholder="10"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={checkInGraceMinutes}
+                                                        onChangeText={setCheckInGraceMinutes}
+                                                    />
+                                                </View>
+                                                <Text className="text-slate-400 text-sm font-bold">
+                                                    {t('duration.minutes')}
+                                                </Text>
+                                            </View>
+                                            <Text className={FIELD_HINT}>
+                                                {t('form.checkInGraceHint')}
+                                            </Text>
+                                        </View>
+                                    )}
 
                                     {/* Third Place Match — hidden for League, double-elim brackets, and pure Swiss */}
                                     {canShowThirdPlace && (

@@ -100,3 +100,19 @@ export function getCurrencyLabel(currency?: number | string | null): string {
         default: return 'EUR';
     }
 }
+
+/**
+ * Case-insensitive equality for two backend ids (GUIDs).
+ *
+ * The same id can reach the app in different casing depending on which endpoint produced it —
+ * the auth user comes from one response, a members/participants list from another — and a
+ * `===` between those two silently answers "different person". Roughly a dozen call sites
+ * already spell this out inline as `a.toLowerCase() === b.toLowerCase()`; this is that, with the
+ * null handling those inline versions each got slightly differently.
+ *
+ * Missing ids are never equal: two absent values are not "the same user".
+ */
+export function sameId(a?: string | null, b?: string | null): boolean {
+    if (!a || !b) return false;
+    return a.toLowerCase() === b.toLowerCase();
+}

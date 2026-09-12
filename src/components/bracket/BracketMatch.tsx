@@ -27,6 +27,27 @@ export interface TeamProgress {
     awayWins: number;
 }
 
+/** Ready-check state of a bracket card. Present only while the match actually runs one. */
+export interface CardCheckIn {
+    homeIn: boolean;
+    awayIn: boolean;
+}
+
+/**
+ * Pulls the ready-check state off a bracket match payload (dual-cased, absent on older backends
+ * and on every match that runs no check). The server only computes CheckInDeadline for a match
+ * that can still be turned up for, so its presence is what says "this card has a check to run".
+ */
+export function checkInFrom(match: any): CardCheckIn | null {
+    const deadline = match?.checkInDeadline ?? match?.CheckInDeadline;
+    if (!deadline) return null;
+
+    return {
+        homeIn: !!(match?.homeCheckedInOn ?? match?.HomeCheckedInOn),
+        awayIn: !!(match?.awayCheckedInOn ?? match?.AwayCheckedInOn),
+    };
+}
+
 /**
  * Pulls the team-progress block off a bracket match payload (dual-cased, and absent on solo
  * cards or against an older backend). Returns null when there is nothing to show, so callers
@@ -59,11 +80,13 @@ interface BracketMatchProps {
     proposedByUserId?: string | null;
     // Team fixtures only: lets the card show the running score mid-fixture instead of a dash.
     teamProgress?: TeamProgress | null;
+    // Ready check — set only while this match is waiting on one.
+    checkIn?: CardCheckIn | null;
 }
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress }: BracketMatchProps) {
+export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, checkIn }: BracketMatchProps) {
     const { t } = useTranslation('bracket');
     const navigation = useNavigation<NavigationProp>();
 
@@ -226,15 +249,25 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     // TieBreakRequired likewise — that is where the tiebreak games get reported.
     const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4 || status === 5 || status === 6);
 
+    // A ready check still owed: nobody may report yet — either the missing side turns up, or the
+    // match is settled by forfeit. Showing "Report Result" here would offer something the server
+    // refuses, so the card says what is actually being waited on instead.
+    const checkInPending = !!checkIn && !(checkIn.homeIn && checkIn.awayIn);
+    const checkedInCount = checkIn ? (checkIn.homeIn ? 1 : 0) + (checkIn.awayIn ? 1 : 0) : 0;
+
     const hasStartTime = !!startTime;
     const canUserReport = hasStartTime ? isParticipant : isAdmin;
     // While a proposal is pending we hide the "Report Result" CTA — the opponent should Approve / Reject instead.
     // A tiebreak-pending match keeps its CTA despite already having a score: the reported series is
     // exactly what makes the next games necessary.
-    const canReport = canShowDetails && !isAwaitingApproval && canUserReport
+    const canReport = canShowDetails && !isAwaitingApproval && !checkInPending && canUserReport
         && (isTieBreakNeeded || (!isAlreadyReported && (status === 2 || status === 1)));
 
-    const glow = canReport || isLive ? '#10B981' : isAwaitingApproval ? '#F59E0B' : null;
+    // The check-in banner is for the two players; an organizer scanning the bracket sees the
+    // scheduled state as before.
+    const showCheckIn = checkInPending && isParticipant && !isCompleted && !isNoShow;
+
+    const glow = canReport || isLive ? '#10B981' : isAwaitingApproval || showCheckIn ? '#F59E0B' : null;
 
     return (
         <Pressable
@@ -265,12 +298,12 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             )}
 
             {/* Status / action header */}
-            {(canReport || isAwaitingApproval || isLive || isCompleted || isNoShow || isTeamInProgress || isTieBreakNeeded) && (
+            {(canReport || isAwaitingApproval || showCheckIn || isLive || isCompleted || isNoShow || isTeamInProgress || isTieBreakNeeded) && (
                 <View className={cn(
                     "flex-row items-center justify-between px-4 py-2",
                     canReport
                         ? "bg-emerald-500/[0.08]"
-                        : isAwaitingApproval || isNoShow
+                        : showCheckIn || isAwaitingApproval || isNoShow
                             ? "bg-warning/[0.10]"
                             : isLive || isTeamInProgress
                                 ? "bg-emerald-500/[0.06]"
@@ -299,8 +332,24 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             </View>
                         </>
                     )}
+                    {/* Ready check owed — takes the header over the plain "Scheduled" state, since
+                        it is the one thing these two players have to act on right now. */}
+                    {!canReport && showCheckIn && (
+                        <>
+                            <View className="flex-row items-center gap-1.5">
+                                <Ionicons name="hand-left-outline" size={11} color="#F59E0B" />
+                                <Text numberOfLines={1} className="text-[10px] font-black text-warning uppercase tracking-[1.5px]">
+                                    {t('card.checkIn')}
+                                </Text>
+                            </View>
+                            <Text className="text-[10px] font-black text-warning/70 tracking-[0.5px]">
+                                {checkedInCount}/2
+                            </Text>
+                        </>
+                    )}
+
                     {/* Everyone without a report affordance still gets the live state. */}
-                    {!canReport && !isAwaitingApproval && isTeamInProgress && (
+                    {!canReport && !isAwaitingApproval && !showCheckIn && isTeamInProgress && (
                         <>
                             <View className="flex-row items-center gap-1.5">
                                 <View className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -324,7 +373,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             <Ionicons name="chevron-forward" size={11} color="#F59E0B" />
                         </>
                     )}
-                    {!canReport && !isAwaitingApproval && !isTeamInProgress && isLive && (
+                    {!canReport && !isAwaitingApproval && !showCheckIn && !isTeamInProgress && isLive && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="time-outline" size={11} color="#34D399" />
                             <Text numberOfLines={1} className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">

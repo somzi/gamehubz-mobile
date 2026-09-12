@@ -82,7 +82,8 @@
     "lbRound": "LB Round {{n}}",
     "totalScore": "TOTAL SCORE",
     "gamesWon": "GAMES WON",
-    "perGame": " · PER GAME"
+    "perGame": " · PER GAME",
+    "checkIn": "Check in"
   },
   "table": {
     "played": "P",

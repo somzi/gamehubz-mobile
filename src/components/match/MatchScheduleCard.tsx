@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
 import { MatchTimingStrip, MatchDeadlineBar } from './MatchTimingStrip';
+import { MatchCheckInPanel, MatchCheckInBar, type MatchCheckInState } from './MatchCheckInPanel';
 import { PlayerIdentity, hasNickname } from './PlayerIdentity';
 import { EvidenceSection } from './EvidenceSection';
 import { Button } from '../ui/Button';
@@ -63,6 +64,17 @@ interface MatchScheduleCardProps {
     opponentNickname?: string;
     userNickname?: string;
     status: MatchStatus;
+    /**
+     * Ready-check state straight off the match list, so the card face can run its countdown (and
+     * offer the button) without opening the match. Absent on hosts that don't send it — the card
+     * then only learns about the check when the modal fetches details.
+     */
+    checkIn?: {
+        enabled?: boolean;
+        graceMinutes?: number | null;
+        /** Which side the viewer plays; null when they are neither. */
+        isHome?: boolean | null;
+    } & MatchCheckInState;
     /** Round deadline as a raw backend timestamp (MatchOverviewDto.roundDeadline). */
     deadline?: string;
     scheduledTime?: string;
@@ -80,7 +92,11 @@ interface MatchScheduleCardProps {
     bestOf?: number;
 }
 
-export function MatchScheduleCard({
+/**
+ * The card itself. Exported below wrapped in React.memo — see the note there; call sites import
+ * the memoized `MatchScheduleCard`, not this.
+ */
+function MatchScheduleCardBase({
     matchId,
     tournamentId,
     tournamentName,
@@ -90,6 +106,7 @@ export function MatchScheduleCard({
     opponentNickname,
     userNickname,
     status: initialStatus,
+    checkIn,
     deadline = 'TBD',
     scheduledTime: initialScheduledTime,
     scheduledTimeIso,
@@ -172,6 +189,33 @@ export function MatchScheduleCard({
     // for a best-of match and then swap it out, which reads as the modal reopening itself.
     const [detailsLoaded, setDetailsLoaded] = useState(false);
 
+    // Ready check on this fixture. Null state = the tournament runs no check, or this match has no
+    // agreed kick-off to turn up for; the panel renders nothing either way.
+    const [checkInEnabled, setCheckInEnabled] = useState(Boolean(checkIn?.enabled));
+    const [checkInGraceMinutes, setCheckInGraceMinutes] = useState<number | null>(checkIn?.graceMinutes ?? null);
+    const [checkInState, setCheckInState] = useState<MatchCheckInState>({
+        homeCheckedInOn: checkIn?.homeCheckedInOn ?? null,
+        awayCheckedInOn: checkIn?.awayCheckedInOn ?? null,
+        checkInOpensAt: checkIn?.checkInOpensAt ?? null,
+        checkInDeadline: checkIn?.checkInDeadline ?? null,
+    });
+
+    // The card outlives a list refetch (same key), so a check-in the opponent made in the
+    // meantime has to reach it — the same reason the deadline is synced above.
+    useEffect(() => {
+        if (!checkIn) return;
+        setCheckInEnabled(Boolean(checkIn.enabled));
+        setCheckInGraceMinutes(checkIn.graceMinutes ?? null);
+        setCheckInState({
+            homeCheckedInOn: checkIn.homeCheckedInOn ?? null,
+            awayCheckedInOn: checkIn.awayCheckedInOn ?? null,
+            checkInOpensAt: checkIn.checkInOpensAt ?? null,
+            checkInDeadline: checkIn.checkInDeadline ?? null,
+        });
+    }, [checkIn?.enabled, checkIn?.graceMinutes, checkIn?.homeCheckedInOn, checkIn?.awayCheckedInOn,
+        checkIn?.checkInOpensAt, checkIn?.checkInDeadline]);
+
+
     const isSeriesMatch = seriesFormat.bestOf > 1 || reportedGames.length > 0 || proposedGames.length > 0;
 
     // The card face renders before the modal has fetched details, so it falls back to the Best-of
@@ -215,6 +259,9 @@ export function MatchScheduleCard({
     const mainScrollY = useRef(0);
     const connectionRef = useRef<HubConnection | null>(null);
     const commentInputRef = useRef<TextInput>(null);
+    // The real in-flight guard — see the note in handleSendComment. State is one render behind,
+    // which is precisely the window a fast double-tap lands in.
+    const sendingCommentRef = useRef(false);
 
     // Collapsible sections state. Evidence starts closed: it's the tallest block on the screen,
     // empty most of the time, and open it pushed "Need Help?" below the fold.
@@ -229,6 +276,19 @@ export function MatchScheduleCard({
     const isMatchParticipant = !!user?.id && (
         (!!dbHomeUserId && dbHomeUserId.toLowerCase() === user.id.toLowerCase()) ||
         (!!dbAwayUserId && dbAwayUserId.toLowerCase() === user.id.toLowerCase())
+    );
+
+    // Which side the viewer plays. The list says so outright; inside the modal it is resolved
+    // from the details fetch, which is the only source once the card is open.
+    //
+    // Null means "not resolved yet" and never "away": guessing the away side for any participant
+    // (which is what this did) puts the "(you)" marker on the wrong row for every home player
+    // until the details land. Unknown is honest, and the panel simply holds its button until the
+    // fetch answers.
+    const checkInSide: boolean | null = checkIn?.isHome ?? (
+        !!dbHomeUserId && !!user?.id
+            ? dbHomeUserId.toLowerCase() === user.id.toLowerCase()
+            : null
     );
 
     // The card outlives a list refetch (same key), so pick up a deadline the admin moved
@@ -313,23 +373,32 @@ export function MatchScheduleCard({
     }, [modalVisible, activeModalTab, matchId]);
 
     const handleSendComment = async () => {
-        // isSendingComment is part of the guard, not just the disabled prop: the button now fires
-        // on touch-down, so a double-tap could otherwise post the same message twice.
-        if (!newComment.trim() || !matchId || isSendingComment) return;
+        const content = newComment.trim();
+        // The guard has to be a REF, not the isSendingComment state: the button fires on
+        // touch-down, and state is captured in this closure and only refreshes on re-render — so
+        // two taps inside one frame both read false, both pass, and the message posts twice. The
+        // `disabled` prop has the same one-render lag and guards nothing here.
+        if (!content || !matchId || sendingCommentRef.current) return;
 
+        sendingCommentRef.current = true;
         // Keep the keyboard up across sends (Discord-style): re-assert focus before the
         // async round-trip — a no-op when already focused, and it re-opens the keyboard
         // if a near-miss tap on the message list just dismissed it.
         commentInputRef.current?.focus();
         setIsSendingComment(true);
+
+        // Cleared NOW rather than when the server answers: the old text sitting in the box for
+        // the length of the round-trip is what reads as "send did nothing" and gets it pressed
+        // again. Restored below if the send actually fails.
+        setNewComment('');
+
         try {
             const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
                 method: 'POST',
-                body: JSON.stringify({ content: newComment.trim() }),
+                body: JSON.stringify({ content }),
             });
 
             if (response.ok) {
-                setNewComment('');
                 // If SignalR is not connected or fails, we might want a manual refresh
                 // but we should do it silently to avoid UI jumps
                 if (!connectionRef.current) {
@@ -339,10 +408,15 @@ export function MatchScheduleCard({
                 setTimeout(() => {
                     commentsListRef.current?.scrollToEnd({ animated: true });
                 }, 100);
+            } else {
+                // Only into an empty box — anything typed since outranks the failed message.
+                setNewComment((current) => (current.length === 0 ? content : current));
             }
         } catch (error) {
             console.error('Error sending comment:', error);
+            setNewComment((current) => (current.length === 0 ? content : current));
         } finally {
+            sendingCommentRef.current = false;
             setIsSendingComment(false);
         }
     };
@@ -431,6 +505,23 @@ export function MatchScheduleCard({
                 setReportedGames(games);
                 setProposedGames(proposed);
                 setAllowsTiebreak(allowsTie);
+
+                // Ready check. The setting is tournament-wide (parent DTO on a team tie); the
+                // state belongs to the individual game, which is what this card shows.
+                const checkInSource = data.homeCheckedInOn !== undefined || data.checkInDeadline !== undefined
+                    ? data
+                    : (data.subMatches || data.SubMatches || []).find(
+                        (s: any) => (s.matchId || s.MatchId || '').toLowerCase() === (matchId || '').toLowerCase()
+                    ) ?? {};
+
+                setCheckInEnabled(Boolean(data.requireMatchCheckIn ?? data.RequireMatchCheckIn ?? false));
+                setCheckInGraceMinutes(data.checkInGraceMinutes ?? data.CheckInGraceMinutes ?? null);
+                setCheckInState({
+                    homeCheckedInOn: checkInSource.homeCheckedInOn ?? checkInSource.HomeCheckedInOn ?? null,
+                    awayCheckedInOn: checkInSource.awayCheckedInOn ?? checkInSource.AwayCheckedInOn ?? null,
+                    checkInOpensAt: checkInSource.checkInOpensAt ?? checkInSource.CheckInOpensAt ?? null,
+                    checkInDeadline: checkInSource.checkInDeadline ?? checkInSource.CheckInDeadline ?? null,
+                });
 
                 setDbHomeUserId(homeUserId);
                 setDbAwayUserId(awayUserId);
@@ -533,6 +624,18 @@ export function MatchScheduleCard({
             fetchStreams();
         }
     }, [modalVisible, matchId]); // Removed currentStatus from dependencies to prevent re-fetching on status changes
+
+    // While a ready check is open, the opponent's confirmation arrives without this user touching
+    // anything — and it is what unlocks the result form. Poll for it instead of leaving them on a
+    // stale "waiting" panel. Stops the moment both are in.
+    useEffect(() => {
+        if (!modalVisible || !checkInEnabled) return;
+        if (!checkInState.checkInDeadline) return;
+        if (checkInState.homeCheckedInOn && checkInState.awayCheckedInOn) return;
+
+        const id = setInterval(() => { fetchDbHomeUserId(); }, 20000);
+        return () => clearInterval(id);
+    }, [modalVisible, matchId, checkInEnabled, checkInState.checkInDeadline, checkInState.homeCheckedInOn, checkInState.awayCheckedInOn]);
 
     // SignalR Connection
     useEffect(() => {
@@ -1172,6 +1275,22 @@ export function MatchScheduleCard({
                             </View>
                         </View>
 
+                        {/* Ready check, when this match is running one. Sits above the deadline
+                            strip: "confirm in the next 6 minutes" outranks "the round ends on
+                            Sunday". The button lives inside the card's Pressable — RN gives the
+                            inner press priority, so tapping Ready doesn't also open the match. */}
+                        {currentStatus !== 'completed' && (
+                            <MatchCheckInBar
+                                matchId={matchId}
+                                enabled={checkInEnabled}
+                                scheduledTimeIso={matchTimeIso}
+                                state={checkInState}
+                                isHome={checkInSide}
+                                onCheckedIn={setCheckInState}
+                                className="mt-2"
+                            />
+                        )}
+
                         {/* Round deadline. It only lived inside the modal, so nothing on a list
                             told a player which of their open matches was about to time out.
                             Renders nothing without a deadline, and is meaningless once played. */}
@@ -1380,6 +1499,13 @@ export function MatchScheduleCard({
                                             // Map the DB home/away scores back to the visual left/right so the proposer sees
                                             // their reported numbers in the same orientation they entered them.
                                             const isUserDbHome = !!dbHomeUserId && !!meId && dbHomeUserId.toLowerCase() === meId;
+                                            // One player's word is not a result while the ready check is still
+                                            // open. Mirrors the server-side refusal so the button never promises
+                                            // something the API will reject; organizers stay outside it.
+                                            const checkInBlocksReport = checkInEnabled
+                                                && !!checkInState.checkInDeadline
+                                                && !(checkInState.homeCheckedInOn && checkInState.awayCheckedInOn)
+                                                && !isPrivileged;
                                             const visualLeftScore = isUserDbHome ? proposedHomeScore : proposedAwayScore;
                                             const visualRightScore = isUserDbHome ? proposedAwayScore : proposedHomeScore;
                                             const proposerName = !!proposedByUserId && dbHomeUserId && proposedByUserId.toLowerCase() === dbHomeUserId.toLowerCase()
@@ -1401,6 +1527,22 @@ export function MatchScheduleCard({
                                                     matchTimeText={matchTime}
                                                     deadline={localDeadline}
                                                 />
+
+                                                {/* Ready check — sits under the kick-off it belongs to. The panel
+                                                    hides itself when this match runs no check. */}
+                                                {checkInEnabled && !!checkInState.checkInDeadline && (
+                                                    <MatchCheckInPanel
+                                                        matchId={matchId}
+                                                        enabled
+                                                        scheduledTimeIso={matchTimeIso}
+                                                        state={checkInState}
+                                                        graceMinutes={checkInGraceMinutes}
+                                                        isHome={checkInSide}
+                                                        homeLabel={dbHomeUsername || t('checkIn.homeSide')}
+                                                        awayLabel={dbAwayUsername || t('checkIn.awaySide')}
+                                                        onCheckedIn={setCheckInState}
+                                                    />
+                                                )}
 
                                                 {/* Pending Proposal Card — hidden while editing so the edit form gets the full stage. */}
                                                 {hasPendingProposal && !isEditingProposal && (
@@ -1719,7 +1861,7 @@ export function MatchScheduleCard({
                                                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
                                                         // Also held while the details load: the format decides what a valid
                                                         // submission even looks like.
-                                                        disabled={isSubmitting || isRoundLocked || !detailsLoaded}
+                                                        disabled={isSubmitting || isRoundLocked || !detailsLoaded || checkInBlocksReport}
                                                         className={cn("h-14 rounded-2xl overflow-hidden active:opacity-90", isEditingProposal ? "flex-1" : "w-full")}
                                                         style={{
                                                             shadowColor: isRoundLocked ? '#475569' : '#10B981',
@@ -1730,7 +1872,7 @@ export function MatchScheduleCard({
                                                         }}
                                                     >
                                                         <LinearGradient
-                                                            colors={isRoundLocked ? ['#475569', '#334155'] : ['#10B981', '#059669']}
+                                                            colors={(isRoundLocked || checkInBlocksReport) ? ['#475569', '#334155'] : ['#10B981', '#059669']}
                                                             start={{ x: 0, y: 0 }}
                                                             end={{ x: 1, y: 1 }}
                                                             style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
@@ -1740,16 +1882,18 @@ export function MatchScheduleCard({
                                                             ) : (
                                                                 <View className="flex-row items-center gap-2">
                                                                     <Ionicons
-                                                                        name={isRoundLocked ? "lock-closed" : "checkmark-circle"}
+                                                                        name={(isRoundLocked || checkInBlocksReport) ? "lock-closed" : "checkmark-circle"}
                                                                         size={18}
-                                                                        color={isRoundLocked ? "#CBD5E1" : "#022C22"}
+                                                                        color={(isRoundLocked || checkInBlocksReport) ? "#CBD5E1" : "#022C22"}
                                                                     />
                                                                     <Text numberOfLines={1} className={cn(
                                                                         "font-black uppercase tracking-widest text-xs",
-                                                                        isRoundLocked ? "text-slate-200" : "text-emerald-950"
+                                                                        (isRoundLocked || checkInBlocksReport) ? "text-slate-200" : "text-emerald-950"
                                                                     )}>
                                                                         {isRoundLocked
                                                                             ? t('card.roundNotOpen')
+                                                                            : checkInBlocksReport
+                                                                            ? t('checkIn.blockedShort')
                                                                             : isEditingProposal
                                                                                 ? t('card.updateReport')
                                                                                 // A level knockout series is reported now and decided by a
@@ -2062,6 +2206,19 @@ export function MatchScheduleCard({
         );
     }
 }
+
+/**
+ * The card is rendered once per row on Home and My Matches, and it is a heavy component — dozens
+ * of pieces of state, its own modal, its own SignalR connection. Without this wrapper every
+ * unrelated Home state change (a badge tick, a collapsed section, a tab-focus refetch) re-rendered
+ * every card's whole tree.
+ *
+ * Both call sites were already written for it — stable `onMatchUpdate` callbacks, the `checkIn`
+ * object built once in the normalizer, everything else a primitive — and their comments say
+ * "so MatchScheduleCard's React.memo actually skips". The memo itself was simply never added, so
+ * all of that care bought nothing. It does now.
+ */
+export const MatchScheduleCard = React.memo(MatchScheduleCardBase);
 
 interface ModalTabButtonProps {
     active: boolean;

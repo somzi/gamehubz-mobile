@@ -136,7 +136,12 @@
     "summaryOpensAt": "Abre {{opens}}",
     "summaryStartsAt": "Empieza {{starts}}",
     "swissPlayInHintShort": "Los {{direct}} primeros pasan directos al cuadro. Los puestos {{from}}–{{to}} juegan una ronda de repechaje por las {{spots}} plazas restantes.",
-    "thirdPlaceHintEdit": "Agrega un partido por el tercer puesto entre los perdedores de semifinales. Se omite si el cuadro acaba con menos de 4 participantes. Se aplica al generar el cuadro."
+    "thirdPlaceHintEdit": "Agrega un partido por el tercer puesto entre los perdedores de semifinales. Se omite si el cuadro acaba con menos de 4 participantes. Se aplica al generar el cuadro.",
+    "readyCheck": "Confirmación de listos",
+    "readyCheckHint": "Los jugadores confirman que están frente al teclado cuando hay una hora acordada. Quien aparezca solo gana por incomparecencia; si no aparece nadie, la partida se anula.",
+    "checkInGrace": "Periodo de gracia",
+    "checkInGraceHint": "Minutos que tiene el rival para confirmar antes de perder, contados desde la hora acordada.",
+    "summaryReadyCheck": "Confirmación de listos"
   },
   "validation": {
     "nameAndHubRequired": "El nombre del torneo y el hub son obligatorios",
@@ -330,7 +335,9 @@
     "fetchTournamentFailed": "No se pudo cargar el torneo ({{status}})",
     "fetchBracketFailed": "No se pudo cargar el cuadro ({{status}})",
     "shareBracketPdf": "Compartir PDF del cuadro",
-    "liveBadge": "EN VIVO"
+    "liveBadge": "EN VIVO",
+    "noConfirmedMatch": "Ningún jugador confirmado coincide con «{{query}}».",
+    "noRegistrationMatch": "Ninguna inscripción coincide con «{{query}}»."
   },
   "manage": {
     "title": "Administrar torneo",

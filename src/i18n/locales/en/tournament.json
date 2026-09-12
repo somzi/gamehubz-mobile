@@ -136,7 +136,12 @@
     "summaryOpensAt": "Opens {{opens}}",
     "summaryStartsAt": "Starts {{starts}}",
     "swissPlayInHintShort": "Top {{direct}} go straight to the bracket. Standings {{from}}–{{to}} play one play-in round for the remaining {{spots}} spots.",
-    "thirdPlaceHintEdit": "Adds a third place match between the semi-final losers. Skipped if the bracket ends up with fewer than 4 entrants. Takes effect when the bracket is generated."
+    "thirdPlaceHintEdit": "Adds a third place match between the semi-final losers. Skipped if the bracket ends up with fewer than 4 entrants. Takes effect when the bracket is generated.",
+    "readyCheck": "Ready check",
+    "readyCheckHint": "Players confirm they're at the keyboard once a match time is agreed. Whoever shows up alone wins by walkover; if neither does, the match is written off.",
+    "checkInGrace": "Grace period",
+    "checkInGraceHint": "Minutes the opponent has to check in before forfeiting, counted from the agreed time.",
+    "summaryReadyCheck": "Ready check"
   },
   "validation": {
     "nameAndHubRequired": "Tournament name and Hub are required",
@@ -330,7 +335,9 @@
     "fetchTournamentFailed": "Failed to load the tournament ({{status}})",
     "fetchBracketFailed": "Failed to load the bracket ({{status}})",
     "shareBracketPdf": "Share Bracket PDF",
-    "liveBadge": "LIVE"
+    "liveBadge": "LIVE",
+    "noConfirmedMatch": "No confirmed player matches “{{query}}”.",
+    "noRegistrationMatch": "No registration matches “{{query}}”."
   },
   "manage": {
     "title": "Manage Tournament",

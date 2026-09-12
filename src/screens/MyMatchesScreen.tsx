@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -28,6 +28,20 @@ interface MatchOverviewDto {
     unreadMessages?: number;
     /** Games this match is played over — 1 (or absent) is a plain single game. */
     bestOf?: number;
+    /**
+     * Ready check, shaped for the card and built ONCE in the normalizer. The card is memoized on
+     * its props, so a fresh object literal in the JSX would re-render every card on every parent
+     * render — this way the identity is as stable as the match row it came from.
+     */
+    checkIn?: {
+        enabled: boolean;
+        graceMinutes: number | null;
+        isHome: boolean | null;
+        homeCheckedInOn: string | null;
+        awayCheckedInOn: string | null;
+        checkInOpensAt: string | null;
+        checkInDeadline: string | null;
+    };
 }
 
 export default function MyMatchesScreen() {
@@ -38,7 +52,10 @@ export default function MyMatchesScreen() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scheduled'>('all');
 
-    const fetchMatches = async () => {
+    // useCallback so the identity is stable: it is handed to every MatchScheduleCard as
+    // onMatchUpdate, and the card is memoized — a fresh function here would invalidate every
+    // row on every render and undo the memo entirely.
+    const fetchMatches = useCallback(async () => {
         if (!user?.id) return;
         setLoading(true);
         try {
@@ -59,7 +76,17 @@ export default function MyMatchesScreen() {
                     status: m.status !== undefined ? m.status : m.Status,
                     isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
                     unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
-                    bestOf: m.bestOf ?? m.BestOf ?? 1
+                    bestOf: m.bestOf ?? m.BestOf ?? 1,
+                    // Ready check — the card face renders the countdown and the button from this.
+                    checkIn: {
+                        enabled: m.requireMatchCheckIn ?? m.RequireMatchCheckIn ?? false,
+                        graceMinutes: m.checkInGraceMinutes ?? m.CheckInGraceMinutes ?? null,
+                        isHome: m.isHome ?? m.IsHome ?? null,
+                        homeCheckedInOn: m.homeCheckedInOn ?? m.HomeCheckedInOn ?? null,
+                        awayCheckedInOn: m.awayCheckedInOn ?? m.AwayCheckedInOn ?? null,
+                        checkInOpensAt: m.checkInOpensAt ?? m.CheckInOpensAt ?? null,
+                        checkInDeadline: m.checkInDeadline ?? m.CheckInDeadline ?? null,
+                    },
                 }));
                 // Optionally filter them out completely if the user expects them gone from here too.
                 // The user explicitly requested filtering in "Home panel", but keeping them here with locks is better UI.
@@ -70,11 +97,11 @@ export default function MyMatchesScreen() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user?.id]);
 
     useEffect(() => {
         fetchMatches();
-    }, [user?.id]);
+    }, [fetchMatches]);
 
     const filteredMatches = matches.filter(m => {
         if (activeTab === 'all') return true;
@@ -140,6 +167,7 @@ export default function MyMatchesScreen() {
                                 isRoundLocked={match.isRoundLocked}
                                 unreadMessages={match.unreadMessages}
                                 bestOf={match.bestOf}
+                                checkIn={match.checkIn}
                             />
                         ))
                     ) : (

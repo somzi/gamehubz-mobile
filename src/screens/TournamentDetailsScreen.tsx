@@ -11,7 +11,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
-import { BracketMatch, teamProgressFrom } from '../components/bracket/BracketMatch';
+import { BracketMatch, teamProgressFrom, checkInFrom } from '../components/bracket/BracketMatch';
 import { SeriesFormatChip, matchSeriesFormat } from '../components/bracket/SeriesFormatChip';
 
 import { Button } from '../components/ui/Button';
@@ -2121,6 +2121,7 @@ export default function TournamentDetailsScreen() {
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                         teamProgress={teamProgressFrom(grandFinalMatch)}
+                                        checkIn={checkInFrom(grandFinalMatch)}
                                     />
                                 </View>
                             </View>
@@ -2150,6 +2151,7 @@ export default function TournamentDetailsScreen() {
                                         isAdmin={canManage}
                                         isTeamTournament={tournament?.isTeamTournament}
                                         teamProgress={teamProgressFrom(grandFinalResetMatch)}
+                                        checkIn={checkInFrom(grandFinalResetMatch)}
                                     />
                                 </View>
                             </View>
@@ -2190,6 +2192,7 @@ export default function TournamentDetailsScreen() {
                                             isAdmin={canManage}
                                             isTeamTournament={tournament?.isTeamTournament}
                                             teamProgress={teamProgressFrom(thirdPlaceMatch)}
+                                            checkIn={checkInFrom(thirdPlaceMatch)}
                                         />
                                     </View>
                                 )}
@@ -3446,7 +3449,7 @@ export default function TournamentDetailsScreen() {
                                 ) : filteredParticipants.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="search-outline" size={40} color="#71717A" />
-                                        <Text className="text-slate-400 mt-4 text-center">No confirmed player matches “{playerSearch.trim()}”.</Text>
+                                        <Text className="text-slate-400 mt-4 text-center">{t('details.noConfirmedMatch', { query: playerSearch.trim() })}</Text>
                                     </View>
                                 ) : (
                                     filteredParticipants.map(({ p, seed }) => {
@@ -3611,7 +3614,7 @@ export default function TournamentDetailsScreen() {
                                     ) : filteredRegistrations.length === 0 ? (
                                         <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="search-outline" size={40} color="#71717A" />
-                                            <Text className="text-slate-400 mt-4 text-center">No registration matches “{playerSearch.trim()}”.</Text>
+                                            <Text className="text-slate-400 mt-4 text-center">{t('details.noRegistrationMatch', { query: playerSearch.trim() })}</Text>
                                         </View>
                                     ) : (
                                         filteredRegistrations.map((reg) => {

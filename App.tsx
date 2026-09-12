@@ -230,6 +230,14 @@ function routeFromNotification(
     // A match's deadline is approaching — open the tournament and land straight on the
     // match modal's 'match' tab, where the result is reported.
     case 'rounddeadline':
+    // The ready check: the opponent confirmed and a clock is running, or the check just
+    // decided the match. Same destination — the match modal, where the Ready button and the
+    // countdown live.
+    case 'checkin':
+    // The fixture that was waiting on somebody else's result now has an opponent in it — a
+    // knockout drawn out of the group stage, the next round of a bracket, a fresh Swiss
+    // pairing. Straight to the match, which is where the time gets agreed.
+    case 'opponentready':
       if (tournamentId && matchId) {
         return go('TournamentDetails', {
           id: tournamentId,

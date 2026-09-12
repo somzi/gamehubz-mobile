@@ -20,6 +20,11 @@ interface PlayerIdentityProps {
     username?: string | null;
     /** In-game nickname. Rendered on its own gamepad line whenever the player has one. */
     nickname?: string | null;
+    /** Flag emoji for the player's country, straight off the backend catalog. Absent for a player
+     *  who never set a country — the line is simply dropped rather than guessed at. */
+    countryFlag?: string | null;
+    /** Country name behind the flag, used as the screen-reader label for it. */
+    countryName?: string | null;
     /** Which side of the pairing this is — only tints the gamepad icon, matching the home card. */
     tone?: 'home' | 'away';
     /** Keep the nickname line's height even without a nickname, so both sides of a pairing stay
@@ -32,23 +37,41 @@ interface PlayerIdentityProps {
  * The two names a player carries — account username and in-game nickname — shown as separate,
  * labelled lines so nobody has to guess which one they are looking at. Mirrors the pairing block
  * on the home screen's match card.
+ *
+ * The flag sits next to the username rather than on a line of its own: it answers one question
+ * ("how far away is this person, roughly") that matters while two players are agreeing a time,
+ * and it is not worth a row of vertical space in a block that already carries two.
  */
 export function PlayerIdentity({
     username,
     nickname,
+    countryFlag,
+    countryName,
     tone = 'home',
     reserveNicknameSpace = false,
     className,
 }: PlayerIdentityProps) {
     const name = username?.trim() || '';
     const nick = nickname?.trim() || '';
+    const flag = countryFlag?.trim() || '';
     const showNickname = hasNickname(nick);
 
     return (
         <View className={cn('items-center w-full', className)}>
-            <Text className="text-xs font-bold text-slate-300 text-center px-1" numberOfLines={1}>
-                {name}
-            </Text>
+            <View className="flex-row items-center justify-center gap-1 px-1">
+                {!!flag && (
+                    <Text
+                        className="text-[13px]"
+                        accessibilityLabel={countryName || undefined}
+                        numberOfLines={1}
+                    >
+                        {flag}
+                    </Text>
+                )}
+                <Text className="text-xs font-bold text-slate-300 text-center shrink" numberOfLines={1}>
+                    {name}
+                </Text>
+            </View>
             {showNickname ? (
                 <View className="flex-row items-center justify-center gap-1 mt-1 px-1">
                     <Ionicons

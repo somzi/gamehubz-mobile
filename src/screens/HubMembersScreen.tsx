@@ -8,7 +8,7 @@ import { HubRole } from '../types/hub';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
-import { formatDateSafe } from '../lib/utils';
+import { formatDateSafe, sameId } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
@@ -520,14 +520,18 @@ export default function HubMembersScreen() {
     const adminCount = members.filter(m => m.hubRole === HubRole.HubAdmin).length;
 
     // The viewer's own role within this hub (drives what actions they may take).
-    const currentUserRole = members.find(m => m.userId === currentUser?.id)?.hubRole;
+    // sameId, not ===: the members list and the auth user come from different endpoints, so a
+    // casing difference would leave this undefined and silently strip an owner or admin of
+    // every control on this screen. (The server enforces the real rules either way — see
+    // UserHubService.ChangeMemberRole / RemoveMember — this only decides what is drawn.)
+    const currentUserRole = members.find(m => sameId(m.userId, currentUser?.id))?.hubRole;
     const viewerIsOwner = isOwner || currentUserRole === HubRole.HubOwner;
     const viewerIsAdmin = currentUserRole === HubRole.HubAdmin;
 
     // The owner can manage every other member. An admin can only manage regular and
     // exclusive members — never the owner or another admin.
     const canManageMember = (member: MemberRow): boolean => {
-        if (member.userId === currentUser?.id) return false;     // never self
+        if (sameId(member.userId, currentUser?.id)) return false; // never self
         if (member.hubRole === HubRole.HubOwner) return false;   // owner is untouchable
         if (viewerIsOwner) return true;
         if (viewerIsAdmin) return member.hubRole !== HubRole.HubAdmin;
@@ -592,7 +596,7 @@ export default function HubMembersScreen() {
                         contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
                         removeClippedSubviews
                         renderItem={({ item: member }) => {
-                            const isSelf = member.userId === currentUser?.id;
+                            const isSelf = sameId(member.userId, currentUser?.id);
                             const isProcessing = processingIds.has(member.userId);
                             return (
                                 <View className="flex-row items-center justify-between py-3.5 border-b border-white/5">

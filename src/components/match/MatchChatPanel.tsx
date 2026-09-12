@@ -48,6 +48,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const listRef = useRef<FlatList<MatchComment>>(null);
     const connectionRef = useRef<HubConnection | null>(null);
     const inputRef = useRef<TextInput>(null);
+    // The real in-flight guard. `isSending` state cannot do this job: it is captured in the
+    // handler's closure and only refreshes on re-render, so two taps inside one frame both read
+    // false, both pass, and the same message is posted twice. A ref updates synchronously.
+    const sendingRef = useRef(false);
     // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
     const didInitialScrollRef = useRef(false);
 
@@ -210,27 +214,45 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     }, [matchId, active]);
 
     const handleSend = async () => {
-        if (!newComment.trim() || !matchId || isSending) return;
+        const content = newComment.trim();
+        // Ref first, and synchronously — see sendingRef. The `disabled` prop is no guard either:
+        // it only takes effect on the next render, which is exactly the window a fast double-tap
+        // lands in.
+        if (!content || !matchId || sendingRef.current) return;
+
+        sendingRef.current = true;
         // Keep the keyboard up across sends (Discord-style): re-assert focus before the
         // async round-trip — a no-op when already focused, and it re-opens the keyboard
         // if a near-miss tap on the message list just dismissed it.
         inputRef.current?.focus();
         setIsSending(true);
+
+        // Cleared NOW, not when the server answers. Waiting for the round-trip leaves the sent
+        // text sitting in the box for as long as the network takes — which reads as "send did
+        // nothing", and is what makes someone press it again. Put back below if the send fails,
+        // so a message is never silently lost either.
+        setNewComment('');
+
         try {
             const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
                 method: 'POST',
-                body: JSON.stringify({ content: newComment.trim() }),
+                body: JSON.stringify({ content }),
             });
             if (response.ok) {
-                setNewComment('');
                 if (!connectionRef.current) {
                     await fetchComments(true);
                 }
                 setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+            } else {
+                // Only restore into an empty box: whatever the user has started typing since
+                // outranks the message that failed.
+                setNewComment((current) => (current.length === 0 ? content : current));
             }
         } catch (error) {
             console.error('[MatchChatPanel] Error sending comment:', error);
+            setNewComment((current) => (current.length === 0 ? content : current));
         } finally {
+            sendingRef.current = false;
             setIsSending(false);
         }
     };

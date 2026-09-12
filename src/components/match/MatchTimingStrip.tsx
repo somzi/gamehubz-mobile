@@ -201,14 +201,23 @@ export function MatchDeadlineBar({
     const { t } = useTranslation('match');
     const deadlineDate = useMemo(() => toDate(deadline), [deadline]);
 
-    // Same 60s tick as the strip: the label is measured in minutes at its finest.
+    // Unlike the strip, this bar renders once per row of a list, so its tick is paced by how fast
+    // the label it prints can actually change. describeRemaining only counts minutes inside the
+    // last hour; above that it reads in hours and then days, and waking every row of Home once a
+    // minute to re-render "3 days left" is work nobody sees.
     const [now, setNow] = useState(() => Date.now());
-    const hasDeadline = !!deadlineDate;
+    const msLeft = deadlineDate ? deadlineDate.getTime() - now : null;
+    const tickMs = msLeft == null || msLeft <= 0
+        ? null                       // no deadline, or already overdue — the label is final
+        : msLeft <= 3600_000
+            ? 60_000                 // minutes are ticking down and visible
+            : 600_000;               // hours/days: ten minutes is far finer than the label needs
+
     useEffect(() => {
-        if (!hasDeadline) return;
-        const id = setInterval(() => setNow(Date.now()), 60000);
+        if (tickMs == null) return;
+        const id = setInterval(() => setNow(Date.now()), tickMs);
         return () => clearInterval(id);
-    }, [hasDeadline]);
+    }, [tickMs]);
 
     if (!deadlineDate) return null;
 

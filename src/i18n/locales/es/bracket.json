@@ -82,7 +82,8 @@
     "lbRound": "Perdedores R{{n}}",
     "totalScore": "PUNTUACIÓN TOTAL",
     "gamesWon": "PARTIDOS GANADOS",
-    "perGame": " · POR PARTIDO"
+    "perGame": " · POR PARTIDO",
+    "checkIn": "Confirmar"
   },
   "table": {
     "played": "PJ",

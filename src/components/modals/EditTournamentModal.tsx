@@ -149,6 +149,13 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     );
     const [hasThirdPlaceMatch, setHasThirdPlaceMatch] = useState(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
     const [requireResultApproval, setRequireResultApproval] = useState(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
+
+    // Ready check on scheduled matches, editable for the life of the tournament like the series
+    // format: turning it on mid-tournament only ever reaches fixtures still to be played.
+    const [requireMatchCheckIn, setRequireMatchCheckIn] = useState(Boolean(tournament?.requireMatchCheckIn ?? tournament?.RequireMatchCheckIn));
+    const [checkInGraceMinutes, setCheckInGraceMinutes] = useState(
+        String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10),
+    );
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
     const [doubleRoundRobin, setDoubleRoundRobin] = useState(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
     const [teamSize, setTeamSize] = useState(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
@@ -323,6 +330,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setRegistrationOpensAt(tournament?.registrationOpensAt || tournament?.RegistrationOpensAt || '');
         setHasThirdPlaceMatch(Boolean(tournament?.hasThirdPlaceMatch ?? tournament?.HasThirdPlaceMatch));
         setRequireResultApproval(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
+        setRequireMatchCheckIn(Boolean(tournament?.requireMatchCheckIn ?? tournament?.RequireMatchCheckIn));
+        setCheckInGraceMinutes(String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10));
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
         setTeamSize(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
@@ -518,6 +527,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 // pure Swiss) so a format switch clears a stale flag.
                 HasThirdPlaceMatch: canShowThirdPlace ? hasThirdPlaceMatch : false,
                 RequireResultApproval: requireResultApproval,
+                RequireMatchCheckIn: requireMatchCheckIn,
+                CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
                 // Series format — applied whenever AllowStructuralEdits is set, with no start-date
                 // gate: already-played matches carry their own frozen format, so this can only
                 // change fixtures that have yet to be reported.
@@ -636,6 +647,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const matchSettingsSummary = [
         bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
         requireResultApproval ? t('form.summaryResultApproval') : null,
+        requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
         canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? t('form.summaryDoubleRoundRobin') : null,
     ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
@@ -982,6 +994,46 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             {t('form.requireApprovalHintShort')}
                                         </Text>
                                     </View>
+
+                                    {/* Ready check — both sides confirm they turned up for the time
+                                        they agreed on; the one who shows up alone takes the match.
+                                        Like approval, safe to toggle mid-tournament: it can only
+                                        reach fixtures that are still to be played. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.readyCheck')}</Text>
+                                        <SegmentedToggle
+                                            options={yesNoOptions}
+                                            value={requireMatchCheckIn ? 'yes' : 'no'}
+                                            onChange={(v) => setRequireMatchCheckIn(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            {t('form.readyCheckHint')}
+                                        </Text>
+                                    </View>
+
+                                    {requireMatchCheckIn && (
+                                        <View>
+                                            <Text className={FIELD_LABEL}>{t('form.checkInGrace')}</Text>
+                                            <View className="flex-row items-center gap-3">
+                                                <View className="flex-1">
+                                                    <TextInput
+                                                        className={FIELD_INPUT}
+                                                        placeholder="10"
+                                                        placeholderTextColor="#334155"
+                                                        keyboardType="numeric"
+                                                        value={checkInGraceMinutes}
+                                                        onChangeText={setCheckInGraceMinutes}
+                                                    />
+                                                </View>
+                                                <Text className="text-slate-400 text-sm font-bold">
+                                                    {t('duration.minutes')}
+                                                </Text>
+                                            </View>
+                                            <Text className={FIELD_HINT}>
+                                                {t('form.checkInGraceHint')}
+                                            </Text>
+                                        </View>
+                                    )}
 
                                     {canShowThirdPlace && (
                                         <View>

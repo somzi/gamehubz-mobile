@@ -174,6 +174,9 @@ export const ENDPOINTS = {
     // Organizer-only undo of a confirmed kick-off: clears the time AND both sides' offered
     // hours, so the match goes back to Pending instead of instantly re-confirming the old overlap.
     CLEAR_MATCH_SCHEDULE: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/schedule/clear`,
+    // Ready check: "I'm here" for the caller's side of a scheduled match. Idempotent — the server
+    // keeps the first stamp — and answers with the whole check-in state of the match.
+    MATCH_CHECK_IN: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/checkin`,
 
     // ─── Match streaming ────────────────────────────────────────────────
     GET_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream`,
@@ -513,7 +516,12 @@ export function getErrorMessage(error: any): string {
     if (axios.isAxiosError(error)) {
         const data = error.response?.data;
 
-        console.log('[API Error Debug] Axios error data:', JSON.stringify(data));
+        // Dev only. getErrorMessage runs on EVERY failed request, so unconditionally this dumped
+        // the whole response body of every error — sign-in, profile, anything — into the device
+        // log, which `adb logcat` reads off any Android build.
+        if (__DEV__) {
+            console.log('[API Error Debug] Axios error data:', JSON.stringify(data));
+        }
 
         if (data) return getErrorMessage(data);
 

@@ -40,6 +40,20 @@ interface MatchOverviewDto {
     unreadMessages?: number;
     /** Games this match is played over — 1 (or absent) is a plain single game. */
     bestOf?: number;
+    /**
+     * Ready check, shaped for the card and built ONCE in the normalizer. The card is memoized on
+     * its props, so a fresh object literal in the JSX would re-render every card on every parent
+     * render — this way the identity is as stable as the match row it came from.
+     */
+    checkIn?: {
+        enabled: boolean;
+        graceMinutes: number | null;
+        isHome: boolean | null;
+        homeCheckedInOn: string | null;
+        awayCheckedInOn: string | null;
+        checkInOpensAt: string | null;
+        checkInDeadline: string | null;
+    };
 }
 
 const SECTION_GAP = 22;
@@ -105,6 +119,16 @@ export default function HomeScreen() {
                 // the round actually had — the API has been sending it all along.
                 roundDeadline: m.roundDeadline ?? m.RoundDeadline ?? null,
                 bestOf: m.bestOf ?? m.BestOf ?? 1,
+                // Ready check — the card face renders the countdown and the button from this.
+                checkIn: {
+                    enabled: m.requireMatchCheckIn ?? m.RequireMatchCheckIn ?? false,
+                    graceMinutes: m.checkInGraceMinutes ?? m.CheckInGraceMinutes ?? null,
+                    isHome: m.isHome ?? m.IsHome ?? null,
+                    homeCheckedInOn: m.homeCheckedInOn ?? m.HomeCheckedInOn ?? null,
+                    awayCheckedInOn: m.awayCheckedInOn ?? m.AwayCheckedInOn ?? null,
+                    checkInOpensAt: m.checkInOpensAt ?? m.CheckInOpensAt ?? null,
+                    checkInDeadline: m.checkInDeadline ?? m.CheckInDeadline ?? null,
+                },
                 opponentName: m.opponentName || m.OpponentName,
                 opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
                 opponentNickname: m.opponentNickname || m.OpponentNickname,
@@ -316,6 +340,7 @@ export default function HomeScreen() {
                                         onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
                                         bestOf={match.bestOf}
+                                        checkIn={match.checkIn}
                                     />
                                 ))}
                             </Animated.View>
@@ -372,6 +397,7 @@ export default function HomeScreen() {
                                         onMatchUpdate={invalidateMatches}
                                         unreadMessages={match.unreadMessages}
                                         bestOf={match.bestOf}
+                                        checkIn={match.checkIn}
                                     />
                                 ))}
                             </View>

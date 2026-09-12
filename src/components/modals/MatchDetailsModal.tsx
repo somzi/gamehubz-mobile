@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchTimingStrip } from '../match/MatchTimingStrip';
+import { MatchCheckInPanel, type MatchCheckInState } from '../match/MatchCheckInPanel';
 import { PlayerIdentity, hasNickname } from '../match/PlayerIdentity';
 import { EvidenceSection } from '../match/EvidenceSection';
 import { EvidenceThumb } from '../match/EvidenceThumb';
@@ -81,6 +82,12 @@ export interface MatchResultDetailDto {
     HomeUserAvatarUrl?: string;
     awayUserAvatarUrl?: string;
     AwayUserAvatarUrl?: string;
+    /** Flag emoji + country name per side, resolved server-side from the catalog. Absent for a
+     *  player who never set a country — there is no region fallback, see homeIdentity. */
+    homeUserCountryFlag?: string | null;
+    homeUserCountryName?: string | null;
+    awayUserCountryFlag?: string | null;
+    awayUserCountryName?: string | null;
     requireResultApproval?: boolean;
     proposedHomeScore?: number | null;
     proposedAwayScore?: number | null;
@@ -96,6 +103,14 @@ export interface MatchResultDetailDto {
     proposedGames?: SeriesGame[] | null;
     /** True only for solo knockout, where a level series is replayed rather than standing as a draw. */
     allowsTieBreak?: boolean;
+    /** Ready check: the tournament setting, plus this match's state. The two computed moments
+     *  are server-side arithmetic (they are null unless this match actually runs a check). */
+    requireMatchCheckIn?: boolean;
+    checkInGraceMinutes?: number | null;
+    homeCheckedInOn?: string | null;
+    awayCheckedInOn?: string | null;
+    checkInOpensAt?: string | null;
+    checkInDeadline?: string | null;
     /** True when this match is one game of a team tie (resolved out of the parent team-match DTO).
      *  Drives the team-aware double-walkover copy — a voided game only counts for neither team;
      *  the tie itself is voided only if NO game ends up played. */
@@ -198,6 +213,10 @@ export function MatchDetailsModal({
     // Reporting state
     const [homeScore, setHomeScore] = useState('');
     const [awayScore, setAwayScore] = useState('');
+
+    // The viewer's own check-in, before the next details fetch catches up. Null = nothing to
+    // override, so the payload's state is what renders.
+    const [checkInOverride, setCheckInOverride] = useState<MatchCheckInState | null>(null);
 
     // Series entry state. This modal renders in DB home/away order (unlike MatchScheduleCard,
     // which centres the logged-in player), so no side-flipping is needed here.
@@ -379,9 +398,17 @@ export function MatchDetailsModal({
                 sub?.evidenceItems || sub?.EvidenceItems,
                 sub?.evidences || sub?.Evidences,
             ),
-            scheduledTime: data.scheduledTime || data.ScheduledTime,
+            // The individual game carries its own agreed time; the tie has none of its own.
+            scheduledTime: sub?.scheduledStartTime || sub?.ScheduledStartTime
+                || data.scheduledTime || data.ScheduledTime,
             homeUserAvatarUrl: formatAvatarUrl(hp?.avatarUrl || hp?.AvatarUrl),
             awayUserAvatarUrl: formatAvatarUrl(ap?.avatarUrl || ap?.AvatarUrl),
+            // The two players of THIS game, not the teams: a tie is played pairing by pairing and
+            // the ping that matters is between the two people actually connecting.
+            homeUserCountryFlag: hp?.countryFlag ?? hp?.CountryFlag ?? null,
+            homeUserCountryName: hp?.countryName ?? hp?.CountryName ?? null,
+            awayUserCountryFlag: ap?.countryFlag ?? ap?.CountryFlag ?? null,
+            awayUserCountryName: ap?.countryName ?? ap?.CountryName ?? null,
             requireResultApproval: data.requireResultApproval ?? data.RequireResultApproval ?? false,
             proposedHomeScore: sub?.proposedHomeScore ?? sub?.ProposedHomeScore ?? null,
             proposedAwayScore: sub?.proposedAwayScore ?? sub?.ProposedAwayScore ?? null,
@@ -396,14 +423,29 @@ export function MatchDetailsModal({
             games: seriesGamesFrom(sub),
             proposedGames: seriesGamesFrom({ games: sub?.proposedGames ?? sub?.ProposedGames }),
             allowsTieBreak: false,
+            // Ready check: the setting is tournament-wide, the state belongs to THIS game of the
+            // tie — each pairing agrees its own kick-off and each player answers for himself.
+            requireMatchCheckIn: data.requireMatchCheckIn ?? data.RequireMatchCheckIn ?? false,
+            checkInGraceMinutes: data.checkInGraceMinutes ?? data.CheckInGraceMinutes ?? null,
+            homeCheckedInOn: sub?.homeCheckedInOn ?? sub?.HomeCheckedInOn ?? null,
+            awayCheckedInOn: sub?.awayCheckedInOn ?? sub?.AwayCheckedInOn ?? null,
+            checkInOpensAt: sub?.checkInOpensAt ?? sub?.CheckInOpensAt ?? null,
+            checkInDeadline: sub?.checkInDeadline ?? sub?.CheckInDeadline ?? null,
             isTeamSub: true,
         };
     };
 
-    const fetchMatchDetails = async () => {
+    /**
+     * `silent` refreshes the payload underneath a screen the user is already using: no spinner, no
+     * error banner, and — critically — no exit from edit mode. The ready-check poll runs this way;
+     * without it, a 20-second tick would collapse a half-typed score into a loading state.
+     */
+    const fetchMatchDetails = async (silent = false) => {
         if (!matchId) return;
-        setIsLoadingDetails(true);
-        setError(null);
+        if (!silent) {
+            setIsLoadingDetails(true);
+            setError(null);
+        }
         try {
             // Combo endpoint: details + streams + availability in one round-trip.
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS_FULL(matchId));
@@ -434,6 +476,10 @@ export function MatchDetailsModal({
                 // team-match DTO (no top-level home/away — the individual players, scores and
                 // help-request flag live on the matching sub-match). Resolve our sub-match so
                 // the solo modal renders the real pairing & result instead of an empty 0:0.
+                // Fresh server state supersedes the optimistic copy we kept after our own
+                // check-in — otherwise the poll below could never show the opponent arriving.
+                setCheckInOverride(null);
+
                 const subMatches = data.subMatches || data.SubMatches;
                 const normalizedData: MatchResultDetailDto = Array.isArray(subMatches)
                     ? mapSubMatchDetails(data, subMatches)
@@ -458,6 +504,10 @@ export function MatchDetailsModal({
                         scheduledTime: data.scheduledTime || data.ScheduledTime,
                         homeUserAvatarUrl: formatAvatarUrl(data.homeUserAvatarUrl || data.HomeUserAvatarUrl),
                         awayUserAvatarUrl: formatAvatarUrl(data.awayUserAvatarUrl || data.AwayUserAvatarUrl),
+                        homeUserCountryFlag: data.homeUserCountryFlag ?? data.HomeUserCountryFlag ?? null,
+                        homeUserCountryName: data.homeUserCountryName ?? data.HomeUserCountryName ?? null,
+                        awayUserCountryFlag: data.awayUserCountryFlag ?? data.AwayUserCountryFlag ?? null,
+                        awayUserCountryName: data.awayUserCountryName ?? data.AwayUserCountryName ?? null,
                         requireResultApproval: data.requireResultApproval ?? data.RequireResultApproval ?? false,
                         proposedHomeScore: data.proposedHomeScore ?? data.ProposedHomeScore ?? null,
                         proposedAwayScore: data.proposedAwayScore ?? data.ProposedAwayScore ?? null,
@@ -477,15 +527,17 @@ export function MatchDetailsModal({
                     // Clock stacked under the date — the tile is too narrow for one line.
                     setConfirmedTime(formatDateTimeShort(normalizedData.scheduledTime, '\n'));
                 }
-            } else {
+            } else if (!silent) {
                 setError(t('details.loadResultsFailed'));
             }
         } catch (err) {
             console.error('Error fetching match details:', err);
-            setError(t('details.loadResultsError'));
+            if (!silent) setError(t('details.loadResultsError'));
         } finally {
-            setIsLoadingDetails(false);
-            setIsEditMode(false);
+            if (!silent) {
+                setIsLoadingDetails(false);
+                setIsEditMode(false);
+            }
         }
     };
 
@@ -1114,13 +1166,22 @@ export function MatchDetailsModal({
     // What PlayerIdentity prints for each side: the account username on the main line, the in-game
     // nickname on the gamepad line below it. Older backends only send the collapsed `homeUser`
     // (nickname-or-username) and no `homeNickname` — those fall back to exactly today's single line.
+    //
+    // The flag rides along here so every PlayerIdentity in this modal gets it from one place. It
+    // is absent for a player who never set a country — and deliberately has NO region fallback:
+    // region is derived from the country and from nothing else, so the players with no flag are
+    // exactly the players whose region is the meaningless GLOBAL default.
     const homeIdentity = {
         username: matchDetails?.homeUsername || matchDetails?.homeUser || '',
         nickname: matchDetails?.homeNickname || null,
+        countryFlag: matchDetails?.homeUserCountryFlag || null,
+        countryName: matchDetails?.homeUserCountryName || null,
     };
     const awayIdentity = {
         username: matchDetails?.awayUsername || matchDetails?.awayUser || '',
         nickname: matchDetails?.awayNickname || null,
+        countryFlag: matchDetails?.awayUserCountryFlag || null,
+        countryName: matchDetails?.awayUserCountryName || null,
     };
     // One player having a nickname makes their column taller — reserve the line on both sides so
     // the pairing (and the winner chip under it) stays level.
@@ -1133,6 +1194,25 @@ export function MatchDetailsModal({
     const canEditResult = effectiveStatus === 'completed' && !isEditMode
         && (canRevert || ((isHubOwner || canManage) && !!effectiveHome && !!effectiveAway));
 
+    // Ready check. checkInDeadline is only computed for a match that actually runs one (check on,
+    // kick-off agreed, nothing decided yet), so its presence is the cleanest "is this live" test.
+    // Memoized: the panel syncs its own copy off this prop, and a fresh object on every render of
+    // a modal that re-renders on every keystroke in the score form would churn that sync pointlessly.
+    const checkInState: MatchCheckInState = React.useMemo(() => checkInOverride ?? {
+        homeCheckedInOn: matchDetails?.homeCheckedInOn ?? null,
+        awayCheckedInOn: matchDetails?.awayCheckedInOn ?? null,
+        checkInOpensAt: matchDetails?.checkInOpensAt ?? null,
+        checkInDeadline: matchDetails?.checkInDeadline ?? null,
+    }, [
+        checkInOverride,
+        matchDetails?.homeCheckedInOn,
+        matchDetails?.awayCheckedInOn,
+        matchDetails?.checkInOpensAt,
+        matchDetails?.checkInDeadline,
+    ]);
+    const checkInLive = !!matchDetails?.requireMatchCheckIn && !!checkInState.checkInDeadline;
+    const bothCheckedIn = !!checkInState.homeCheckedInOn && !!checkInState.awayCheckedInOn;
+
     const canSubmit = isParticipant || isHubOwner || canManage;
 
     // Approval-flow derived state.
@@ -1142,6 +1222,11 @@ export function MatchDetailsModal({
     const hasPendingProposal = approvalRequired && !!proposedByUserId && effectiveStatus !== 'completed';
     const isProposer = hasPendingProposal && !!user?.id && proposedByUserId?.toLowerCase() === user.id.toLowerCase();
     const isPrivileged = isHubOwner || canManage;
+    // One player's word is not a result while the ready check is still open — either the missing
+    // side turns up, or it forfeits. Organizers stay outside it: they are the escape hatch when
+    // the pair played anyway. Mirrors the server-side refusal, so the button never promises
+    // something the API will reject.
+    const checkInBlocksReport = checkInLive && !bothCheckedIn && !isPrivileged;
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
@@ -1196,6 +1281,17 @@ export function MatchDetailsModal({
     useEffect(() => {
         if (activeTab === 'schedule' && !showScheduleTab) setActiveTab('match');
     }, [activeTab, showScheduleTab]);
+
+    // While a ready check is open, the other side's confirmation is the one piece of state that
+    // changes without this user touching anything — and it is what unlocks the result form. Poll
+    // for it rather than leaving them staring at a stale "waiting" panel. Stops the moment both
+    // are in, so a played match costs nothing.
+    useEffect(() => {
+        if (!visible || !checkInLive || bothCheckedIn) return;
+
+        const id = setInterval(() => { fetchMatchDetails(true); }, 20000);
+        return () => clearInterval(id);
+    }, [visible, checkInLive, bothCheckedIn, matchId]);
 
     const hasLiveStream = streams.some(s => s.status === MatchStreamStatus.Live);
     // Completed matches keep the conversation visible but block new messages. A no-show stays
@@ -1308,6 +1404,8 @@ export function MatchDetailsModal({
                                     className="mt-2.5"
                                     username={homeIdentity.username}
                                     nickname={homeIdentity.nickname}
+                                    countryFlag={homeIdentity.countryFlag}
+                                    countryName={homeIdentity.countryName}
                                     tone="home"
                                     reserveNicknameSpace={pairingHasNickname}
                                 />
@@ -1358,6 +1456,8 @@ export function MatchDetailsModal({
                                     className="mt-2.5"
                                     username={awayIdentity.username}
                                     nickname={awayIdentity.nickname}
+                                    countryFlag={awayIdentity.countryFlag}
+                                    countryName={awayIdentity.countryName}
                                     tone="away"
                                     reserveNicknameSpace={pairingHasNickname}
                                 />
@@ -1507,6 +1607,8 @@ export function MatchDetailsModal({
                             <PlayerIdentity
                                 username={homeIdentity.username}
                                 nickname={homeIdentity.nickname}
+                                countryFlag={homeIdentity.countryFlag}
+                                countryName={homeIdentity.countryName}
                                 tone="home"
                                 reserveNicknameSpace={pairingHasNickname}
                             />
@@ -1532,6 +1634,8 @@ export function MatchDetailsModal({
                             <PlayerIdentity
                                 username={awayIdentity.username}
                                 nickname={awayIdentity.nickname}
+                                countryFlag={awayIdentity.countryFlag}
+                                countryName={awayIdentity.countryName}
                                 tone="away"
                                 reserveNicknameSpace={pairingHasNickname}
                             />
@@ -1646,6 +1750,8 @@ export function MatchDetailsModal({
                                 className="mt-2.5"
                                 username={homeIdentity.username}
                                 nickname={homeIdentity.nickname}
+                                countryFlag={homeIdentity.countryFlag}
+                                countryName={homeIdentity.countryName}
                                 tone="home"
                                 reserveNicknameSpace={pairingHasNickname}
                             />
@@ -1665,6 +1771,8 @@ export function MatchDetailsModal({
                                 className="mt-2.5"
                                 username={awayIdentity.username}
                                 nickname={awayIdentity.nickname}
+                                countryFlag={awayIdentity.countryFlag}
+                                countryName={awayIdentity.countryName}
                                 tone="away"
                                 reserveNicknameSpace={pairingHasNickname}
                             />
@@ -1754,6 +1862,23 @@ export function MatchDetailsModal({
                     isLoading={isLoadingDetails || !matchDetails}
                 />
 
+                {/* Ready check — who has turned up, and how long the missing side has left. Sits under
+                    the kick-off so the two times are read together. */}
+                {checkInLive && (
+                    <MatchCheckInPanel
+                        className="mb-5"
+                        matchId={matchId}
+                        enabled
+                        scheduledTimeIso={confirmedTimeIso || matchDetails?.scheduledTime}
+                        state={checkInState}
+                        graceMinutes={matchDetails?.checkInGraceMinutes}
+                        isHome={isHome ? true : isAway ? false : null}
+                        homeLabel={homeIdentity.username || t('checkIn.homeSide')}
+                        awayLabel={awayIdentity.username || t('checkIn.awaySide')}
+                        onCheckedIn={setCheckInOverride}
+                    />
+                )}
+
                 {/* Pending proposal card — hidden while the user is editing so the edit form gets the full stage. */}
                 {hasPendingProposal && !isEditingProposal && renderPendingProposalCard()}
 
@@ -1837,6 +1962,8 @@ export function MatchDetailsModal({
                             <PlayerIdentity
                                 username={effectiveHome?.username || t('details.homeSide')}
                                 nickname={homeIdentity.nickname}
+                                countryFlag={homeIdentity.countryFlag}
+                                countryName={homeIdentity.countryName}
                                 tone="home"
                                 reserveNicknameSpace={pairingHasNickname}
                             />
@@ -1863,6 +1990,8 @@ export function MatchDetailsModal({
                             <PlayerIdentity
                                 username={effectiveAway?.username || opponentName || t('details.awaySide')}
                                 nickname={awayIdentity.nickname}
+                                countryFlag={awayIdentity.countryFlag}
+                                countryName={awayIdentity.countryName}
                                 tone="away"
                                 reserveNicknameSpace={pairingHasNickname}
                             />
@@ -1899,10 +2028,10 @@ export function MatchDetailsModal({
                     )}
                     <Pressable
                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
-                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit}
+                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport}
                         className={cn(
                             "flex-1 rounded-2xl py-4 items-center active:opacity-80",
-                            ((isRoundLocked && !isHubOwner) || !canSubmit) ? "bg-white/5 border border-white/[0.06]" : "bg-primary"
+                            ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport) ? "bg-white/5 border border-white/[0.06]" : "bg-primary"
                         )}
                     >
                         {isSubmitting ? (
@@ -1910,15 +2039,17 @@ export function MatchDetailsModal({
                         ) : (
                             <Text numberOfLines={1} className={cn(
                                 "text-sm font-black uppercase tracking-wider w-full text-center",
-                                ((isRoundLocked && !isHubOwner) || !canSubmit) ? "text-slate-500" : "text-primary-foreground"
+                                ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport) ? "text-slate-500" : "text-primary-foreground"
                             )}>
                                 {(isRoundLocked && !isHubOwner)
                                     ? t('details.locked')
                                     : !canSubmit
                                         ? t('details.viewOnly')
-                                        : isEditingProposal
-                                            ? t('details.updateReport')
-                                            : (approvalRequired && !isPrivileged ? t('details.report') : t('details.submit'))}
+                                        : checkInBlocksReport
+                                            ? t('checkIn.blockedShort')
+                                            : isEditingProposal
+                                                ? t('details.updateReport')
+                                                : (approvalRequired && !isPrivileged ? t('details.report') : t('details.submit'))}
                             </Text>
                         )}
                     </Pressable>

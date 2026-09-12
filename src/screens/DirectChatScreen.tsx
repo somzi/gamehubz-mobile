@@ -58,6 +58,9 @@ export default function DirectChatScreen() {
     const listRef = useRef<FlatList<DirectMessage>>(null);
     const connectionRef = useRef<HubConnection | null>(null);
     const inputRef = useRef<TextInput>(null);
+    // The real in-flight guard — see send(). The `sending` state is one render behind, which is
+    // exactly the window a fast double-tap lands in.
+    const sendingRef = useRef(false);
     // Guards the one-time scroll-to-bottom on first load so paging in older
     // messages (which grows the list at the top) doesn't yank the view down.
     const didInitialScrollRef = useRef(false);
@@ -301,11 +304,20 @@ export default function DirectChatScreen() {
     const send = useCallback(async () => {
         if (!chat?.id) return;
         const content = input.trim();
-        if (!content || sending) return;
+        // Ref, not the `sending` state: state is captured in this closure and only refreshes on
+        // re-render, so two taps inside one frame both read false and the same message goes twice.
+        if (!content || sendingRef.current) return;
+
+        sendingRef.current = true;
         // Keep the keyboard up across sends (Discord-style): re-assert focus before the
         // async round-trip — a no-op when already focused, and it re-opens the keyboard
         // if a near-miss tap on the message list just dismissed it.
         inputRef.current?.focus();
+
+        // Cleared NOW rather than on the server's answer: text left in the box for the length of
+        // the round-trip reads as "send did nothing". Put back below when the send really fails.
+        setInput('');
+
         try {
             setSending(true);
             setSendError(null);
@@ -314,7 +326,6 @@ export default function DirectChatScreen() {
                 body: JSON.stringify({ content }),
             });
             if (res.ok) {
-                setInput('');
                 // We'll also receive via SignalR; the dedup in ReceiveMessage handler covers double-add.
                 const echo: DirectMessage = await res.json();
                 setMessages((prev) => {
@@ -325,15 +336,19 @@ export default function DirectChatScreen() {
             } else {
                 const body = await res.text().catch(() => '');
                 console.log('[DM] send failed:', res.status, body);
+                // Only into an empty box — anything typed since outranks the failed message.
+                setInput((current) => (current.length === 0 ? content : current));
                 showSendError(getErrorMessage(body) || t('chat.couldNotSend'));
             }
         } catch (e) {
             console.log('[DM] send threw:', e);
+            setInput((current) => (current.length === 0 ? content : current));
             showSendError(getErrorMessage(e));
         } finally {
+            sendingRef.current = false;
             setSending(false);
         }
-    }, [chat?.id, input, sending, showSendError]);
+    }, [chat?.id, input, showSendError]);
 
     if (loading) {
         return (

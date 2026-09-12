@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { BracketMatch, teamProgressFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
 import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
@@ -256,6 +256,7 @@ export function TournamentBracket({
                                                     isTeamTournament={isTeamTournament}
                                                     proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                     teamProgress={teamProgressFrom(match)}
+                                                    checkIn={checkInFrom(match)}
                                                     className={isHighlighted ? 'border-indigo-500/30' : undefined}
                                                 />
                                             </View>
