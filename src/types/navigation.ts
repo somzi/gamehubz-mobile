@@ -24,6 +24,8 @@ export type RootStackParamList = {
     PlayerProfile: { id: string };
     NotFound: undefined;
     Settings: undefined;
+    /** The notification inbox. */
+    Notifications: undefined;
     ChangePassword: undefined;
     HelpCenter: undefined;
     AboutUs: undefined;

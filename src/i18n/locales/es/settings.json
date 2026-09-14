@@ -38,6 +38,11 @@
     "message": "No se pudo eliminar tu cuenta. Inténtalo de nuevo más tarde."
   },
   "notifications": {
+    "inbox": "Bandeja de notificaciones",
+    "push": "Notificaciones push",
+    "pushOn": "Activadas",
+    "pushOff": "Desactivadas",
+    "pushOffHint": "Las notificaciones push están desactivadas en este dispositivo, así que no verás avisos; todo sigue llegando a tu bandeja de notificaciones. Toca Notificaciones push para activarlas.",
     "moderatedChats": "Chats que modero",
     "moderatedChatsHint": "Avísame cuando los jugadores respondan en un chat de partido al que me uní como organizador. Esto nunca silencia los chats de tus propios partidos.",
     "perMatchHint": "Para silenciar solo un partido, abre su chat y toca Silenciado.",

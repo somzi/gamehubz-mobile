@@ -7,6 +7,8 @@ import * as SecureStore from 'expo-secure-store';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { useAuth } from './AuthContext';
 import { BadgeCounts, ApprovalsBreakdown, TournamentApprovalCount, HubApprovalCount } from '../types/social';
+import { NOTIFICATIONS_KEY, NOTIFICATION_SUMMARY_KEY } from '../lib/notificationsApi';
+import type { NotificationSummary } from '../types/notifications';
 
 const EMPTY_BADGES: BadgeCounts = {
     friendRequests: 0,
@@ -178,9 +180,31 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
             }
         });
 
+        // Inbox counters ride the same connection — it is the app's only per-user channel.
+        connection.on('NotificationsUpdated', (next: NotificationSummary) => {
+            if (!active || !next) return;
+            const previous = queryClient.getQueryData<NotificationSummary>(NOTIFICATION_SUMMARY_KEY);
+            queryClient.setQueryData(NOTIFICATION_SUMMARY_KEY, next);
+            // Counters that moved without this device moving them mean new rows, or rows read on
+            // another device — either way the cached inbox pages are behind. A change this device
+            // made was already applied optimistically, so it compares equal and costs no refetch.
+            const changed =
+                previous == null ||
+                previous.unseen !== next.unseen ||
+                previous.unreadActions !== next.unreadActions ||
+                previous.unreadUpdates !== next.unreadUpdates;
+            if (changed) {
+                queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+            }
+        });
+
         // Whenever the connection (re)establishes, pull a fresh snapshot so we
         // never miss a push that happened while we were offline.
-        connection.onreconnected(() => { if (active) refresh(); });
+        connection.onreconnected(() => {
+            if (!active) return;
+            refresh();
+            queryClient.invalidateQueries({ queryKey: NOTIFICATION_SUMMARY_KEY });
+        });
 
         connection.start()
             .then(() => { if (active) refresh(); })
@@ -189,6 +213,7 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
         return () => {
             active = false;
             connection.off('BadgesUpdated');
+            connection.off('NotificationsUpdated');
             connection.stop().catch(() => { /* ignore */ });
         };
     }, [isAuthenticated, user?.id, queryClient, refresh]);

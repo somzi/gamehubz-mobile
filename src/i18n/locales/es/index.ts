@@ -6,6 +6,7 @@ import common from './common.json';
 import home from './home.json';
 import hub from './hub.json';
 import match from './match.json';
+import notifications from './notifications.json';
 import profile from './profile.json';
 import settings from './settings.json';
 import social from './social.json';
@@ -21,6 +22,7 @@ export default {
     home,
     hub,
     match,
+    notifications,
     profile,
     settings,
     social,

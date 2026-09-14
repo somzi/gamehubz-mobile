@@ -223,6 +223,15 @@ export const ENDPOINTS = {
     GET_BADGES: `${API_BASE_URL}/api/v2/badges`,
     GET_BADGE_APPROVALS: `${API_BASE_URL}/api/v2/badges/approvals`,
 
+    // ─── Notification inbox ─────────────────────────────────────────────
+    GET_NOTIFICATIONS: (filter: string, before?: string | null, take: number = 30) =>
+        `${API_BASE_URL}/api/v2/notifications?take=${take}${filter !== 'all' ? `&category=${filter}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}`,
+    GET_NOTIFICATION_SUMMARY: `${API_BASE_URL}/api/v2/notifications/summary`,
+    MARK_NOTIFICATIONS_SEEN: `${API_BASE_URL}/api/v2/notifications/seen`,
+    MARK_NOTIFICATION_READ: (id: string) => `${API_BASE_URL}/api/v2/notifications/${id}/read`,
+    MARK_ALL_NOTIFICATIONS_READ: (filter: string = 'all') =>
+        `${API_BASE_URL}/api/v2/notifications/read-all${filter !== 'all' ? `?category=${filter}` : ''}`,
+
     // ─── Client diagnostics ─────────────────────────────────────────────
     REPORT_EMERGENCY_LAUNCH: `${API_BASE_URL}/api/v2/diagnostics/emergency-launch`,
 

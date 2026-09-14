@@ -36,6 +36,15 @@ export function formatLocalDateTime(dateStr?: string | null): string {
     return isToday ? time : `${d.toLocaleDateString(i18n.language)} ${time}`;
 }
 
+// Exact local clock time only ("15:00"), for rows under a day header that already carries the date
+// (the notification inbox). Same formatting as formatLocalDateTime's time part — never "x ago".
+export function formatLocalTime(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    const d = parseUtcDate(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+}
+
 // Schedule picker values are dual-format: the backend sends UTC ISO ("…Z"), while the
 // in-app DateTimePickerModal emits a local wall-clock string ("YYYY-MM-DD HH:mm", no
 // zone). Both must render as the local wall-clock time the user picked, so we parse

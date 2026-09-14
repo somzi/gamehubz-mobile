@@ -9,6 +9,7 @@ import NotFoundScreen from '../screens/NotFoundScreen';
 import MyMatchesScreen from '../screens/MyMatchesScreen';
 import DirectChatScreen from '../screens/DirectChatScreen';
 import TeamRedirectScreen from '../screens/TeamRedirectScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -139,6 +140,10 @@ export function RootNavigator() {
                     <Stack.Screen
                         name="DirectChat"
                         component={DirectChatScreen}
+                    />
+                    <Stack.Screen
+                        name="Notifications"
+                        component={NotificationsScreen}
                     />
                     <Stack.Screen
                         name="Team"

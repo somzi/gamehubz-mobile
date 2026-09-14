@@ -38,6 +38,11 @@
     "message": "Failed to delete your account. Please try again later."
   },
   "notifications": {
+    "inbox": "Notification inbox",
+    "push": "Push notifications",
+    "pushOn": "On",
+    "pushOff": "Off",
+    "pushOffHint": "Push is off on this device, so nothing pops up — everything still lands in your notification inbox. Tap Push notifications to turn it on.",
     "moderatedChats": "Chats I moderate",
     "moderatedChatsHint": "Alert me when players reply in a match chat I joined as an organizer. Chats on your own matches are never silenced by this.",
     "perMatchHint": "To silence one specific match instead, open its chat and tap Muted.",

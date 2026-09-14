@@ -1,0 +1,44 @@
+{
+  "title": "Notifications",
+  "tabs": {
+    "all": "All",
+    "action": "Needs you",
+    "update": "Updates"
+  },
+  "sections": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "markAllRead": "Mark all as read",
+  "confirmMarkAll": {
+    "title": "Mark all as read?",
+    "all_one": "This marks your {{count}} unread notification as read. It can't be undone.",
+    "all_other": "This marks all {{count}} unread notifications as read. It can't be undone.",
+    "tab_one": "This marks the {{count}} unread notification under {{tab}} as read. It can't be undone.",
+    "tab_other": "This marks the {{count}} unread notifications under {{tab}} as read. It can't be undone.",
+    "confirm": "Mark as read"
+  },
+  "opensOutside": "Opens outside the app",
+  "footer": "That's everything. Notifications are kept for {{days}} days.",
+  "empty": {
+    "allTitle": "You're all caught up",
+    "allHint": "Match reminders, results and requests will show up here.",
+    "actionTitle": "Nothing needs you right now",
+    "actionHint": "Ready checks, results to confirm and join requests will land here.",
+    "updateTitle": "No updates yet",
+    "updateHint": "Tournament news and team or hub updates will show up here."
+  },
+  "error": {
+    "title": "Couldn't load notifications",
+    "hint": "Check your connection and try again."
+  },
+  "bell": {
+    "a11y": "Notifications",
+    "a11yNew_one": "Notifications, {{count}} new",
+    "a11yNew_other": "Notifications, {{count}} new"
+  },
+  "a11y": {
+    "unread": "Unread",
+    "opensOutside": "Opens a link outside the app"
+  }
+}

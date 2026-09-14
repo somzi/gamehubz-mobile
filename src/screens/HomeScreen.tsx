@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { EmptyState } from '../components/ui/EmptyState';
+import { NotificationBell } from '../components/ui/NotificationBell';
 import { COLORS } from '../lib/theme';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
@@ -271,14 +272,15 @@ export default function HomeScreen() {
                 contentContainerStyle={{ paddingBottom: 32 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── Top date strip ── */}
-                <View className="flex-row items-center px-5 pt-3 pb-1">
+                {/* ── Top date strip + notification inbox ── */}
+                <View className="flex-row items-center justify-between px-5 pt-2">
                     <View className="flex-row items-center gap-2">
                         <View className="w-1 h-1 rounded-full bg-emerald-400/60" />
                         <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px]">
                             {dateLabel}
                         </Text>
                     </View>
+                    <NotificationBell onPress={() => navigation.navigate('Notifications')} />
                 </View>
 
                 {/* ── Greeting hero ── */}

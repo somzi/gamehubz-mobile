@@ -13,11 +13,14 @@ import './global.css';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { BadgesProvider } from './src/context/BadgesContext';
+import { NotificationsProvider, useNotifications } from './src/context/NotificationsContext';
 import i18n from './src/i18n';
 import { I18nGate } from './src/i18n/I18nGate';
 import { I18nextProvider } from 'react-i18next';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useOtaUpdates } from './src/hooks/useOtaUpdates';
+// Shared with the notification inbox, so a row opens exactly the screen its push tap would.
+import { externalLinkFromNotification, routeFromNotification } from './src/lib/notificationRouting';
 import { RootStackParamList } from './src/types/navigation';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -99,6 +102,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       PlayerProfile: 'player/:id',
       DirectChat: 'chat/:chatId',
       Team: 'team/:teamId',
+      Notifications: 'notifications',
       Login: 'login',
     },
   },
@@ -106,192 +110,6 @@ const linking: LinkingOptions<RootStackParamList> = {
   getStateFromPath: (path, options) =>
     getStateFromPath(path.replace(/^\/*user\//, 'player/'), options),
 };
-
-// Announcement pushes carry an http(s) url instead of an in-app screen: the tap belongs to
-// the OS (browser / Discord app), not to the navigator. Kept out of routeFromNotification
-// because the router verifies a *route* landed and re-dispatches until it does — running an
-// openURL through that loop would reopen the link every 150ms.
-function externalLinkFromNotification(rawData: unknown): string | null {
-  if (!rawData || typeof rawData !== 'object') return null;
-  const data = rawData as Record<string, any>;
-
-  const type = typeof data.type === 'string' ? data.type.toLowerCase() : undefined;
-  if (type !== 'link') return null;
-
-  const url = typeof data.url === 'string' ? data.url.trim() : '';
-
-  // http(s) only — the backend enforces the same. A stray custom scheme here would hand an
-  // arbitrary intent to the OS, and a payload without a usable url falls through to the
-  // normal router (which lands on the hub profile via hubId).
-  return /^https?:\/\//i.test(url) ? url : null;
-}
-
-// Dispatches the deep link for a notification payload and returns the top-level stack
-// route it navigated to (`null` when the payload carries nothing routable). The caller
-// uses that name to confirm the navigation actually took — see NotificationRouter.
-function routeFromNotification(
-  nav: NavigationContainerRef<RootStackParamList>,
-  rawData: unknown,
-): string | null {
-  if (!rawData || typeof rawData !== 'object') return null;
-  const data = rawData as Record<string, any>;
-
-  const go = (name: string, params?: object): string => {
-    // The union of every screen's params is too wide for navigate()'s overloads to narrow
-    // behind this indirection; each call site below still mirrors the shape
-    // RootStackParamList declares for the screen it targets.
-    (nav.navigate as (screen: string, params?: object) => void)(name, params);
-    return name;
-  };
-
-  const type = typeof data.type === 'string' ? data.type.toLowerCase() : undefined;
-  const chatId = data.chatId ? String(data.chatId) : undefined;
-  const tournamentId = data.tournamentId ? String(data.tournamentId) : undefined;
-  const matchId = data.matchId ? String(data.matchId) : undefined;
-  // Set for team-tournament sub-matches — routes to the team-match modal so the
-  // payload isn't lost in the solo modal that can't render a sub-match id.
-  const teamMatchId = data.teamMatchId ? String(data.teamMatchId) : undefined;
-  const userId = data.userId ? String(data.userId) : undefined;
-  const hubId = data.hubId ? String(data.hubId) : undefined;
-
-  // Explicit type wins
-  switch (type) {
-    case 'direct_message':
-      if (chatId) {
-        return go('DirectChat', { chatId });
-      }
-      break;
-    case 'friend_request':
-      return go('MainTabs' as any, {
-        screen: 'Social',
-        params: { initialTab: 'requests' },
-      });
-    case 'friend_accepted':
-      if (userId) {
-        return go('PlayerProfile', { id: userId });
-      }
-      break;
-    // A player requested admin help in their match — drop the admin into the
-    // tournament and pop the help-requests inbox so every pending request is one
-    // tap away (and the requesting match's chat from there).
-    case 'adminhelp':
-      if (tournamentId) {
-        return go('TournamentDetails', { id: tournamentId, openAdminHelp: true });
-      }
-      break;
-    // A new match-chat message — open the tournament and jump straight into that
-    // match's chat tab.
-    case 'matchmessage':
-      if (tournamentId && matchId) {
-        return go('TournamentDetails', {
-          id: tournamentId,
-          focusMatchId: matchId,
-          focusTeamMatchId: teamMatchId,
-          focusMatchTab: 'chat',
-        });
-      }
-      break;
-    // A result was reported and is waiting for this user to confirm/dispute it.
-    case 'resultproposed':
-      return go('MyMatches' as any);
-    // A team tie ended level — this captain must pick a tie-break representative.
-    // focusTeamMatchId (without focusMatchId) opens the team-match modal, where the
-    // "Choose Representative" picker lives.
-    case 'teamtiebreak':
-      if (tournamentId && teamMatchId) {
-        return go('TournamentDetails', {
-          id: tournamentId,
-          focusTeamMatchId: teamMatchId,
-        });
-      }
-      break;
-    // Tournament finished — open it so the winner / final standings are visible.
-    case 'tournamentwon':
-      if (tournamentId) {
-        return go('TournamentDetails', { id: tournamentId });
-      }
-      break;
-    // Admin promo blast ("this tournament is open, come register") — open the tournament so the
-    // register button is one tap away.
-    case 'promo':
-      if (tournamentId) {
-        return go('TournamentDetails', { id: tournamentId });
-      }
-      break;
-    // A tournament was announced with a scheduled opening — open it so the exact local
-    // opening time (and the rules/prize) are right there.
-    case 'registrationscheduled':
-    // Registration closing soon — open the tournament so the user can still register.
-    case 'registrationdeadline':
-      if (tournamentId) {
-        return go('TournamentDetails', { id: tournamentId });
-      }
-      break;
-    // A match's deadline is approaching — open the tournament and land straight on the
-    // match modal's 'match' tab, where the result is reported.
-    case 'rounddeadline':
-    // The ready check: the opponent confirmed and a clock is running, or the check just
-    // decided the match. Same destination — the match modal, where the Ready button and the
-    // countdown live.
-    case 'checkin':
-    // The fixture that was waiting on somebody else's result now has an opponent in it — a
-    // knockout drawn out of the group stage, the next round of a bracket, a fresh Swiss
-    // pairing. Straight to the match, which is where the time gets agreed.
-    case 'opponentready':
-      if (tournamentId && matchId) {
-        return go('TournamentDetails', {
-          id: tournamentId,
-          focusMatchId: matchId,
-          focusTeamMatchId: teamMatchId,
-          focusMatchTab: 'match',
-        });
-      }
-      break;
-    // The organizer handed someone's spot to another member — open the tournament so the
-    // incoming player sees their fixtures and the outgoing one sees they're no longer in it.
-    case 'participantswappedin':
-    case 'participantswappedout':
-      if (tournamentId) {
-        return go('TournamentDetails', { id: tournamentId });
-      }
-      break;
-    // Team join / lineup lifecycle — open the tournament where the roster is managed. A lineup
-    // change means the player either picked up the outgoing starter's fixtures or lost their own.
-    case 'teamjoinrequest':
-    case 'teamjoinapproved':
-    case 'teamjoinrejected':
-    case 'teamlineupin':
-    case 'teamlineupout':
-      if (tournamentId) {
-        return go('TournamentDetails', { id: tournamentId });
-      }
-      break;
-    // Hub join lifecycle — open the hub (managers review requests there).
-    case 'hubjoinrequest':
-    case 'hubjoinapproved':
-    case 'hubjoinrejected':
-      if (hubId) {
-        return go('HubProfile', { id: hubId });
-      }
-      break;
-  }
-
-  // Fallback by id field (backend tournament/match pushes omit `type`)
-  if (chatId) {
-    return go('DirectChat', { chatId });
-  }
-  if (matchId) {
-    return go('MyMatches' as any);
-  }
-  if (tournamentId) {
-    return go('TournamentDetails', { id: tournamentId });
-  }
-  if (hubId) {
-    return go('HubProfile', { id: hubId });
-  }
-
-  return null;
-}
 
 // A cold start (app killed, user taps the push) is the hard case for a notification deep
 // link: the tap is delivered before the stored session has been read back off disk, so at
@@ -314,12 +132,16 @@ function NotificationRouter({
   navReady: boolean;
 }) {
   const { isAuthenticated } = useAuth();
+  const { markRead } = useNotifications();
   const lastResponse = Notifications.useLastNotificationResponse();
   // NOT a plain `null` start value: on Android the identifier can itself BE null, and the
   // old `useRef<string | null>(null)` made the very first dedupe check `null === null` —
   // true — so the tap was discarded as "already handled" before anything was routed. A
   // sentinel no identifier can equal is the only safe initial value here.
   const handledRef = useRef<string | typeof NOT_HANDLED>(NOT_HANDLED);
+  // The inbox row the tapped push belongs to — marked read once, however many times the
+  // routing effect below re-runs before the navigation lands.
+  const markedReadRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!lastResponse) return;
@@ -336,6 +158,14 @@ function NotificationRouter({
     if (handledRef.current !== NOT_HANDLED && handledRef.current === reqId) return;
 
     const data = lastResponse.notification.request.content.data;
+
+    // Opening the push is reading it: the server puts the id of the push's inbox row in the
+    // payload, so the row stops showing as unread whichever screen the tap leads to.
+    const notificationId = (data as Record<string, unknown> | undefined)?.notificationId;
+    if (typeof notificationId === 'string' && markedReadRef.current !== notificationId) {
+      markedReadRef.current = notificationId;
+      markRead(notificationId);
+    }
 
     // A link announcement ("grab the Discord role") has no in-app destination — hand it to the
     // OS once and mark it handled, before the navigation retry loop below ever sees it.
@@ -397,7 +227,7 @@ function NotificationRouter({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [lastResponse, isAuthenticated, navReady, navigationRef]);
+  }, [lastResponse, isAuthenticated, navReady, navigationRef, markRead]);
 
   return null;
 }
@@ -441,15 +271,17 @@ export default function App() {
             <I18nGate>
               <AuthProvider>
                 <BadgesProvider>
-                  <NavigationContainer
-                    ref={navigationRef}
-                    linking={linking}
-                    onReady={() => setNavReady(true)}
-                  >
-                    <RootNavigator />
-                  </NavigationContainer>
-                  <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
-                  <OtaUpdater />
+                  <NotificationsProvider>
+                    <NavigationContainer
+                      ref={navigationRef}
+                      linking={linking}
+                      onReady={() => setNavReady(true)}
+                    >
+                      <RootNavigator />
+                    </NavigationContainer>
+                    <NotificationRouter navigationRef={navigationRef} navReady={navReady} />
+                    <OtaUpdater />
+                  </NotificationsProvider>
                 </BadgesProvider>
               </AuthProvider>
             </I18nGate>
