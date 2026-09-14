@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchTimingStrip } from '../match/MatchTimingStrip';
+import { hapticError, hapticSuccess } from '../../lib/haptics';
 import { MatchCheckInPanel, type MatchCheckInState } from '../match/MatchCheckInPanel';
 import { PlayerIdentity, hasNickname } from '../match/PlayerIdentity';
 import { EvidenceSection } from '../match/EvidenceSection';
@@ -805,6 +806,10 @@ export function MatchDetailsModal({
                 && !!matchDetails?.allowsTieBreak
                 && !!seriesOutcome?.isLevel;
 
+            // Reporting a result is the one thing in the app that settles a match. Fires for the
+            // proposal branch too — from the reporter's side the submission landed either way.
+            hapticSuccess();
+
             if (onMatchUpdate) onMatchUpdate(freshStructure);
 
             if (willCreateProposal || awaitingTiebreak) {
@@ -818,6 +823,7 @@ export function MatchDetailsModal({
             }
         } catch (err: any) {
             console.error('Report result error:', err);
+            hapticError();
             setError(err.message || t('details.reportResultError'));
         } finally {
             setIsSubmitting(false);

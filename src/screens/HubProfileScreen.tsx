@@ -4,6 +4,8 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { HUB_KEY, fetchHub } from '../lib/profileQueries';
 
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { TournamentCard } from '../components/cards/TournamentCard';
@@ -57,13 +59,10 @@ export default function HubProfileScreen() {
     const [isRequestingJoin, setIsRequestingJoin] = useState(false);
     const [hubTab, setHubTab] = useState('overview');
     const [tournamentFilter, setTournamentFilter] = useState('live');
-    const [hubData, setHubData] = useState<any>(null);
     const [tournaments, setTournaments] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [isListLoading, setIsListLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(true);
     const [isAboutOpen, setIsAboutOpen] = useState(true);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
@@ -87,10 +86,45 @@ export default function HubProfileScreen() {
     );
 
 
+    // The hub header is cached: re-opening a hub paints the last snapshot immediately instead of
+    // going blank, and the refetch below swaps in fresh data a moment later. Same contract the
+    // Hubs and Tournaments tabs already run on — see the persister in App.tsx.
+    const queryClient = useQueryClient();
+    const hubQuery = useQuery({
+        queryKey: HUB_KEY(id),
+        queryFn: () => fetchHub(id),
+        enabled: !!id,
+        staleTime: 30_000,
+    });
+
+    const hubData = hubQuery.data ?? null;
+    // "Nothing to paint yet" rather than "a request is in flight": on a cache hit this is already
+    // false in the first frame, which is the whole point of the change.
+    const isLoading = hubQuery.isPending;
+    const error = hubQuery.isError
+        ? (hubQuery.error instanceof Error ? hubQuery.error.message : tCommon('unexpectedError'))
+        : null;
+
+    const refetchHub = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: HUB_KEY(id) });
+    }, [queryClient, id]);
+
+    // Follow / join / cancel answer instantly and let the server confirm afterwards, so these stay
+    // local state rather than being read straight off the query. Re-seeding them whenever a fetch
+    // lands is what makes a change made on another device show up here.
+    useEffect(() => {
+        if (!hubData) return;
+        setIsFollowing(hubData.isUserFollowHub || false);
+        setIsOwner(hubData.isUserOwner || false);
+        setIsAdmin(hubData.isUserAdmin || hubData.IsUserAdmin || false);
+        setIsPublic(hubData.isPublic !== false);
+        setHasPendingRequest(hubData.hasPendingJoinRequest || false);
+    }, [hubData]);
+
     useFocusEffect(
         useCallback(() => {
-            fetchHubDetails();
-        }, [id])
+            refetchHub();
+        }, [refetchHub])
     );
 
     useEffect(() => {
@@ -102,30 +136,6 @@ export default function HubProfileScreen() {
             fetchTournaments(0, tournamentFilter);
         }
     }, [tournamentFilter, hubTab]);
-
-    const fetchHubDetails = async () => {
-        try {
-            setIsLoading(true);
-            const response = await authenticatedFetch(ENDPOINTS.GET_HUB(id));
-            if (!response.ok) {
-                throw new Error(t('profile.fetchFailed'));
-            }
-            const data = await response.json();
-            const hub = data.result || data;
-            setHubData(hub);
-            setIsFollowing(hub.isUserFollowHub || false);
-            setIsOwner(hub.isUserOwner || false);
-            setIsAdmin(hub.isUserAdmin || hub.IsUserAdmin || false);
-            setIsPublic(hub.isPublic !== false);
-            setHasPendingRequest(hub.hasPendingJoinRequest || false);
-            setError(null);
-        } catch (err: any) {
-            console.error('Error fetching hub details:', err);
-            setError(err.message || tCommon('unexpectedError'));
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const fetchTournaments = async (currentPage: number, tab: string) => {
         if (!hasMore && currentPage > 0) return;
@@ -310,7 +320,7 @@ export default function HubProfileScreen() {
             });
 
             if (response.ok) {
-                fetchHubDetails();
+                refetchHub();
             }
         } catch (error) {
             console.error('Error updating hub:', error);
@@ -454,7 +464,7 @@ export default function HubProfileScreen() {
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
                     <Text className="text-red-400 mt-4 text-center font-medium">{error || t('profile.hubNotFound')}</Text>
                     <Pressable
-                        onPress={fetchHubDetails}
+                        onPress={refetchHub}
                         className="mt-6 bg-card px-8 py-3 rounded-2xl border border-white/5"
                     >
                         <Text className="text-white font-bold">{tCommon('retry')}</Text>

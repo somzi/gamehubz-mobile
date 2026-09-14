@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
+import { hapticSelection } from '../lib/haptics';
 
 /**
  * Copy-to-clipboard plus a short-lived `copied` flag for inline feedback.
@@ -30,6 +31,9 @@ export function useCopyToClipboard(resetDelay = 1200) {
             void (async () => {
                 try {
                     await Clipboard.setStringAsync(text);
+                    // A long press has no pressed state to speak of, so until now the only sign it
+                    // had registered was the pill appearing. The tick lands with the gesture.
+                    hapticSelection();
                     setCopied(true);
                     if (timerRef.current) {
                         clearTimeout(timerRef.current);

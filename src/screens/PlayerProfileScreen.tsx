@@ -10,6 +10,8 @@ import { CircularProgress } from '../components/ui/CircularProgress';
 import { SocialLinks } from '../components/profile/SocialLinks';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { PLAYER_PROFILE_KEY, fetchPlayerProfile } from '../lib/profileQueries';
 import { UserInfo, SocialType } from '../types/auth';
 import { PlayerMatchesDto } from '../types/user';
 import { cn, formatDateSafe, getCurrencySymbol } from '../lib/utils';
@@ -42,8 +44,6 @@ export default function PlayerProfileScreen() {
     const { id } = route.params;
 
     const [activeTab, setActiveTab] = useState('stats');
-    const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-    const [playerMatches, setPlayerMatches] = useState<PlayerMatchesDto | null>(null);
     const [userTournaments, setUserTournaments] = useState<any[]>([]);
     const [tournamentsPage, setTournamentsPage] = useState(0);
     const [hasMoreTournaments, setHasMoreTournaments] = useState(true);
@@ -54,8 +54,6 @@ export default function PlayerProfileScreen() {
     const [hasMoreMatches, setHasMoreMatches] = useState(true);
     const [isLoadingMoreMatches, setIsLoadingMoreMatches] = useState(false);
 
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [shareCardVisible, setShareCardVisible] = useState(false);
 
     // Stable so the memoized TournamentCard doesn't invalidate on every parent
@@ -66,80 +64,41 @@ export default function PlayerProfileScreen() {
         [navigation],
     );
 
+    // The header (identity + career numbers) is cached, so re-opening a player paints the last
+    // snapshot immediately instead of going blank; the refetch lands underneath. The paginated
+    // tournament and match lists below still load per visit — see the note on the reset effect.
+    const queryClient = useQueryClient();
+    const profileQuery = useQuery({
+        queryKey: PLAYER_PROFILE_KEY(id),
+        queryFn: () => fetchPlayerProfile(id),
+        enabled: !!id,
+        staleTime: 30_000,
+    });
+
+    const userInfo = profileQuery.data?.userInfo ?? null;
+    const playerMatches = profileQuery.data?.playerMatches ?? null;
+    // "Nothing to paint yet", not "a request is in flight": on a cache hit this is already false
+    // in the first frame.
+    const isLoading = profileQuery.isPending;
+    const error = profileQuery.isError
+        ? (profileQuery.error instanceof Error ? profileQuery.error.message : t('loadProfileFailed'))
+        : null;
+
+    const refetchProfile = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: PLAYER_PROFILE_KEY(id) });
+    }, [queryClient, id]);
+
+    // Switching to another player has to drop the previous one's rows. The pagination cursors only
+    // decide WHERE the next fetch starts, they don't wipe the visible list — without this, opening
+    // Player B after Player A shows B's header over A's rows, and loadMore then APPENDS B's onto
+    // A's instead of replacing them. Kept as its own effect now that the header is a query.
     useEffect(() => {
-        let cancelled = false;
-        const fetchPlayerData = async () => {
-            if (!id) return;
-            setIsLoading(true);
-            setError(null);
-            setUserInfo(null);
-            setPlayerMatches(null);
-            setTournamentsPage(0);
-            setHasMoreTournaments(true);
-            setMatchesPage(0);
-            setHasMoreMatches(true);
-            // Also drop the previous player's rows — the pagination cursors above only
-            // decide WHERE the next fetch starts, they don't wipe the visible list. Without
-            // this, opening Player B after Player A shows B's header (name/stats) with A's
-            // tournament and match rows underneath until the user scrolls to trigger a load,
-            // and even then loadMore APPENDS B's rows onto A's instead of replacing them.
-            setUserTournaments([]);
-            setUserMatches([]);
-            try {
-                const [infoRes, statsRes] = await Promise.all([
-                    authenticatedFetch(ENDPOINTS.GET_USER_INFO(id)),
-                    authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(id))
-                ]);
-
-                if (cancelled) return;
-
-                if (infoRes.ok) {
-                    const infoData = await infoRes.json();
-                    if (cancelled) return;
-                    const d = infoData.result || infoData;
-                    setUserInfo({
-                        ...d,
-                        id: d.id || d.Id,
-                        username: d.username || d.Username,
-                        nickName: d.nickName || d.NickName || d.Nickname || d.nickname,
-                        avatarUrl: d.avatarUrl || d.AvatarUrl || d.Avatar || d.avatar
-                    });
-                }
-
-                if (statsRes.ok) {
-                    const statsData = await statsRes.json();
-                    if (cancelled) return;
-                    const s = statsData.result || statsData;
-                    const normalizedStats: PlayerMatchesDto = {
-                        stats: s.stats || s.Stats ? {
-                            totalMatches: s.stats?.TotalMatches || s.stats?.totalMatches || s.Stats?.TotalMatches || s.Stats?.totalMatches || 0,
-                            wins: s.stats?.Wins || s.stats?.wins || s.Stats?.Wins || s.Stats?.wins || 0,
-                            losses: s.stats?.Losses || s.stats?.losses || s.Stats?.Losses || s.Stats?.losses || 0,
-                            draws: s.stats?.Draws || s.stats?.draws || s.Stats?.Draws || s.Stats?.draws || 0,
-                            tournamentsWon: s.stats?.tournamentsWon || s.Stats?.tournamentsWon || s.stats?.tournamentsWon || 0,
-                            winRate: s.stats?.WinRate || s.stats?.winRate || s.Stats?.WinRate || s.Stats?.winRate || 0,
-                        } : null,
-                        performance: (s.performance || s.Performance || []).map((m: any) => ({
-                            outcome: (m.outcome || m.Outcome || 'L') as 'W' | 'L' | 'D'
-                        }))
-                    };
-                    setPlayerMatches(normalizedStats);
-                }
-
-                if (!infoRes.ok && !statsRes.ok) {
-                    throw new Error(t('couldNotLoadPlayer'));
-                }
-            } catch (err: any) {
-                if (cancelled) return;
-                console.error('Player data fetch error:', err);
-                setError(err.message || t('loadProfileFailed'));
-            } finally {
-                if (!cancelled) setIsLoading(false);
-            }
-        };
-
-        fetchPlayerData();
-        return () => { cancelled = true; };
+        setTournamentsPage(0);
+        setHasMoreTournaments(true);
+        setMatchesPage(0);
+        setHasMoreMatches(true);
+        setUserTournaments([]);
+        setUserMatches([]);
     }, [id]);
 
     useEffect(() => {
@@ -282,6 +241,14 @@ export default function PlayerProfileScreen() {
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
                     <Text className="text-destructive mt-4 text-center font-medium">{error || t('playerNotFound')}</Text>
+                    {/* A failed load used to be a dead end — the only way out was the back arrow. */}
+                    <Pressable
+                        onPress={refetchProfile}
+                        accessibilityRole="button"
+                        className="mt-6 bg-card px-8 py-3 rounded-2xl border border-white/5 active:opacity-70"
+                    >
+                        <Text className="text-white font-bold">{tCommon('retry')}</Text>
+                    </Pressable>
                 </View>
             </SafeAreaView>
         );

@@ -7,6 +7,7 @@ import { PressableScale } from '../ui/PressableScale';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
+import { hapticError, hapticSuccess } from '../../lib/haptics';
 import i18n from '../../i18n';
 
 /** The ready-check state of a match, exactly as every backend payload carries it. */
@@ -210,8 +211,12 @@ function useCheckIn({
             };
 
             setLocal(next);
+            // Checking in is a commitment against a running clock — missing it forfeits the match.
+            // The buzz is the confirmation, for the case where the phone is not being looked at.
+            hapticSuccess();
             onCheckedIn?.(next);
         } catch (err: any) {
+            hapticError();
             setError(err?.message || t('checkIn.failed'));
         } finally {
             setIsSubmitting(false);

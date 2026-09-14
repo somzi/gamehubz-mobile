@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
 import { MatchTimingStrip, MatchDeadlineBar } from './MatchTimingStrip';
+import { hapticError, hapticSuccess } from '../../lib/haptics';
 import { MatchCheckInPanel, MatchCheckInBar, type MatchCheckInState } from './MatchCheckInPanel';
 import { PlayerIdentity, hasNickname } from './PlayerIdentity';
 import { EvidenceSection } from './EvidenceSection';
@@ -967,6 +968,9 @@ function MatchScheduleCardBase({
 
             console.log('[MatchScheduleCard] Complete! Closing modal and refreshing');
 
+            // Same action as in MatchDetailsModal, so it has to feel the same from here.
+            hapticSuccess();
+
             if (onMatchUpdate) {
                 onMatchUpdate();
             }
@@ -988,6 +992,7 @@ function MatchScheduleCardBase({
             }
         } catch (err: any) {
             console.error('[MatchScheduleCard] Report result error:', err);
+            hapticError();
             setError(err.message || t('card.reportError'));
         } finally {
             setIsSubmitting(false);
