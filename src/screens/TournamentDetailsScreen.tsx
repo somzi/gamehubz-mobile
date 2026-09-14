@@ -529,7 +529,13 @@ export default function TournamentDetailsScreen() {
             const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V3(id);
             const response = await authenticatedFetch(url);
             if (!response.ok) {
-                throw new Error(t('details.fetchTournamentFailed', { status: response.status }));
+                // A 404 here is the normal end of a tournament's life, not a failure: this screen is
+                // where push notifications, share links and the notification inbox all land, and any
+                // of those can outlive what they point at. Saying "failed (404)" next to a Retry that
+                // can never succeed reads as a network problem the user should keep poking at.
+                throw new Error(response.status === 404
+                    ? t('details.tournamentGone')
+                    : t('details.fetchTournamentFailed', { status: response.status }));
             }
             const data = await response.json();
             const rawData = data.result || data;

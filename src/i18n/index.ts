@@ -12,11 +12,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import en from './locales/en';
 import es from './locales/es';
+import pt from './locales/pt';
 
 /** Key under which the user's explicit language choice is persisted. */
 export const STORAGE_KEY_LANGUAGE = 'app_language';
 
-export type LanguageCode = 'en' | 'es';
+export type LanguageCode = 'en' | 'es' | 'pt';
 
 export interface LanguageOption {
     code: LanguageCode;
@@ -28,6 +29,9 @@ export interface LanguageOption {
 export const SUPPORTED_LANGUAGES: LanguageOption[] = [
     { code: 'en', label: 'English', flag: '🇬🇧' },
     { code: 'es', label: 'Español', flag: '🇪🇸' },
+    // The resource set is written in Brazilian Portuguese, so the flag and label say so
+    // rather than implying a pt-PT translation we don't have. 'pt-PT' still resolves here.
+    { code: 'pt', label: 'Português (BR)', flag: '🇧🇷' },
 ];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
@@ -38,6 +42,7 @@ export const DEFAULT_LANGUAGE: LanguageCode = 'en';
 const resources = {
     en,
     es,
+    pt,
 };
 
 const namespaces = Object.keys(en);
@@ -55,7 +60,7 @@ i18n.use(initReactI18next).init({
     fallbackLng: DEFAULT_LANGUAGE,
     defaultNS: 'common',
     ns: namespaces,
-    // A key missing from `es` falls back to the `en` value rather than rendering the
+    // A key missing from `es`/`pt` falls back to the `en` value rather than rendering the
     // key itself. This is what lets Phase 2 ship screen-by-screen over OTA without a
     // half-translated build ever showing "settings.title" to a user.
     fallbackNS: false,
@@ -74,13 +79,13 @@ i18n.use(initReactI18next).init({
  * Resolves the language actually in effect: the stored choice, or English.
  *
  * Deliberately NOT the device locale. Sniffing it would flip an existing account to
- * Spanish on the first launch after the update, without anyone asking — and because
- * the client syncs its language to the profile on every login, that guess would then
- * silently turn their push notifications Spanish too. English is the product default;
- * Spanish is something you choose, at registration or in Settings.
+ * Spanish or Portuguese on the first launch after the update, without anyone asking —
+ * and because the client syncs its language to the profile on every login, that guess
+ * would then silently turn their push notifications too. English is the product default;
+ * every other language is something you choose, at registration or in Settings.
  *
- * App gates its first render on this so a user who HAS chosen Spanish never sees a
- * frame of English first.
+ * App gates its first render on this so a user who HAS chosen a translation never sees
+ * a frame of English first.
  */
 export const i18nReady: Promise<void> = (async () => {
     try {

@@ -1,0 +1,52 @@
+{
+  "title": "Configurações",
+  "sections": {
+    "notifications": "Notificações",
+    "account": "Conta",
+    "preferences": "Preferências",
+    "support": "Suporte",
+    "accountActions": "Ações da conta"
+  },
+  "editProfile": "Editar dados do perfil",
+  "manageSocials": "Gerenciar redes",
+  "passwordSecurity": "Senha e segurança",
+  "language": "Idioma",
+  "helpCenter": "Central de ajuda",
+  "contactUs": "Fale conosco",
+  "aboutUs": "Sobre nós",
+  "logOut": "Sair",
+  "deleteAccount": "Excluir conta",
+  "version": "GameHubz Mobile v{{version}}",
+  "languagePicker": {
+    "title": "Idioma",
+    "subtitle": "Escolha o idioma do app"
+  },
+  "logOutConfirm": {
+    "title": "Sair",
+    "message": "Tem certeza de que quer sair?"
+  },
+  "deleteConfirm": {
+    "title": "Excluir conta",
+    "message": "Tem certeza de que quer excluir sua conta? Esta ação é permanente e não pode ser desfeita."
+  },
+  "deleteSuccess": {
+    "title": "Conta excluída",
+    "message": "Sua conta foi excluída com sucesso."
+  },
+  "deleteFailed": {
+    "title": "Falha ao excluir",
+    "message": "Não foi possível excluir sua conta. Tente novamente mais tarde."
+  },
+  "notifications": {
+    "inbox": "Caixa de notificações",
+    "push": "Notificações push",
+    "pushOn": "Ativadas",
+    "pushOff": "Desativadas",
+    "pushOffHint": "O push está desativado neste dispositivo, então nada aparece na tela — tudo continua chegando na sua caixa de notificações. Toque em Notificações push para ativar.",
+    "moderatedChats": "Chats que eu modero",
+    "moderatedChatsHint": "Me avise quando jogadores responderem em um chat de partida em que entrei como organizador. Isso nunca silencia os chats das suas próprias partidas.",
+    "perMatchHint": "Para silenciar só uma partida, abra o chat dela e toque em Silenciado.",
+    "saveFailedTitle": "Não foi possível salvar",
+    "saveFailedMessage": "Sua configuração de notificação não foi atualizada. Tente novamente em instantes."
+  }
+}

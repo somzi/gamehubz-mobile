@@ -1,0 +1,44 @@
+{
+  "title": "Notificações",
+  "tabs": {
+    "all": "Todas",
+    "action": "Pendentes",
+    "update": "Novidades"
+  },
+  "sections": {
+    "today": "Hoje",
+    "yesterday": "Ontem"
+  },
+  "markAllRead": "Marcar todas como lidas",
+  "confirmMarkAll": {
+    "title": "Marcar todas como lidas?",
+    "all_one": "Isso marca {{count}} notificação não lida como lida. Não dá para desfazer.",
+    "all_other": "Isso marca todas as {{count}} notificações não lidas como lidas. Não dá para desfazer.",
+    "tab_one": "Isso marca {{count}} notificação não lida em {{tab}} como lida. Não dá para desfazer.",
+    "tab_other": "Isso marca as {{count}} notificações não lidas em {{tab}} como lidas. Não dá para desfazer.",
+    "confirm": "Marcar como lidas"
+  },
+  "opensOutside": "Abre fora do app",
+  "footer": "Isso é tudo. As notificações ficam salvas por {{days}} dias.",
+  "empty": {
+    "allTitle": "Você está em dia",
+    "allHint": "Lembretes de partidas, resultados e pedidos aparecem aqui.",
+    "actionTitle": "Nada pendente por enquanto",
+    "actionHint": "Check-ins, resultados a confirmar e pedidos para entrar chegam aqui.",
+    "updateTitle": "Nenhuma novidade ainda",
+    "updateHint": "Notícias de torneios e atualizações de times ou hubs aparecem aqui."
+  },
+  "error": {
+    "title": "Não foi possível carregar as notificações",
+    "hint": "Verifique sua conexão e tente novamente."
+  },
+  "bell": {
+    "a11y": "Notificações",
+    "a11yNew_one": "Notificações, {{count}} nova",
+    "a11yNew_other": "Notificações, {{count}} novas"
+  },
+  "a11y": {
+    "unread": "Não lida",
+    "opensOutside": "Abre um link fora do app"
+  }
+}

@@ -257,6 +257,7 @@
     "headerTournament": "Tournament",
     "loadingTournament": "Loading tournament...",
     "tournamentNotFound": "Tournament not found",
+    "tournamentGone": "This tournament no longer exists. It may have been deleted.",
     "teamsWord": "Teams",
     "participantsWord": "Participants",
     "exclusiveMembersOfHub": "exclusive members of this hub",

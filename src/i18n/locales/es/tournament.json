@@ -257,6 +257,7 @@
     "headerTournament": "Torneo",
     "loadingTournament": "Cargando torneo...",
     "tournamentNotFound": "Torneo no encontrado",
+    "tournamentGone": "Este torneo ya no existe. Es posible que haya sido eliminado.",
     "teamsWord": "Equipos",
     "participantsWord": "Participantes",
     "exclusiveMembersOfHub": "los miembros exclusivos de este hub",
