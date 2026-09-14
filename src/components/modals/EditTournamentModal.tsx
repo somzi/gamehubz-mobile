@@ -684,6 +684,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     </View>
 
                     <ScrollView
+                        keyboardShouldPersistTaps="handled"
                         className="px-5 py-4"
                         contentContainerStyle={{ paddingBottom: 40 }}
                         showsVerticalScrollIndicator={false}

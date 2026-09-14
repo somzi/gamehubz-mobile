@@ -43,6 +43,7 @@ import {
 } from '../types/tournament';
 import { BracketDrawModal } from '../components/modals/BracketDrawModal';
 import { CountryListModal } from '../components/ui/CountryListModal';
+import { ParticipantRow } from '../components/tournament/ParticipantRow';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { RoundScheduleModal } from '../components/modals/RoundScheduleModal';
@@ -219,6 +220,12 @@ export default function TournamentDetailsScreen() {
         if (!query) return seeded;
         return seeded.filter(({ p }) => (p.username || p.Username || '').toLowerCase().startsWith(query));
     }, [participants, playerSearch]);
+
+    // Stable across renders so ParticipantRow's memo actually holds — an inline arrow
+    // here would give every row a new prop on each keystroke in the search box.
+    const openPlayerProfile = useCallback((userId: string) => {
+        navigation.navigate('PlayerProfile', { id: userId });
+    }, [navigation]);
 
     const filteredRegistrations = useMemo(() => {
         const query = playerSearch.trim().toLowerCase();
@@ -3454,133 +3461,25 @@ export default function TournamentDetailsScreen() {
                                 ) : (
                                     filteredParticipants.map(({ p, seed }) => {
                                         const pUserId = p.userId || p.UserId || p.id;
-                                        const isCreator = canManage;
-                                        const canRemove = isCreator && (tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2);
-                                        // Swapping stays available once the tournament is LIVE (3) — that's the whole
-                                        // point of it. Whether this particular player has played too much to still be
-                                        // replaced is the backend's call, shown inside the sheet.
-                                        const canSwapPlayer = isCreator
-                                            && !tournament?.isTeamTournament
-                                            && (tournament?.status ?? 99) <= 3;
-                                        const isCurrentUser = user?.id?.toLowerCase() === pUserId?.toLowerCase();
-
                                         return (
-                                            <View key={`${p.participantId || p.id || pUserId || 'p'}-${seed}`} className="flex-row items-center gap-2.5">
-                                                <Pressable
-                                                    onPress={() => { if (pUserId) navigation.navigate('PlayerProfile', { id: pUserId }); }}
-                                                    className="flex-1 active:opacity-80"
-                                                >
-                                                    <View
-                                                        className="rounded-[22px] overflow-hidden"
-                                                        style={{
-                                                            backgroundColor: '#131B2E',
-                                                            shadowColor: isCurrentUser ? '#10B981' : '#000000',
-                                                            shadowOpacity: isCurrentUser ? 0.18 : 0.22,
-                                                            shadowRadius: 12,
-                                                            shadowOffset: { width: 0, height: 5 },
-                                                            elevation: 4,
-                                                        }}
-                                                    >
-                                                        <LinearGradient
-                                                            colors={[isCurrentUser ? 'rgba(16,185,129,0.16)' : 'rgba(255,255,255,0.035)', 'transparent']}
-                                                            start={{ x: 0, y: 0 }}
-                                                            end={{ x: 0.85, y: 0 }}
-                                                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                                                        />
-                                                        <View
-                                                            pointerEvents="none"
-                                                            className="absolute inset-0 rounded-[22px]"
-                                                            style={{ borderWidth: 1, borderColor: isCurrentUser ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.06)' }}
-                                                        />
-                                                        {isCurrentUser && (
-                                                            <View
-                                                                style={{
-                                                                    position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
-                                                                    backgroundColor: '#10B981', borderTopRightRadius: 3, borderBottomRightRadius: 3,
-                                                                    shadowColor: '#10B981', shadowOpacity: 0.7, shadowRadius: 8, shadowOffset: { width: 0, height: 0 },
-                                                                }}
-                                                            />
-                                                        )}
-                                                        <View className="flex-row items-center p-3.5 pl-4">
-                                                            <View
-                                                                className="w-8 h-8 rounded-xl items-center justify-center mr-3"
-                                                                style={{
-                                                                    backgroundColor: isCurrentUser ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.04)',
-                                                                    borderWidth: 1,
-                                                                    borderColor: isCurrentUser ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.07)',
-                                                                }}
-                                                            >
-                                                                <Text className="font-black text-[13px]" style={{ color: isCurrentUser ? '#34D399' : '#64748B' }}>{seed}</Text>
-                                                            </View>
-                                                            <View style={{ shadowColor: '#10B981', shadowOpacity: 0.3, shadowRadius: 7, shadowOffset: { width: 0, height: 2 } }}>
-                                                                <View style={{ borderWidth: 1.5, borderColor: isCurrentUser ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)', borderRadius: 999, padding: 2 }}>
-                                                                    <PlayerAvatar src={p.avatarUrl || p.AvatarUrl} name={p.username || p.Username || tCommon('player')} size="md" />
-                                                                </View>
-                                                                <View
-                                                                    className="absolute items-center justify-center"
-                                                                    style={{ bottom: -2, right: -2, width: 18, height: 18, borderRadius: 999, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#131B2E' }}
-                                                                >
-                                                                    <Ionicons name="checkmark" size={9} color="#0F172A" />
-                                                                </View>
-                                                            </View>
-                                                            <View className="flex-1 ml-3 justify-center">
-                                                                <View className="flex-row items-center gap-2">
-                                                                    <Text className="font-black text-base text-white" numberOfLines={1}>{p.username || p.Username}</Text>
-                                                                    {isCurrentUser && (
-                                                                        <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
-                                                                            <Text className="text-[9px] font-black uppercase tracking-wider text-emerald-300">{t('details.youBadge')}</Text>
-                                                                        </View>
-                                                                    )}
-                                                                </View>
-                                                                <View className="flex-row items-center gap-1 mt-1">
-                                                                    <View className="w-1 h-1 rounded-full" style={{ backgroundColor: '#10B981' }} />
-                                                                    <Text className="text-[10px] font-bold uppercase tracking-[1.5px]" style={{ color: 'rgba(16,185,129,0.8)' }}>{t('details.confirmedBadge')}</Text>
-                                                                </View>
-                                                            </View>
-                                                            <View
-                                                                className="w-8 h-8 rounded-full items-center justify-center ml-2"
-                                                                style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' }}
-                                                            >
-                                                                <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                                                            </View>
-                                                        </View>
-                                                    </View>
-                                                </Pressable>
-                                                {canSwapPlayer && (
-                                                    <Pressable
-                                                        onPress={() => setParticipantSwapTarget({
-                                                            userId: pUserId,
-                                                            username: p.username || p.Username || tCommon('player'),
-                                                            avatarUrl: p.avatarUrl || p.AvatarUrl,
-                                                        })}
-                                                        disabled={processingId !== null}
-                                                        className="w-11 h-11 rounded-2xl items-center justify-center active:opacity-60"
-                                                        style={{
-                                                            backgroundColor: 'rgba(129,140,248,0.10)',
-                                                            borderWidth: 1,
-                                                            borderColor: 'rgba(129,140,248,0.22)',
-                                                        }}
-                                                    >
-                                                        <Ionicons name="swap-horizontal" size={18} color="#818CF8" />
-                                                    </Pressable>
-                                                )}
-                                                {canRemove && (
-                                                    <Pressable
-                                                        onPress={() => setRemoveParticipantTarget({
-                                                            userId: pUserId,
-                                                            username: p.username || p.Username || t('details.thisPlayer'),
-                                                        })}
-                                                        disabled={processingId !== null}
-                                                        className="w-11 h-11 rounded-2xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
-                                                    >
-                                                        {processingId === pUserId ? (
-                                                            <ActivityIndicator size="small" color="#EF4444" />
-                                                        ) : (
-                                                            <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                                                        )}
-                                                    </Pressable>
-                                                )}
-                                            </View>
+                                            <ParticipantRow
+                                                key={`${p.participantId || p.id || pUserId || 'p'}-${seed}`}
+                                                participant={p}
+                                                seed={seed}
+                                                isCurrentUser={user?.id?.toLowerCase() === pUserId?.toLowerCase()}
+                                                // Swapping stays available once the tournament is LIVE (3) — that's the whole
+                                                // point of it. Whether this particular player has played too much to still be
+                                                // replaced is the backend's call, shown inside the sheet.
+                                                canSwap={canManage
+                                                    && !tournament?.isTeamTournament
+                                                    && (tournament?.status ?? 99) <= 3}
+                                                canRemove={canManage && (tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2)}
+                                                isProcessing={processingId === pUserId}
+                                                actionsDisabled={processingId !== null}
+                                                onOpenProfile={openPlayerProfile}
+                                                onSwap={setParticipantSwapTarget}
+                                                onRemove={setRemoveParticipantTarget}
+                                            />
                                         );
                                     })
                                 )

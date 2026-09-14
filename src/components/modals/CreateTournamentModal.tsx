@@ -735,6 +735,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     </View>
 
                     <ScrollView
+                        keyboardShouldPersistTaps="handled"
                         className="px-5 py-4"
                         contentContainerStyle={{ paddingBottom: 32 }}
                         showsVerticalScrollIndicator={false}

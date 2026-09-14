@@ -25,7 +25,11 @@ const textSizes = {
     xl: "text-xl",
 };
 
-export function PlayerAvatar({ src, name, size = "md", className }: PlayerAvatarProps) {
+// Memoized: every prop is a primitive, and this renders once per row in participant,
+// member, friend and chat lists — a parent re-render (a keystroke in a search box, a
+// poll tick) would otherwise redo the initials split and the Cloudinary URL build for
+// every visible avatar.
+export const PlayerAvatar = React.memo(function PlayerAvatar({ src, name, size = "md", className }: PlayerAvatarProps) {
     const initials = (name || "")
         .split(" ")
         .map((n) => n?.[0] || "")
@@ -64,4 +68,4 @@ export function PlayerAvatar({ src, name, size = "md", className }: PlayerAvatar
             )}
         </View>
     );
-}
+});

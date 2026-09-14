@@ -2300,6 +2300,7 @@ export function MatchDetailsModal({
 
                 {activeTab === 'schedule' && showScheduleTab && adminAvailability ? (
                     <ScrollView
+                        keyboardShouldPersistTaps="handled"
                         className="flex-1 px-6 pt-2"
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 32 }}
@@ -2346,6 +2347,7 @@ export function MatchDetailsModal({
                     </View>
                 ) : (
                 <ScrollView
+                    keyboardShouldPersistTaps="handled"
                     ref={mainScrollViewRef}
                     onScroll={e => { mainScrollY.current = e.nativeEvent.contentOffset.y; }}
                     scrollEventThrottle={16}

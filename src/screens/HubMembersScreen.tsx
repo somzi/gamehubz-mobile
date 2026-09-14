@@ -590,6 +590,7 @@ export default function HubMembersScreen() {
                     </View>
                 ) : (
                     <FlatList
+                        keyboardShouldPersistTaps="handled"
                         data={filteredMembers}
                         keyExtractor={(item) => item.userId}
                         className="flex-1 px-4"
@@ -660,6 +661,7 @@ export default function HubMembersScreen() {
                     </View>
                 ) : (
                     <FlatList
+                        keyboardShouldPersistTaps="handled"
                         data={filteredRequests}
                         keyExtractor={(item) => item.requestId}
                         className="flex-1 px-4"
@@ -726,6 +728,7 @@ export default function HubMembersScreen() {
                     </View>
                 ) : (
                     <FlatList
+                        keyboardShouldPersistTaps="handled"
                         data={filteredBans}
                         keyExtractor={(item) => item.userId}
                         className="flex-1 px-4"

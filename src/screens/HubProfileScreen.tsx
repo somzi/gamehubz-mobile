@@ -499,6 +499,7 @@ export default function HubProfileScreen() {
             </View>
 
             <ScrollView
+                keyboardShouldPersistTaps="handled"
                 className="flex-1"
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 150 }}

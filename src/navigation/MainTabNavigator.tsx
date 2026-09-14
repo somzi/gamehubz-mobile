@@ -11,12 +11,21 @@ import { ModernTabBar } from '../components/navigation/ModernTabBar';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+// Hoisted out of the render: an inline arrow here is a new component type on every
+// render of the navigator, which remounts the whole tab bar instead of updating it.
+const renderTabBar = (props: React.ComponentProps<typeof ModernTabBar>) => <ModernTabBar {...props} />;
+
 export function MainTabNavigator() {
     return (
         <Tab.Navigator
-            tabBar={(props) => <ModernTabBar {...props} />}
+            tabBar={renderTabBar}
             screenOptions={{
                 headerShown: false,
+                // Tabs stay mounted once visited, so Home's countdown timers and card
+                // subscriptions kept re-rendering it while the user was three tabs away.
+                // freezeOnBlur suspends rendering of a blurred tab until it is focused
+                // again; state still updates, it just isn't painted off-screen.
+                freezeOnBlur: true,
             }}
         >
             <Tab.Screen name="Home" component={HomeScreen} />

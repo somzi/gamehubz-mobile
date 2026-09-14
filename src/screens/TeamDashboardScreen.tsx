@@ -429,6 +429,7 @@ export default function TeamDashboardScreen() {
             />
 
             <ScrollView
+                keyboardShouldPersistTaps="handled"
                 className="flex-1"
                 contentContainerStyle={{ paddingBottom: 48 }}
                 showsVerticalScrollIndicator={false}

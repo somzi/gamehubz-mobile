@@ -240,6 +240,7 @@ export default function TournamentsScreen() {
                 </View>
             ) : (
                 <FlatList
+                    keyboardShouldPersistTaps="handled"
                     data={tournaments}
                     keyExtractor={keyExtractor}
                     renderItem={renderTournament}

@@ -148,6 +148,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
 
     return (
         <FlatList
+            keyboardShouldPersistTaps="handled"
             data={friends}
             keyExtractor={(item) => item.userId}
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
@@ -303,6 +304,7 @@ function RequestsTab() {
             </View>
 
             <FlatList
+                keyboardShouldPersistTaps="handled"
                 data={list}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
@@ -486,6 +488,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
 
     return (
         <FlatList
+            keyboardShouldPersistTaps="handled"
             data={chats}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}

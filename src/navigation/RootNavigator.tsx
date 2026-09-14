@@ -44,6 +44,11 @@ export function RootNavigator() {
         <Stack.Navigator
             screenOptions={{
                 headerShown: false, // We use our own PageHeader
+                // A pushed screen leaves the one below it mounted: open a match modal from
+                // Tournament Details and the tab stack underneath keeps re-rendering behind
+                // it. freezeOnBlur suspends the covered screens' rendering until they come
+                // back into view — their state and subscriptions are untouched.
+                freezeOnBlur: true,
             }}
         >
             {!isAuthenticated ? (

@@ -310,6 +310,7 @@ export default function HubsScreen() {
                 // cost for every card off-screen. Pagination hangs off onEndReached via the
                 // useInfiniteQuery cursor rather than manual page-number bookkeeping.
                 <FlatList
+                    keyboardShouldPersistTaps="handled"
                     data={hubs}
                     keyExtractor={keyExtractor}
                     renderItem={renderHubItem}

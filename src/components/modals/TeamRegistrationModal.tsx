@@ -102,6 +102,7 @@ export function TeamRegistrationModal({
 
                         {/* Content */}
                         <ScrollView
+                            keyboardShouldPersistTaps="handled"
                             className="px-6 py-6"
                             contentContainerStyle={{ paddingBottom: 24 }}
                             showsVerticalScrollIndicator={false}

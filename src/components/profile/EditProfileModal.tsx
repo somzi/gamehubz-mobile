@@ -60,7 +60,7 @@ export function EditProfileModal({ visible, onClose, onSave, initialData }: Edit
                             </Pressable>
                         </View>
 
-                        <ScrollView className="flex-1">
+                        <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
                             <Text className="text-sm font-medium text-muted-foreground mb-4">{t('socialModal.socialLinks')}</Text>
 
                             <View className="gap-4">
