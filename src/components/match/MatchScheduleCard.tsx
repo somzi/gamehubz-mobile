@@ -23,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { PendingEvidenceStrip } from './PendingEvidenceStrip';
 import { EvidenceThumb } from './EvidenceThumb';
 import { EvidencePreviewModal } from './EvidencePreviewModal';
+import { ConfirmationModal } from '../modals/ConfirmationModal';
 import {
     EvidenceItem,
     PreparedEvidence,
@@ -141,6 +142,9 @@ function MatchScheduleCardBase({
     const [matchTime, setMatchTime] = useState(initialScheduledTime);
     const [matchTimeIso, setMatchTimeIso] = useState<string | undefined>(scheduledTimeIso ?? undefined);
     const [localDeadline, setLocalDeadline] = useState<string>(deadline);
+    /** "We already agreed outside the app" is a one-way skip of the whole availability step —
+     *  it schedules the match for BOTH sides — so it goes through a confirmation first. */
+    const [confirmMarkScheduled, setConfirmMarkScheduled] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Slots state
@@ -1331,7 +1335,16 @@ function MatchScheduleCardBase({
                 animationType="slide"
                 transparent={false}
                 visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}
+                onRequestClose={() => {
+                    // The confirmation is an overlay inside this window, not its own Modal, so
+                    // Android's back key arrives here — it has to dismiss the dialog rather than
+                    // the whole match sheet underneath it.
+                    if (confirmMarkScheduled) {
+                        setConfirmMarkScheduled(false);
+                        return;
+                    }
+                    setModalVisible(false);
+                }}
                 statusBarTranslucent={true}
             >
                 <View
@@ -1480,7 +1493,7 @@ function MatchScheduleCardBase({
                                                     opponentAvailability={opponentSlots}
                                                     initialSlots={mySlots}
                                                     onSubmit={handleAvailabilitySubmit}
-                                                    onMarkScheduled={handleMarkScheduled}
+                                                    onMarkScheduled={() => setConfirmMarkScheduled(true)}
                                                 />
                                             </View>
                                         )}
@@ -2202,6 +2215,27 @@ function MatchScheduleCardBase({
                         </View>
                     </View>
                 </View>
+
+                {/* Overlay, not a nested Modal: this keeps the sheet and its confirmation in one
+                    Android window, so closing them cannot strand a window over the screen. Sibling
+                    of the padded root so it dims the full screen, as in LineupSwapModal. */}
+                <ConfirmationModal
+                    overlay
+                    stacked
+                    isDestructive={false}
+                    visible={confirmMarkScheduled}
+                    onClose={() => setConfirmMarkScheduled(false)}
+                    onConfirm={() => {
+                        // Dropped before the request goes out: success swaps the whole
+                        // pending-availability section away, and a dialog still presented while
+                        // that happens is left stranded over the screen.
+                        setConfirmMarkScheduled(false);
+                        handleMarkScheduled();
+                    }}
+                    title={t('card.markScheduledConfirmTitle')}
+                    message={t('card.markScheduledConfirmMessage', { opponent: opponentName })}
+                    confirmText={t('card.markScheduledConfirmAction')}
+                />
             </Modal>
         );
     }

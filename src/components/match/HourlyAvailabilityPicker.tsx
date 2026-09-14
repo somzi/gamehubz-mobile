@@ -42,17 +42,29 @@ const addDays = (date: Date, days: number) => {
     return result;
 };
 
-const buildDateTimeSlots = (slots: Set<string>) => {
-    return Array.from(slots).map(slot => {
-        const parts = slot.split('-');
-        const year = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10);
-        const day = parseInt(parts[2], 10);
-        const hour = parseInt(parts[3], 10);
+// The real local Date for a slot, built from the 'YYYY-MM-DD' day key and the hour.
+// Never `new Date(dayKey)`: a date-only string is parsed as UTC midnight by spec, so on any
+// device whose timezone is behind UTC (all of the Americas) it resolves to the PREVIOUS local
+// day — which is what used to make every hour of "today" reject the tap.
+const slotDateFrom = (dayKey: string, hour: number): Date => {
+    const [year, month, day] = dayKey.split('-').map(part => parseInt(part, 10));
+    return new Date(year, month - 1, day, hour, 0, 0, 0);
+};
 
-        // Construct local date and convert to UTC ISO string
-        const localDate = new Date(year, month - 1, day, hour, 0, 0);
-        return localDate.toISOString();
+// Single source of truth for "this hour can't be offered": the grid greys the cell out with it
+// and the tap handler refuses with it, so the two can never disagree again.
+const isSlotDisabled = (dayKey: string, hour: number, deadlineDate: Date | null): boolean => {
+    const slotTime = slotDateFrom(dayKey, hour).getTime();
+    if (slotTime < Date.now()) return true;
+    return !!deadlineDate && slotTime > deadlineDate.getTime();
+};
+
+const buildDateTimeSlots = (slots: Set<string>) => {
+    return Array.from(slots).map(slotId => {
+        // slotId is `${dayKey}-${hour}` — the hour is everything past the last dash.
+        const cut = slotId.lastIndexOf('-');
+        // Local wall-clock hour the user picked, handed to the backend as UTC.
+        return slotDateFrom(slotId.slice(0, cut), parseInt(slotId.slice(cut + 1), 10)).toISOString();
     });
 };
 
@@ -145,15 +157,22 @@ export function HourlyAvailabilityPicker({
         for (let i = 0; i < 7; i++) {
             const date = addDays(today, i);
             if (deadlineDate && date > deadlineDate) break;
+            const key = formatDate(date, 'yyyy-MM-dd');
+            // Drop a day with nothing left to offer — today once its last hour is gone, or the
+            // deadline day when the deadline itself has already passed. Such a day used to render
+            // as a tab of 24 dead cells with no hint why none of them could be tapped.
+            if (!HOURS.some(hour => !isSlotDisabled(key, hour, deadlineDate))) continue;
             availableDays.push({
                 date,
                 label: formatDate(date, 'EEE', i18n.language),
                 fullLabel: formatDate(date, 'MMM d', i18n.language),
-                key: formatDate(date, 'yyyy-MM-dd'),
+                key,
             });
         }
         return availableDays;
-    }, [deadlineDate]);
+        // Recomputed on each open too, so a screen left sitting for hours doesn't keep offering a
+        // stale "today" whose hours have since passed.
+    }, [deadlineDate, pickerVisible, i18n.language]);
 
     const selectedDay = days[selectedDateIndex] || days[0];
 
@@ -172,11 +191,8 @@ export function HourlyAvailabilityPicker({
     const closePicker = () => setPickerVisible(false);
 
     const toggleDraftSlot = (dayKey: string, hour: number) => {
-        const slotDate = new Date(dayKey);
-        slotDate.setHours(hour, 0, 0, 0);
-        const isExpired = deadlineDate && slotDate.getTime() > deadlineDate.getTime();
-        const isPast = slotDate.getTime() < new Date().getTime();
-        if (isExpired || isPast) return;
+        // Same predicate the cell is rendered with — a cell that looks tappable always is.
+        if (isSlotDisabled(dayKey, hour, deadlineDate)) return;
 
         const slotId = `${dayKey}-${hour}`;
         setDraftSlots((prev) => {
@@ -513,12 +529,11 @@ export function HourlyAvailabilityPicker({
                                         const opponentAvail = isOpponentAvailable(dayKey, hour);
                                         const isMutual = isSelected && opponentAvail;
 
-                                        const slotDate = new Date(selectedDay.date);
-                                        slotDate.setHours(hour, 0, 0, 0);
-                                        const isAfterDeadline = deadlineDate && slotDate.getTime() > deadlineDate.getTime();
-                                        const isPast = slotDate.getTime() < new Date().getTime();
-                                        const isDisabled = isAfterDeadline || isPast;
-                                        const isInactive = isDisabled && !isSelected && !opponentAvail;
+                                        const isDisabled = isSlotDisabled(dayKey, hour, deadlineDate);
+                                        // Everything untappable reads as untappable. The opponent's amber
+                                        // used to win this branch, so an hour they had offered but which had
+                                        // already passed looked live and silently swallowed every tap.
+                                        const isInactive = isDisabled && !isSelected;
 
                                         return (
                                             <Pressable
