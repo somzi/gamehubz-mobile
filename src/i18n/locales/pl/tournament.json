@@ -267,7 +267,7 @@
     "teamsCount_many": "{{count}} drużyn",
     "teamsCount_other": "{{count}} drużyny",
     "participantsCount_one": "{{count}} uczestnik",
-    "participantsCount_few": "{{count}} uczestników",
+    "participantsCount_few": "{{count}} uczestnicy",
     "participantsCount_many": "{{count}} uczestników",
     "participantsCount_other": "{{count}} uczestnika",
     "exclusiveMembersOfHub": "członkowie huba z rolą Exclusive",

@@ -200,7 +200,13 @@ function useCheckIn({
             const data = await response.json().catch(() => null);
 
             if (!response.ok) {
-                throw new Error(data?.message || data?.Message || t('checkIn.failed'));
+                // The server's reason (e.g. "check-in closed") is localized and worth showing; a
+                // network failure never gets here — it throws out of fetch with an English message,
+                // which is why the catch below falls back to our own string for that case.
+                const serverMessage = data?.message || data?.Message;
+                const httpError = new Error(serverMessage || t('checkIn.failed'));
+                (httpError as any).fromServer = true;
+                throw httpError;
             }
 
             const next: MatchCheckInState = {
@@ -217,7 +223,7 @@ function useCheckIn({
             onCheckedIn?.(next);
         } catch (err: any) {
             hapticError();
-            setError(err?.message || t('checkIn.failed'));
+            setError(err?.fromServer && err?.message ? err.message : t('checkIn.failed'));
         } finally {
             setIsSubmitting(false);
         }
@@ -467,17 +473,20 @@ export function MatchCheckInBar({
 }: Omit<MatchCheckInPanelProps, 'homeLabel' | 'awayLabel' | 'graceMinutes'>) {
     const { t } = useTranslation('match');
     const {
-        kickOff, bothIn, isOpen, expired, mine, isPlayer, canPress,
-        remaining, critical, isSubmitting, submit,
+        kickOff, deadline, bothIn, isOpen, expired, mine, isPlayer, canPress,
+        remaining, critical, isSubmitting, error, submit,
     } = useCheckIn({ matchId, enabled, scheduledTimeIso, state, isHome, onCheckedIn });
 
     // A list card is not the place for "opens in 3 hours", a settled match, or a check that is
-    // over — the deadline strip beside it already carries the timing story.
-    if (!enabled || !kickOff || bothIn || !isOpen || expired || !isPlayer) return null;
+    // over — the deadline strip beside it already carries the timing story. No deadline means the
+    // server has nothing left to check (not Scheduled any more, or already ruled): without this,
+    // `expired` can never turn true and the bar would offer a button the server refuses forever.
+    if (!enabled || !kickOff || !deadline || bothIn || !isOpen || expired || !isPlayer) return null;
 
     const accent = critical ? COLORS.destructive : mine ? COLORS.primary : COLORS.warning;
 
     return (
+        <View className={className}>
         <View
             className={cn(
                 'flex-row items-center gap-2 rounded-2xl border px-2.5 py-2',
@@ -486,7 +495,6 @@ export function MatchCheckInBar({
                     : mine
                         ? 'border-primary/25 bg-primary/[0.06]'
                         : 'border-warning/30 bg-warning/[0.08]',
-                className,
             )}
         >
             <Ionicons name={mine ? 'checkmark-circle' : 'alert-circle'} size={13} color={accent} />
@@ -535,6 +543,20 @@ export function MatchCheckInBar({
                         </>
                     )}
                 </PressableScale>
+            )}
+        </View>
+
+            {/* The failure has to be visible here: this is where the check-in is actually pressed,
+                and a haptic buzz alone reads as success to someone not looking at the phone —
+                who then gets forfeited for a request that never reached the server. */}
+            {!!error && (
+                <Text
+                    accessibilityRole="alert"
+                    numberOfLines={2}
+                    className="text-[11px] font-bold text-destructive mt-1 px-1"
+                >
+                    {error}
+                </Text>
             )}
         </View>
     );

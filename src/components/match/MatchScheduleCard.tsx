@@ -1288,7 +1288,10 @@ function MatchScheduleCardBase({
                             strip: "confirm in the next 6 minutes" outranks "the round ends on
                             Sunday". The button lives inside the card's Pressable — RN gives the
                             inner press priority, so tapping Ready doesn't also open the match. */}
-                        {currentStatus !== 'completed' && (
+                        {/* Gated on the deadline exactly like the panel: the backend nulls it once the
+                            match is no longer Scheduled or the check was already ruled, and without
+                            one the bar would show a live "your turn" button the server refuses. */}
+                        {currentStatus !== 'completed' && !!checkInState.checkInDeadline && (
                             <MatchCheckInBar
                                 matchId={matchId}
                                 enabled={checkInEnabled}

@@ -24,7 +24,7 @@
   "noAccountsYet": "Аккаунтов соцсетей пока нет",
   "platformExists": "Платформа уже добавлена",
   "platformExistsHub": "У этого хаба такая платформа уже добавлена.",
-  "platformExistsUser": "Ты уже добавил эту платформу.",
+  "platformExistsUser": "Эта платформа уже добавлена.",
   "removeFailed": "Не удалось удалить аккаунт соцсети",
   "removeHubMessage": "Точно удалить {{platform}}?",
   "removeTitle": "Удалить аккаунт соцсети",

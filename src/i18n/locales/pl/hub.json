@@ -15,7 +15,7 @@
     "searchBanned": "Szukaj na czarnej liście...",
     "you": "Ty",
     "adminSummary_one": "{{count}} admin · łącznie {{total}}",
-    "adminSummary_few": "{{count}} adminów · łącznie {{total}}",
+    "adminSummary_few": "{{count}} admini · łącznie {{total}}",
     "adminSummary_many": "{{count}} adminów · łącznie {{total}}",
     "adminSummary_other": "{{count}} admina · łącznie {{total}}",
     "noMembersFound": "Nie znaleziono członków",
