@@ -1626,7 +1626,9 @@ export default function TournamentDetailsScreen() {
                             });
                             setShowStatusModal(true);
                             setTournamentTeams(prev => prev.filter(teamRow => (teamRow.teamId || teamRow.TeamId) !== teamId));
-                            fetchTournamentTeams(id);
+                            // The optimistic filter above already removed the row; the authoritative
+                            // reload comes from fetchTournamentDetails, which refetches the teams for
+                            // a team tournament itself. Calling both raced two identical requests.
                             fetchTournamentDetails();
                         } catch (err: any) {
                             setStatusModalConfig({
@@ -1678,15 +1680,18 @@ export default function TournamentDetailsScreen() {
         try {
             const tab = activeTabRef.current;
             await Promise.all([
+                // Teams are deliberately absent here: fetchTournamentDetails already refetches them
+                // itself for a team tournament. Listing them again meant pull-to-refresh on the teams
+                // tab fired two identical requests in parallel, and whichever landed second won — so a
+                // team the first response had already dropped could flicker back in.
                 fetchTournamentDetails(true),
                 tab === 'bracket' ? fetchBracket(true) : null,
                 tab === 'overview' || tab === 'players' ? fetchParticipants() : null,
-                tab === 'teams' && tournament?.isTeamTournament ? fetchTournamentTeams(id) : null,
             ]);
         } finally {
             setIsRefreshing(false);
         }
-    }, [id, tournament?.isTeamTournament]);
+    }, [id]);
 
     // `tab` lets a caller land straight on the chat (the Round Progress list uses it to open
     // the conversation with the two players who haven't played yet). Every other call site
@@ -1948,35 +1953,14 @@ export default function TournamentDetailsScreen() {
         );
     };
 
-    const renderStages = () => {
-        if (stages.length === 0) {
-            const isCreator = canManage;
-            const isRegClosed = tournament?.status === 2;
-
-            return (
-                <View className="py-20 items-center justify-center px-6">
-                    <Ionicons name="trophy-outline" size={48} color="#71717A" />
-                    <Text className="text-muted-foreground mt-4 text-center">
-                        {isCreator
-                            ? (isRegClosed
-                                ? t('details.bracketReadyHint')
-                                : t('details.bracketNotReadyHint'))
-                            : t('details.bracketNotAvailable')}
-                    </Text>
-
-                    {isCreator && isRegClosed && (
-                        <Button
-                            className="mt-6 w-full"
-                            onPress={handleStartBracket}
-                            loading={isCreatingBracket}
-                        >
-                            {t('details.createBracket')}
-                        </Button>
-                    )}
-                </View>
-            );
-        }
-
+    // Everything renderStages() derives from the loaded bracket, hoisted out of it. The function is
+    // called as a plain function from JSX, so this ran on *every* render of this screen — and the
+    // screen consumes useBadges(), whose SignalR pushes re-render it on any badge change anywhere in
+    // the tournament. Each pass did a flatMap over every match in the stage, three full .find() scans
+    // over that flattened list, and a rebuild of every round object. On a 256-entrant bracket that is
+    // 255 matches walked four times per push, for a result that only changes when the bracket, the
+    // selected stage, or the tournament format does.
+    const stageDerivation = useMemo(() => {
         const currentStage = stages[selectedStageIndex];
         if (!currentStage) return null;
 
@@ -2046,6 +2030,41 @@ export default function TournamentDetailsScreen() {
                 }))
                 .filter((r: any) => r.matches.length > 0)
             : stageRounds;
+
+        return { currentStage, stageType, isLosersBracket, swissZones, groupZones, swissTotalRounds, stageRounds, thirdPlaceMatch, grandFinalMatch, grandFinalResetMatch, bracketRounds };
+    }, [stages, selectedStageIndex, tournament]);
+
+    const renderStages = () => {
+        if (stages.length === 0) {
+            const isCreator = canManage;
+            const isRegClosed = tournament?.status === 2;
+
+            return (
+                <View className="py-20 items-center justify-center px-6">
+                    <Ionicons name="trophy-outline" size={48} color="#71717A" />
+                    <Text className="text-muted-foreground mt-4 text-center">
+                        {isCreator
+                            ? (isRegClosed
+                                ? t('details.bracketReadyHint')
+                                : t('details.bracketNotReadyHint'))
+                            : t('details.bracketNotAvailable')}
+                    </Text>
+
+                    {isCreator && isRegClosed && (
+                        <Button
+                            className="mt-6 w-full"
+                            onPress={handleStartBracket}
+                            loading={isCreatingBracket}
+                        >
+                            {t('details.createBracket')}
+                        </Button>
+                    )}
+                </View>
+            );
+        }
+
+        if (!stageDerivation) return null;
+        const { currentStage, stageType, isLosersBracket, swissZones, groupZones, swissTotalRounds, stageRounds, thirdPlaceMatch, grandFinalMatch, grandFinalResetMatch, bracketRounds } = stageDerivation;
 
         return (
             <View key={currentStage.stageId || selectedStageIndex} className="mb-8">
