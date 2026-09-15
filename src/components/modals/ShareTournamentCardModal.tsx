@@ -16,7 +16,7 @@ import {
     StatPill,
     PosterWordmark,
 } from './ShareCardShell';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 // Shareable tournament card — the player-card poster style in a violet/gold
 // "champion" theme: trophy emblem, name + status chip, prize (or participants)
@@ -95,7 +95,7 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
     }
 
     const dateValue = startDate
-        ? new Date(startDate).toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })
+        ? new Date(startDate).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
         : t('app.tbd');
     const modeValue = isTeam ? (teamSize ? `${teamSize}v${teamSize}` : t('team:modeTeam')) : t('team:modeSolo');
 

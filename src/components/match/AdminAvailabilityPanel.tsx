@@ -6,7 +6,7 @@ import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { PressableScale } from '../ui/PressableScale';
 import { cn, formatDateTimeShort, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 /** One side of the fixture, as the organizer projection sends it. */
 export interface AdminAvailabilitySide {
@@ -54,13 +54,13 @@ function groupByDay(slots: string[]): { day: string; hours: string }[] {
         if (!byDay.has(key)) {
             byDay.set(key, {
                 sort: new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime(),
-                day: date.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' }),
+                day: date.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' }),
                 hours: [],
             });
         }
         byDay.get(key)!.hours.push({
             sort: date.getTime(),
-            label: date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false }),
+            label: date.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }),
         });
     }
 

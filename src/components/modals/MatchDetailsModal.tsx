@@ -52,7 +52,7 @@ import {
     normalizeCondition,
     seriesGamesFrom,
 } from '../../lib/series';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -468,7 +468,7 @@ export function MatchDetailsModal({
                     if (inlineAvailability.matchDeadline) setLocalDeadline(inlineAvailability.matchDeadline);
                     if (inlineAvailability.confirmedTime) {
                         const confirmedDate = parseUtcDate(inlineAvailability.confirmedTime);
-                        setConfirmedTime(confirmedDate.toLocaleString(i18n.language));
+                        setConfirmedTime(confirmedDate.toLocaleString(dateLocale()));
                         setConfirmedTimeIso(inlineAvailability.confirmedTime);
                         setCurrentStatus('scheduled');
                     }
@@ -556,7 +556,7 @@ export function MatchDetailsModal({
                 }
                 if (data.confirmedTime) {
                     const confirmedDate = parseUtcDate(data.confirmedTime);
-                    setConfirmedTime(confirmedDate.toLocaleString(i18n.language));
+                    setConfirmedTime(confirmedDate.toLocaleString(dateLocale()));
                     setConfirmedTimeIso(data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
@@ -2399,7 +2399,7 @@ export function MatchDetailsModal({
                                                         // parseUtcDate, not new Date(): the backend serializes without a
                                                         // Z suffix, so raw parsing reads UTC as local and shifts the time.
                                                         const confirmedDate = parseUtcDate(result.data.confirmedTime);
-                                                        setConfirmedTime(confirmedDate.toLocaleString(i18n.language));
+                                                        setConfirmedTime(confirmedDate.toLocaleString(dateLocale()));
                                                         setConfirmedTimeIso(result.data.confirmedTime);
                                                         setCurrentStatus('scheduled');
                                                     }

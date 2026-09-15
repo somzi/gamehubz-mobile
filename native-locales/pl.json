@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "GameHubz potrzebuje dostępu do biblioteki zdjęć, aby można było przesyłać zdjęcia profilowe konta i hubów oraz zrzuty ekranu i krótkie klipy wideo jako dowód wyników meczów. Wybrane zdjęcia i filmy są używane wyłącznie w aplikacji i nie są udostępniane podmiotom trzecim."
+  }
+}

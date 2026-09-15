@@ -13,7 +13,7 @@ import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
 import { mergeMessagesById } from '../../lib/mergeMessages';
 import { cn, parseUtcDate } from '../../lib/utils';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 // Initial page size — load a screenful fast; older messages page in on demand.
 const PAGE_SIZE = 30;
@@ -261,9 +261,9 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     // messages not sent today, so same-day chat stays compact.
     const formatCommentTime = (dateString: string) => {
         const date = parseUtcDate(dateString);
-        const time = date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+        const time = date.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
         const isToday = date.toDateString() === new Date().toDateString();
-        return isToday ? time : `${date.toLocaleDateString(i18n.language)} ${time}`;
+        return isToday ? time : `${date.toLocaleDateString(dateLocale())} ${time}`;
     };
 
     return (

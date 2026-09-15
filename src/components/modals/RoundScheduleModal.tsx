@@ -12,7 +12,7 @@ import { DateTimePickerModal } from './DateTimePickerModal';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
 import { BestOfInput } from '../match/BestOfInput';
 import { normalizeBestOf } from '../../lib/series';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 interface RoundScheduleModalProps {
     visible: boolean;
@@ -52,11 +52,11 @@ const isLockSentinel = (d: Date | null): boolean => !!d && d.getFullYear() > 900
 const formatDatePart = (d: Date): string => {
     const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' };
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-    return d.toLocaleDateString(i18n.language, opts);
+    return d.toLocaleDateString(dateLocale(), opts);
 };
 
 const formatTimePart = (d: Date): string =>
-    d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+    d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 
 const formatWindow = (ms: number): string => {
     const totalHours = Math.round(ms / 3600000);

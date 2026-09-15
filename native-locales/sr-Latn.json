@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "GameHubz traži pristup biblioteci fotografija kako bi se mogle otpremati profilne slike naloga i hubova, kao i snimci ekrana i kratki video-klipovi kao dokaz rezultata mečeva. Izabrane fotografije i video-snimci koriste se samo u aplikaciji i ne dele se sa trećim stranama."
+  }
+}

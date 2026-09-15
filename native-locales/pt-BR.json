@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "O GameHubz precisa de acesso à sua biblioteca de fotos para que você possa enviar fotos de perfil da sua conta e dos seus hubs, além de capturas de tela e vídeos curtos como prova dos resultados das partidas. As fotos e os vídeos selecionados são usados apenas no app e não são compartilhados com terceiros."
+  }
+}

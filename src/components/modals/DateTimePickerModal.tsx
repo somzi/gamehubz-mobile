@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { dateLocale } from '../../i18n';
 
 interface DateTimePickerModalProps {
     visible: boolean;
@@ -160,7 +161,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
             calendarDays.push(i);
         }
 
-        const weekDays = shortWeekdays(i18n.language);
+        const weekDays = shortWeekdays(dateLocale());
 
         return (
             <View className="gap-y-4">
@@ -170,7 +171,7 @@ export function DateTimePickerModal({ visible, onClose, onConfirm, title, initia
                         <Ionicons name="chevron-back" size={20} color="#10B981" />
                     </TouchableOpacity>
                     <Text className="text-white font-bold text-lg">
-                        {monthName(viewMonth, i18n.language)} {viewYear}
+                        {monthName(viewMonth, dateLocale())} {viewYear}
                     </Text>
                     <TouchableOpacity onPress={() => changeMonth(1)} className="p-2 bg-white/5 rounded-full">
                         <Ionicons name="chevron-forward" size={20} color="#10B981" />

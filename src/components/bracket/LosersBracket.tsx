@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import i18n from '../../i18n';
+import i18n, { dateLocale } from '../../i18n';
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
@@ -352,11 +352,11 @@ export function LosersBracket({
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                         <Ionicons name="time-outline" size={9} color="#F87171" />
                                         <Text style={{ fontSize: 9, color: '#F87171', fontWeight: '600' }}>
-                                            {parseUtcDate(round.roundDeadline).toLocaleDateString(i18n.language, {
+                                            {parseUtcDate(round.roundDeadline).toLocaleDateString(dateLocale(), {
                                                 month: 'short',
                                                 day: 'numeric',
                                             })}{' '}
-                                            {parseUtcDate(round.roundDeadline).toLocaleTimeString(i18n.language, {
+                                            {parseUtcDate(round.roundDeadline).toLocaleTimeString(dateLocale(), {
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                                 hour12: false,

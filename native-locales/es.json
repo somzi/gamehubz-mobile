@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "GameHubz necesita acceso a tu fototeca para que puedas subir fotos de perfil para tu cuenta y tus hubs, así como capturas de pantalla y clips de video cortos como prueba de los resultados de los partidos. Las fotos y los videos seleccionados solo se usan dentro de la app y no se comparten con terceros."
+  }
+}

@@ -4,7 +4,7 @@ import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
 import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 /* ── Layout constants ─────────────────────────────────────────────── */
 const MATCH_H = 130;            // vertical slot per match card
@@ -219,9 +219,9 @@ export function TournamentBracket({
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                                             <Ionicons name="time-outline" size={9} color="#F87171" />
                                             <Text style={{ fontSize: 9, color: '#F87171', fontWeight: '600' }}>
-                                                {parseUtcDate(round.roundDeadline).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' })}
+                                                {parseUtcDate(round.roundDeadline).toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' })}
                                                 {' '}
-                                                {parseUtcDate(round.roundDeadline).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                {parseUtcDate(round.roundDeadline).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}
                                             </Text>
                                         </View>
                                     )}

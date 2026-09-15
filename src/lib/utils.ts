@@ -1,4 +1,4 @@
-import i18n from '../i18n';
+import i18n, { dateLocale } from '../i18n';
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -19,8 +19,8 @@ export function formatDateTimeShort(dateStr?: string | null, separator = ', '): 
     if (!dateStr) return '';
     const d = parseUtcDate(dateStr);
     if (isNaN(d.getTime())) return '';
-    const day = d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
-    const time = d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
+    const day = d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
+    const time = d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
     return `${day}${separator}${time}`;
 }
 
@@ -31,9 +31,9 @@ export function formatLocalDateTime(dateStr?: string | null): string {
     if (!dateStr) return '';
     const d = parseUtcDate(dateStr);
     if (isNaN(d.getTime())) return '';
-    const time = d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+    const time = d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
     const isToday = d.toDateString() === new Date().toDateString();
-    return isToday ? time : `${d.toLocaleDateString(i18n.language)} ${time}`;
+    return isToday ? time : `${d.toLocaleDateString(dateLocale())} ${time}`;
 }
 
 // Exact local clock time only ("15:00"), for rows under a day header that already carries the date
@@ -42,7 +42,7 @@ export function formatLocalTime(dateStr?: string | null): string {
     if (!dateStr) return '';
     const d = parseUtcDate(dateStr);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 // Schedule picker values are dual-format: the backend sends UTC ISO ("…Z"), while the
@@ -56,8 +56,8 @@ export function formatSchedulePickerValue(value?: string | null): { date: string
     const d = new Date(String(value).replace(' ', 'T'));
     if (isNaN(d.getTime())) return null;
     return {
-        date: d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' }),
-        time: d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false }),
+        date: d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' }),
+        time: d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }),
     };
 }
 
@@ -69,7 +69,7 @@ export function formatDateSafe(dateStr: string | null | undefined, fallback?: st
     if (!dateStr) return shown;
     const d = parseUtcDate(dateStr);
     if (isNaN(d.getTime())) return shown;
-    return d.toLocaleDateString(i18n.language);
+    return d.toLocaleDateString(dateLocale());
 }
 
 // Backend PrizeCurrency enum:  1=EUR, 2=USD, 3=StarPass, 4=FCP

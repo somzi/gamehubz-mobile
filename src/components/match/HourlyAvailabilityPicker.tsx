@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import i18n from '../../i18n';
+import i18n, { dateLocale } from '../../i18n';
 
 interface HourlyAvailabilityPickerProps {
     matchId: string;
@@ -120,9 +120,9 @@ export function HourlyAvailabilityPicker({
 
     const displayDeadline = useMemo(() => {
         if (!deadlineDate) return deadline;
-        return deadlineDate.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' }) +
+        return deadlineDate.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) +
             ', ' +
-            deadlineDate.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
+            deadlineDate.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
     }, [deadlineDate, deadline]);
 
     useEffect(() => {
@@ -164,8 +164,8 @@ export function HourlyAvailabilityPicker({
             if (!HOURS.some(hour => !isSlotDisabled(key, hour, deadlineDate))) continue;
             availableDays.push({
                 date,
-                label: formatDate(date, 'EEE', i18n.language),
-                fullLabel: formatDate(date, 'MMM d', i18n.language),
+                label: formatDate(date, 'EEE', dateLocale()),
+                fullLabel: formatDate(date, 'MMM d', dateLocale()),
                 key,
             });
         }

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import i18n from '../i18n';
+import i18n, { dateLocale } from '../i18n';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -686,15 +686,15 @@ function formatChatTime(iso: string): string {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const dayMs = 86400000;
     const ts = d.getTime();
-    if (ts >= startOfToday) return d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+    if (ts >= startOfToday) return d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
     if (ts >= startOfToday - dayMs) return YESTERDAY_LABEL();
-    if (ts >= startOfToday - 6 * dayMs) return d.toLocaleDateString(i18n.language, { weekday: 'short' });
-    return d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' });
+    if (ts >= startOfToday - 6 * dayMs) return d.toLocaleDateString(dateLocale(), { weekday: 'short' });
+    return d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
 }
 
 function monthYear(iso?: string): string {
     if (!iso) return '';
-    return parseUtcDate(iso).toLocaleDateString(i18n.language, { month: 'short', year: 'numeric' });
+    return parseUtcDate(iso).toLocaleDateString(dateLocale(), { month: 'short', year: 'numeric' });
 }
 
 // Premium card chrome shared across all Social rows: soft gradient, hairline

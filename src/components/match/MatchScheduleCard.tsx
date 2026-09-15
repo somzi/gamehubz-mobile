@@ -52,7 +52,7 @@ import {
 } from '../../lib/series';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -318,7 +318,7 @@ function MatchScheduleCardBase({
                     // parseUtcDate, not new Date(): the backend serializes without a Z suffix,
                     // so raw parsing reads the UTC clock as local and shifts the time.
                     const confirmedDate = parseUtcDate(data.confirmedTime);
-                    setMatchTime(confirmedDate.toLocaleString(i18n.language));
+                    setMatchTime(confirmedDate.toLocaleString(dateLocale()));
                     setMatchTimeIso(data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }
@@ -749,7 +749,7 @@ function MatchScheduleCardBase({
                 // Check if match was scheduled
                 if (result.data?.confirmedTime) {
                     const confirmedDate = parseUtcDate(result.data.confirmedTime);
-                    setMatchTime(confirmedDate.toLocaleString(i18n.language));
+                    setMatchTime(confirmedDate.toLocaleString(dateLocale()));
                     setMatchTimeIso(result.data.confirmedTime);
                     setCurrentStatus('scheduled');
                 }

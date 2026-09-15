@@ -12,7 +12,7 @@ import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 import { parseUtcDate } from '../lib/utils';
-import i18n from '../i18n';
+import { dateLocale } from '../i18n';
 
 interface MatchOverviewDto {
     id: string;
@@ -160,7 +160,7 @@ export default function MyMatchesScreen() {
                                 status={!match.scheduledTime ? 'pending_availability' : match.status === 3 ? 'completed' : 'scheduled'}
                                 // parseUtcDate, not new Date(): backend timestamps carry no Z, so
                                 // raw parsing read the UTC clock as local and showed a shifted time.
-                                scheduledTime={match.scheduledTime ? parseUtcDate(match.scheduledTime).toLocaleString(i18n.language) : undefined}
+                                scheduledTime={match.scheduledTime ? parseUtcDate(match.scheduledTime).toLocaleString(dateLocale()) : undefined}
                                 scheduledTimeIso={match.scheduledTime}
                                 deadline={match.roundDeadline ?? undefined}
                                 onMatchUpdate={fetchMatches}

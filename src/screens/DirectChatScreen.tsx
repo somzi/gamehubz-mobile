@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import i18n from '../i18n';
+import i18n, { dateLocale } from '../i18n';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View,
@@ -644,7 +644,7 @@ function formatTime(iso: string): string {
         // parseUtcDate treats a tz-less backend timestamp as UTC, so toLocaleTimeString
         // renders it in the device timezone (e.g. 15:00 in RS shows as 18:30 in IN).
         const d = parseUtcDate(iso);
-        return d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
     } catch {
         return '';
     }
@@ -660,7 +660,7 @@ function formatDay(iso: string): string {
         );
         if (diffDays === 0) return i18n.t('match:chat.today');
         if (diffDays === 1) return i18n.t('match:chat.yesterday');
-        return d.toLocaleDateString(i18n.language);
+        return d.toLocaleDateString(dateLocale());
     } catch {
         return '';
     }

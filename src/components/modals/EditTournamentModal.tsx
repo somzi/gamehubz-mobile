@@ -23,7 +23,7 @@ import { SegmentedToggle } from '../ui/SegmentedToggle';
 import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 // Values stay at module scope; labels are resolved per render so a language switch applies.
 const YES_NO_OPTIONS = [
@@ -653,8 +653,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
     const scheduleSummary = startDate
         ? (isScheduled && registrationOpensAt
-            ? t('form.summaryOpensAt', { opens: new Date(registrationOpensAt).toLocaleString(i18n.language) })
-            : t('form.summaryStartsAt', { starts: new Date(startDate).toLocaleString(i18n.language) }))
+            ? t('form.summaryOpensAt', { opens: new Date(registrationOpensAt).toLocaleString(dateLocale()) })
+            : t('form.summaryStartsAt', { starts: new Date(startDate).toLocaleString(dateLocale()) }))
         : t('form.summaryNotSetShort');
     const prizeSummary = prize && prize !== '0' ? `${prize} ${getCurrencyLabel()}` : t('form.none');
 

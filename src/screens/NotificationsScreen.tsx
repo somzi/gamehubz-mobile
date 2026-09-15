@@ -26,7 +26,7 @@ import { NOTIFICATIONS_KEY, fetchNotificationPage } from '../lib/notificationsAp
 import { externalLinkFromNotification, routeFromNotification } from '../lib/notificationRouting';
 import { COLORS } from '../lib/theme';
 import { parseUtcDate } from '../lib/utils';
-import i18n from '../i18n';
+import { dateLocale } from '../i18n';
 import { RootStackParamList } from '../types/navigation';
 import type { NotificationFilter, NotificationItem, NotificationPage } from '../types/notifications';
 
@@ -68,7 +68,7 @@ function dayTitle(date: Date, todayLabel: string, yesterdayLabel: string): strin
     if (localDayKey(date) === localDayKey(now)) return todayLabel;
     if (localDayKey(date) === localDayKey(yesterday)) return yesterdayLabel;
 
-    return date.toLocaleDateString(i18n.language, {
+    return date.toLocaleDateString(dateLocale(), {
         weekday: 'long',
         day: 'numeric',
         month: 'long',

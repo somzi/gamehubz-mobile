@@ -123,6 +123,17 @@ export function getRequestLanguage(): LanguageCode {
 }
 
 /**
+ * Locale for Intl date and time formatting: the UI language, except Serbian. CLDR resolves a bare
+ * "sr" to Cyrillic, while the Serbian resource set is written in Latin script — so "sr" would print
+ * "уторак, 15. септембар" next to Latin UI text. Pass this, never `i18n.language`, to
+ * toLocaleDateString / toLocaleTimeString / Intl.DateTimeFormat.
+ */
+export function dateLocale(): string {
+    const language = getCurrentLanguage();
+    return language === 'sr' ? 'sr-Latn' : language;
+}
+
+/**
  * Switches language and persists the choice. Persisting is best-effort: a failed
  * write means the app reverts to detection on next launch, which is preferable to
  * failing the switch the user just asked for.

@@ -8,7 +8,7 @@ import { cn, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { hapticError, hapticSuccess } from '../../lib/haptics';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 /** The ready-check state of a match, exactly as every backend payload carries it. */
 export interface MatchCheckInState {
@@ -43,7 +43,7 @@ const toDate = (value?: string | null): Date | null => {
 };
 
 const formatClock = (d: Date) =>
-    d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
+    d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 
 /**
  * Exact local time, carrying the date whenever it is not today — the same rule as
@@ -55,7 +55,7 @@ const formatStamp = (d: Date) => {
     const time = formatClock(d);
     if (d.toDateString() === new Date().toDateString()) return time;
 
-    return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })} ${time}`;
+    return `${d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })} ${time}`;
 };
 
 /**

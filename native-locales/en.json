@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "GameHubz requires access to your photo library so you can upload profile pictures for your account and hubs, as well as screenshots and short video clips as proof of match results. Selected photos and videos are used only within the app and are not shared with third parties."
+  }
+}

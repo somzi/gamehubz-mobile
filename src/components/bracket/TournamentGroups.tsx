@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import i18n from '../../i18n';
+import i18n, { dateLocale } from '../../i18n';
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -301,7 +301,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                 <View className="flex-row items-center gap-1.5">
                                                     <Ionicons name="time-outline" size={11} color="#EF4444" />
                                                     <Text className="text-[10px] text-red-400 font-semibold">
-                                                        {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString(i18n.language)} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString(dateLocale())} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}
                                                     </Text>
                                                 </View>
                                             ) : <View />}

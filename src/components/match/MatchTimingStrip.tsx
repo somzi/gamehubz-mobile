@@ -4,7 +4,7 @@ import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
-import i18n from '../../i18n';
+import { dateLocale } from '../../i18n';
 
 interface MatchTimingStripProps {
     /** Agreed match time as a raw backend timestamp — preferred, it renders as clock + date. */
@@ -49,12 +49,12 @@ function toDate(value?: string | null): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
-const formatClock = (d: Date) => d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false });
-const formatDay = (d: Date) => d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' });
+const formatClock = (d: Date) => d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
+const formatDay = (d: Date) => d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 
 // Day + clock on one line, for places too tight for the two-line strip.
 const formatShortStamp = (d: Date) =>
-    `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}, ${formatClock(d)}`;
+    `${d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })}, ${formatClock(d)}`;
 
 const dayDelta = (d: Date, now: number) => {
     const startOfToday = new Date(now);

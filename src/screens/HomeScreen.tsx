@@ -20,7 +20,7 @@ import { COLORS } from '../lib/theme';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
 import { parseUtcDate, formatLocalDateTime } from '../lib/utils';
-import i18n from '../i18n';
+import { dateLocale } from '../i18n';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -223,8 +223,8 @@ export default function HomeScreen() {
 
     const dateLabel = useMemo(() => {
         const d = new Date();
-        const day = d.toLocaleDateString(i18n.language, { weekday: 'short' });
-        const monthDay = d.toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' });
+        const day = d.toLocaleDateString(dateLocale(), { weekday: 'short' });
+        const monthDay = d.toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' });
         return `${day.toUpperCase()} · ${monthDay.toUpperCase()}`;
     }, []);
 
@@ -386,7 +386,7 @@ export default function HomeScreen() {
                                         status="scheduled"
                                         scheduledTime={
                                             match.scheduledTime
-                                                ? parseUtcDate(match.scheduledTime).toLocaleString(i18n.language, {
+                                                ? parseUtcDate(match.scheduledTime).toLocaleString(dateLocale(), {
                                                     month: 'short',
                                                     day: 'numeric',
                                                     hour: '2-digit',

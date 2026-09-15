@@ -123,8 +123,12 @@ export default function HubProfileScreen() {
 
     useFocusEffect(
         useCallback(() => {
+            // The mount already fetches whenever there is nothing fresh to paint; invalidating on top of
+            // that cancelled the in-flight request and sent GET_HUB a second time. Every later focus
+            // still refetches.
+            if (queryClient.isFetching({ queryKey: HUB_KEY(id) }) > 0) return;
             refetchHub();
-        }, [refetchHub])
+        }, [queryClient, id, refetchHub])
     );
 
     useEffect(() => {

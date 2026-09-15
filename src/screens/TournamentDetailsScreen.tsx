@@ -64,7 +64,7 @@ import {
 } from '../lib/teamApi';
 import { useTranslation } from 'react-i18next';
 import type { TeamDto } from '../types/team';
-import i18n from '../i18n';
+import { dateLocale } from '../i18n';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -2676,7 +2676,7 @@ export default function TournamentDetailsScreen() {
                                     icon="calendar"
                                     iconColor="#60A5FA"
                                     label={t('details.startDateLabel')}
-                                    value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' }) : tCommon('app.tbd')}
+                                    value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) : tCommon('app.tbd')}
                                 />
                                 {tournament.registrationDeadline && (
                                     <InfoRow
@@ -2685,7 +2685,7 @@ export default function TournamentDetailsScreen() {
                                         label={t('details.regDeadlineLabel')}
                                         value={(() => {
                                             const d = new Date(tournament.registrationDeadline);
-                                            return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                                            return `${d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}`;
                                         })()}
                                     />
                                 )}
