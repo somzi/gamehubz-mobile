@@ -2411,7 +2411,9 @@ export default function TournamentDetailsScreen() {
                             <View className="flex-row items-center gap-2">
                                 <Ionicons name="people-outline" size={16} color="#71717A" />
                                 <Text className="text-sm font-bold text-zinc-500">
-                                    {tournament?.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0)} {tournament?.isTeamTournament ? t('details.teamsWord') : t('details.participantsWord')}
+                                    {tournament?.isTeamTournament
+                                        ? t('details.teamsCount', { count: tournamentTeams.length })
+                                        : t('details.participantsCount', { count: tournament.numberOfParticipants || 0 })}
                                 </Text>
                             </View>
                         </View>
@@ -2457,7 +2459,7 @@ export default function TournamentDetailsScreen() {
                                     <View key="restricted" className="w-full bg-[#0D1525] border border-white/[0.06] rounded-2xl p-4 flex-row items-center gap-3">
                                         <Ionicons name="lock-closed" size={18} color="#64748B" />
                                         <Text className="flex-1 text-slate-400 text-sm font-medium">
-                                            Restricted to {restrictionLabel} — you're not eligible to join.
+                                            {t('details.restrictedNotice', { restriction: restrictionLabel })}
                                         </Text>
                                     </View>
                                 );
@@ -2560,10 +2562,7 @@ export default function TournamentDetailsScreen() {
                                     <View className="flex-1 gap-0.5">
                                         <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t('details.registrationOpensLabel')}</Text>
                                         <Text className="text-base font-black text-white">
-                                            {(() => {
-                                                const d = new Date(tournament.registrationOpensAt);
-                                                return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
-                                            })()}
+                                            {formatDateTimeShort(tournament.registrationOpensAt)}
                                         </Text>
                                         <Text className="text-[11px] text-slate-400 mt-0.5">
                                             {t('details.notifyOnOpen')}
@@ -2581,10 +2580,7 @@ export default function TournamentDetailsScreen() {
                                     <View className="flex-1 gap-0.5">
                                         <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t('details.registrationDeadlineLabel')}</Text>
                                         <Text className="text-base font-black text-white">
-                                            {(() => {
-                                                const d = new Date(tournament.registrationDeadline);
-                                                return `${d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short', year: 'numeric' })} at ${d.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', hour12: false })}`;
-                                            })()}
+                                            {formatDateTimeShort(tournament.registrationDeadline)}
                                         </Text>
                                     </View>
                                 </View>

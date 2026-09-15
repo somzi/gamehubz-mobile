@@ -1,0 +1,52 @@
+{
+  "title": "Ustawienia",
+  "sections": {
+    "notifications": "Powiadomienia",
+    "account": "Konto",
+    "preferences": "Preferencje",
+    "support": "Pomoc",
+    "accountActions": "Działania na koncie"
+  },
+  "editProfile": "Edytuj dane profilu",
+  "manageSocials": "Konta społecznościowe",
+  "passwordSecurity": "Hasło i bezpieczeństwo",
+  "language": "Język",
+  "helpCenter": "Centrum pomocy",
+  "contactUs": "Kontakt",
+  "aboutUs": "O nas",
+  "logOut": "Wyloguj się",
+  "deleteAccount": "Usuń konto",
+  "version": "GameHubz Mobile v{{version}}",
+  "languagePicker": {
+    "title": "Język",
+    "subtitle": "Wybierz język aplikacji"
+  },
+  "logOutConfirm": {
+    "title": "Wyloguj się",
+    "message": "Na pewno chcesz się wylogować?"
+  },
+  "deleteConfirm": {
+    "title": "Usuń konto",
+    "message": "Na pewno chcesz usunąć swoje konto? Ta operacja jest nieodwracalna i nie można jej cofnąć."
+  },
+  "deleteSuccess": {
+    "title": "Konto usunięte",
+    "message": "Twoje konto zostało usunięte."
+  },
+  "deleteFailed": {
+    "title": "Nie udało się usunąć",
+    "message": "Nie udało się usunąć konta. Spróbuj ponownie później."
+  },
+  "notifications": {
+    "inbox": "Skrzynka powiadomień",
+    "push": "Powiadomienia push",
+    "pushOn": "Wł.",
+    "pushOff": "Wył.",
+    "pushOffHint": "Powiadomienia push są wyłączone na tym urządzeniu, więc nic nie wyskakuje — wszystko i tak trafia do skrzynki powiadomień. Naciśnij Powiadomienia push, aby je włączyć.",
+    "moderatedChats": "Czaty, które moderuję",
+    "moderatedChatsHint": "Powiadamiaj mnie, gdy gracze odpowiadają na czacie meczu, w którym uczestniczę jako organizator. To ustawienie nigdy nie wycisza czatów Twoich własnych meczów.",
+    "perMatchHint": "Aby wyciszyć tylko jeden konkretny mecz, otwórz jego czat i naciśnij Wyciszony.",
+    "saveFailedTitle": "Nie udało się zapisać",
+    "saveFailedMessage": "Ustawienie powiadomień nie zostało zaktualizowane. Spróbuj ponownie za chwilę."
+  }
+}

@@ -4,7 +4,7 @@ import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Alert, Scro
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
-import i18n from '../../i18n';
+import { formatDateSafe } from '../../lib/utils';
 
 enum HubVerificationStatus {
     Pending = 0,
@@ -128,7 +128,7 @@ export function RequestVerificationModal({ visible, hubId, isAlreadyVerified, on
                         <View className="flex-1">
                             <Text className="text-amber-400 font-black text-sm">{t('verification.pendingReview')}</Text>
                             <Text className="text-amber-300/70 text-xs mt-0.5">
-                                Submitted {request?.createdOn ? new Date(request.createdOn).toLocaleDateString(i18n.language) : ''}
+                                {t('verification.submittedOn', { date: formatDateSafe(request?.createdOn, '') })}
                             </Text>
                         </View>
                     </View>

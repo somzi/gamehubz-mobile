@@ -111,6 +111,8 @@
     "allow": "Allow",
     "maybeLater": "Maybe Later",
     "allHighlights": "All Highlights",
+    "activitiesCount_one": "{{count}} activity",
+    "activitiesCount_other": "{{count}} activities",
     "noMoreActivities": "No more activities to load",
     "noHighlightsYet": "No Highlights Yet",
     "noHighlightsHint": "Hub activities and tournament updates will appear here",

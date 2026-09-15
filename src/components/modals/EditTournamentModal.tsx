@@ -641,7 +641,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const accessSummary = [
         isTeamTournament ? tTeam('modeTeam') : tTeam('modeSolo'),
         isTeamTournament && allowReserves && maxReserves ? t('form.summaryReserves', { count: Number(maxReserves) }) : null,
-        scopeMode === 'region' ? getRegionLabel() : `${selectedCountries.length} ${selectedCountries.length === 1 ? 'country' : 'countries'}`,
+        scopeMode === 'region' ? getRegionLabel() : t('form.summaryCountries', { count: selectedCountries.length }),
         isExclusive ? t('form.summaryExclusive') : null,
     ].filter(Boolean).join(' · ');
     const matchSettingsSummary = [

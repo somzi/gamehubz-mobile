@@ -565,7 +565,7 @@ export default function HubMembersScreen() {
             {activeTab === 'members' && adminCount > 0 && (
                 <View className="px-4 pt-2">
                     <Text className="text-[11px] text-slate-500">
-                        {adminCount} {adminCount === 1 ? 'admin' : 'admins'} · {members.length} total
+                        {t('members.adminSummary', { count: adminCount, total: members.length })}
                     </Text>
                 </View>
             )}

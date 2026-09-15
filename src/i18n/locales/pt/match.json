@@ -274,7 +274,7 @@
     "groupStage": "Fase de grupos",
     "matchFormat": "Formato da partida",
     "phaseFormat": "Formato: {{phase}}",
-    "appliesToEveryGame": "Vale para cada jogo individual dentro de um confronto — o confronto em si continua sendo decidido por",
+    "appliesToEveryGame": "Vale para cada jogo individual dentro de um confronto — o confronto em si continua sendo decidido pela sua própria condição de vitória.",
     "seriesDecidedBy": "Série decidida por",
     "gamesWon": "Jogos vencidos",
     "totalScore": "Placar total",
@@ -284,9 +284,10 @@
     "sameAsPhase": "Igual a {{phase}}",
     "different": "Diferente",
     "knockoutSameHint": "As partidas de mata-mata têm a mesma duração de {{phase}}.",
+    "perRoundOverride": "Cada rodada ainda pode ser alterada individualmente depois que o chaveamento for criado.",
     "knockoutTiebreak": "Desempate do mata-mata",
     "sameFormat": "Mesmo formato",
-    "tiebreakNote": "Jogos individuais podem empatar, então uma série pode terminar empatada em qualquer formato. O mata-mata"
+    "tiebreakNote": "Jogos individuais podem empatar, então uma série pode terminar empatada em qualquer formato. No mata-mata sempre há desempate; em liga, grupos e suíço, o resultado fica registrado como empate."
   },
   "adminHelp": {
     "notifyFailed": "Não foi possível avisar os admins",

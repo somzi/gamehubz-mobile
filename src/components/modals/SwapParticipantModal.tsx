@@ -579,9 +579,7 @@ export function SwapParticipantModal({
 
                                 {selected && eligibility.playedMatches > 0 && (
                                     <Text className="text-slate-500 text-[11px] text-center mb-3 leading-4">
-                                        {selected.username} inherits {eligibility.playedMatches}{' '}
-                                        {t('swap.playedMatch', { count: eligibility.playedMatches })} and the
-                                        standings that go with them.
+                                        {t('swap.inheritsSummary', { name: selected.username, count: eligibility.playedMatches })}
                                     </Text>
                                 )}
 

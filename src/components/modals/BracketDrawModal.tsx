@@ -301,8 +301,7 @@ export function BracketDrawModal({
     const problem = useMemo(() => {
         if (step !== 'arrange' || !options) return null;
         if (unassigned.length > 0) {
-            const noun = options.isTeamTournament ? 'team' : 'player';
-            return t('stillToPlace', { count: unassigned.length, noun });
+            return t(options.isTeamTournament ? 'stillToPlaceTeams' : 'stillToPlacePlayers', { count: unassigned.length });
         }
         if (bucketKind === 'pot') {
             const bad = buckets.findIndex((b, i) => b.length !== potTarget(i));

@@ -107,7 +107,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                             <View>
                                 <Text className="text-xl font-bold text-foreground">{t('app.allHighlights')}</Text>
                                 <Text className="text-xs text-muted-foreground mt-0.5">
-                                    {paginatedActivities.length} {paginatedActivities.length === 1 ? 'activity' : 'activities'}
+                                    {t('app.activitiesCount', { count: paginatedActivities.length })}
                                 </Text>
                             </View>
                         </View>

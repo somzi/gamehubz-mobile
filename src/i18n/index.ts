@@ -13,11 +13,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import en from './locales/en';
 import es from './locales/es';
 import pt from './locales/pt';
+import pl from './locales/pl';
 
 /** Key under which the user's explicit language choice is persisted. */
 export const STORAGE_KEY_LANGUAGE = 'app_language';
 
-export type LanguageCode = 'en' | 'es' | 'pt';
+export type LanguageCode = 'en' | 'es' | 'pt' | 'pl';
 
 export interface LanguageOption {
     code: LanguageCode;
@@ -32,6 +33,7 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
     // The resource set is written in Brazilian Portuguese, so the flag and label say so
     // rather than implying a pt-PT translation we don't have. 'pt-PT' still resolves here.
     { code: 'pt', label: 'Português (BR)', flag: '🇧🇷' },
+    { code: 'pl', label: 'Polski', flag: '🇵🇱' },
 ];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
@@ -43,6 +45,7 @@ const resources = {
     en,
     es,
     pt,
+    pl,
 };
 
 const namespaces = Object.keys(en);
@@ -60,7 +63,7 @@ i18n.use(initReactI18next).init({
     fallbackLng: DEFAULT_LANGUAGE,
     defaultNS: 'common',
     ns: namespaces,
-    // A key missing from `es`/`pt` falls back to the `en` value rather than rendering the
+    // A key missing from a translation falls back to the `en` value rather than rendering the
     // key itself. This is what lets Phase 2 ship screen-by-screen over OTA without a
     // half-translated build ever showing "settings.title" to a user.
     fallbackNS: false,

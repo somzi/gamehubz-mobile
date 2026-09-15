@@ -111,6 +111,8 @@
     "allow": "Permitir",
     "maybeLater": "Quizá más tarde",
     "allHighlights": "Todos los destacados",
+    "activitiesCount_one": "{{count}} actividad",
+    "activitiesCount_other": "{{count}} actividades",
     "noMoreActivities": "No hay más actividad para cargar",
     "noHighlightsYet": "Aún no hay destacados",
     "noHighlightsHint": "La actividad de los hubs y las novedades de los torneos aparecerán aquí",

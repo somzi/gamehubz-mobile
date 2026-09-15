@@ -1,0 +1,50 @@
+{
+  "title": "Powiadomienia",
+  "tabs": {
+    "all": "Wszystkie",
+    "action": "Do zrobienia",
+    "update": "Aktualności"
+  },
+  "sections": {
+    "today": "Dzisiaj",
+    "yesterday": "Wczoraj"
+  },
+  "markAllRead": "Oznacz wszystkie jako przeczytane",
+  "confirmMarkAll": {
+    "title": "Oznaczyć wszystkie jako przeczytane?",
+    "all_one": "{{count}} nieprzeczytane powiadomienie zostanie oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "all_few": "Wszystkie nieprzeczytane powiadomienia ({{count}}) zostaną oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "all_many": "Wszystkie nieprzeczytane powiadomienia ({{count}}) zostaną oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "all_other": "Wszystkie nieprzeczytane powiadomienia ({{count}}) zostaną oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "tab_one": "{{count}} nieprzeczytane powiadomienie w zakładce {{tab}} zostanie oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "tab_few": "Nieprzeczytane powiadomienia w zakładce {{tab}} ({{count}}) zostaną oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "tab_many": "Nieprzeczytane powiadomienia w zakładce {{tab}} ({{count}}) zostaną oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "tab_other": "Nieprzeczytane powiadomienia w zakładce {{tab}} ({{count}}) zostaną oznaczone jako przeczytane. Nie można tego cofnąć.",
+    "confirm": "Oznacz jako przeczytane"
+  },
+  "opensOutside": "Otwiera się poza aplikacją",
+  "footer": "To wszystko. Powiadomienia są przechowywane przez {{days}} dni.",
+  "empty": {
+    "allTitle": "Jesteś na bieżąco",
+    "allHint": "Przypomnienia o meczach, wyniki i prośby pojawią się tutaj.",
+    "actionTitle": "Teraz nic na Ciebie nie czeka",
+    "actionHint": "Tutaj trafią potwierdzenia gotowości, wyniki do zatwierdzenia i prośby o dołączenie.",
+    "updateTitle": "Brak aktualności",
+    "updateHint": "Tutaj pojawią się wieści z turniejów oraz zmiany w drużynach i hubach."
+  },
+  "error": {
+    "title": "Nie udało się wczytać powiadomień",
+    "hint": "Sprawdź połączenie i spróbuj ponownie."
+  },
+  "bell": {
+    "a11y": "Powiadomienia",
+    "a11yNew_one": "Powiadomienia, {{count}} nowe",
+    "a11yNew_few": "Powiadomienia, {{count}} nowe",
+    "a11yNew_many": "Powiadomienia, {{count}} nowych",
+    "a11yNew_other": "Powiadomienia, {{count}} nowego"
+  },
+  "a11y": {
+    "unread": "Nieprzeczytane",
+    "opensOutside": "Otwiera link poza aplikacją"
+  }
+}

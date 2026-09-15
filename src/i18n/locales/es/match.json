@@ -274,7 +274,7 @@
     "groupStage": "Fase de grupos",
     "matchFormat": "Formato del partido",
     "phaseFormat": "Formato de {{phase}}",
-    "appliesToEveryGame": "Se aplica a cada partido individual dentro de una serie — la serie en sí se decide por",
+    "appliesToEveryGame": "Se aplica a cada partido individual dentro de una serie — la serie en sí se decide por su propia condición de victoria.",
     "seriesDecidedBy": "La serie se decide por",
     "gamesWon": "Partidos ganados",
     "totalScore": "Puntuación total",
@@ -284,9 +284,10 @@
     "sameAsPhase": "Igual que {{phase}}",
     "different": "Diferente",
     "knockoutSameHint": "Los partidos eliminatorios se juegan con la misma extensión que {{phase}}.",
+    "perRoundOverride": "Cada ronda se puede seguir cambiando por separado una vez creado el cuadro.",
     "knockoutTiebreak": "Desempate de la eliminatoria",
     "sameFormat": "Mismo formato",
-    "tiebreakNote": "Los partidos individuales pueden empatar, así que una serie puede terminar igualada en cualquier formato. La eliminatoria"
+    "tiebreakNote": "Los partidos individuales pueden empatar, así que una serie puede terminar igualada en cualquier formato. En la eliminatoria siempre se juega un desempate; en liga, grupos y sistema suizo se registra como empate."
   },
   "adminHelp": {
     "notifyFailed": "No se pudo avisar a los administradores",

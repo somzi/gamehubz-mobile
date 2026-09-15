@@ -274,7 +274,7 @@
     "groupStage": "Group Stage",
     "matchFormat": "Match Format",
     "phaseFormat": "{{phase}} Format",
-    "appliesToEveryGame": "Applies to every individual game inside a tie — the tie itself is still decided by",
+    "appliesToEveryGame": "Applies to every individual game inside a tie — the tie itself is still decided by its own win condition.",
     "seriesDecidedBy": "Series Decided By",
     "gamesWon": "Games Won",
     "totalScore": "Total Score",
@@ -284,9 +284,10 @@
     "sameAsPhase": "Same as {{phase}}",
     "different": "Different",
     "knockoutSameHint": "Knockout matches are played over the same length as the {{phase}}.",
+    "perRoundOverride": "Each round can still be changed on its own once the bracket exists.",
     "knockoutTiebreak": "Knockout Tiebreak",
     "sameFormat": "Same Format",
-    "tiebreakNote": "Individual games may be drawn, so a series can end level at any format. Knockout"
+    "tiebreakNote": "Individual games may be drawn, so a series can end level at any format. Knockout matches always go to a tiebreak; league, group and Swiss matches record it as a draw."
   },
   "adminHelp": {
     "notifyFailed": "Failed to notify admins",

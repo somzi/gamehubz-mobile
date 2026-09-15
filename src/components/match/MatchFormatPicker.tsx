@@ -89,10 +89,7 @@ export function MatchFormatPicker({
                 <Text className={FIELD_HINT}>{bestOfInlineDescription(bestOf, winCondition)}</Text>
 
                 {isTeamTournament && (
-                    <Text className={FIELD_HINT}>
-                        {t('formatPicker.appliesToEveryGame')}
-                        its own win condition.
-                    </Text>
+                    <Text className={FIELD_HINT}>{t('formatPicker.appliesToEveryGame')}</Text>
                 )}
             </View>
 
@@ -146,7 +143,7 @@ export function MatchFormatPicker({
                         {knockoutBestOf == null
                             ? t('formatPicker.knockoutSameHint', { phase: phaseLabel.toLowerCase() })
                             : bestOfInlineDescription(effectiveKnockoutBestOf, winCondition)}
-                        {' '}Each round can still be changed on its own once the bracket exists.
+                        {' '}{t('formatPicker.perRoundOverride')}
                     </Text>
                 </View>
             )}
@@ -185,7 +182,6 @@ export function MatchFormatPicker({
                         <Ionicons name="information-circle-outline" size={15} color="#64748B" style={{ marginTop: 1 }} />
                         <Text className="flex-1 text-[11px] text-slate-500 leading-4">
                             {t('formatPicker.tiebreakNote')}
-                            matches always go to a tiebreak; league, group and Swiss matches record it as a draw.
                         </Text>
                     </View>
                 </View>
