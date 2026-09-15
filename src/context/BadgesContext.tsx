@@ -7,7 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { useAuth } from './AuthContext';
 import { BadgeCounts, ApprovalsBreakdown, TournamentApprovalCount, HubApprovalCount } from '../types/social';
-import { NOTIFICATIONS_KEY, NOTIFICATION_SUMMARY_KEY } from '../lib/notificationsApi';
+import { NOTIFICATIONS_KEY, NOTIFICATION_SUMMARY_KEY, acceptHubSummary } from '../lib/notificationsApi';
 import type { NotificationSummary } from '../types/notifications';
 
 const EMPTY_BADGES: BadgeCounts = {
@@ -183,6 +183,9 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
         // Inbox counters ride the same connection — it is the app's only per-user channel.
         connection.on('NotificationsUpdated', (next: NotificationSummary) => {
             if (!active || !next) return;
+            // A mark-read / seen from this device is still waiting for its answer: this push may be
+            // older than that answer, so it is held and reconciled when the write settles.
+            if (!acceptHubSummary(next)) return;
             const previous = queryClient.getQueryData<NotificationSummary>(NOTIFICATION_SUMMARY_KEY);
             queryClient.setQueryData(NOTIFICATION_SUMMARY_KEY, next);
             // Counters that moved without this device moving them mean new rows, or rows read on
@@ -204,6 +207,10 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
             if (!active) return;
             refresh();
             queryClient.invalidateQueries({ queryKey: NOTIFICATION_SUMMARY_KEY });
+            // The pages too, not just the counters: a notification that arrived during the outage
+            // would otherwise be counted on the bell but missing from an inbox left open. Only a
+            // mounted inbox refetches; cached tabs are just marked stale.
+            queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
         });
 
         connection.start()

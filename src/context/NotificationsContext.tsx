@@ -8,8 +8,10 @@ import {
     EMPTY_NOTIFICATION_SUMMARY,
     NOTIFICATIONS_KEY,
     NOTIFICATION_SUMMARY_KEY,
+    beginSummaryWrite,
     fetchNotificationSummary,
     postNotificationWrite,
+    settleSummaryWrite,
 } from '../lib/notificationsApi';
 import {
     NotificationCategory,
@@ -120,9 +122,11 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             }
         }
 
+        // Two-callback then, not then/catch: a throw inside the success path must not settle twice.
+        const seq = beginSummaryWrite();
         postNotificationWrite(ENDPOINTS.MARK_NOTIFICATION_READ(id))
-            .then(setSummary)
-            .catch((error) => {
+            .then((next) => settleSummaryWrite(queryClient, seq, next), (error) => {
+                settleSummaryWrite(queryClient, seq);
                 console.warn('[Notifications] mark read failed:', error);
                 // Undo only what this call did — restoring a whole snapshot could clobber a refetch
                 // that landed in the meantime.
@@ -148,9 +152,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             ));
         }
 
+        const seq = beginSummaryWrite();
         postNotificationWrite(ENDPOINTS.MARK_ALL_NOTIFICATIONS_READ(filter))
-            .then(setSummary)
-            .catch((error) => {
+            .then((next) => settleSummaryWrite(queryClient, seq, next), (error) => {
+                settleSummaryWrite(queryClient, seq);
                 console.warn('[Notifications] mark all read failed:', error);
                 patchRows(queryClient, (item) => item.readOn === readOn, (item) => ({ ...item, readOn: null }));
                 queryClient.invalidateQueries({ queryKey: NOTIFICATION_SUMMARY_KEY });
@@ -165,11 +170,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         seenInFlight.current = true;
         setSummary({ ...current, unseen: 0 });
 
+        const seq = beginSummaryWrite();
         postNotificationWrite(ENDPOINTS.MARK_NOTIFICATIONS_SEEN)
-            .then(setSummary)
-            // No rollback: the bell would light straight back up while the user is looking at the
-            // inbox. The next server summary (live push, foreground, reconnect) settles it either way.
-            .catch((error) => console.warn('[Notifications] mark seen failed:', error))
+            .then((next) => settleSummaryWrite(queryClient, seq, next), (error) => {
+                settleSummaryWrite(queryClient, seq);
+                // No rollback: the bell would light straight back up while the user is looking at the
+                // inbox. The next server summary (live push, foreground, reconnect) settles it either way.
+                console.warn('[Notifications] mark seen failed:', error);
+            })
             .finally(() => { seenInFlight.current = false; });
     }, [queryClient, setSummary]);
 

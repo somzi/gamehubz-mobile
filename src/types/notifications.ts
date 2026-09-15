@@ -26,6 +26,8 @@ export interface NotificationPage {
     items: NotificationItem[];
     /** Pass back as `before` for the next (older) page; null at the end. */
     nextCursor: string | null;
+    /** Days the server keeps a notification. Absent from a backend older than this field. */
+    retentionDays?: number;
 }
 
 /** Mirrors backend NotificationSummaryDto. */

@@ -32,8 +32,9 @@ import type { NotificationFilter, NotificationItem, NotificationPage } from '../
 
 type NotificationsNavigationProp = StackNavigationProp<RootStackParamList>;
 
-// The backend's default Notifications:RetentionDays — quoted in the end-of-list footer.
-const RETENTION_DAYS = 60;
+// Footer fallback only: the page itself reports the server's Notifications:RetentionDays, and this is
+// the backend default for a server that predates that field.
+const DEFAULT_RETENTION_DAYS = 60;
 const SKELETON_ROWS = 6;
 const ROW_GAP = 8;
 
@@ -255,7 +256,7 @@ export default function NotificationsScreen() {
     } else if (sections.length > 0 && !hasNextPage) {
         footer = (
             <Text className="text-slate-600 text-[11px] text-center leading-4 pt-6 px-10">
-                {t('footer', { days: RETENTION_DAYS })}
+                {t('footer', { days: data?.pages[0]?.retentionDays ?? DEFAULT_RETENTION_DAYS })}
             </Text>
         );
     }

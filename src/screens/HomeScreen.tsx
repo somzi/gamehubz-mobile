@@ -84,7 +84,7 @@ const byDeadline = (a: MatchOverviewDto, b: MatchOverviewDto) => {
 };
 
 export default function HomeScreen() {
-    const { t } = useTranslation('home');
+    const { t, i18n } = useTranslation('home');
     const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const { user } = useAuth();
@@ -219,14 +219,17 @@ export default function HomeScreen() {
         if (h < 12) return t('greetMorning');
         if (h < 17) return t('greetAfternoon');
         return t('greetEvening');
-    }, []);
+        // `t` alone does not change identity on a language switch; the language is the real input.
+    }, [t, i18n.language]);
 
     const dateLabel = useMemo(() => {
         const d = new Date();
         const day = d.toLocaleDateString(dateLocale(), { weekday: 'short' });
         const monthDay = d.toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' });
         return `${day.toUpperCase()} · ${monthDay.toUpperCase()}`;
-    }, []);
+        // dateLocale() reads the active language, so it is a dependency even though it is not referenced.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [i18n.language]);
 
     const sortedActiveMatches = useMemo(() => {
         return [...myMatches].sort((a, b) => {
