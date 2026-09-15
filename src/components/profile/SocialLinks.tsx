@@ -72,9 +72,14 @@ export function SocialLinks({ links, className }: SocialLinksProps) {
     const handlePress = (link: SocialLink) => {
         if (link.platform === 'discord') {
             if (link.url && link.url !== '#') {
-                // Invite link — open Discord app or browser
+                // A discord.gg address is already Discord's own universal link: iOS and Android hand
+                // it to the app when it is installed and fall through to the browser when it is not,
+                // so there is nothing useful to attempt ahead of it. The previous "fallback" retried
+                // the identical URL and then swallowed the failure into console.error — which App.tsx
+                // replaces with a no-op in release builds, so a link that could not open did nothing
+                // and said nothing. Tell the user instead.
                 Linking.openURL(link.url).catch(() =>
-                    Linking.openURL(link.url!).catch((err) => console.error("Couldn't open Discord", err))
+                    Alert.alert(t('socialModal.linkFailedTitle'), t('socialModal.linkFailedBody'))
                 );
             } else {
                 // Plain username — share/copy
@@ -83,7 +88,10 @@ export function SocialLinks({ links, className }: SocialLinksProps) {
             return;
         }
         if (link.url && link.url !== '#') {
-            Linking.openURL(link.url).catch((err) => console.error("Couldn't load page", err));
+            // Same reasoning as the Discord branch: a silenced console.error is not a failure path.
+            Linking.openURL(link.url).catch(() =>
+                Alert.alert(t('socialModal.linkFailedTitle'), t('socialModal.linkFailedBody'))
+            );
         }
     };
 

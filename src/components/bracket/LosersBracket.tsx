@@ -6,6 +6,7 @@ import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
 import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
+import { MatchStatus, isPlayableMatchStatus } from '../../types/matchStatus';
 
 // LB layout is a flat column-per-round grid: match counts don't halve cleanly between rounds
 // (a "minor" consolidation round is followed by a "major" round with the same count once a
@@ -75,8 +76,8 @@ type RoundStatus = 'completed' | 'active' | 'upcoming';
 
 function getRoundStatus(round: Round): RoundStatus {
     if (!round.matches.length) return 'upcoming';
-    if (round.matches.every(m => m.status === 3 || m.status === 4)) return 'completed';
-    if (round.matches.some(m => m.status === 1 || m.status === 2)) return 'active';
+    if (round.matches.every(m => m.status === MatchStatus.Completed)) return 'completed';
+    if (round.matches.some(m => isPlayableMatchStatus(m.status))) return 'active';
     return 'upcoming';
 }
 

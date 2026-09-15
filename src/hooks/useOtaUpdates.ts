@@ -116,6 +116,13 @@ export function useOtaUpdates(canReportDiagnostics: boolean) {
 
         const syncAndMaybeReload = async (awayMs: number) => {
             try {
+                // Cheapest gate first. This used to sit below the download, so every flick out to
+                // another app and straight back — the commonest resume there is — spent a round-trip
+                // on the update server, and sometimes a whole bundle download, for a reload that the
+                // very next line then refused. Nothing is lost by leaving early: this function only
+                // ever runs on resume, so the next qualifying resume does the check instead.
+                if (awayMs < MIN_BACKGROUND_MS) return;
+
                 if (!updateReadyRef.current) {
                     const check = await Updates.checkForUpdateAsync();
 
@@ -132,7 +139,6 @@ export function useOtaUpdates(canReportDiagnostics: boolean) {
 
                 // Ready, but not at any price. Every one of these means "keep it and apply it
                 // at a better moment" — the download is not lost either way.
-                if (awayMs < MIN_BACKGROUND_MS) return;
                 if (reloadedThisProcess) return;
                 if (AppState.currentState !== 'active') return;
                 if (Date.now() - lastTapAtRef.current < NOTIFICATION_WAKE_WINDOW_MS) return;

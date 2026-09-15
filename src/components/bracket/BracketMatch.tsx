@@ -7,6 +7,7 @@ import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { MatchStatus, isPlayableMatchStatus } from '../../types/matchStatus';
 
 interface Participant {
     participantId: string;
@@ -96,7 +97,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     // every game played and still no result — that is exactly when the running score matters most.
     const isTeamInProgress = !!teamProgress
         && teamProgress.decided > 0
-        && status !== 3 && status !== 4;
+        && status !== MatchStatus.Completed;
 
     const handlePlayerClick = (userId: string) => {
         if (onPress) {
@@ -108,7 +109,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
 
     // A completed match with exactly one side is a bye (Swiss free win / walkover) —
     // label the empty slot BYE instead of TBD since nobody is coming.
-    const isCompletedBye = (status === 3 || status === 4) && (!home !== !away);
+    const isCompletedBye = status === MatchStatus.Completed && (!home !== !away);
 
     const renderParticipant = (participant: Participant | null, position: 'top' | 'bottom') => {
         const isTop = position === 'top';
@@ -228,26 +229,44 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
 
     const hasScore = (p: any) => p?.score !== null && p?.score !== undefined;
     const isAlreadyReported = hasScore(home) || hasScore(away);
-    const isCompleted = status === 3 || status === 4;
+    // Completed only. This used to read `status === 3 || status === 4`, and 3 is Live, not a second
+    // spelling of Completed — a match under way would have rendered as finished and lost its Report
+    // Result button (canReport below requires Pending/Scheduled). Safe to drop rather than preserve:
+    // the backend never assigns Live, so no row has ever carried it.
+    const isCompleted = status === MatchStatus.Completed;
     // Backend MatchStatus.NoShow (5): a group/league/Swiss fixture the admin closed as a double
     // forfeit — nobody played, nobody scored points. Terminal like Completed, rendered distinctly.
-    const isNoShow = status === 5;
+    const isNoShow = status === MatchStatus.NoShow;
     // Double walkover: a completed elimination match with both players present, no winner and no
     // scores. Both no-showed, so neither advanced (their opponent went through unopposed). The
     // no-score guard separates it from a legitimate scored draw.
     const isDoubleWalkover = isCompleted && !!home && !!away && !home.isWinner && !away.isWinner
         && !hasScore(home) && !hasScore(away);
-    const isLive = status === 2;
+    // Renamed, not re-pointed: this has always been Scheduled (2), and what it renders is
+    // t('card.scheduled'). Calling it isScheduled while comparing against Scheduled is what made the
+    // isCompleted bug above easy to miss. Live (3) has no rendering of its own and, since the
+    // backend never sets it, needs none — it now falls through to the neutral state instead of
+    // masquerading as finished.
+    const isScheduled = status === MatchStatus.Scheduled;
     // MatchStatus.TieBreakRequired (6): the series was reported but finished level, so the match is
     // played-but-undecided and still owes a tiebreak. Terminal for neither side.
-    const isTieBreakNeeded = status === 6;
+    const isTieBreakNeeded = status === MatchStatus.TieBreakRequired;
     // A pending proposal trumps any other in-progress state — surface it clearly so participants
     // know they're waiting on an approval and not on the actual match.
     const isAwaitingApproval = !isCompleted && !isNoShow && !!proposedByUserId;
 
     // NoShow stays openable: the admin can still enter a late real result (or undo) from the modal.
     // TieBreakRequired likewise — that is where the tiebreak games get reported.
-    const canShowDetails = !!onPress && !!home && !!away && (status === 1 || status === 2 || status === 3 || status === 4 || status === 5 || status === 6);
+    // Spelled out rather than a numeric range: `status` is optional, and a range check would also
+    // silently swallow any value the backend adds to the enum later.
+    const canShowDetails = !!onPress && !!home && !!away && (
+        status === MatchStatus.Pending
+        || status === MatchStatus.Scheduled
+        || status === MatchStatus.Live
+        || status === MatchStatus.Completed
+        || status === MatchStatus.NoShow
+        || status === MatchStatus.TieBreakRequired
+    );
 
     // A ready check still owed: nobody may report yet — either the missing side turns up, or the
     // match is settled by forfeit. Showing "Report Result" here would offer something the server
@@ -261,13 +280,13 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     // A tiebreak-pending match keeps its CTA despite already having a score: the reported series is
     // exactly what makes the next games necessary.
     const canReport = canShowDetails && !isAwaitingApproval && !checkInPending && canUserReport
-        && (isTieBreakNeeded || (!isAlreadyReported && (status === 2 || status === 1)));
+        && (isTieBreakNeeded || (!isAlreadyReported && isPlayableMatchStatus(status)));
 
     // The check-in banner is for the two players; an organizer scanning the bracket sees the
     // scheduled state as before.
     const showCheckIn = checkInPending && isParticipant && !isCompleted && !isNoShow;
 
-    const glow = canReport || isLive ? '#10B981' : isAwaitingApproval || showCheckIn ? '#F59E0B' : null;
+    const glow = canReport || isScheduled ? '#10B981' : isAwaitingApproval || showCheckIn ? '#F59E0B' : null;
 
     return (
         <Pressable
@@ -298,14 +317,14 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
             )}
 
             {/* Status / action header */}
-            {(canReport || isAwaitingApproval || showCheckIn || isLive || isCompleted || isNoShow || isTeamInProgress || isTieBreakNeeded) && (
+            {(canReport || isAwaitingApproval || showCheckIn || isScheduled || isCompleted || isNoShow || isTeamInProgress || isTieBreakNeeded) && (
                 <View className={cn(
                     "flex-row items-center justify-between px-4 py-2",
                     canReport
                         ? "bg-emerald-500/[0.08]"
                         : showCheckIn || isAwaitingApproval || isNoShow
                             ? "bg-warning/[0.10]"
-                            : isLive || isTeamInProgress
+                            : isScheduled || isTeamInProgress
                                 ? "bg-emerald-500/[0.06]"
                                 : "bg-white/[0.02]"
                 )}>
@@ -373,7 +392,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
                             <Ionicons name="chevron-forward" size={11} color="#F59E0B" />
                         </>
                     )}
-                    {!canReport && !isAwaitingApproval && !showCheckIn && !isTeamInProgress && isLive && (
+                    {!canReport && !isAwaitingApproval && !showCheckIn && !isTeamInProgress && isScheduled && (
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name="time-outline" size={11} color="#34D399" />
                             <Text numberOfLines={1} className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">

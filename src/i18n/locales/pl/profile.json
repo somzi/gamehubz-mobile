@@ -75,7 +75,9 @@
     "discordPlaceholder": "nazwa#0000",
     "tiktokUsername": "Nazwa użytkownika TikTok",
     "instagramUsername": "Nazwa użytkownika Instagram",
-    "handlePlaceholder": "@nazwa"
+    "handlePlaceholder": "@nazwa",
+    "linkFailedTitle": "Nie udało się otworzyć linku",
+    "linkFailedBody": "Żadna aplikacja na tym urządzeniu nie może otworzyć tego linku."
   },
   "friend": {
     "thisUser": "(bez nazwy)",

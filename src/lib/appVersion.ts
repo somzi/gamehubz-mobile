@@ -12,6 +12,16 @@ export interface AppVersionCheck {
 const PLAY_STORE_WEB_URL = 'https://play.google.com/store/apps/details?id=com.codespheresolutions.gamehubzmobile';
 const PLAY_STORE_APP_URL = 'market://details?id=com.codespheresolutions.gamehubzmobile';
 
+// The iOS equivalents, and the reason they are hardcoded: the update screen is the one place the
+// app must not depend on server config to be useful. When ShareLinks:AppStoreUrl is unset the
+// backend sends iosStoreUrl: null, and the old fallback ("itms-apps://apps.apple.com") opened the
+// App Store's *front page* — a gated user had one button and it did not lead to the update.
+// No country segment on purpose: apps.apple.com/app/id… redirects to the viewer's own storefront,
+// which matters for an app shipping in seven languages. A hardcoded /rs/ would send everyone to
+// the Serbian store.
+const APP_STORE_WEB_URL = 'https://apps.apple.com/app/id6760719022';
+const APP_STORE_APP_URL = 'itms-apps://apps.apple.com/app/id6760719022';
+
 /**
  * The installed build's version. With runtimeVersion "appVersion" an OTA update only ever reaches builds
  * of the same version, so the version the running bundle was published with IS the installed build's —
@@ -70,7 +80,14 @@ export async function fetchVersionCheck(signal?: AbortSignal): Promise<AppVersio
  */
 export async function openStorePage(check: AppVersionCheck): Promise<void> {
     if (Platform.OS === 'ios') {
-        await Linking.openURL(check.iosStoreUrl || 'itms-apps://apps.apple.com').catch(() => { /* nothing more to try */ });
+        // Mirrors the Android branch below: try the App Store app first, fall back to the web
+        // listing. Both point at the real GameHubz page whether or not the server supplied one.
+        const configuredIos = check.iosStoreUrl || APP_STORE_WEB_URL;
+        try {
+            await Linking.openURL(configuredIos.startsWith('https://apps.apple.com') ? APP_STORE_APP_URL : configuredIos);
+        } catch {
+            await Linking.openURL(configuredIos).catch(() => { /* nothing more to try */ });
+        }
         return;
     }
 

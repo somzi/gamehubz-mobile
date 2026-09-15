@@ -92,7 +92,9 @@
     "instagramUsername": "Ім’я в Instagram",
     "socialLinks": "СОЦМЕРЕЖІ",
     "tiktokUsername": "Ім’я в TikTok",
-    "title": "Редагувати профіль"
+    "title": "Редагувати профіль",
+    "linkFailedTitle": "Не вдалося відкрити посилання",
+    "linkFailedBody": "На цьому пристрої немає застосунку, який відкриє це посилання."
   },
   "tabMatches": "Матчі",
   "tabStats": "Статистика",

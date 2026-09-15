@@ -75,7 +75,9 @@
     "discordPlaceholder": "korisnik#0000",
     "tiktokUsername": "TikTok korisničko ime",
     "instagramUsername": "Instagram korisničko ime",
-    "handlePlaceholder": "@korisnik"
+    "handlePlaceholder": "@korisnik",
+    "linkFailedTitle": "Link nije moguće otvoriti",
+    "linkFailedBody": "Nijedna aplikacija na uređaju ne može da otvori taj link."
   },
   "friend": {
     "thisUser": "(bez imena)",

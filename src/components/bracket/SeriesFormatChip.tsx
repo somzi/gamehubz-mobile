@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
 import { SeriesWinCondition, SeriesWinConditionValue, seriesFormatFrom, seriesGamesFrom } from '../../lib/series';
+import { MatchStatus } from '../../types/matchStatus';
 
 export interface RoundSeriesFormat {
     bestOf: number;
@@ -17,7 +18,7 @@ function isFormatLocked(match: any): boolean {
     // Completed (3/4), NoShow (5) and TieBreakRequired (6) are all past the point of re-formatting.
     return seriesGamesFrom(match).length > 0
         || !!(match?.proposedByUserId ?? match?.ProposedByUserId)
-        || status === 3 || status === 4 || status === 5 || status === 6;
+        || status === MatchStatus.Completed || status === MatchStatus.NoShow || status === MatchStatus.TieBreakRequired;
 }
 
 /**

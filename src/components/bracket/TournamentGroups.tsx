@@ -9,6 +9,7 @@ import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
 import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
+import { isTerminalMatchStatus } from '../../types/matchStatus';
 
 interface Standing {
     position: number;
@@ -295,7 +296,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                         />
                                     )}
                                     {/* Deadline + Edit Schedule row (only if deadline exists or admin) */}
-                                    {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4 || m.status === 5)))) && (
+                                    {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => isTerminalMatchStatus(m.status))))) && (
                                         <View className="flex-row items-center justify-between px-1 mb-4">
                                             {currentRoundMatches[0]?.roundDeadline ? (
                                                 <View className="flex-row items-center gap-1.5">
@@ -305,7 +306,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                                     </Text>
                                                 </View>
                                             ) : <View />}
-                                            {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => m.status === 3 || m.status === 4 || m.status === 5)) && (
+                                            {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => isTerminalMatchStatus(m.status))) && (
                                                 <Pressable
                                                     onPress={() => onEditDeadline?.({ roundNumber: Number(activeRound), roundDeadline: currentRoundMatches[0]?.roundDeadline, roundOpenAt: currentRoundMatches[0]?.matchOpensAt })}
                                                     className="flex-row items-center gap-1 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 active:opacity-70"
