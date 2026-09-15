@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
-import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
+import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
 import { useTrailingDebounce } from '../../hooks/useTrailingDebounce';
@@ -43,6 +43,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const [newComment, setNewComment] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [sendError, setSendError] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const [loadingEarlier, setLoadingEarlier] = useState(false);
     const listRef = useRef<FlatList<MatchComment>>(null);
@@ -233,7 +234,20 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         // so a message is never silently lost either.
         setNewComment('');
 
+        const restoreFailedComment = () => {
+            // Preserve both drafts in chronological order when the user has already started
+            // the next message during the request. Restoring only into an empty composer made
+            // the failed message disappear in exactly that case.
+            setNewComment((current) => current.length === 0 ? content : `${content}\n${current}`);
+        };
+
+        const showSendError = (message: string) => {
+            setSendError(message);
+            Alert.alert(t('chat.messageNotSent'), message);
+        };
+
         try {
+            setSendError(null);
             const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
                 method: 'POST',
                 body: JSON.stringify({ content }),
@@ -244,13 +258,14 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 }
                 setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
             } else {
-                // Only restore into an empty box: whatever the user has started typing since
-                // outranks the message that failed.
-                setNewComment((current) => (current.length === 0 ? content : current));
+                const body = await response.text().catch(() => '');
+                restoreFailedComment();
+                showSendError(getErrorMessage(body) || t('chat.couldNotSend'));
             }
         } catch (error) {
             console.error('[MatchChatPanel] Error sending comment:', error);
-            setNewComment((current) => (current.length === 0 ? content : current));
+            restoreFailedComment();
+            showSendError(getErrorMessage(error) || t('chat.couldNotSend'));
         } finally {
             sendingRef.current = false;
             setIsSending(false);
@@ -392,6 +407,26 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 </View>
             ) : (
             <View className="py-3 border-t border-white/5">
+                {sendError && (
+                    <View
+                        accessibilityRole="alert"
+                        className="flex-row items-center bg-red-500/10 border border-red-500/25 rounded-2xl px-3 py-2 mb-2"
+                    >
+                        <Ionicons name="alert-circle" size={16} color="#F87171" />
+                        <Text className="text-red-300 text-xs font-bold flex-1 ml-2" numberOfLines={2}>
+                            {sendError}
+                        </Text>
+                        <Pressable
+                            onPress={() => setSendError(null)}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('common:close')}
+                            className="ml-2"
+                        >
+                            <Ionicons name="close" size={14} color="#F87171" />
+                        </Pressable>
+                    </View>
+                )}
                 <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
                     <TextInput
                         ref={inputRef}

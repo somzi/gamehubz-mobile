@@ -139,6 +139,8 @@ export const ParticipantRow = React.memo(function ParticipantRow({
                         avatarUrl,
                     })}
                     disabled={actionsDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel="Swap participant"
                     className="w-11 h-11 rounded-2xl items-center justify-center active:opacity-60"
                     style={{
                         backgroundColor: 'rgba(129,140,248,0.10)',
@@ -156,6 +158,8 @@ export const ParticipantRow = React.memo(function ParticipantRow({
                         username: username || t('details.thisPlayer'),
                     })}
                     disabled={actionsDisabled}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove participant"
                     className="w-11 h-11 rounded-2xl bg-red-500/10 items-center justify-center border border-red-500/20 active:opacity-60"
                 >
                     {isProcessing ? (

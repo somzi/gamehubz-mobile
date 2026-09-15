@@ -245,6 +245,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import i18n, { getRequestLanguage } from '../i18n';
+import { updateServerClockFromDateHeader } from './serverClock';
 
 // Sent on every request so server-side ErrorLog rows record which app build/platform hit
 // the bug — set once at startup.
@@ -274,6 +275,7 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
+    (config as typeof config & { serverClockRequestStartedAt?: number }).serverClockRequestStartedAt = Date.now();
     config.headers['X-App-Version'] = APP_VERSION;
     config.headers['X-Platform'] = APP_PLATFORM;
     config.headers['Language'] = getRequestLanguage();
@@ -317,10 +319,12 @@ async function doRefresh(): Promise<string> {
     const accessToken = await SecureStore.getItemAsync('access_token');
     if (!refreshToken || !accessToken) throw new Error('Refresh failed');
 
+    const requestStartedAt = Date.now();
     const refreshResponse = await axios.post(`${API_BASE_URL}/api/Auth/refreshtoken`, {
         AccessToken: accessToken,
         RefreshToken: refreshToken,
     });
+    updateServerClockFromDateHeader(refreshResponse.headers?.date, requestStartedAt);
 
     const data = refreshResponse.data;
     const newAccess = data?.accessToken?.token || data?.accessToken || data?.AccessToken;
@@ -333,8 +337,21 @@ async function doRefresh(): Promise<string> {
     return newAccess;
 }
 
-apiClient.interceptors.response.use((response) => response, async (error) => {
+apiClient.interceptors.response.use((response) => {
+    const requestStartedAt = (response.config as typeof response.config & {
+        serverClockRequestStartedAt?: number;
+    }).serverClockRequestStartedAt;
+    updateServerClockFromDateHeader(response.headers?.date, requestStartedAt);
+    return response;
+}, async (error) => {
     const originalRequest = error.config;
+
+    if (error.response) {
+        const requestStartedAt = (originalRequest as typeof originalRequest & {
+            serverClockRequestStartedAt?: number;
+        } | undefined)?.serverClockRequestStartedAt;
+        updateServerClockFromDateHeader(error.response.headers?.date, requestStartedAt);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {
@@ -410,13 +427,16 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             const doUpload = async (activeToken: string | null) => {
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), uploadTimeout);
+                const requestStartedAt = Date.now();
                 try {
-                    return await fetch(url, {
+                    const response = await fetch(url, {
                         method: options.method || 'POST',
                         headers: buildFormHeaders(activeToken),
                         body: options.body,
                         signal: controller.signal,
                     });
+                    updateServerClockFromDateHeader(response.headers.get('date'), requestStartedAt);
+                    return response;
                 } finally {
                     clearTimeout(timer);
                 }

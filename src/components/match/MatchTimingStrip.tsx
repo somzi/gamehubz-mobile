@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
 import { dateLocale } from '../../i18n';
+import { useServerClockOffset } from '../../hooks/useServerClockOffset';
 
 interface MatchTimingStripProps {
     /** Agreed match time as a raw backend timestamp — preferred, it renders as clock + date. */
@@ -115,16 +116,18 @@ export function MatchTimingStrip({
     className,
 }: MatchTimingStripProps) {
     const { t } = useTranslation('match');
+    const serverClockOffset = useServerClockOffset();
     const matchDate = useMemo(() => toDate(matchTimeIso), [matchTimeIso]);
     const deadlineDate = useMemo(() => toDate(deadline), [deadline]);
 
     // Keep the countdown honest while the screen stays open (the modal unmounts on close,
     // so the interval dies with it).
-    const [now, setNow] = useState(() => Date.now());
+    const [deviceNow, setDeviceNow] = useState(() => Date.now());
+    const now = deviceNow + serverClockOffset;
     const hasCountdown = !!deadlineDate || !!matchDate;
     useEffect(() => {
         if (!hasCountdown) return;
-        const id = setInterval(() => setNow(Date.now()), 60000);
+        const id = setInterval(() => setDeviceNow(Date.now()), 60000);
         return () => clearInterval(id);
     }, [hasCountdown]);
 
@@ -199,13 +202,15 @@ export function MatchDeadlineBar({
     className?: string;
 }) {
     const { t } = useTranslation('match');
+    const serverClockOffset = useServerClockOffset();
     const deadlineDate = useMemo(() => toDate(deadline), [deadline]);
 
     // Unlike the strip, this bar renders once per row of a list, so its tick is paced by how fast
     // the label it prints can actually change. describeRemaining only counts minutes inside the
     // last hour; above that it reads in hours and then days, and waking every row of Home once a
     // minute to re-render "3 days left" is work nobody sees.
-    const [now, setNow] = useState(() => Date.now());
+    const [deviceNow, setDeviceNow] = useState(() => Date.now());
+    const now = deviceNow + serverClockOffset;
     const msLeft = deadlineDate ? deadlineDate.getTime() - now : null;
     const tickMs = msLeft == null || msLeft <= 0
         ? null                       // no deadline, or already overdue — the label is final
@@ -215,7 +220,7 @@ export function MatchDeadlineBar({
 
     useEffect(() => {
         if (tickMs == null) return;
-        const id = setInterval(() => setNow(Date.now()), tickMs);
+        const id = setInterval(() => setDeviceNow(Date.now()), tickMs);
         return () => clearInterval(id);
     }, [tickMs]);
 

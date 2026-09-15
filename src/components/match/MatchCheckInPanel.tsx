@@ -9,6 +9,7 @@ import { COLORS } from '../../lib/theme';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { hapticError, hapticSuccess } from '../../lib/haptics';
 import { dateLocale } from '../../i18n';
+import { useServerClockOffset } from '../../hooks/useServerClockOffset';
 
 /** The ready-check state of a match, exactly as every backend payload carries it. */
 export interface MatchCheckInState {
@@ -51,9 +52,9 @@ const formatClock = (d: Date) =>
  * parsed. The clock alone is not enough for a window that opens days out: "opens at 19:45" on a
  * Saturday fixture reads as tonight, and that is the one misreading here that costs a match.
  */
-const formatStamp = (d: Date) => {
+const formatStamp = (d: Date, now: number) => {
     const time = formatClock(d);
-    if (d.toDateString() === new Date().toDateString()) return time;
+    if (d.toDateString() === new Date(now).toDateString()) return time;
 
     return `${d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })} ${time}`;
 };
@@ -134,6 +135,7 @@ function useCheckIn({
     onCheckedIn,
 }: Pick<MatchCheckInPanelProps, 'matchId' | 'enabled' | 'scheduledTimeIso' | 'state' | 'isHome' | 'onCheckedIn'>) {
     const { t } = useTranslation('match');
+    const serverClockOffset = useServerClockOffset();
 
     const [local, setLocal] = useState<MatchCheckInState>(state);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -156,7 +158,8 @@ function useCheckIn({
 
     const bothIn = !!homeIn && !!awayIn;
 
-    const [now, setNow] = useState(() => Date.now());
+    const [deviceNow, setDeviceNow] = useState(() => Date.now());
+    const now = deviceNow + serverClockOffset;
 
     const isOpen = !opensAt || now >= opensAt.getTime();
     const expired = !!deadline && now >= deadline.getTime() && !bothIn;
@@ -179,7 +182,7 @@ function useCheckIn({
     useEffect(() => {
         if (!enabled || !kickOff || bothIn || phase === 'over') return;
 
-        const id = setInterval(() => setNow(Date.now()), phase === 'live' ? 1000 : 60000);
+        const id = setInterval(() => setDeviceNow(Date.now()), phase === 'live' ? 1000 : 60000);
         return () => clearInterval(id);
     }, [enabled, kickOff, bothIn, phase]);
 
@@ -232,7 +235,7 @@ function useCheckIn({
     return {
         kickOff, opensAt, deadline, homeIn, awayIn, bothIn,
         isOpen, expired, mine, theirs, isPlayer, canPress,
-        remaining, critical, isSubmitting, error, submit,
+        now, remaining, critical, isSubmitting, error, submit,
     };
 }
 
@@ -252,7 +255,7 @@ export function MatchCheckInPanel({
     const {
         kickOff, opensAt, homeIn, awayIn, bothIn,
         isOpen, expired, mine, theirs, isPlayer, canPress,
-        remaining, critical, isSubmitting, error, submit,
+        now, remaining, critical, isSubmitting, error, submit,
     } = useCheckIn({ matchId, enabled, scheduledTimeIso, state, isHome, onCheckedIn });
 
     if (!enabled || !kickOff) return null;
@@ -291,7 +294,7 @@ export function MatchCheckInPanel({
                     {t('checkIn.title')}
                 </Text>
                 <Text numberOfLines={1} className="flex-1 text-[11px] font-bold text-slate-500 text-right">
-                    {t('checkIn.opensAt', { time: formatStamp(opensAt ?? kickOff) })}
+                    {t('checkIn.opensAt', { time: formatStamp(opensAt ?? kickOff, now) })}
                 </Text>
             </View>
         );
@@ -526,6 +529,7 @@ export function MatchCheckInBar({
                 <PressableScale
                     onPress={submit}
                     disabled={isSubmitting}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     accessibilityRole="button"
                     accessibilityLabel={t('checkIn.cta')}
                     accessibilityHint={t('checkIn.a11yHint')}
