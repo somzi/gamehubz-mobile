@@ -1,59 +1,57 @@
-import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { Text, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
-import { cn } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
 import { useLanguage } from '../../i18n/useLanguage';
+import { ActionSheetModal } from '../modals/ActionSheetModal';
 
 /**
- * Language pills for the signed-out screens.
+ * Language picker for the signed-out screens: one pill naming the active language, opening the same
+ * sheet Settings uses.
  *
- * Settings opens the full action sheet, but here the choice is short enough to show
- * inline — a sheet would wrap a tap of ceremony around it, and the whole point on the
- * register screen is that the choice is visible without being hunted for.
- * Switching re-renders the form in the chosen language immediately, and the `Language`
- * header on the submit is what stamps the new account's profile.
- *
- * The row wraps: three pills no longer fit on one line on a narrow phone, and the
- * fourth language would not fit either. `flex-1` claims the parent row's width so the
- * wrapped lines stay right-aligned instead of collapsing to content width.
+ * It used to be a row of inline pills — right for two or three languages, but at seven the row
+ * wrapped into three lines above the register hero. The choice is still visible without being
+ * hunted for, since the pill shows the current language and its flag. Switching re-renders the form
+ * in the chosen language immediately, and the `Language` header on the submit is what stamps the new
+ * account's profile.
  *
  * Labels are the language's own name and are never translated.
  */
 export function LanguageToggle() {
-    const { options, language, change } = useLanguage();
+    const { t } = useTranslation('settings');
+    const { current, options, language, change } = useLanguage();
+    const [open, setOpen] = useState(false);
 
     return (
-        <View className="flex-1 flex-row flex-wrap justify-end gap-2">
-            {options.map(option => {
-                const active = option.code === language;
+        <>
+            <Pressable
+                onPress={() => setOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('languagePicker.title')}: ${current.label}`}
+                hitSlop={8}
+                className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white/[0.03] border-white/[0.07] active:opacity-70"
+            >
+                <Text className="text-[12px]">{current.flag}</Text>
+                <Text className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                    {current.label}
+                </Text>
+                <Ionicons name="chevron-down" size={12} color={COLORS.slate400} />
+            </Pressable>
 
-                return (
-                    <Pressable
-                        key={option.code}
-                        onPress={() => { void change(option.code); }}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: active }}
-                        accessibilityLabel={option.label}
-                        hitSlop={6}
-                        className={cn(
-                            'flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border active:opacity-70',
-                            active
-                                ? 'bg-primary/10 border-primary/30'
-                                : 'bg-white/[0.03] border-white/[0.07]',
-                        )}
-                    >
-                        <Text className="text-[12px]">{option.flag}</Text>
-                        <Text
-                            className={cn(
-                                'text-[11px] font-black uppercase tracking-wider',
-                                active ? 'text-primary' : 'text-slate-500',
-                            )}
-                        >
-                            {option.label}
-                        </Text>
-                    </Pressable>
-                );
-            })}
-        </View>
+            <ActionSheetModal
+                visible={open}
+                onClose={() => setOpen(false)}
+                title={t('languagePicker.title')}
+                subtitle={t('languagePicker.subtitle')}
+                actions={options.map(option => ({
+                    label: option.label,
+                    emoji: option.flag,
+                    selected: option.code === language,
+                    onPress: () => { void change(option.code); },
+                }))}
+            />
+        </>
     );
 }
