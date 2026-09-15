@@ -16,11 +16,12 @@ import pt from './locales/pt';
 import pl from './locales/pl';
 import sr from './locales/sr';
 import ru from './locales/ru';
+import uk from './locales/uk';
 
 /** Key under which the user's explicit language choice is persisted. */
 export const STORAGE_KEY_LANGUAGE = 'app_language';
 
-export type LanguageCode = 'en' | 'es' | 'pt' | 'pl' | 'sr' | 'ru';
+export type LanguageCode = 'en' | 'es' | 'pt' | 'pl' | 'sr' | 'ru' | 'uk';
 
 export interface LanguageOption {
     code: LanguageCode;
@@ -39,6 +40,7 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
     // Written in Latin script, ekavian.
     { code: 'sr', label: 'Srpski', flag: '🇷🇸' },
     { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+    { code: 'uk', label: 'Українська', flag: '🇺🇦' },
 ];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
@@ -53,6 +55,7 @@ const resources = {
     pl,
     sr,
     ru,
+    uk,
 };
 
 const namespaces = Object.keys(en);
