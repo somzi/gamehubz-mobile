@@ -19,6 +19,7 @@ import { I18nGate } from './src/i18n/I18nGate';
 import { I18nextProvider } from 'react-i18next';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useOtaUpdates } from './src/hooks/useOtaUpdates';
+import { ForceUpdateGate } from './src/components/ForceUpdateGate';
 // Shared with the notification inbox, so a row opens exactly the screen its push tap would.
 import { externalLinkFromNotification, routeFromNotification } from './src/lib/notificationRouting';
 import { RootStackParamList } from './src/types/navigation';
@@ -290,6 +291,10 @@ export default function App() {
                   </NotificationsProvider>
                 </BadgesProvider>
               </AuthProvider>
+              {/* Over everything, signed in or not: a build the server no longer supports is stopped
+                  before it can sign in or talk to endpoints that have moved on. Inside I18nGate so the
+                  screen is already in the user's language. */}
+              <ForceUpdateGate />
             </I18nGate>
           </I18nextProvider>
           <StatusBar style="light" />

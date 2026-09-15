@@ -163,5 +163,10 @@
     "D": "E"
   },
   "or": "O",
-  "stream": "Transmisión"
+  "stream": "Transmisión",
+  "forceUpdate": {
+    "title": "Actualización necesaria",
+    "body": "Esta versión de GameHubz ya no es compatible. Actualiza a la última versión para seguir jugando.",
+    "button": "Actualizar ahora"
+  }
 }

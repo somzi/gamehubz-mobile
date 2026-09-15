@@ -165,5 +165,10 @@
     "D": "R"
   },
   "or": "LUB",
-  "stream": "Stream"
+  "stream": "Stream",
+  "forceUpdate": {
+    "title": "Wymagana aktualizacja",
+    "body": "Ta wersja GameHubz nie jest już obsługiwana. Zaktualizuj aplikację do najnowszej wersji, aby dalej grać.",
+    "button": "Zaktualizuj teraz"
+  }
 }

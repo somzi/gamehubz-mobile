@@ -164,5 +164,10 @@
     "D": "N"
   },
   "or": "ILI",
-  "stream": "Strim"
+  "stream": "Strim",
+  "forceUpdate": {
+    "title": "Potrebno ažuriranje",
+    "body": "Ova verzija GameHubz aplikacije više nije podržana. Ažuriraj na najnoviju verziju i nastavi da igraš.",
+    "button": "Ažuriraj sada"
+  }
 }

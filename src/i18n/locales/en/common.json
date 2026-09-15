@@ -163,5 +163,10 @@
     "D": "D"
   },
   "or": "OR",
-  "stream": "Stream"
+  "stream": "Stream",
+  "forceUpdate": {
+    "title": "Update required",
+    "body": "This version of GameHubz is no longer supported. Update to the latest version to keep playing.",
+    "button": "Update now"
+  }
 }
