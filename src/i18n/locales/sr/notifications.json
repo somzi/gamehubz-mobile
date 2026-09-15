@@ -43,5 +43,6 @@
   "a11y": {
     "unread": "Nepročitano",
     "opensOutside": "Otvara link van aplikacije"
-  }
+  },
+  "nothingToOpen": "Ovo obaveštenje više nema šta da otvori."
 }

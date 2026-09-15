@@ -8,6 +8,7 @@ import Animated, {
     withRepeat,
     withTiming,
 } from 'react-native-reanimated';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 
 interface SkeletonProps {
     width?: DimensionValue;
@@ -24,16 +25,26 @@ interface SkeletonProps {
  * Compose several into the real layout (see NotificationRowSkeleton) rather than showing a spinner.
  */
 export function Skeleton({ width = '100%', height, radius = 8, style }: SkeletonProps) {
+    // The OS "Reduce motion" setting asks apps to drop decorative, looping motion — a placeholder
+    // that pulses for as long as a request takes is exactly that. Held still it still reads as
+    // "loading"; the shape is what carries it.
+    const reduceMotion = useReduceMotion();
     const opacity = useSharedValue(0.45);
 
     useEffect(() => {
+        if (reduceMotion) {
+            cancelAnimation(opacity);
+            opacity.value = 0.7;
+            return;
+        }
+
         opacity.value = withRepeat(
             withTiming(1, { duration: 800, easing: Easing.inOut(Easing.quad) }),
             -1,
             true,
         );
         return () => cancelAnimation(opacity);
-    }, [opacity]);
+    }, [opacity, reduceMotion]);
 
     const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 

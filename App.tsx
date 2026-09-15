@@ -26,13 +26,19 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Linking } from 'react-native';
 
-// Silence console.log in production builds. The codebase logs a lot of debug info
-// (auth state with usernames, navigation events, network payloads) that shouldn't
-// leak into release artifacts — both for user privacy and to save the cost of the
-// per-call JS→native bridge crossing. warn/error stay on so real problems surface.
+// Silence the console in production builds. The codebase logs a lot of debug info
+// (auth state with usernames, navigation events, network payloads, error bodies) that
+// shouldn't leak into release artifacts — anything logged is readable through `adb logcat`
+// on any Android build — and every call is a JS→native bridge crossing. Nothing in a
+// release build reads warn/error either, so they go too; a crash still reaches the native
+// crash log, which does not depend on the JS console.
 if (!__DEV__) {
     // eslint-disable-next-line no-console
     console.log = () => {};
+    console.info = () => {};
+    console.debug = () => {};
+    console.warn = () => {};
+    console.error = () => {};
 }
 
 // Show notifications even when the app is in the foreground

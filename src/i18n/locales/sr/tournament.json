@@ -164,7 +164,8 @@
     "createFailed": "Nije uspelo pravljenje turnira",
     "updateFailed": "Nije uspelo ažuriranje turnira",
     "playInNeedsPlayers": "Baraž zahteva igrača: {{needed}} ({{direct}} direktno + {{playIn}} u baražu), a maks. broj igrača je {{players}}",
-    "nameRequired": "Ime turnira je obavezno"
+    "nameRequired": "Ime turnira je obavezno",
+    "checkInGraceRange": "Rok za potvrdu mora biti između {{min}} i {{max}} minuta"
   },
   "details": {
     "joinFailed": "Nije uspela prijava na turnir",

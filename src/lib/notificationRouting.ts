@@ -82,6 +82,9 @@ export function routeFromNotification(
                 return go('TournamentDetails', { id: tournamentId, openAdminHelp: true });
             }
             break;
+        // The organizer marked this player's help request resolved — back into that match's chat,
+        // where the conversation with the organizer happened.
+        case 'adminhelpresolved':
         // A new match-chat message — open the tournament and jump straight into that
         // match's chat tab.
         case 'matchmessage':
@@ -101,6 +104,9 @@ export function routeFromNotification(
         // focusTeamMatchId (without focusMatchId) opens the team-match modal, where the
         // "Choose Representative" picker lives.
         case 'teamtiebreak':
+        // A game of this captain's team match has a kick-off (or an opponent already checked in) but
+        // nobody from the team nominated for it — the team-match modal is where the lineup is set.
+        case 'lineupmissing':
             if (tournamentId && teamMatchId) {
                 return go('TournamentDetails', {
                     id: tournamentId,
@@ -141,6 +147,8 @@ export function routeFromNotification(
         // knockout drawn out of the group stage, the next round of a bracket, a fresh Swiss
         // pairing. Straight to the match, which is where the time gets agreed.
         case 'opponentready':
+        // The organizer cleared an agreed kick-off — back to the match, where a new time is picked.
+        case 'schedulecleared':
             if (tournamentId && matchId) {
                 return go('TournamentDetails', {
                     id: tournamentId,
@@ -215,6 +223,7 @@ const META_BY_TYPE: Record<string, MetaEntry> = {
     opponentready: { icon: 'game-controller', accent: COLORS.primary },
     resultproposed: { icon: 'checkmark-circle', accent: COLORS.warning },
     teamtiebreak: { icon: 'people', accent: COLORS.team },
+    lineupmissing: { icon: 'people', accent: COLORS.warning },
     adminhelp: { icon: 'help-buoy', accent: COLORS.live },
     hubjoinrequest: { icon: 'person-add', accent: COLORS.info },
     teamjoinrequest: { icon: 'person-add', accent: COLORS.team },

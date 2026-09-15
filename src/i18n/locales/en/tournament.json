@@ -163,7 +163,8 @@
     "createFailed": "Failed to create tournament",
     "updateFailed": "Failed to update tournament",
     "playInNeedsPlayers": "Play-in needs {{needed}} players ({{direct}} direct + {{playIn}} play-in) but Max Players is {{players}}",
-    "nameRequired": "Tournament name is required"
+    "nameRequired": "Tournament name is required",
+    "checkInGraceRange": "Grace period must be between {{min}} and {{max}} minutes"
   },
   "details": {
     "joinFailed": "Failed to join tournament",

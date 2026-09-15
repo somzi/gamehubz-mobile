@@ -165,7 +165,8 @@
     "createFailed": "Nie udało się utworzyć turnieju",
     "updateFailed": "Nie udało się zaktualizować turnieju",
     "playInNeedsPlayers": "Play-in wymaga graczy: {{needed}} ({{direct}} bezpośrednio + {{playIn}} w play-in), a maks. liczba graczy to {{players}}",
-    "nameRequired": "Nazwa turnieju jest wymagana"
+    "nameRequired": "Nazwa turnieju jest wymagana",
+    "checkInGraceRange": "Czas na zgłoszenie musi wynosić od {{min}} do {{max}} minut"
   },
   "details": {
     "joinFailed": "Nie udało się dołączyć do turnieju",

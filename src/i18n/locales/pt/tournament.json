@@ -163,7 +163,8 @@
     "createFailed": "Não foi possível criar o torneio",
     "updateFailed": "Não foi possível atualizar o torneio",
     "playInNeedsPlayers": "O play-in precisa de {{needed}} jogadores ({{direct}} diretos + {{playIn}} no play-in), mas o máx. de jogadores é {{players}}",
-    "nameRequired": "O nome do torneio é obrigatório"
+    "nameRequired": "O nome do torneio é obrigatório",
+    "checkInGraceRange": "A tolerância deve ficar entre {{min}} e {{max}} minutos"
   },
   "details": {
     "joinFailed": "Não foi possível entrar no torneio",

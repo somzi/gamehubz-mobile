@@ -19,10 +19,11 @@ export const LANGUAGES: Language[] = [
   { label: 'Français', code: 'FR', flag: '🇫🇷' },
   { label: 'हिन्दी', code: 'HI', flag: '🇮🇳' },
   { label: 'العربية', code: 'AR', flag: '🇸🇦' },
-  { label: 'Português', code: 'PT-PT', flag: '🇵🇹' },
+  { label: 'Português (BR)', code: 'PT-BR', flag: '🇧🇷' },
   { label: 'Italiano', code: 'IT', flag: '🇮🇹' },
   { label: 'Türkçe', code: 'TR', flag: '🇹🇷' },
   { label: 'Русский', code: 'RU', flag: '🇷🇺' },
+  { label: 'Українська', code: 'UK', flag: '🇺🇦' },
   { label: 'Polski', code: 'PL', flag: '🇵🇱' },
 ];
 

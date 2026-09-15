@@ -6,6 +6,7 @@ import {
     RefreshControl,
     Linking,
     Pressable,
+    Alert,
     SectionListData,
     SectionListRenderItem,
 } from 'react-native';
@@ -14,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -104,6 +105,7 @@ export default function NotificationsScreen() {
     const { t } = useTranslation('notifications');
     const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<NotificationsNavigationProp>();
+    const queryClient = useQueryClient();
     const isFocused = useIsFocused();
     const { summary, markRead, markAllRead, markSeen } = useNotifications();
 
@@ -155,17 +157,31 @@ export default function NotificationsScreen() {
 
         // The same router a push tap uses. A notification that outlived its target (a deleted
         // tournament, a hub the user left) lands on that screen's own not-found state.
-        routeFromNotification(navigation, item.data);
-    }, [markRead, navigation]);
+        const destination = routeFromNotification(navigation, item.data);
+        if (!destination) {
+            // No payload, or nothing this build knows how to open. The tap has already marked the row
+            // read; saying so beats a row that silently ignores the finger.
+            Alert.alert(t('title'), t('nothingToOpen'));
+        }
+    }, [markRead, navigation, t]);
 
     const handleRefresh = useCallback(async () => {
         setIsPulling(true);
         try {
+            // An infinite query refetches every page it holds, one request each — after paging ten deep a
+            // pull cost ten requests. A refresh is about what is new, which lives on page one, so the older
+            // pages are dropped first and scrolling loads them again.
+            queryClient.setQueryData<InfiniteData<NotificationPage, string | null>>(
+                [...NOTIFICATIONS_KEY, filter],
+                (current) => current && current.pages.length > 1
+                    ? { pages: current.pages.slice(0, 1), pageParams: current.pageParams.slice(0, 1) }
+                    : current,
+            );
             await refetch();
         } finally {
             setIsPulling(false);
         }
-    }, [refetch]);
+    }, [queryClient, filter, refetch]);
 
     const handleEndReached = useCallback(() => {
         // After a failed page the footer offers a retry — scrolling does not hammer the request.

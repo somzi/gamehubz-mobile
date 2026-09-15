@@ -46,5 +46,6 @@
   "a11y": {
     "unread": "Nieprzeczytane",
     "opensOutside": "Otwiera link poza aplikacją"
-  }
+  },
+  "nothingToOpen": "To powiadomienie nie ma już nic do otwarcia."
 }

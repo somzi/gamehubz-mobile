@@ -398,6 +398,16 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             return;
         }
 
+        // Grace is free text: say what is wrong here instead of letting the server quietly clamp it.
+        // Empty stays allowed — it means the default.
+        if (requireMatchCheckIn && checkInGraceMinutes.trim() !== '') {
+            const grace = parseInt(checkInGraceMinutes, 10);
+            if (isNaN(grace) || grace < 1 || grace > 180) {
+                setError(t('validation.checkInGraceRange', { min: 1, max: 180 }));
+                return;
+            }
+        }
+
         if (isTeamTournament) {
             const ts = parseInt(teamSize);
             if (!teamSize || isNaN(ts) || ts < 2 || ts > 11) {

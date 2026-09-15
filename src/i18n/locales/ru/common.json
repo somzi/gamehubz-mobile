@@ -48,7 +48,7 @@
     "showOriginal": "Показать оригинал",
     "somethingWentWrong": "Что-то пошло не так",
     "stayInTheGame": "Оставайся в игре!",
-    "tbd": "не определено",
+    "tbd": "ПОЗЖЕ",
     "translateMessage": "Перевести сообщение",
     "tryAgain": "Попробовать снова",
     "unexpectedCrash": "В приложении произошла непредвиденная ошибка.",
@@ -119,7 +119,6 @@
     "statTournaments": "ТУРНИРЫ",
     "statTrophies": "ТРОФЕИ",
     "statWins": "ПОБЕДЫ",
-    "tbd": "не определено",
     "teams": "КОМАНДЫ",
     "tournamentCard": "Карточка турнира",
     "tournamentDialogTitle": "{{name}} — турнир GameHubz"

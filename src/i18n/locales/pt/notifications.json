@@ -40,5 +40,6 @@
   "a11y": {
     "unread": "Não lida",
     "opensOutside": "Abre um link fora do app"
-  }
+  },
+  "nothingToOpen": "Esta notificação não tem mais nada para abrir."
 }
