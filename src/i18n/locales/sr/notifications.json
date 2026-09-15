@@ -1,0 +1,47 @@
+{
+  "title": "Obaveštenja",
+  "tabs": {
+    "all": "Sva",
+    "action": "Čeka te",
+    "update": "Novosti"
+  },
+  "sections": {
+    "today": "Danas",
+    "yesterday": "Juče"
+  },
+  "markAllRead": "Označi sve kao pročitano",
+  "confirmMarkAll": {
+    "title": "Označiti sve kao pročitano?",
+    "all_one": "{{count}} nepročitano obaveštenje biće označeno kao pročitano. Ovo se ne može poništiti.",
+    "all_few": "Sva {{count}} nepročitana obaveštenja biće označena kao pročitana. Ovo se ne može poništiti.",
+    "all_other": "Svih {{count}} nepročitanih obaveštenja biće označeno kao pročitano. Ovo se ne može poništiti.",
+    "tab_one": "{{count}} nepročitano obaveštenje u kartici {{tab}} biće označeno kao pročitano. Ovo se ne može poništiti.",
+    "tab_few": "{{count}} nepročitana obaveštenja u kartici {{tab}} biće označena kao pročitana. Ovo se ne može poništiti.",
+    "tab_other": "{{count}} nepročitanih obaveštenja u kartici {{tab}} biće označeno kao pročitano. Ovo se ne može poništiti.",
+    "confirm": "Označi kao pročitano"
+  },
+  "opensOutside": "Otvara se van aplikacije",
+  "footer": "To je sve. Obaveštenja se čuvaju {{days}} dana.",
+  "empty": {
+    "allTitle": "Sve je pregledano",
+    "allHint": "Podsetnici za mečeve, rezultati i zahtevi pojaviće se ovde.",
+    "actionTitle": "Trenutno te ništa ne čeka",
+    "actionHint": "Potvrde spremnosti, rezultati za potvrdu i zahtevi za pridruživanje stizaće ovde.",
+    "updateTitle": "Još nema novosti",
+    "updateHint": "Vesti o turnirima i promene u timovima i hubovima pojaviće se ovde."
+  },
+  "error": {
+    "title": "Nije uspelo učitavanje obaveštenja",
+    "hint": "Proveri vezu i pokušaj ponovo."
+  },
+  "bell": {
+    "a11y": "Obaveštenja",
+    "a11yNew_one": "Obaveštenja, {{count}} novo",
+    "a11yNew_few": "Obaveštenja, {{count}} nova",
+    "a11yNew_other": "Obaveštenja, {{count}} novih"
+  },
+  "a11y": {
+    "unread": "Nepročitano",
+    "opensOutside": "Otvara link van aplikacije"
+  }
+}

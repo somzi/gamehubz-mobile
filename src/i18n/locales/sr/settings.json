@@ -1,0 +1,52 @@
+{
+  "title": "Podešavanja",
+  "sections": {
+    "notifications": "Obaveštenja",
+    "account": "Nalog",
+    "preferences": "Preferencije",
+    "support": "Podrška",
+    "accountActions": "Radnje sa nalogom"
+  },
+  "editProfile": "Izmeni podatke profila",
+  "manageSocials": "Društvene mreže",
+  "passwordSecurity": "Lozinka i bezbednost",
+  "language": "Jezik",
+  "helpCenter": "Centar za pomoć",
+  "contactUs": "Kontakt",
+  "aboutUs": "O nama",
+  "logOut": "Odjavi se",
+  "deleteAccount": "Obriši nalog",
+  "version": "GameHubz Mobile v{{version}}",
+  "languagePicker": {
+    "title": "Jezik",
+    "subtitle": "Izaberi jezik aplikacije"
+  },
+  "logOutConfirm": {
+    "title": "Odjava",
+    "message": "Da li sigurno želiš da se odjaviš?"
+  },
+  "deleteConfirm": {
+    "title": "Brisanje naloga",
+    "message": "Da li sigurno želiš da obrišeš nalog? Ova radnja je trajna i ne može se poništiti."
+  },
+  "deleteSuccess": {
+    "title": "Nalog obrisan",
+    "message": "Tvoj nalog je uspešno obrisan."
+  },
+  "deleteFailed": {
+    "title": "Brisanje nije uspelo",
+    "message": "Nije uspelo brisanje naloga. Pokušaj ponovo kasnije."
+  },
+  "notifications": {
+    "inbox": "Sanduče obaveštenja",
+    "push": "Push obaveštenja",
+    "pushOn": "Uklj.",
+    "pushOff": "Isklj.",
+    "pushOffHint": "Push je isključen na ovom uređaju, pa ništa ne iskače — sve i dalje stiže u sanduče obaveštenja. Dodirni Push obaveštenja da ga uključiš.",
+    "moderatedChats": "Četovi koje moderiram",
+    "moderatedChatsHint": "Obavesti me kad igrači odgovore u četu meča koji moderiram kao organizator. Četove tvojih mečeva ovo nikad ne utišava.",
+    "perMatchHint": "Da utišaš samo jedan meč, otvori njegov čet i dodirni Utišano.",
+    "saveFailedTitle": "Čuvanje nije uspelo",
+    "saveFailedMessage": "Podešavanje obaveštenja nije sačuvano. Pokušaj ponovo za trenutak."
+  }
+}

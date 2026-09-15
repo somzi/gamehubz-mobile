@@ -14,11 +14,12 @@ import en from './locales/en';
 import es from './locales/es';
 import pt from './locales/pt';
 import pl from './locales/pl';
+import sr from './locales/sr';
 
 /** Key under which the user's explicit language choice is persisted. */
 export const STORAGE_KEY_LANGUAGE = 'app_language';
 
-export type LanguageCode = 'en' | 'es' | 'pt' | 'pl';
+export type LanguageCode = 'en' | 'es' | 'pt' | 'pl' | 'sr';
 
 export interface LanguageOption {
     code: LanguageCode;
@@ -34,6 +35,8 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
     // rather than implying a pt-PT translation we don't have. 'pt-PT' still resolves here.
     { code: 'pt', label: 'Português (BR)', flag: '🇧🇷' },
     { code: 'pl', label: 'Polski', flag: '🇵🇱' },
+    // Written in Latin script, ekavian.
+    { code: 'sr', label: 'Srpski', flag: '🇷🇸' },
 ];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
@@ -46,6 +49,7 @@ const resources = {
     es,
     pt,
     pl,
+    sr,
 };
 
 const namespaces = Object.keys(en);
