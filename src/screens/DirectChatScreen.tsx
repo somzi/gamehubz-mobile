@@ -17,12 +17,14 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../lib/api';
 import { parseUtcDate } from '../lib/utils';
 import { mergeMessagesById } from '../lib/mergeMessages';
 import { useAuth } from '../context/AuthContext';
+import { useBadges } from '../context/BadgesContext';
 import { useTrailingDebounce } from '../hooks/useTrailingDebounce';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { CopiedOverlay } from '../components/chat/CopiedOverlay';
@@ -42,6 +44,8 @@ export default function DirectChatScreen() {
     const route = useRoute<Route>();
     const navigation = useNavigation<Nav>();
     const { user } = useAuth();
+    const { refresh: refreshBadges } = useBadges();
+    const queryClient = useQueryClient();
     const myUserId = user?.id;
 
     const { chatId: initialChatId, otherUserId, header } = route.params || {};
@@ -66,12 +70,46 @@ export default function DirectChatScreen() {
     // messages (which grows the list at the top) doesn't yank the view down.
     const didInitialScrollRef = useRef(false);
 
+    // The chat list lives underneath this stack screen and stays mounted. Keep every
+    // cached search result in sync immediately so going back cannot reveal the old
+    // unread badge while the server round-trip/refetch is still settling.
+    const updateCachedChat = useCallback((chatId: string, update: (chat: DirectChat) => DirectChat) => {
+        queryClient.setQueriesData<DirectChat[]>({ queryKey: ['direct-chats'] }, (current) => {
+            if (!current) return current;
+            let changed = false;
+            const next = current.map((item) => {
+                if (item.id.toLowerCase() !== chatId.toLowerCase()) return item;
+                changed = true;
+                return update(item);
+            });
+            return changed ? next : current;
+        });
+    }, [queryClient]);
+
+    const markChatRead = useCallback(async (chatId: string) => {
+        updateCachedChat(chatId, (item) => item.unreadCount === 0
+            ? item
+            : { ...item, unreadCount: 0 });
+
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' });
+            if (!response.ok) throw new Error(`MARK_DIRECT_CHAT_READ failed: ${response.status}`);
+
+            // Reconcile both the per-chat list and the aggregate Social badge with
+            // the committed server state. Prefix invalidation covers cached searches.
+            queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+            refreshBadges();
+        } catch {
+            // The optimistic clear must not become permanent if the write failed.
+            queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+        }
+    }, [queryClient, refreshBadges, updateCachedChat]);
+
     // Trailing-debounced mark-read: coalesces bursts of incoming messages into a
     // single POST, and flushes on unmount so leaving the chat within the 600ms
     // window still fires the read (naive clearTimeout was silently dropping it).
     const { debounced: markReadDebounced } = useTrailingDebounce((chatId: string) => {
-        authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' })
-            .catch(() => { });
+        void markChatRead(chatId);
     });
 
     // ─── Bootstrap: resolve chat + load messages ────────────────────────
@@ -162,8 +200,7 @@ export default function DirectChatScreen() {
                     }
                 }
 
-                authenticatedFetch(ENDPOINTS.MARK_DIRECT_CHAT_READ(chatId), { method: 'POST' })
-                    .catch(() => { /* ignore */ });
+                void markChatRead(chatId);
             } catch (e: any) {
                 if (!cancelled) setError(getErrorMessage(e));
             } finally {
@@ -331,6 +368,16 @@ export default function DirectChatScreen() {
                     if (prev.some((p) => p.id === echo.id)) return prev;
                     return [...prev, echo];
                 });
+                updateCachedChat(chat.id, (item) => ({
+                    ...item,
+                    lastMessage: echo.content,
+                    lastMessageAt: echo.sentAt,
+                    lastMessageSenderId: echo.senderId,
+                    unreadCount: 0,
+                }));
+                // The optimistic row above makes Back instantaneous; the refetch
+                // also picks up any concurrent message that won the latest slot.
+                queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
                 setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
             } else {
                 const body = await res.text().catch(() => '');
@@ -347,7 +394,7 @@ export default function DirectChatScreen() {
             sendingRef.current = false;
             setSending(false);
         }
-    }, [chat?.id, input, showSendError]);
+    }, [chat?.id, input, queryClient, showSendError, updateCachedChat]);
 
     if (loading) {
         return (
