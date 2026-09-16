@@ -28,6 +28,7 @@ import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { CopiedOverlay } from '../components/chat/CopiedOverlay';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { DirectChat, DirectMessage } from '../types/social';
+import { startSignalRWithRetry } from '../lib/signalR';
 
 type Route = RouteProp<RootStackParamList, 'DirectChat'>;
 type Nav = StackNavigationProp<RootStackParamList>;
@@ -269,29 +270,27 @@ export default function DirectChatScreen() {
                 .catch(() => { });
         });
 
-        const startPromise = connection
-            .start()
-            .then(() => {
+        const initialConnection = startSignalRWithRetry(connection, {
+            onConnected: () => {
                 if (!isActive) return;
                 return connection.invoke('JoinChatGroup', currentChatId);
-            })
-            .catch((e) => console.warn('[DM] SignalR connect failed', e));
+            },
+            onError: (e) => console.warn('[DM] SignalR connect failed', e),
+        });
 
         connectionRef.current = connection;
 
         return () => {
             isActive = false;
             connection.off('ReceiveMessage');
-            // Wait for start to settle before leaving/stopping so we don't
-            // invoke on a connection still in the Connecting state.
-            startPromise.finally(async () => {
+            void (async () => {
                 try {
                     if (connection.state === 'Connected') {
                         await connection.invoke('LeaveChatGroup', currentChatId);
                     }
                 } catch { /* ignore */ }
-                try { await connection.stop(); } catch { /* ignore */ }
-            });
+                await initialConnection.stop();
+            })();
             connectionRef.current = null;
         };
     }, [chat?.id, myUserId]);

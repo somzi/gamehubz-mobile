@@ -268,6 +268,7 @@ export const triggerLogout = () => { logoutListeners.forEach(l => l()); };
 // Timeouts surface as a normal axios error that our interceptors and callers
 // already handle, and react-query will surface the retry-once behaviour on top.
 const NETWORK_TIMEOUT_MS = 15_000;
+const REFRESH_TIMEOUT_MS = 15_000;
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -296,16 +297,11 @@ apiClient.interceptors.request.use(async (config) => {
     return config;
 }, (error) => Promise.reject(error));
 
-let isRefreshing = false;
-let failedQueue: { resolve: (val?: any) => void, reject: (err: any) => void }[] = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-    failedQueue.forEach(prom => {
-        if (error) prom.reject(error);
-        else prom.resolve(token);
-    });
-    failedQueue = [];
-};
+// One promise is the refresh queue. Axios requests and raw-fetch uploads all await this exact
+// operation, so a rotating refresh token can never be submitted by two concurrent 401 handlers.
+// Keeping the waiters on the promise itself also removes the old manually-managed failedQueue,
+// which could be left pending if a refresh request never settled.
+let refreshPromise: Promise<string> | null = null;
 
 /**
  * Perform a single token refresh against the backend and persist the new pair.
@@ -323,6 +319,11 @@ async function doRefresh(): Promise<string> {
     const refreshResponse = await axios.post(`${API_BASE_URL}/api/Auth/refreshtoken`, {
         AccessToken: accessToken,
         RefreshToken: refreshToken,
+    }, {
+        // This request deliberately uses the bare axios client so a 401 cannot recurse through the
+        // apiClient interceptor. It still needs its own timeout or every original request awaiting
+        // the shared refresh promise would remain pending forever.
+        timeout: REFRESH_TIMEOUT_MS,
     });
     updateServerClockFromDateHeader(refreshResponse.headers?.date, requestStartedAt);
 
@@ -336,6 +337,41 @@ async function doRefresh(): Promise<string> {
     authToken = newAccess;
     return newAccess;
 }
+
+/**
+ * Returns the one in-flight refresh, creating it only when necessary. Failure cleanup lives here,
+ * not in individual callers, so JSON and FormData requests observe the same session-expired result.
+ */
+function refreshAccessToken(): Promise<string> {
+    if (refreshPromise) return refreshPromise;
+
+    refreshPromise = (async () => {
+        try {
+            return await doRefresh();
+        } catch (error) {
+            authToken = null;
+            await Promise.all([
+                SecureStore.deleteItemAsync('access_token').catch(() => { }),
+                SecureStore.deleteItemAsync('refresh_token').catch(() => { }),
+            ]);
+            triggerLogout();
+            throw error;
+        } finally {
+            // Both resolve and reject release the single-flight slot. Every waiter is attached to
+            // this promise, so all of them have already received the same outcome.
+            refreshPromise = null;
+        }
+    })();
+
+    return refreshPromise;
+}
+
+const bearerTokenFromHeaders = (headers: any): string | null => {
+    const raw = typeof headers?.get === 'function'
+        ? headers.get('Authorization')
+        : headers?.Authorization ?? headers?.authorization;
+    return typeof raw === 'string' && raw.startsWith('Bearer ') ? raw.slice(7) : null;
+};
 
 apiClient.interceptors.response.use((response) => {
     const requestStartedAt = (response.config as typeof response.config & {
@@ -353,32 +389,21 @@ apiClient.interceptors.response.use((response) => {
         updateServerClockFromDateHeader(error.response.headers?.date, requestStartedAt);
     }
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-        if (isRefreshing) {
-            return new Promise((resolve, reject) => {
-                failedQueue.push({ resolve, reject });
-            }).then(token => {
-                originalRequest.headers.Authorization = 'Bearer ' + token;
-                return apiClient(originalRequest);
-            }).catch(err => Promise.reject(err));
-        }
-
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
         originalRequest._retry = true;
-        isRefreshing = true;
 
         try {
-            const newAccess = await doRefresh();
+            const requestAccess = bearerTokenFromHeaders(originalRequest.headers);
+            // A late 401 may arrive after another request has already completed the refresh. Retry
+            // with that newer access token instead of rotating the just-issued refresh token again.
+            const newAccess = authToken && requestAccess !== authToken
+                ? authToken
+                : await refreshAccessToken();
+            originalRequest.headers = originalRequest.headers ?? {};
             originalRequest.headers.Authorization = 'Bearer ' + newAccess;
-            processQueue(null, newAccess);
             return apiClient(originalRequest);
         } catch (refreshError) {
-            processQueue(refreshError, null);
-            await SecureStore.deleteItemAsync('access_token');
-            await SecureStore.deleteItemAsync('refresh_token');
-            triggerLogout();
             return Promise.reject(refreshError);
-        } finally {
-            isRefreshing = false;
         }
     }
 
@@ -449,13 +474,15 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             // doesn't silently fail (e.g. avatar / match evidence upload on a stale session).
             if (fetchResponse.status === 401) {
                 try {
-                    const newAccess = await doRefresh();
+                    // Same late-401 protection as the axios interceptor: if another request already
+                    // refreshed while this upload was in flight, reuse its access token. Otherwise
+                    // join the shared refresh promise — never start an upload-specific refresh.
+                    const newAccess = authToken && token !== authToken
+                        ? authToken
+                        : await refreshAccessToken();
+                    token = newAccess;
                     fetchResponse = await doUpload(newAccess);
-                } catch {
-                    await SecureStore.deleteItemAsync('access_token').catch(() => { });
-                    await SecureStore.deleteItemAsync('refresh_token').catch(() => { });
-                    triggerLogout();
-                }
+                } catch { /* refreshAccessToken performs the shared logout cleanup */ }
             }
 
             // Ako server vrati grešku (npr. 400, 413, 500)

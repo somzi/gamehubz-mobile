@@ -14,6 +14,7 @@ import { MatchComment } from '../../types/auth';
 import { mergeMessagesById } from '../../lib/mergeMessages';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { dateLocale } from '../../i18n';
+import { startSignalRWithRetry } from '../../lib/signalR';
 
 // Initial page size — load a screenful fast; older messages page in on demand.
 const PAGE_SIZE = 30;
@@ -195,21 +196,20 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             fetchComments(true, 100);
         });
 
-        const startPromise = connection.start()
-            .then(() => {
+        const initialConnection = startSignalRWithRetry(connection, {
+            onConnected: () => {
                 if (!isActive) return;
                 return connection.invoke('JoinMatchGroup', matchId);
-            })
-            .catch((err) => console.error('[MatchChatPanel] SignalR error:', err));
+            },
+            onError: (err) => console.error('[MatchChatPanel] SignalR error:', err),
+        });
 
         connectionRef.current = connection;
 
         return () => {
             isActive = false;
             connection.off('ReceiveMessage');
-            startPromise.finally(async () => {
-                try { await connection.stop(); } catch { /* ignore */ }
-            });
+            void initialConnection.stop();
             connectionRef.current = null;
         };
     }, [matchId, active]);

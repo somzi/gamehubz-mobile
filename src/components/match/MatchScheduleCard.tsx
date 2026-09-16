@@ -22,6 +22,7 @@ import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signal
 import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import { PendingEvidenceStrip } from './PendingEvidenceStrip';
+import { startSignalRWithRetry } from '../../lib/signalR';
 import { EvidenceThumb } from './EvidenceThumb';
 import { EvidencePreviewModal } from './EvidencePreviewModal';
 import { ConfirmationModal } from '../modals/ConfirmationModal';
@@ -699,23 +700,20 @@ function MatchScheduleCardBase({
                 .catch(() => { });
         });
 
-        const startPromise = connection.start()
-            .then(() => {
+        const initialConnection = startSignalRWithRetry(connection, {
+            onConnected: () => {
                 if (!isActive) return;
                 return connection.invoke("JoinMatchGroup", matchId);
-            })
-            .catch((err) => console.error('SignalR Connection Error:', err));
+            },
+            onError: (err) => console.error('SignalR Connection Error:', err),
+        });
 
         connectionRef.current = connection;
 
         return () => {
             isActive = false;
             connection.off("ReceiveMessage");
-            // Wait for start to settle before stopping, otherwise stop() on a
-            // still-Connecting connection throws and leaves orphan sockets.
-            startPromise.finally(async () => {
-                try { await connection.stop(); } catch { /* ignore */ }
-            });
+            void initialConnection.stop();
             connectionRef.current = null;
         };
     }, [matchId, modalVisible]);

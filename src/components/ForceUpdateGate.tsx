@@ -40,7 +40,6 @@ export function ForceUpdateGate() {
         if (!installed || inFlight.current) return;
 
         inFlight.current = true;
-        lastCheckedAt.current = Date.now();
 
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -49,9 +48,17 @@ export function ForceUpdateGate() {
             const result = await fetchVersionCheck(controller.signal);
             if (!result) return;
 
-            const next = compareVersions(installed, result.minSupportedVersion) === -1 ? result : null;
+            // A syntactically present but unusable version is not a valid check and must neither
+            // clear a previous force-update decision nor suppress retries for thirty minutes.
+            const comparison = compareVersions(installed, result.minSupportedVersion);
+            if (comparison === null) return;
+
+            const next = comparison === -1 ? result : null;
             requiredRef.current = next;
             setRequired(next);
+            // Cool down only after a complete, semantically valid backend answer. Network errors,
+            // timeouts, non-2xx responses and malformed payloads remain immediately retryable.
+            lastCheckedAt.current = Date.now();
         } catch {
             // Fail open — see above.
         } finally {

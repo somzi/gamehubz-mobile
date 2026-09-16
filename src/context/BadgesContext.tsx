@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { startSignalRWithRetry } from '../lib/signalR';
 import { useAuth } from './AuthContext';
 import { BadgeCounts, ApprovalsBreakdown, TournamentApprovalCount, HubApprovalCount } from '../types/social';
 import { NOTIFICATIONS_KEY, NOTIFICATION_SUMMARY_KEY, acceptHubSummary } from '../lib/notificationsApi';
@@ -213,15 +214,16 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
             queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
         });
 
-        connection.start()
-            .then(() => { if (active) refresh(); })
-            .catch((err) => console.warn('[Badges] user hub connect error:', err));
+        const initialConnection = startSignalRWithRetry(connection, {
+            onConnected: () => { if (active) refresh(); },
+            onError: (err) => console.warn('[Badges] user hub connect error:', err),
+        });
 
         return () => {
             active = false;
             connection.off('BadgesUpdated');
             connection.off('NotificationsUpdated');
-            connection.stop().catch(() => { /* ignore */ });
+            void initialConnection.stop();
         };
     }, [isAuthenticated, user?.id, queryClient, refresh]);
 
