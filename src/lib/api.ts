@@ -19,6 +19,7 @@ export const ENDPOINTS = {
     GET_TOURNAMENT_STRUCTURE_V3: (id: string) => `${API_BASE_URL}/api/tournament/${id}/structure/v3`,
     UPDATE_PROFILE: `${API_BASE_URL}/api/user/update`,
     GET_PLAYER_STATS: (id: string) => `${API_BASE_URL}/api/UserProfile/v2/${id}/stats`,
+    GET_HEAD_TO_HEAD: (id: string, opponentId: string) => `${API_BASE_URL}/api/UserProfile/${id}/head-to-head/${opponentId}`,
     USER_SOCIAL: `${API_BASE_URL}/api/UserSocial`,
     GET_USER_INFO: (id: string) => `${API_BASE_URL}/api/UserProfile/${id}/info`,
     // Discord bot account link (OAuth runs fully on the backend; the app just opens authorizeUrl).

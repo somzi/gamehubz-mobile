@@ -15,6 +15,7 @@ import { PendingEvidenceStrip } from '../match/PendingEvidenceStrip';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { useMatchChatMute } from '../../hooks/useMatchChatMute';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
+import { MatchInsightsPanel, type MatchInsightPlayer } from '../match/MatchInsightsPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
 import { AdminAvailabilityPanel, type AdminAvailability } from '../match/AdminAvailabilityPanel';
 import { ConfirmationModal } from './ConfirmationModal';
@@ -307,7 +308,7 @@ export function MatchDetailsModal({
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
     // same matchId still honors the host's intent.
-    const [activeTab, setActiveTab] = useState<'match' | 'chat' | 'stream' | 'schedule'>(defaultTab);
+    const [activeTab, setActiveTab] = useState<'match' | 'insights' | 'chat' | 'stream' | 'schedule'>(defaultTab);
 
     // Streams for this match — drives the Stream tab (live POVs + replays) and its LIVE dot.
     const [streams, setStreams] = useState<MatchStream[]>([]);
@@ -1260,6 +1261,10 @@ export function MatchDetailsModal({
     //  - spectators tapping a bracket match keep the read-only match view
     const isTournamentCompleted = Number(tournamentStatus) === 4;
     const showChatTab = !isTournamentCompleted && (isParticipant || isPrivileged);
+    // Matchup form only makes sense once both sides are known. It stays available to spectators
+    // too — for a participant the left side is always "you"; everyone else sees home vs away.
+    const showInsightsTab = !!effectiveHome?.userId && !!effectiveAway?.userId
+        && effectiveHome.userId.toLowerCase() !== effectiveAway.userId.toLowerCase();
     // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
     const showStreamTab = effectiveStatus !== 'pending_availability';
@@ -1274,19 +1279,34 @@ export function MatchDetailsModal({
         && !adminAvailability.confirmedTime
         && sideAnswered(adminAvailability.home) !== sideAnswered(adminAvailability.away);
 
-    // Four tabs share the row an organizer sees; two or three is the common case. Rather than let
-    // the widest label ellipsise (Spanish runs longer than English at the same weight), the whole
-    // bar steps down a size once the fourth tab is in play.
-    const tabCount = 1 + (showChatTab ? 1 : 0) + (showStreamTab ? 1 : 0) + (showScheduleTab ? 1 : 0);
-    const tabLabelClass = tabCount >= 4
+    // Five tabs can share the row for an organizer. FORM is deliberately short, while the whole
+    // bar steps down once Schedule and Stream join it so translated labels remain intact.
+    const tabCount = 1 + (showInsightsTab ? 1 : 0) + (showChatTab ? 1 : 0) + (showStreamTab ? 1 : 0) + (showScheduleTab ? 1 : 0);
+    const tabLabelClass = tabCount >= 5
+        ? 'text-[8px] font-black uppercase tracking-normal'
+        : tabCount >= 4
         ? 'text-[10px] font-black uppercase tracking-wider'
         : 'text-xs font-black uppercase tracking-widest';
+
+    const insightHome: MatchInsightPlayer = {
+        id: effectiveHome?.userId || '',
+        name: matchDetails?.homeUsername || effectiveHome?.username || t('details.homeSide'),
+        avatarUrl: matchDetails?.homeUserAvatarUrl || matchDetails?.HomeUserAvatarUrl || null,
+    };
+    const insightAway: MatchInsightPlayer = {
+        id: effectiveAway?.userId || '',
+        name: matchDetails?.awayUsername || effectiveAway?.username || t('details.awaySide'),
+        avatarUrl: matchDetails?.awayUserAvatarUrl || matchDetails?.AwayUserAvatarUrl || null,
+    };
+    const insightPrimary = isAway ? insightAway : insightHome;
+    const insightOpponent = isAway ? insightHome : insightAway;
 
     // The Schedule tab is gated on a payload that arrives after the modal opens and can go away
     // again (a refetch that settles the match). Leaving it selected would render nothing.
     useEffect(() => {
-        if (activeTab === 'schedule' && !showScheduleTab) setActiveTab('match');
-    }, [activeTab, showScheduleTab]);
+        if ((activeTab === 'schedule' && !showScheduleTab)
+            || (activeTab === 'insights' && !showInsightsTab)) setActiveTab('match');
+    }, [activeTab, showScheduleTab, showInsightsTab]);
 
     // While a ready check is open, the other side's confirmation is the one piece of state that
     // changes without this user touching anything — and it is what unlocks the result form. Poll
@@ -2212,11 +2232,9 @@ export function MatchDetailsModal({
                     )}
                 </View>
 
-                {/* Match / Chat / Schedule / Stream tabs. The bar appears if any of the three
-                    optional ones is available; Match is always present. A fourth tab has to share
-                    the same row, so the labels drop a size rather than truncate — Spanish runs
-                    longer than English and would lose characters at the original size. */}
-                {(showChatTab || showStreamTab || showScheduleTab) && (
+                {/* Match / Form / Chat / Schedule / Stream tabs. Match is always present; the
+                    optional matchup tab appears as soon as both players are resolved. */}
+                {(showInsightsTab || showChatTab || showStreamTab || showScheduleTab) && (
                     <View className="flex-row mx-6 mt-3 mb-2 rounded-2xl p-1 bg-card border border-white/[0.04]">
                         <Pressable
                             onPress={() => setActiveTab('match')}
@@ -2230,6 +2248,27 @@ export function MatchDetailsModal({
                                 activeTab === 'match' ? "text-primary" : "text-slate-500"
                             )}>{t('tournament:details.match')}</Text>
                         </Pressable>
+                        {showInsightsTab && (
+                        <Pressable
+                            onPress={() => setActiveTab('insights')}
+                            className={cn(
+                                "flex-1 py-2.5 items-center rounded-xl",
+                                activeTab === 'insights' ? "bg-indigo-500/15" : "bg-transparent"
+                            )}
+                        >
+                            <View className="flex-row items-center gap-1.5">
+                                <Ionicons
+                                    name="pulse"
+                                    size={12}
+                                    color={activeTab === 'insights' ? '#818CF8' : '#64748B'}
+                                />
+                                <Text numberOfLines={1} className={cn(
+                                    tabLabelClass,
+                                    activeTab === 'insights' ? "text-indigo-400" : "text-slate-500"
+                                )}>{t('insights.tab')}</Text>
+                            </View>
+                        </Pressable>
+                        )}
                         {showChatTab && (
                         <Pressable
                             onPress={() => setActiveTab('chat')}
@@ -2304,7 +2343,14 @@ export function MatchDetailsModal({
                     </View>
                 )}
 
-                {activeTab === 'schedule' && showScheduleTab && adminAvailability ? (
+                {activeTab === 'insights' && showInsightsTab ? (
+                    <MatchInsightsPanel
+                        active={visible && activeTab === 'insights'}
+                        primary={insightPrimary}
+                        opponent={insightOpponent}
+                        viewerIsPrimary={isParticipant}
+                    />
+                ) : activeTab === 'schedule' && showScheduleTab && adminAvailability ? (
                     <ScrollView
                         keyboardShouldPersistTaps="handled"
                         className="flex-1 px-6 pt-2"
