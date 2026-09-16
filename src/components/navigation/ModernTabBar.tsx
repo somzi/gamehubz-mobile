@@ -5,7 +5,7 @@ import {
     TouchableOpacity,
     StyleSheet,
     Animated,
-    Dimensions,
+    useWindowDimensions,
 } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,12 +14,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useBadges } from '../../context/BadgesContext';
 
-const { width } = Dimensions.get('window');
-const TAB_WIDTH = width / 4;
-
 export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const { t } = useTranslation('common');
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
     const translateX = useRef(new Animated.Value(0)).current;
     const { badges } = useBadges();
 
@@ -48,7 +46,7 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
             tension: 60,
             friction: 10,
         }).start();
-    }, [state.index]);
+    }, [state.index, tabWidth, translateX]);
 
     return (
         <View

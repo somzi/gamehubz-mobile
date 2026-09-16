@@ -3,12 +3,12 @@
     "name": "GameHubz",
     "scheme": "gamehubz",
     "slug": "gamehubz-mobile",
-    "version": "2.18.1",
-    "orientation": "portrait",
+    "version": "2.18.2",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-   "runtimeVersion": {
+    "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
@@ -145,7 +145,16 @@
         }
       ],
       "react-native-compressor",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
     ]
   }
 }
