@@ -39,6 +39,9 @@ interface Props {
     primary: MatchInsightPlayer;
     opponent: MatchInsightPlayer;
     viewerIsPrimary: boolean;
+    /** Opens a player's profile. The host does the navigating: it has to close its own modal
+     *  first, or the pushed screen ends up underneath it. */
+    onPlayerPress?: (playerId: string) => void;
 }
 
 const read = (source: any, camel: string, pascal: string) => source?.[camel] ?? source?.[pascal];
@@ -87,7 +90,7 @@ async function fetchInsights(primaryId: string, opponentId: string): Promise<Mat
     };
 }
 
-export function MatchInsightsPanel({ active, primary, opponent, viewerIsPrimary }: Props) {
+export function MatchInsightsPanel({ active, primary, opponent, viewerIsPrimary, onPlayerPress }: Props) {
     const { t } = useTranslation('match');
     const { t: tCommon } = useTranslation('common');
     const [formLimit, setFormLimit] = useState<5 | 10>(5);
@@ -148,9 +151,12 @@ export function MatchInsightsPanel({ active, primary, opponent, viewerIsPrimary 
         ? t('insights.level')
         : t('insights.leads', { name: h2h.myWins > h2h.opponentWins ? primary.name : opponent.name });
 
+    // No horizontal padding of its own: the two hosts inset their content differently (the
+    // bracket modal wraps it, the Home match sheet already pads its whole body), same as the
+    // stream panel.
     return (
         <ScrollView
-            className="flex-1 px-6 pt-2"
+            className="flex-1"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 36 }}
         >
@@ -171,7 +177,11 @@ export function MatchInsightsPanel({ active, primary, opponent, viewerIsPrimary 
                 style={{ borderRadius: 24, borderWidth: 1, borderColor: 'rgba(52,211,153,0.16)', padding: 18 }}
             >
                 <View className="flex-row items-center justify-between">
-                    <PlayerColumn player={primary} badge={viewerIsPrimary ? t('insights.you') : undefined} />
+                    <PlayerColumn
+                        player={primary}
+                        badge={viewerIsPrimary ? t('insights.you') : undefined}
+                        onPress={onPlayerPress && primary.id ? () => onPlayerPress(primary.id) : undefined}
+                    />
 
                     <View className="items-center px-2">
                         {h2h.totalMatches > 0 ? (
@@ -192,7 +202,10 @@ export function MatchInsightsPanel({ active, primary, opponent, viewerIsPrimary 
                         )}
                     </View>
 
-                    <PlayerColumn player={opponent} />
+                    <PlayerColumn
+                        player={opponent}
+                        onPress={onPlayerPress && opponent.id ? () => onPlayerPress(opponent.id) : undefined}
+                    />
                 </View>
 
                 {h2h.totalMatches > 0 ? (
@@ -326,9 +339,15 @@ export function MatchInsightsPanel({ active, primary, opponent, viewerIsPrimary 
     );
 }
 
-function PlayerColumn({ player, badge }: { player: MatchInsightPlayer; badge?: string }) {
+function PlayerColumn({ player, badge, onPress }: { player: MatchInsightPlayer; badge?: string; onPress?: () => void }) {
     return (
-        <View className="flex-1 items-center min-w-0">
+        <Pressable
+            onPress={onPress}
+            disabled={!onPress}
+            accessibilityRole={onPress ? 'button' : undefined}
+            accessibilityLabel={player.name}
+            className="flex-1 items-center min-w-0 active:opacity-70"
+        >
             <View className="rounded-full p-[2px] bg-white/10">
                 <PlayerAvatar src={player.avatarUrl ?? undefined} name={player.name} size="lg" className="border-0" />
             </View>
@@ -340,7 +359,7 @@ function PlayerColumn({ player, badge }: { player: MatchInsightPlayer; badge?: s
                     </View>
                 )}
             </View>
-        </View>
+        </Pressable>
     );
 }
 

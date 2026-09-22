@@ -33,6 +33,9 @@ interface SeriesScoreEntryProps {
     rightName: string;
     rightNickname?: string | null;
     rightAvatarUrl?: string | null;
+    /** Open that player's profile from their header. Without them the headers are plain labels. */
+    onLeftPress?: () => void;
+    onRightPress?: () => void;
     format: SeriesFormat;
     /**
      * Whether a level series can go to a tiebreak replay. True only for solo knockout matches:
@@ -140,6 +143,8 @@ export function SeriesScoreEntry({
     rightName,
     rightNickname,
     rightAvatarUrl,
+    onLeftPress,
+    onRightPress,
     format,
     allowTiebreak,
     initialGames,
@@ -249,7 +254,12 @@ export function SeriesScoreEntry({
                     the in-game nickname stays visible rather than being collapsed into a username. */}
                 <View className="flex-row items-start px-4 pt-4 pb-2">
                     <View className="w-16" />
-                    <View className="flex-1 items-center gap-1.5">
+                    <Pressable
+                        onPress={onLeftPress}
+                        disabled={!onLeftPress}
+                        accessibilityRole={onLeftPress ? 'button' : undefined}
+                        className="flex-1 items-center gap-1.5 active:opacity-70"
+                    >
                         <PlayerAvatar src={leftAvatarUrl ?? undefined} name={leftName} size="sm" />
                         <PlayerIdentity
                             username={leftName}
@@ -257,9 +267,14 @@ export function SeriesScoreEntry({
                             tone="home"
                             reserveNicknameSpace={pairingHasNickname}
                         />
-                    </View>
+                    </Pressable>
                     <View className="w-8" />
-                    <View className="flex-1 items-center gap-1.5">
+                    <Pressable
+                        onPress={onRightPress}
+                        disabled={!onRightPress}
+                        accessibilityRole={onRightPress ? 'button' : undefined}
+                        className="flex-1 items-center gap-1.5 active:opacity-70"
+                    >
                         <PlayerAvatar src={rightAvatarUrl ?? undefined} name={rightName} size="sm" />
                         <PlayerIdentity
                             username={rightName}
@@ -267,7 +282,7 @@ export function SeriesScoreEntry({
                             tone="away"
                             reserveNicknameSpace={pairingHasNickname}
                         />
-                    </View>
+                    </Pressable>
                 </View>
 
                 {blocks.map(block => (

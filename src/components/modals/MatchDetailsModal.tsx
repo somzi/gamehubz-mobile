@@ -57,6 +57,8 @@ import { dateLocale } from '../../i18n';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
+export type MatchModalTab = 'match' | 'insights' | 'chat' | 'stream' | 'schedule';
+
 export interface MatchResultDetailDto {
     /** Backend MatchStatus (1 Pending / 2 Scheduled / 3 Live / 4 Completed / 5 NoShow).
      *  Optional — older backends don't send it; used to detect a settled match (Completed or
@@ -158,9 +160,16 @@ interface MatchDetailsModalProps {
     /**
      * Which tab to show first when the modal opens. Defaults to "match".
      * The TournamentDetailsScreen passes "chat" when an admin enters from the
-     * help-requests inbox so the conversation is one tap away.
+     * help-requests inbox so the conversation is one tap away, and the tab the
+     * modal was left on when it reopens after a player's profile.
      */
-    defaultTab?: 'match' | 'chat';
+    defaultTab?: MatchModalTab;
+    /**
+     * Takes a player tap over (open that profile) so the host can bring this modal back, on the
+     * same tab, when the viewer returns. Without it the modal closes and pushes the profile
+     * itself, and coming back lands on the bare screen.
+     */
+    onOpenProfile?: (userId: string, fromTab: MatchModalTab) => void;
 }
 
 export function MatchDetailsModal({
@@ -190,6 +199,7 @@ export function MatchDetailsModal({
     nextMatchLoserBracketId,
     tournamentStatus,
     defaultTab = 'match',
+    onOpenProfile,
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
     const { t } = useTranslation('match');
@@ -308,7 +318,11 @@ export function MatchDetailsModal({
     // Match / Chat tab state — initial value mirrors defaultTab; the effects below
     // re-apply it whenever the modal opens or the match changes so reopening on the
     // same matchId still honors the host's intent.
-    const [activeTab, setActiveTab] = useState<'match' | 'insights' | 'chat' | 'stream' | 'schedule'>(defaultTab);
+    const [activeTab, setActiveTab] = useState<MatchModalTab>(defaultTab);
+
+    // The match a player tap just left for that player's profile, while the host has the modal
+    // hidden. Coming back on the same match is a return, not a fresh open — see the fetch effect.
+    const profileTripMatchIdRef = useRef<string | null>(null);
 
     // Streams for this match — drives the Stream tab (live POVs + replays) and its LIVE dot.
     const [streams, setStreams] = useState<MatchStream[]>([]);
@@ -360,15 +374,20 @@ export function MatchDetailsModal({
 
     useEffect(() => {
         if (visible && matchId) {
+            // Back from a player's profile opened from this match: what is on screen is what the
+            // viewer just left, so it refreshes underneath (silently) instead of behind a loader.
+            const returning = profileTripMatchIdRef.current === matchId;
+            profileTripMatchIdRef.current = null;
             // fetchMatchDetails hits /details/full which returns details + streams + the caller's
             // availability in a single round-trip. It handles setting all three; the legacy
             // fetchAvailability / streams effect only runs as a fallback.
-            fetchMatchDetails();
-        } else {
+            fetchMatchDetails(returning);
+        } else if (!profileTripMatchIdRef.current) {
             // Closed: re-arm for the next open. matchDetails deliberately survives the close
             // (reopening the same match is instant), but it must not be rendered as if it were
             // already refreshed. Open with no matchId is the opposite case — nothing will ever
-            // arrive, so the form must not sit behind the loading gate forever.
+            // arrive, so the form must not sit behind the loading gate forever. Hidden for a
+            // profile trip is neither: the modal comes back on this match as it was.
             setIsLoadingDetails(!visible);
         }
     }, [visible, status, matchId, evidences, home, away]);
@@ -879,6 +898,11 @@ export function MatchDetailsModal({
 
     const navigateToProfile = (userId?: string) => {
         if (!userId) return;
+        if (onOpenProfile) {
+            profileTripMatchIdRef.current = matchId;
+            onOpenProfile(userId, activeTab);
+            return;
+        }
         onClose();
         navigation.navigate('PlayerProfile', { id: userId });
     };
@@ -2344,12 +2368,15 @@ export function MatchDetailsModal({
                 )}
 
                 {activeTab === 'insights' && showInsightsTab ? (
-                    <MatchInsightsPanel
-                        active={visible && activeTab === 'insights'}
-                        primary={insightPrimary}
-                        opponent={insightOpponent}
-                        viewerIsPrimary={isParticipant}
-                    />
+                    <View className="flex-1 px-6 pt-2">
+                        <MatchInsightsPanel
+                            active={visible && activeTab === 'insights'}
+                            primary={insightPrimary}
+                            opponent={insightOpponent}
+                            viewerIsPrimary={isParticipant}
+                            onPlayerPress={navigateToProfile}
+                        />
+                    </View>
                 ) : activeTab === 'schedule' && showScheduleTab && adminAvailability ? (
                     <ScrollView
                         keyboardShouldPersistTaps="handled"

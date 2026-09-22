@@ -16,6 +16,9 @@ interface HourlyAvailabilityPickerProps {
     initialSlots?: string[];
     onSubmit: (selectedSlots: string[], dateTimeSlots: string[]) => void | Promise<void>;
     onMarkScheduled?: () => void | Promise<void>;
+    /** Opens the opponent's profile from the header row. Only that row: the banner inside the
+     *  slot editor stays inert, since leaving from there would drop the unsaved selection. */
+    onOpponentPress?: () => void;
 }
 
 // Generate hours from 00:00 to 23:00
@@ -77,6 +80,7 @@ export function HourlyAvailabilityPicker({
     initialSlots = [],
     onSubmit,
     onMarkScheduled,
+    onOpponentPress,
 }: HourlyAvailabilityPickerProps) {
     const { t, i18n } = useTranslation('match');
     const insets = useSafeAreaInsets();
@@ -251,7 +255,12 @@ export function HourlyAvailabilityPicker({
     return (
         <View className="flex-1">
             {/* Opponent — who this match is against, prominent at the top */}
-            <View className="bg-slate-800/40 rounded-2xl p-3 border border-white/5 mb-3 flex-row items-center gap-3">
+            <Pressable
+                onPress={onOpponentPress}
+                disabled={!onOpponentPress}
+                accessibilityRole={onOpponentPress ? 'button' : undefined}
+                className="bg-slate-800/40 rounded-2xl p-3 border border-white/5 mb-3 flex-row items-center gap-3 active:opacity-70"
+            >
                 <View className="rounded-full p-[2px] bg-indigo-500/25">
                     <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" />
                 </View>
@@ -262,7 +271,7 @@ export function HourlyAvailabilityPicker({
                 <View className="bg-white/[0.05] border border-white/[0.08] rounded-xl px-2.5 py-1.5">
                     <Text className="text-[11px] font-black italic text-slate-300 tracking-wider">VS</Text>
                 </View>
-            </View>
+            </Pressable>
 
             {/* Deadline */}
             <View className="bg-slate-800/40 rounded-2xl p-3.5 border border-white/5 mb-4 flex-row items-center gap-3">

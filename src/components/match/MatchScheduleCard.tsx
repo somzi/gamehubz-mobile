@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
@@ -36,11 +38,13 @@ import {
     MAX_VIDEO_DURATION_SECONDS,
 } from '../../lib/evidence';
 import { MatchComment } from '../../types/auth';
+import { RootStackParamList } from '../../types/navigation';
 import { MAX_FILE_SIZE, formatFileSize } from '../../lib/image';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { mergeMessagesById } from '../../lib/mergeMessages';
 import { AdminHelpSection } from './AdminHelpSection';
 import { MatchStreamPanel } from './MatchStreamPanel';
+import { MatchInsightsPanel, type MatchInsightPlayer } from './MatchInsightsPanel';
 import { SeriesScoreEntry } from './SeriesScoreEntry';
 import { SeriesBreakdown } from './SeriesBreakdown';
 import {
@@ -125,6 +129,7 @@ function MatchScheduleCardBase({
     const { t: tCommon } = useTranslation('common');
     const { user } = useAuth();
     const { refresh: refreshBadges } = useBadges();
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const insets = useSafeAreaInsets();
 
     // Local copy so the card badge clears the moment the user opens the chat,
@@ -274,7 +279,7 @@ function MatchScheduleCardBase({
     const [isEvidenceExpanded, setIsEvidenceExpanded] = useState(false);
     const [isChatExpanded, setIsChatExpanded] = useState(true);
     const [isAvailabilityExpanded, setIsAvailabilityExpanded] = useState(true);
-    const [activeModalTab, setActiveModalTab] = useState<'match' | 'chat' | 'stream'>('match');
+    const [activeModalTab, setActiveModalTab] = useState<'match' | 'insights' | 'chat' | 'stream'>('match');
 
     // Streaming — both opponents can stream, so we track a list.
     const [streams, setStreams] = useState<MatchStream[]>([]);
@@ -295,6 +300,64 @@ function MatchScheduleCardBase({
         !!dbHomeUserId && !!user?.id
             ? dbHomeUserId.toLowerCase() === user.id.toLowerCase()
             : null
+    );
+
+    // Stats tab — head-to-head plus the opponent's recent form, the same panel the bracket's
+    // match modal shows. The list row has no opponent id (it arrives with the details fetch the
+    // modal runs on open), but every row here is the viewer's own match with both sides filled,
+    // so the tab is drawn from the first frame and only the panel waits for the id — gating the
+    // tab on the fetch drew three tabs and then re-flowed the bar to four. It is dropped only if
+    // the details come back with no opponent (a failed fetch, a team game missing a player).
+    const opponentUserId = isUserDbHomeSide ? dbAwayUserId : isMatchParticipant ? dbHomeUserId : null;
+    const showInsightsTab = !!user?.id && (opponentUserId
+        ? opponentUserId.toLowerCase() !== user.id.toLowerCase()
+        : !detailsLoaded);
+    const insightMe: MatchInsightPlayer = {
+        id: user?.id || '',
+        name: user?.username || t('card.you'),
+        avatarUrl: user?.avatarUrl ?? null,
+    };
+    const insightOpponent: MatchInsightPlayer = {
+        id: opponentUserId || '',
+        name: opponentName,
+        avatarUrl: opponentAvatarUrl ?? null,
+    };
+
+    // A fourth tab has to share the row, so the labels drop a size — the same rule
+    // MatchDetailsModal applies to its own tab bar.
+    const modalTabCount = 2 + (showInsightsTab ? 1 : 0) + (currentStatus !== 'pending_availability' ? 1 : 0);
+    const modalTabLabelClass = modalTabCount >= 4
+        ? 'text-[10px] font-black uppercase tracking-wider'
+        : 'text-xs font-black uppercase tracking-widest';
+
+    // Never leave the Stats tab selected once there is nothing for it to show.
+    useEffect(() => {
+        if (activeModalTab === 'insights' && !showInsightsTab) setActiveModalTab('match');
+    }, [activeModalTab, showInsightsTab]);
+
+    // A player tap has to close the sheet — it is a native Modal and would sit on top of the pushed
+    // profile — and coming back reopens it where it was left. The tab survives the close on its
+    // own, and so do the typed Bo1 scores and the picked evidence (they live in this component).
+    // The rest is handled here: the details stay on screen instead of dropping behind the loading
+    // gate (see the open/close effect), and an unsubmitted best-of draft is handed back to the
+    // form, which otherwise rebuilds from the server's games when it mounts again.
+    const reopenOnFocusRef = useRef(false);
+    const [seriesDraftToRestore, setSeriesDraftToRestore] = useState<SeriesGame[] | null>(null);
+
+    const openPlayerProfile = (userId?: string | null, seriesDraft?: SeriesGame[]) => {
+        if (!userId) return;
+        reopenOnFocusRef.current = true;
+        setSeriesDraftToRestore(seriesDraft?.length ? seriesDraft : null);
+        setModalVisible(false);
+        navigation.navigate('PlayerProfile', { id: userId });
+    };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!reopenOnFocusRef.current) return;
+            reopenOnFocusRef.current = false;
+            setModalVisible(true);
+        }, [])
     );
 
     // The card outlives a list refetch (same key), so pick up a deadline the admin moved
@@ -606,7 +669,9 @@ function MatchScheduleCardBase({
     // Fetch availability and comments when modal opens
     useEffect(() => {
         if (!modalVisible) {
-            setDetailsLoaded(false);
+            // A trip to a player's profile is not a real close: the sheet comes straight back on
+            // this match, so it keeps showing what it had while the fetches below refresh it.
+            if (!reopenOnFocusRef.current) setDetailsLoaded(false);
             return;
         }
 
@@ -1427,17 +1492,42 @@ function MatchScheduleCardBase({
                                     onPress={() => setActiveModalTab('match')}
                                 >
                                     <Text numberOfLines={1} className={cn(
-                                        "text-xs font-black uppercase tracking-widest w-full text-center",
+                                        modalTabLabelClass,
+                                        "w-full text-center",
                                         activeModalTab === 'match' ? "text-emerald-300" : "text-slate-500"
                                     )}>{t('tournament:details.match')}</Text>
                                 </ModalTabButton>
+                                {/* Labels next to an icon or badge carry `shrink`: with four tabs the
+                                    longer translations (es "Estadísticas", "Transmisión") ellipsise
+                                    instead of being clipped at the tab edge. */}
+                                {showInsightsTab && (
+                                    <ModalTabButton
+                                        active={activeModalTab === 'insights'}
+                                        onPress={() => setActiveModalTab('insights')}
+                                        tint="indigo"
+                                    >
+                                        <View className="flex-row items-center gap-1.5">
+                                            <Ionicons
+                                                name="pulse"
+                                                size={12}
+                                                color={activeModalTab === 'insights' ? '#A5B4FC' : '#64748B'}
+                                            />
+                                            <Text numberOfLines={1} className={cn(
+                                                modalTabLabelClass,
+                                                "shrink",
+                                                activeModalTab === 'insights' ? "text-indigo-300" : "text-slate-500"
+                                            )}>{t('insights.tab')}</Text>
+                                        </View>
+                                    </ModalTabButton>
+                                )}
                                 <ModalTabButton
                                     active={activeModalTab === 'chat'}
                                     onPress={() => setActiveModalTab('chat')}
                                 >
                                     <View className="flex-row items-center gap-2">
                                         <Text numberOfLines={1} className={cn(
-                                            "text-xs font-black uppercase tracking-widest",
+                                            modalTabLabelClass,
+                                            "shrink",
                                             activeModalTab === 'chat' ? "text-emerald-300" : "text-slate-500"
                                         )}>{t('match:chat.chat')}</Text>
                                         {comments.length > 0 && (
@@ -1462,7 +1552,8 @@ function MatchScheduleCardBase({
                                     >
                                         <View className="flex-row items-center gap-1.5">
                                             <Text numberOfLines={1} className={cn(
-                                                "text-xs font-black uppercase tracking-widest",
+                                                modalTabLabelClass,
+                                                "shrink",
                                                 activeModalTab === 'stream' ? "text-emerald-300" : "text-slate-500"
                                             )}>{t('common:stream')}</Text>
                                             {streams.some(s => s.status === MatchStreamStatus.Live) && (
@@ -1500,6 +1591,7 @@ function MatchScheduleCardBase({
                                                     initialSlots={mySlots}
                                                     onSubmit={handleAvailabilitySubmit}
                                                     onMarkScheduled={() => setConfirmMarkScheduled(true)}
+                                                    onOpponentPress={opponentUserId ? () => openPlayerProfile(opponentUserId) : undefined}
                                                 />
                                             </View>
                                         )}
@@ -1586,7 +1678,10 @@ function MatchScheduleCardBase({
                                                         </View>
 
                                                         <View className="flex-row items-start justify-between">
-                                                            <View className="flex-1 items-center">
+                                                            <Pressable
+                                                                onPress={() => openPlayerProfile(user?.id)}
+                                                                className="flex-1 items-center active:opacity-70"
+                                                            >
                                                                 <PlayerAvatar
                                                                     src={user?.avatarUrl}
                                                                     name={user?.username || t('card.you')}
@@ -1600,7 +1695,7 @@ function MatchScheduleCardBase({
                                                                     tone="home"
                                                                     reserveNicknameSpace={pairingHasNickname}
                                                                 />
-                                                            </View>
+                                                            </Pressable>
 
                                                             <View className="items-center px-2 pt-3">
                                                                 <View className="flex-row items-baseline">
@@ -1614,7 +1709,11 @@ function MatchScheduleCardBase({
                                                                 </View>
                                                             </View>
 
-                                                            <View className="flex-1 items-center">
+                                                            <Pressable
+                                                                onPress={() => openPlayerProfile(opponentUserId)}
+                                                                disabled={!opponentUserId}
+                                                                className="flex-1 items-center active:opacity-70"
+                                                            >
                                                                 <PlayerAvatar
                                                                     src={opponentAvatarUrl}
                                                                     name={opponentName}
@@ -1628,7 +1727,7 @@ function MatchScheduleCardBase({
                                                                     tone="away"
                                                                     reserveNicknameSpace={pairingHasNickname}
                                                                 />
-                                                            </View>
+                                                            </Pressable>
                                                         </View>
 
                                                         {/* The games behind that headline — deciding whether it is
@@ -1747,13 +1846,20 @@ function MatchScheduleCardBase({
                                                         rightName={opponentName}
                                                         rightNickname={opponentNickname}
                                                         rightAvatarUrl={opponentAvatarUrl}
+                                                        // Leaving from the form takes the games typed so far
+                                                        // along, so they are still there on the way back.
+                                                        onLeftPress={() => openPlayerProfile(user?.id, seriesGames)}
+                                                        onRightPress={opponentUserId ? () => openPlayerProfile(opponentUserId, seriesGames) : undefined}
                                                         format={seriesFormat}
                                                         allowTiebreak={allowsTiebreak}
-                                                        initialGames={visualEntrySeedGames}
+                                                        initialGames={seriesDraftToRestore ?? visualEntrySeedGames}
                                                         onChange={(games, outcome, complete) => {
                                                             setSeriesGames(games);
                                                             setSeriesOutcome(outcome);
                                                             setIsSeriesComplete(complete);
+                                                            // The form has taken the restored draft in (it reads
+                                                            // initialGames once, on mount) — one use only.
+                                                            if (seriesDraftToRestore) setSeriesDraftToRestore(null);
                                                         }}
                                                         onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                                                     />
@@ -1765,30 +1871,36 @@ function MatchScheduleCardBase({
                                                     isPremium ? "bg-card/60 border border-white/[0.04]" : "bg-muted/5"
                                                 )}>
                                                     <View className="flex-row items-center justify-between pb-2">
-                                                        {/* Home Player (You) */}
+                                                        {/* Home Player (You). The identity opens the profile;
+                                                            the score input below stays out of the tap target. */}
                                                         <View className="flex-1 items-center">
-                                                            <View className={cn(
-                                                                "rounded-full p-[3px] mb-2",
-                                                                isPremium ? "bg-primary/20" : ""
-                                                            )}>
-                                                                <PlayerAvatar
-                                                                    src={user?.avatarUrl}
-                                                                    name={user?.username || t('card.you')}
-                                                                    size={isPremium ? "xl" : "lg"}
-                                                                    className={cn(isPremium ? "border-2 border-background-deep" : "")}
-                                                                />
-                                                            </View>
-                                                            <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
-                                                                {user?.username || t('card.you')}
-                                                            </Text>
-                                                            {(userNickname || user?.nickName) && (
-                                                                <View className="flex-row items-center justify-center gap-1 mb-1">
-                                                                    <Ionicons name="game-controller" size={20} color="#10B981" />
-                                                                    <Text className="font-semibold text-[13px] text-slate-500" numberOfLines={1}>
-                                                                        {userNickname || user?.nickName}
-                                                                    </Text>
+                                                            <Pressable
+                                                                onPress={() => openPlayerProfile(user?.id)}
+                                                                className="w-full items-center active:opacity-70"
+                                                            >
+                                                                <View className={cn(
+                                                                    "rounded-full p-[3px] mb-2",
+                                                                    isPremium ? "bg-primary/20" : ""
+                                                                )}>
+                                                                    <PlayerAvatar
+                                                                        src={user?.avatarUrl}
+                                                                        name={user?.username || t('card.you')}
+                                                                        size={isPremium ? "xl" : "lg"}
+                                                                        className={cn(isPremium ? "border-2 border-background-deep" : "")}
+                                                                    />
                                                                 </View>
-                                                            )}
+                                                                <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
+                                                                    {user?.username || t('card.you')}
+                                                                </Text>
+                                                                {(userNickname || user?.nickName) && (
+                                                                    <View className="flex-row items-center justify-center gap-1 mb-1">
+                                                                        <Ionicons name="game-controller" size={20} color="#10B981" />
+                                                                        <Text className="font-semibold text-[13px] text-slate-500" numberOfLines={1}>
+                                                                            {userNickname || user?.nickName}
+                                                                        </Text>
+                                                                    </View>
+                                                                )}
+                                                            </Pressable>
                                                             <View className="w-full px-1 mt-2">
                                                                 <TextInput
                                                                     className={cn(
@@ -1822,28 +1934,34 @@ function MatchScheduleCardBase({
 
                                                         {/* Away Player (Opponent) */}
                                                         <View className="flex-1 items-center">
-                                                            <View className={cn(
-                                                                "rounded-full p-[3px] mb-2",
-                                                                isPremium ? "bg-indigo-500/20" : ""
-                                                            )}>
-                                                                <PlayerAvatar
-                                                                    src={opponentAvatarUrl}
-                                                                    name={opponentName}
-                                                                    size={isPremium ? "xl" : "lg"}
-                                                                    className={cn(isPremium ? "border-2 border-background-deep" : "")}
-                                                                />
-                                                            </View>
-                                                            <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
-                                                                {opponentName}
-                                                            </Text>
-                                                            {opponentNickname && (
-                                                                <View className="flex-row items-center justify-center gap-1 mb-1">
-                                                                    <Ionicons name="game-controller" size={20} color="#6366F1" />
-                                                                    <Text className="font-semibold text-[13px] text-slate-500" numberOfLines={1}>
-                                                                        {opponentNickname}
-                                                                    </Text>
+                                                            <Pressable
+                                                                onPress={() => openPlayerProfile(opponentUserId)}
+                                                                disabled={!opponentUserId}
+                                                                className="w-full items-center active:opacity-70"
+                                                            >
+                                                                <View className={cn(
+                                                                    "rounded-full p-[3px] mb-2",
+                                                                    isPremium ? "bg-indigo-500/20" : ""
+                                                                )}>
+                                                                    <PlayerAvatar
+                                                                        src={opponentAvatarUrl}
+                                                                        name={opponentName}
+                                                                        size={isPremium ? "xl" : "lg"}
+                                                                        className={cn(isPremium ? "border-2 border-background-deep" : "")}
+                                                                    />
                                                                 </View>
-                                                            )}
+                                                                <Text className={cn("font-black text-center mb-0.5", isPremium ? "text-base text-white" : "text-base text-foreground")} numberOfLines={1}>
+                                                                    {opponentName}
+                                                                </Text>
+                                                                {opponentNickname && (
+                                                                    <View className="flex-row items-center justify-center gap-1 mb-1">
+                                                                        <Ionicons name="game-controller" size={20} color="#6366F1" />
+                                                                        <Text className="font-semibold text-[13px] text-slate-500" numberOfLines={1}>
+                                                                            {opponentNickname}
+                                                                        </Text>
+                                                                    </View>
+                                                                )}
+                                                            </Pressable>
                                                             <View className="w-full px-1 mt-2">
                                                                 <TextInput
                                                                     className={cn(
@@ -2050,6 +2168,16 @@ function MatchScheduleCardBase({
                                             </View>
                                         )}
                                     </ScrollView>
+                                ) : activeModalTab === 'insights' && showInsightsTab ? (
+                                    // Every match on this card is the viewer's own, so the viewer is
+                                    // always the left-hand side.
+                                    <MatchInsightsPanel
+                                        active={modalVisible}
+                                        primary={insightMe}
+                                        opponent={insightOpponent}
+                                        viewerIsPrimary
+                                        onPlayerPress={openPlayerProfile}
+                                    />
                                 ) : activeModalTab === 'stream' ? (
                                     <MatchStreamPanel
                                         matchId={matchId}
@@ -2264,9 +2392,17 @@ interface ModalTabButtonProps {
     active: boolean;
     onPress: () => void;
     children: React.ReactNode;
+    /** Stats wears indigo, as it does in MatchDetailsModal; every other tab is emerald. */
+    tint?: 'emerald' | 'indigo';
 }
 
-function ModalTabButton({ active, onPress, children }: ModalTabButtonProps) {
+const MODAL_TAB_TINTS = {
+    emerald: { glow: '#10B981', from: 'rgba(16, 185, 129, 0.28)', to: 'rgba(16, 185, 129, 0.10)' },
+    indigo: { glow: '#818CF8', from: 'rgba(129, 140, 248, 0.28)', to: 'rgba(129, 140, 248, 0.10)' },
+} as const;
+
+function ModalTabButton({ active, onPress, children, tint = 'emerald' }: ModalTabButtonProps) {
+    const colors = MODAL_TAB_TINTS[tint];
     return (
         <Pressable
             onPress={onPress}
@@ -2274,7 +2410,7 @@ function ModalTabButton({ active, onPress, children }: ModalTabButtonProps) {
             style={
                 active
                     ? {
-                        shadowColor: '#10B981',
+                        shadowColor: colors.glow,
                         shadowOpacity: 0.35,
                         shadowRadius: 8,
                         shadowOffset: { width: 0, height: 2 },
@@ -2284,7 +2420,7 @@ function ModalTabButton({ active, onPress, children }: ModalTabButtonProps) {
         >
             {active && (
                 <LinearGradient
-                    colors={['rgba(16, 185, 129, 0.28)', 'rgba(16, 185, 129, 0.10)']}
+                    colors={[colors.from, colors.to]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
                     style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}

@@ -28,7 +28,7 @@ import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
-import { MatchDetailsModal } from '../components/modals/MatchDetailsModal';
+import { MatchDetailsModal, type MatchModalTab } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
 import { PendingApprovalsModal, PendingApprovalItem } from '../components/modals/PendingApprovalsModal';
 import {
@@ -314,8 +314,12 @@ export default function TournamentDetailsScreen() {
     // so it needs no fetch and no loading flag.
     const [showProgressModal, setShowProgressModal] = useState(false);
     // Which tab MatchDetailsModal should open on. Bumped to 'chat' when an admin
-    // enters via the help-requests inbox; reset to 'match' for every other entry.
-    const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<'match' | 'chat'>('match');
+    // enters via the help-requests inbox, set to the tab it was left on when it reopens after a
+    // player's profile, and reset to 'match' for every other entry.
+    const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<MatchModalTab>('match');
+    // Set while a player tap inside the match modal has the viewer on that player's profile: the
+    // modal has to be hidden for the pushed screen to show, and coming back reopens it on this tab.
+    const reopenMatchModalOnFocusRef = useRef<MatchModalTab | null>(null);
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
@@ -1721,6 +1725,27 @@ export default function TournamentDetailsScreen() {
         setMatchModalDefaultTab(tab);
         setShowReportModal(true);
     };
+
+    // A player tap inside the match modal: hide the modal so the pushed profile is visible, and
+    // bring it back on the same tab (same selectedMatch) when the viewer returns. Hidden directly,
+    // not through the modal's onClose — that path means the viewer is done with this game and
+    // hands them back to the team overview it came from. The hand-off still happens, once the
+    // reopened modal is genuinely dismissed.
+    const handleOpenProfileFromMatch = (userId: string, fromTab: MatchModalTab) => {
+        reopenMatchModalOnFocusRef.current = fromTab;
+        setShowReportModal(false);
+        navigation.navigate('PlayerProfile', { id: userId });
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            const tab = reopenMatchModalOnFocusRef.current;
+            if (!tab) return;
+            reopenMatchModalOnFocusRef.current = null;
+            setMatchModalDefaultTab(tab);
+            setShowReportModal(true);
+        }, [])
+    );
 
     useEffect(() => {
         if (activeTab === 'bracket') {
@@ -3687,6 +3712,7 @@ export default function TournamentDetailsScreen() {
                 requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
                 tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
                 defaultTab={matchModalDefaultTab}
+                onOpenProfile={handleOpenProfileFromMatch}
                 onMatchUpdate={(freshStructure?: any) => {
                     // Backend now returns the refreshed bracket structure inline on
                     // matchResult / approve / reject, so we can update local state directly
