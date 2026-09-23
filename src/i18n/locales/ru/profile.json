@@ -1,4 +1,5 @@
 {
+  "bestStreak": "Лучшая серия",
   "couldNotLoadPlayer": "Не удалось загрузить данные игрока",
   "draw": "Ничья",
   "draws": "Ничьи",
@@ -76,7 +77,6 @@
   "noTournamentsFound": "Турниры не найдены.",
   "oldest": "Сначала старые",
   "opponent": "Соперник",
-  "played": "Сыграно",
   "playerNotFound": "Игрок не найден",
   "playerProfile": "Профиль игрока",
   "recentForm": "Текущая форма",
@@ -99,9 +99,9 @@
   "tabStats": "Статистика",
   "tabTournaments": "Турниры",
   "tournamentWord": "Турнир",
+  "tournaments": "Турниры",
   "trophies": "Трофеи",
   "win": "Победа",
-  "winPercent": "% побед",
   "winRate": "Процент побед",
   "wins": "Победы"
 }

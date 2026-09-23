@@ -3,17 +3,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
-import { CircularProgress } from '../components/ui/CircularProgress';
 import { ProfileHeaderCard } from '../components/profile/ProfileHeaderCard';
+import { ProfileStatsTab } from '../components/profile/ProfileStatsTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { normalizePlayerMatches } from '../lib/profileQueries';
 import { PlayerMatchesDto } from '../types/user';
 import { SocialType } from '../types/auth';
-import { cn, parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
+import { parseUtcDate, formatDateSafe, getCurrencySymbol } from '../lib/utils';
 import { getSocialUrl, withDiscordProfileLink } from '../lib/social';
 import { SharePlayerCardModal } from '../components/modals/SharePlayerCardModal';
 import { TournamentCard } from '../components/cards/TournamentCard';
@@ -73,21 +74,7 @@ export default function ProfileScreen() {
 
             if (statsRes.ok) {
                 const statsData = await statsRes.json();
-                const s = statsData.result || statsData;
-                const normalizedStats: PlayerMatchesDto = {
-                    stats: s.stats || s.Stats ? {
-                        totalMatches: s.stats?.TotalMatches || s.stats?.totalMatches || s.Stats?.TotalMatches || s.Stats?.totalMatches || 0,
-                        wins: s.stats?.Wins || s.stats?.wins || s.Stats?.Wins || s.Stats?.wins || 0,
-                        losses: s.stats?.Losses || s.stats?.losses || s.Stats?.Losses || s.Stats?.losses || 0,
-                        draws: s.stats?.Draws || s.stats?.draws || s.Stats?.Draws || s.Stats?.draws || 0,
-                        tournamentsWon: s.stats?.tournamentsWon || s.Stats?.tournamentsWon || s.stats?.tournamentsWon || 0,
-                        winRate: s.stats?.WinRate || s.stats?.winRate || s.Stats?.WinRate || s.Stats?.winRate || 0,
-                    } : null,
-                    performance: (s.performance || s.Performance || []).map((m: any) => ({
-                        outcome: (m.outcome || m.Outcome || 'L') as 'W' | 'L' | 'D'
-                    }))
-                };
-                setPlayerMatches(normalizedStats);
+                setPlayerMatches(normalizePlayerMatches(statsData.result || statsData));
             }
 
         } catch (error: any) {
@@ -186,8 +173,6 @@ export default function ProfileScreen() {
         tournamentsWon: playerMatches?.stats?.tournamentsWon || 0,
         socials: user?.userSocials || []
     };
-
-    const performanceList = playerMatches?.performance || [];
 
     const mapSocialsToLinks = (socials: any[]) => {
         return socials.flatMap(s => {
@@ -288,183 +273,7 @@ export default function ProfileScreen() {
                     </View>
 
                     <View className="px-5 pb-12">
-                        {activeTab === 'stats' && (
-                            <View style={{ gap: 10 }}>
-                                {/* ─── Quick Stats ─── */}
-                                <View className="flex-row bg-card rounded-2xl p-1" style={{ gap: 2 }}>
-                                    <View className="flex-1 py-2 items-center">
-                                        <Text className="text-white text-base font-black">{displayData.totalMatches}</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('played')}</Text>
-                                    </View>
-                                    <View className="w-[1px] bg-white/[0.04] my-2" />
-                                    <View className="flex-1 py-2 items-center">
-                                        <Text className="text-primary text-base font-black">{displayData.wins}</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('wins')}</Text>
-                                    </View>
-                                    <View className="w-[1px] bg-white/[0.04] my-2" />
-                                    <View className="flex-1 py-2 items-center">
-                                        <Text className="text-amber-400 text-base font-black">{displayData.tournamentsWon || 0}</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('trophies')}</Text>
-                                    </View>
-                                    <View className="w-[1px] bg-white/[0.04] my-2" />
-                                    <View className="flex-1 py-2 items-center">
-                                        <Text className="text-indigo-400 text-base font-black">{Math.round(displayData.winPercentage)}%</Text>
-                                        <Text className="text-slate-600 text-[7px] uppercase font-black tracking-[2px]">{t('winPercent')}</Text>
-                                    </View>
-                                </View>
-
-                                {/* ─── Recent Form ─── */}
-                                <View className="bg-card rounded-3xl p-4">
-                                    <View className="flex-row items-center justify-between mb-3">
-                                        <View className="flex-row items-center" style={{ gap: 8 }}>
-                                            <View className="w-7 h-7 rounded-xl bg-indigo-500/10 items-center justify-center">
-                                                <Ionicons name="trending-up" size={14} color="#818CF8" />
-                                            </View>
-                                            <Text className="text-[11px] font-black text-white uppercase tracking-widest">{t('recentForm')}</Text>
-                                        </View>
-                                        {performanceList.length > 0 && (
-                                            <View className="flex-row items-center" style={{ gap: 8 }}>
-                                                <View className="flex-row items-center" style={{ gap: 3 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-primary" />
-                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">{t('win')}</Text>
-                                                </View>
-                                                <View className="flex-row items-center" style={{ gap: 3 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-yellow-500" />
-                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">{t('draw')}</Text>
-                                                </View>
-                                                <View className="flex-row items-center" style={{ gap: 3 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-destructive" />
-                                                    <Text className="text-[8px] text-slate-500 font-bold uppercase">{t('loss')}</Text>
-                                                </View>
-                                            </View>
-                                        )}
-                                    </View>
-                                    {performanceList.length > 0 ? (
-                                        <>
-                                            <View className="flex-row items-center justify-center" style={{ gap: 5 }}>
-                                                {[...performanceList].reverse().slice(-10).map((match, i) => (
-                                                    <View key={i} className="flex-1 items-center">
-                                                        <View
-                                                            className={cn(
-                                                                "w-7 h-7 rounded-lg items-center justify-center",
-                                                                match.outcome === 'W' ? "bg-primary/15" : match.outcome === 'D' ? "bg-yellow-500/15" : "bg-destructive/15"
-                                                            )}
-                                                            style={{ borderWidth: 1.5, borderColor: match.outcome === 'W' ? 'rgba(16,185,129,0.3)' : match.outcome === 'D' ? 'rgba(234,179,8,0.3)' : 'rgba(239,68,68,0.3)' }}
-                                                        >
-                                                            <Text className={cn(
-                                                                "text-[10px] font-black",
-                                                                match.outcome === 'W' ? "text-primary" : match.outcome === 'D' ? "text-yellow-500" : "text-destructive"
-                                                            )}>
-                                                                {tCommon(`outcome.${match.outcome}`)}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                ))}
-                                                {Array.from({ length: Math.max(0, 10 - performanceList.length) }).map((_, i) => (
-                                                    <View key={`empty-${i}`} className="flex-1 items-center">
-                                                        <View
-                                                            className="w-7 h-7 rounded-lg items-center justify-center bg-white/[0.03]"
-                                                            style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.04)' }}
-                                                        >
-                                                            <Text className="text-[10px] font-black text-white/10">-</Text>
-                                                        </View>
-                                                    </View>
-                                                ))}
-                                            </View>
-                                            <View className="flex-row items-center justify-between mt-2 px-1">
-                                                <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">{t('oldest')}</Text>
-                                                <View className="flex-1 mx-3 h-[1px] bg-white/[0.04]" />
-                                                <Text className="text-[7px] text-slate-600 font-bold uppercase tracking-wider">{t('latest')}</Text>
-                                            </View>
-                                        </>
-                                    ) : (
-                                        <View className="items-center py-4">
-                                            <Ionicons name="analytics-outline" size={28} color="#1E293B" />
-                                            <Text className="text-slate-600 text-[10px] mt-2">{t('noPerformanceData')}</Text>
-                                        </View>
-                                    )}
-                                </View>
-
-                                {/* ─── Win Rate Hero ─── */}
-                                <View className="bg-card rounded-3xl p-5 items-center">
-                                    <View style={{
-                                        width: 100,
-                                        height: 100,
-                                        position: 'relative',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        marginBottom: 14,
-                                        shadowColor: '#10B981',
-                                        shadowOffset: { width: 0, height: 0 },
-                                        shadowOpacity: 0.3,
-                                        shadowRadius: 14,
-                                        elevation: 4,
-                                    }}>
-                                        <CircularProgress
-                                            percentage={Math.round(displayData.winPercentage)}
-                                            size={100}
-                                            strokeWidth={9}
-                                            color="#10B981"
-                                            backgroundColor="#1E293B"
-                                            showText={false}
-                                        />
-                                        <View className="absolute inset-0 items-center justify-center">
-                                            <Text className="text-white text-2xl font-black">{Math.round(displayData.winPercentage)}%</Text>
-                                            <Text className="text-slate-500 text-[7px] uppercase font-black tracking-[2px]">{t('winRate')}</Text>
-                                        </View>
-                                    </View>
-
-                                    {/* ─── W / D / L Horizontal Bars ─── */}
-                                    <View className="w-full" style={{ gap: 8 }}>
-                                        <View>
-                                            <View className="flex-row items-center justify-between mb-1">
-                                                <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-primary" />
-                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('wins')}</Text>
-                                                </View>
-                                                <Text className="text-primary text-sm font-black">{displayData.wins}</Text>
-                                            </View>
-                                            <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
-                                                <View
-                                                    className="h-full bg-primary rounded-full"
-                                                    style={{ width: displayData.totalMatches > 0 ? `${(displayData.wins / displayData.totalMatches) * 100}%` : '0%' }}
-                                                />
-                                            </View>
-                                        </View>
-                                        <View>
-                                            <View className="flex-row items-center justify-between mb-1">
-                                                <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-yellow-500" />
-                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('draws')}</Text>
-                                                </View>
-                                                <Text className="text-yellow-500 text-sm font-black">{displayData.draws}</Text>
-                                            </View>
-                                            <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
-                                                <View
-                                                    className="h-full bg-yellow-500 rounded-full"
-                                                    style={{ width: displayData.totalMatches > 0 ? `${(displayData.draws / displayData.totalMatches) * 100}%` : '0%' }}
-                                                />
-                                            </View>
-                                        </View>
-                                        <View>
-                                            <View className="flex-row items-center justify-between mb-1">
-                                                <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <View className="w-2 h-2 rounded-full bg-destructive" />
-                                                    <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('losses')}</Text>
-                                                </View>
-                                                <Text className="text-destructive text-sm font-black">{displayData.losses}</Text>
-                                            </View>
-                                            <View className="bg-white/[0.04] rounded-full overflow-hidden" style={{ height: 6 }}>
-                                                <View
-                                                    className="h-full bg-destructive rounded-full"
-                                                    style={{ width: displayData.totalMatches > 0 ? `${(displayData.losses / displayData.totalMatches) * 100}%` : '0%' }}
-                                                />
-                                            </View>
-                                        </View>
-                                    </View>
-                                </View>
-                            </View>
-                        )}
+                        {activeTab === 'stats' && <ProfileStatsTab playerMatches={playerMatches} />}
 
                         {activeTab === 'tournaments' && (
                             <View className="gap-3">

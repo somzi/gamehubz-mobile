@@ -62,21 +62,29 @@ export async function fetchPlayerProfile(userId: string): Promise<PlayerProfileD
     let playerMatches: PlayerMatchesDto | null = null;
     if (statsRes.ok) {
         const statsData = await statsRes.json();
-        const s = statsData.result || statsData;
-        playerMatches = {
-            stats: s.stats || s.Stats ? {
-                totalMatches: s.stats?.TotalMatches || s.stats?.totalMatches || s.Stats?.TotalMatches || s.Stats?.totalMatches || 0,
-                wins: s.stats?.Wins || s.stats?.wins || s.Stats?.Wins || s.Stats?.wins || 0,
-                losses: s.stats?.Losses || s.stats?.losses || s.Stats?.Losses || s.Stats?.losses || 0,
-                draws: s.stats?.Draws || s.stats?.draws || s.Stats?.Draws || s.Stats?.draws || 0,
-                tournamentsWon: s.stats?.tournamentsWon || s.Stats?.tournamentsWon || s.stats?.tournamentsWon || 0,
-                winRate: s.stats?.WinRate || s.stats?.winRate || s.Stats?.WinRate || s.Stats?.winRate || 0,
-            } : null,
-            performance: (s.performance || s.Performance || []).map((m: any) => ({
-                outcome: (m.outcome || m.Outcome || 'L') as 'W' | 'L' | 'D',
-            })),
-        };
+        playerMatches = normalizePlayerMatches(statsData.result || statsData);
     }
 
     return { userInfo, playerMatches };
+}
+
+/** The stats endpoint's payload, shared by both profile screens. */
+export function normalizePlayerMatches(s: any): PlayerMatchesDto {
+    const raw = s.stats || s.Stats;
+    return {
+        stats: raw ? {
+            totalMatches: raw.TotalMatches || raw.totalMatches || 0,
+            wins: raw.Wins || raw.wins || 0,
+            losses: raw.Losses || raw.losses || 0,
+            draws: raw.Draws || raw.draws || 0,
+            tournamentsWon: raw.TournamentsWon || raw.tournamentsWon || 0,
+            winRate: raw.WinRate || raw.winRate || 0,
+            // No `|| 0` here: an API without these fields must read as "unknown", not as zero.
+            tournamentsPlayed: raw.tournamentsPlayed ?? raw.TournamentsPlayed,
+            longestWinStreak: raw.longestWinStreak ?? raw.LongestWinStreak,
+        } : null,
+        performance: (s.performance || s.Performance || []).map((m: any) => ({
+            outcome: (m.outcome || m.Outcome || 'L') as 'W' | 'L' | 'D',
+        })),
+    };
 }
