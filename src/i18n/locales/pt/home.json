@@ -18,6 +18,15 @@
   "noActiveMatchesHint": "Suas partidas competitivas aparecerão aqui quando começarem",
   "highlights": "Destaques",
   "highlightsSub": "Novidades dos seus hubs",
+  "activity": {
+    "announced": "Novo torneio",
+    "registrationOpen": "Inscrições abertas",
+    "live": "Ao vivo",
+    "completed": "Concluído",
+    "canceled": "Cancelado",
+    "deleted": "Removido",
+    "updated": "Atualizado"
+  },
   "noHighlights": "Nenhum destaque ainda",
   "noHighlightsHint": "A atividade dos seus hubs aparecerá aqui",
   "seeAll": "Ver tudo"

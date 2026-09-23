@@ -1,199 +1,155 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import { PressableScale } from '../ui/PressableScale';
+import { View, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PressableScale } from '../ui/PressableScale';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { cn } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
+import { HubActivityType } from '../../types/dashboard';
+
+type IconName = keyof typeof Ionicons.glyphMap;
 
 interface FeedCardProps {
+    type: HubActivityType;
     hubName: string;
     hubAvatar?: string;
-    message: string;
     tournamentName?: string;
-    timestamp: string;
+    /** When it happened, already formatted ("2h ago"). */
+    time: string;
     onClick?: () => void;
-    className?: string;
-    variant?: 'default' | 'compact';
 }
 
-const ACCENT = '#A78BFA';
+// What happened, told by the card itself: the server's message is a sentence fragment written to
+// follow the hub name ("started a live tournament"), which reads as nothing on its own line with
+// the tournament parked in a tag underneath. Each event gets a label, an icon and a colour instead.
+const EVENTS: Partial<Record<HubActivityType, { labelKey: string; icon: IconName; color: string }>> = {
+    [HubActivityType.TournamentAnnounced]: { labelKey: 'activity.announced', icon: 'megaphone', color: COLORS.info },
+    [HubActivityType.RegistrationOpen]: { labelKey: 'activity.registrationOpen', icon: 'person-add', color: COLORS.primary },
+    [HubActivityType.TournamentLive]: { labelKey: 'activity.live', icon: 'radio', color: COLORS.live },
+    [HubActivityType.TournamentCompleted]: { labelKey: 'activity.completed', icon: 'trophy', color: COLORS.warning },
+    [HubActivityType.TournamentCanceled]: { labelKey: 'activity.canceled', icon: 'close-circle', color: COLORS.slate400 },
+    [HubActivityType.TournamentDeleted]: { labelKey: 'activity.deleted', icon: 'trash', color: COLORS.slate400 },
+};
+const FALLBACK_EVENT = { labelKey: 'activity.updated', icon: 'sparkles' as IconName, color: COLORS.highlight };
 
-// Memoized so refreshing an adjacent card (or an unrelated setState in the parent
-// screen) doesn't re-render every visible feed item. All props are primitives except
-// onClick, which callers should keep stable (useCallback) for the memo to bite.
+/**
+ * One hub event, laid out like the match cards above it on Home: what happened and when on top,
+ * then the tournament it happened to — the thing a tap opens — with its hub underneath.
+ *
+ * Memoized: every prop is a primitive except onClick, which callers should keep stable.
+ */
 export const FeedCard = React.memo(function FeedCard({
+    type,
     hubName,
     hubAvatar,
-    message,
     tournamentName,
-    timestamp,
+    time,
     onClick,
-    className,
-    variant = 'default',
 }: FeedCardProps) {
-    if (variant === 'compact') {
-        return (
-            <PressableScale
-                onPress={onClick}
-                className={cn(
-                    'w-[260px] bg-card rounded-3xl p-5 mr-3',
-                    className
-                )}
-            >
-                <View className="flex-row items-center gap-3 mb-4">
-                    <PlayerAvatar
-                        src={hubAvatar}
-                        name={hubName}
-                        size="md"
-                        className="rounded-xl"
-                    />
-                    <View className="flex-1">
-                        <Text
-                            className="font-bold text-white text-sm"
-                            numberOfLines={1}
-                        >
-                            {hubName}
-                        </Text>
-                        <Text className="text-[10px] text-slate-600 uppercase tracking-widest">
-                            {timestamp}
-                        </Text>
-                    </View>
-                </View>
-
-                <Text
-                    className="text-sm text-slate-300 leading-tight mb-4 h-[40px]"
-                    numberOfLines={2}
-                >
-                    {message}
-                </Text>
-
-                {tournamentName && (
-                    <View className="flex-row items-center gap-1.5 bg-emerald-500/[0.08] self-start px-2 py-1 rounded-lg">
-                        <Ionicons name="trophy-outline" size={10} color="#34D399" />
-                        <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">
-                            {tournamentName}
-                        </Text>
-                    </View>
-                )}
-            </PressableScale>
-        );
-    }
+    const { t } = useTranslation('home');
+    const event = EVENTS[type] ?? FALLBACK_EVENT;
+    const label = t(event.labelKey);
+    const tournament = tournamentName?.trim() || '';
+    // A removed tournament has no page left to open.
+    const tappable = !!onClick && type !== HubActivityType.TournamentDeleted;
 
     return (
-        <PressableScale onPress={onClick}>
+        <PressableScale
+            onPress={tappable ? onClick : undefined}
+            disabled={!tappable}
+            accessibilityRole={tappable ? 'button' : undefined}
+            accessibilityLabel={[label, tournament, hubName, time].filter(Boolean).join('. ')}
+        >
             <View
-                className={cn('rounded-[22px] overflow-hidden', className)}
+                className="rounded-[22px] overflow-hidden"
                 style={{
-                    backgroundColor: '#131B2E',
-                    shadowColor: ACCENT,
+                    backgroundColor: COLORS.card,
+                    shadowColor: event.color,
                     shadowOpacity: 0.12,
                     shadowRadius: 14,
                     shadowOffset: { width: 0, height: 6 },
                     elevation: 6,
                 }}
             >
-                {/* Subtle purple-tinted gradient */}
                 <LinearGradient
-                    colors={['rgba(167, 139, 250, 0.10)', 'transparent']}
+                    colors={[event.color + '14', 'transparent']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0.7, y: 0 }}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    style={StyleSheet.absoluteFill}
                 />
-
-                {/* Soft hairline border */}
                 <View
                     pointerEvents="none"
                     className="absolute inset-0 rounded-[22px]"
                     style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}
                 />
-
-                {/* Left accent line (glowing) */}
                 <View
                     style={{
                         position: 'absolute',
                         left: 0,
-                        top: 14,
-                        bottom: 14,
+                        top: 12,
+                        bottom: 12,
                         width: 3,
-                        backgroundColor: ACCENT,
+                        backgroundColor: event.color,
                         borderTopRightRadius: 3,
                         borderBottomRightRadius: 3,
-                        shadowColor: ACCENT,
+                        shadowColor: event.color,
                         shadowOpacity: 0.7,
                         shadowRadius: 8,
                         shadowOffset: { width: 0, height: 0 },
                     }}
                 />
 
-                <View className="p-4 pl-5">
-                    <View className="flex-row items-start gap-3.5">
-                        <View
-                            style={{
-                                shadowColor: ACCENT,
-                                shadowOpacity: 0.35,
-                                shadowRadius: 10,
-                                shadowOffset: { width: 0, height: 2 },
-                            }}
-                        >
-                            <View
-                                style={{
-                                    borderWidth: 1.5,
-                                    borderColor: 'rgba(167, 139, 250, 0.55)',
-                                    borderRadius: 16,
-                                    padding: 2,
-                                }}
-                            >
-                                <PlayerAvatar
-                                    src={hubAvatar}
-                                    name={hubName}
-                                    size="md"
-                                    className="rounded-[12px]"
-                                />
-                            </View>
-                        </View>
-
-                        <View className="flex-1 min-w-0">
-                            {/* Hub name gets the full row — no longer fights the
-                                timestamp for width, so it stops truncating. */}
+                <View className="pt-3 pb-3 pr-3.5 pl-4">
+                    {/* What happened, and when */}
+                    <View className="flex-row items-center justify-between mb-2.5">
+                        <View className="flex-row items-center gap-1.5 flex-1 mr-2">
+                            <Ionicons name={event.icon} size={11} color={event.color} />
                             <Text
-                                className="font-black text-white text-[14px] tracking-tight"
+                                className="text-[10px] font-black uppercase tracking-[2px] flex-1"
+                                style={{ color: event.color }}
                                 numberOfLines={1}
                             >
-                                {hubName}
+                                {label}
                             </Text>
-                            {/* Timestamp lives on its own line as a quiet subtitle. */}
-                            <View className="flex-row items-center gap-1 mt-0.5 mb-1.5">
-                                <Ionicons name="time-outline" size={10} color="#64748B" />
-                                <Text className="text-[9.5px] font-bold text-slate-500 uppercase tracking-[1px]">
-                                    {timestamp}
-                                </Text>
-                            </View>
-                            <Text
-                                className="text-[13px] text-slate-300 leading-[18px]"
-                                numberOfLines={2}
-                            >
-                                {message}
+                        </View>
+                        {!!time && (
+                            <Text className="text-[10px] font-bold text-slate-500 tracking-wider" numberOfLines={1}>
+                                {time}
                             </Text>
-                            {tournamentName && (
-                                <View
-                                    className="flex-row items-center gap-1.5 mt-2.5 self-start px-2.5 py-1 rounded-lg"
-                                    style={{
-                                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                                        borderWidth: 1,
-                                        borderColor: 'rgba(16, 185, 129, 0.28)',
-                                    }}
-                                >
-                                    <Ionicons name="trophy" size={10} color="#34D399" />
-                                    <Text
-                                        className="text-[10px] font-black text-emerald-300 uppercase tracking-tight"
-                                        numberOfLines={1}
-                                    >
-                                        {tournamentName}
+                        )}
+                    </View>
+
+                    {/* Which tournament, in which hub */}
+                    <View className="flex-row items-center">
+                        <View style={{ borderWidth: 1, borderColor: event.color + '55', borderRadius: 13, padding: 1.5 }}>
+                            <PlayerAvatar src={hubAvatar} name={hubName} size="sm" className="rounded-[10px]" />
+                        </View>
+                        <View className="flex-1 ml-3 min-w-0">
+                            <Text className="text-[17px] leading-[22px] font-black text-white tracking-tight" numberOfLines={1}>
+                                {tournament || hubName}
+                            </Text>
+                            {!!tournament && (
+                                <View className="flex-row items-center mt-1.5" style={{ gap: 5 }}>
+                                    <Ionicons name="planet-outline" size={12} color={COLORS.slate500} />
+                                    <Text className="flex-1 text-[12px] font-semibold text-slate-400" numberOfLines={1}>
+                                        {hubName}
                                     </Text>
                                 </View>
                             )}
                         </View>
+                        {tappable && (
+                            <View
+                                className="w-7 h-7 rounded-full items-center justify-center ml-1.5"
+                                style={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.07)',
+                                }}
+                            >
+                                <Ionicons name="chevron-forward" size={12} color={COLORS.slate400} />
+                            </View>
+                        )}
                     </View>
                 </View>
             </View>

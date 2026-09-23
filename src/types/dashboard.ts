@@ -1,8 +1,11 @@
+/** Mirrors the backend HubActivityType (GameHubz.DataModels.Enums), sent as its number. */
 export enum HubActivityType {
-    TournamentCreated = 1,
-    TournamentStarted = 2,
-    RegistrationOpen = 3,
-    // Add other types as needed based on the backend enum
+    TournamentAnnounced = 1,
+    RegistrationOpen = 2,
+    TournamentLive = 3,
+    TournamentCompleted = 4,
+    TournamentCanceled = 5,
+    TournamentDeleted = 6,
 }
 
 export interface DashboardActivityDto {

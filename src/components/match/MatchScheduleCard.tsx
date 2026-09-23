@@ -1343,8 +1343,10 @@ function MatchScheduleCardBase({
                                     >
                                         vs
                                     </Text>
+                                    {/* Same size as the tournament title on the Highlights card below —
+                                        one type scale for the headline of every Home card. */}
                                     <Text
-                                        className="text-[15px] font-black text-white tracking-tight flex-1"
+                                        className="text-[17px] leading-[22px] font-black text-white tracking-tight flex-1"
                                         numberOfLines={1}
                                     >
                                         {opponentName}

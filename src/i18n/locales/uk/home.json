@@ -7,6 +7,15 @@
   "greetStillUp": "Ще не спиш?",
   "highlights": "Стрічка",
   "highlightsSub": "Останнє з твоїх хабів",
+  "activity": {
+    "announced": "Новий турнір",
+    "registrationOpen": "Реєстрацію відкрито",
+    "live": "Триває",
+    "completed": "Завершено",
+    "canceled": "Скасовано",
+    "deleted": "Видалено",
+    "updated": "Оновлено"
+  },
   "needsAttention": "Потребує уваги",
   "needsAttentionSub": "Потрібна твоя дія",
   "noActiveMatches": "Немає активних матчів",

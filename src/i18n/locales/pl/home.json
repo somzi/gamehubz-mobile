@@ -24,6 +24,15 @@
   "noActiveMatchesHint": "Twoje mecze pojawią się tutaj, gdy się rozpoczną",
   "highlights": "Najważniejsze",
   "highlightsSub": "Nowości z Twoich hubów",
+  "activity": {
+    "announced": "Nowy turniej",
+    "registrationOpen": "Zapisy otwarte",
+    "live": "Na żywo",
+    "completed": "Zakończony",
+    "canceled": "Odwołany",
+    "deleted": "Usunięty",
+    "updated": "Zaktualizowany"
+  },
   "noHighlights": "Brak nowości",
   "noHighlightsHint": "Aktywność z Twoich hubów pojawi się tutaj",
   "seeAll": "Zobacz wszystko"

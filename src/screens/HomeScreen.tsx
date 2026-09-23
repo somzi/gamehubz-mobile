@@ -3,12 +3,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList } from '../types/navigation';
+import { RootStackParamList, MainTabParamList } from '../types/navigation';
 import { FeedCard } from '../components/cards/FeedCard';
 import { MatchScheduleCard } from '../components/match/MatchScheduleCard';
 import { useAuth } from '../context/AuthContext';
@@ -22,7 +23,12 @@ import { HighlightsModal } from '../components/modals/HighlightsModal';
 import { parseUtcDate, formatLocalDateTime } from '../lib/utils';
 import { dateLocale } from '../i18n';
 
-type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+// A tab screen inside the root stack: the avatar switches to the Profile tab, everything else
+// pushes onto the stack.
+type HomeScreenNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<MainTabParamList, 'Home'>,
+    StackNavigationProp<RootStackParamList>
+>;
 
 interface MatchOverviewDto {
     id?: string;
@@ -222,15 +228,6 @@ export default function HomeScreen() {
         // `t` alone does not change identity on a language switch; the language is the real input.
     }, [t, i18n.language]);
 
-    const dateLabel = useMemo(() => {
-        const d = new Date();
-        const day = d.toLocaleDateString(dateLocale(), { weekday: 'short' });
-        const monthDay = d.toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' });
-        return `${day.toUpperCase()} · ${monthDay.toUpperCase()}`;
-        // dateLocale() reads the active language, so it is a dependency even though it is not referenced.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [i18n.language]);
-
     const sortedActiveMatches = useMemo(() => {
         return [...myMatches].sort((a, b) => {
             const da = a.scheduledTime ? parseUtcDate(a.scheduledTime).getTime() : 0;
@@ -275,40 +272,42 @@ export default function HomeScreen() {
                 contentContainerStyle={{ paddingBottom: 32 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── Top date strip + notification inbox ── */}
-                <View className="flex-row items-center justify-between px-5 pt-2">
-                    <View className="flex-row items-center gap-2">
-                        <View className="w-1 h-1 rounded-full bg-emerald-400/60" />
-                        <Text className="text-slate-500 text-[10px] font-black uppercase tracking-[3px]">
-                            {dateLabel}
-                        </Text>
-                    </View>
-                    <NotificationBell onPress={() => navigation.navigate('Notifications')} />
-                </View>
-
-                {/* ── Greeting hero ── */}
-                <View className="px-5 pt-3 pb-5 flex-row items-start">
-                    <View className="flex-1 mr-4">
+                {/* ── Greeting hero: the avatar sits with the name it belongs to, the inbox alone
+                    in the top-right corner ── */}
+                <View className="px-5 pt-2 pb-5 flex-row items-start">
+                    <View className="flex-1 mr-3">
                         <Text className="text-slate-500 text-sm font-medium mb-1">
                             {greeting},
                         </Text>
-                        <Text
-                            className="text-white font-black tracking-tighter"
-                            style={{ fontSize: 36, lineHeight: 40 }}
-                            numberOfLines={1}
-                        >
-                            {user?.username || user?.nickName || tCommon('player')}
-                        </Text>
+                        <View className="flex-row items-center gap-2.5">
+                            <Pressable
+                                onPress={() => navigation.navigate('Profile')}
+                                accessibilityRole="button"
+                                accessibilityLabel={tCommon('nav.profile')}
+                                hitSlop={6}
+                                className="active:opacity-80"
+                            >
+                                {/* 40 = the name's line height, so the two read as one row. */}
+                                <PlayerAvatar
+                                    src={user?.avatarUrl || undefined}
+                                    name={user?.username || 'P'}
+                                    size="md"
+                                    className="border-2 border-white/10"
+                                />
+                            </Pressable>
+                            <Text
+                                className="flex-1 text-white font-black tracking-tighter"
+                                style={{ fontSize: 36, lineHeight: 40 }}
+                                numberOfLines={1}
+                            >
+                                {user?.username || user?.nickName || tCommon('player')}
+                            </Text>
+                        </View>
                         <Text className="text-slate-400 text-[13px] font-medium mt-2 leading-5">
                             {subtitle}
                         </Text>
                     </View>
-                    <PlayerAvatar
-                        src={user?.avatarUrl || undefined}
-                        name={user?.username || 'P'}
-                        size="lg"
-                        className="border-2 border-white/10"
-                    />
+                    <NotificationBell onPress={() => navigation.navigate('Notifications')} />
                 </View>
 
                 <View className="px-5">
@@ -442,11 +441,11 @@ export default function HomeScreen() {
                                         // React to remap cards by position — a pure index key leaks the previous
                                         // card's internal state (animation, collapsed) onto the next item.
                                         key={`${item.tournamentId ?? item.hubName ?? 'feed'}-${item.createdOn ?? index}`}
+                                        type={item.type}
                                         hubName={item.hubName}
                                         hubAvatar={item.hubAvatarUrl || item.hubAvatar}
-                                        message={item.message}
                                         tournamentName={item.tournamentName}
-                                        timestamp={formatLocalDateTime(item.createdOn)}
+                                        time={item.timeAgo || formatLocalDateTime(item.createdOn)}
                                         onClick={
                                             item.tournamentId
                                                 ? () => openTournament(item.tournamentId!)
@@ -551,7 +550,15 @@ function SectionHeader({
                             </View>
                         )}
                     </View>
-                    <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-[1.5px] mt-0.5">
+                    {/* One line in every language: at 9px with light tracking the longest subtitle
+                        fits beside the collapse and See All buttons, and anything longer shrinks
+                        instead of wrapping. */}
+                    <Text
+                        className="text-slate-500 text-[9px] font-bold uppercase tracking-[1px] mt-0.5"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                    >
                         {subtitle}
                     </Text>
                 </View>

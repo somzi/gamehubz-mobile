@@ -7,6 +7,15 @@
   "greetStillUp": "Ещё не спишь?",
   "highlights": "Лента",
   "highlightsSub": "Последнее из твоих хабов",
+  "activity": {
+    "announced": "Новый турнир",
+    "registrationOpen": "Регистрация открыта",
+    "live": "Идёт",
+    "completed": "Завершён",
+    "canceled": "Отменён",
+    "deleted": "Удалён",
+    "updated": "Обновлён"
+  },
   "needsAttention": "Требует внимания",
   "needsAttentionSub": "Нужно твоё действие",
   "noActiveMatches": "Нет активных матчей",

@@ -18,6 +18,15 @@
   "noActiveMatchesHint": "Your competitive matches will appear here once they start",
   "highlights": "Highlights",
   "highlightsSub": "Latest from your hubs",
+  "activity": {
+    "announced": "New tournament",
+    "registrationOpen": "Registration open",
+    "live": "Live",
+    "completed": "Completed",
+    "canceled": "Cancelled",
+    "deleted": "Removed",
+    "updated": "Updated"
+  },
   "noHighlights": "No highlights yet",
   "noHighlightsHint": "Activity from your hubs will appear here",
   "seeAll": "See All"

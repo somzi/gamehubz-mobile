@@ -21,6 +21,15 @@
   "noActiveMatchesHint": "Tvoji takmičarski mečevi pojaviće se ovde kad počnu",
   "highlights": "Istaknuto",
   "highlightsSub": "Najnovije iz tvojih hubova",
+  "activity": {
+    "announced": "Novi turnir",
+    "registrationOpen": "Prijave otvorene",
+    "live": "Uživo",
+    "completed": "Završen",
+    "canceled": "Otkazan",
+    "deleted": "Uklonjen",
+    "updated": "Ažuriran"
+  },
   "noHighlights": "Još nema novosti",
   "noHighlightsHint": "Aktivnost iz tvojih hubova pojaviće se ovde",
   "seeAll": "Vidi sve"

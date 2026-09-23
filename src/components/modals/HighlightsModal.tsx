@@ -33,9 +33,11 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
     useEffect(() => {
         if (visible) {
             setPaginatedActivities([]);
-            setPage(0);
+            // The endpoint counts pages from 1 and reads 0 as 1 — starting at 0 fetched the first
+            // page twice and showed every activity on it twice.
+            setPage(1);
             setHasMore(true);
-            fetchActivities(0);
+            fetchActivities(1);
         }
     }, [visible]);
 
@@ -61,7 +63,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                     hubAvatarUrl: a.hubAvatarUrl || a.HubAvatarUrl
                 }));
 
-                if (pageNumber === 0) {
+                if (pageNumber === 1) {
                     setPaginatedActivities(normalizedData);
                 } else {
                     setPaginatedActivities(prev => [...prev, ...normalizedData]);
@@ -129,11 +131,11 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                         renderItem={({ item }) => (
                             <View className="mb-3">
                                 <FeedCard
+                                    type={item.type}
                                     hubName={item.hubName}
                                     hubAvatar={item.hubAvatarUrl || item.hubAvatar}
-                                    message={item.message}
                                     tournamentName={item.tournamentName}
-                                    timestamp={formatLocalDateTime(item.createdOn)}
+                                    time={item.timeAgo || formatLocalDateTime(item.createdOn)}
                                     onClick={item.tournamentId ? () => handleActivityPress(item.tournamentId) : undefined}
                                 />
                             </View>
@@ -141,7 +143,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                         onEndReached={loadMore}
                         onEndReachedThreshold={0.5}
                         ListFooterComponent={() => {
-                            if (isLoading && page > 0) {
+                            if (isLoading && page > 1) {
                                 return (
                                     <View className="py-4 items-center">
                                         <ActivityIndicator size="small" color="#10B981" />
@@ -158,7 +160,7 @@ export function HighlightsModal({ visible, onClose }: HighlightsModalProps) {
                             return null;
                         }}
                         ListEmptyComponent={() => {
-                            if (isLoading && page === 0) {
+                            if (isLoading && page === 1) {
                                 return (
                                     <View className="flex-1 items-center justify-center py-20">
                                         <ActivityIndicator size="large" color="#10B981" />
