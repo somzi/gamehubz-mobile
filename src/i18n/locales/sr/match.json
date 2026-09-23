@@ -270,11 +270,11 @@
     "messageNotSent": "Poruka nije poslata",
     "couldNotSend": "Slanje poruke nije uspelo.",
     "loadEarlier": "Učitaj starije poruke",
-    "startConversation": "Započni razgovor",
     "typeAMessage": "Napiši poruku...",
     "chat": "Čet",
     "longPressToCopy": "Dugo pritisni da kopiraš poruku",
-    "readSuffix": " • Pročitano",
+    "read": "Pročitano",
+    "sent": "Poslato",
     "today": "Danas",
     "yesterday": "Juče"
   },

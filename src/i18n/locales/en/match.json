@@ -267,11 +267,11 @@
     "messageNotSent": "Message not sent",
     "couldNotSend": "Could not send message.",
     "loadEarlier": "Load earlier messages",
-    "startConversation": "Start the conversation",
     "typeAMessage": "Type a message...",
     "chat": "Chat",
     "longPressToCopy": "Long press to copy this message",
-    "readSuffix": " • Read",
+    "read": "Read",
+    "sent": "Sent",
     "today": "Today",
     "yesterday": "Yesterday"
   },

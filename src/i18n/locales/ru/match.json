@@ -108,8 +108,8 @@
     "missingParams": "Не хватает параметров чата",
     "notAvailable": "Чат недоступен",
     "openChatFailed": "Не удалось открыть чат",
-    "readSuffix": " • Прочитано",
-    "startConversation": "Начни разговор",
+    "read": "Прочитано",
+    "sent": "Отправлено",
     "today": "Сегодня",
     "typeAMessage": "Напиши сообщение...",
     "yesterday": "Вчера"

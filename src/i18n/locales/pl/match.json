@@ -273,11 +273,11 @@
     "messageNotSent": "Wiadomość niewysłana",
     "couldNotSend": "Nie udało się wysłać wiadomości.",
     "loadEarlier": "Wczytaj wcześniejsze wiadomości",
-    "startConversation": "Rozpocznij rozmowę",
     "typeAMessage": "Napisz wiadomość...",
     "chat": "Czat",
     "longPressToCopy": "Przytrzymaj, aby skopiować wiadomość",
-    "readSuffix": " • Przeczytano",
+    "read": "Przeczytano",
+    "sent": "Wysłano",
     "today": "Dzisiaj",
     "yesterday": "Wczoraj"
   },

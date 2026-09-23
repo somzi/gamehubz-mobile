@@ -21,7 +21,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { RootStackParamList } from '../types/navigation';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../lib/api';
-import { parseUtcDate } from '../lib/utils';
+import { parseUtcDate, cn } from '../lib/utils';
+import { COLORS } from '../lib/theme';
 import { mergeMessagesById } from '../lib/mergeMessages';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
@@ -59,6 +60,9 @@ export default function DirectChatScreen() {
     const [sendError, setSendError] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
+    // The header renders from the nav seed before the first page lands; until then the list
+    // is empty but the chat is not, so the "say hi" state must wait for this.
+    const [messagesLoaded, setMessagesLoaded] = useState(false);
 
     const listRef = useRef<FlatList<DirectMessage>>(null);
     const connectionRef = useRef<HubConnection | null>(null);
@@ -129,6 +133,7 @@ export default function DirectChatScreen() {
         setSendError(null);
         setError(null);
         setHasMore(false);
+        setMessagesLoaded(false);
 
         if (header && initialChatId) {
             // Render now from the seed; messages stream in underneath.
@@ -204,7 +209,10 @@ export default function DirectChatScreen() {
             } catch (e: any) {
                 if (!cancelled) setError(getErrorMessage(e));
             } finally {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                    setMessagesLoaded(true);
+                }
             }
         })();
 
@@ -455,24 +463,30 @@ export default function DirectChatScreen() {
                     }}
                     ListHeaderComponent={
                         hasMore ? (
-                            <Pressable
-                                onPress={loadEarlier}
-                                disabled={loadingMore}
-                                className="items-center py-2.5"
-                            >
+                            <View className="items-center pb-3">
                                 {loadingMore ? (
-                                    <ActivityIndicator size="small" color="#10B981" />
+                                    <View className="h-8 justify-center">
+                                        <ActivityIndicator size="small" color={COLORS.primary} />
+                                    </View>
                                 ) : (
-                                    <Text className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
-                                        {t('chat.loadEarlier')}
-                                    </Text>
+                                    <Pressable
+                                        onPress={loadEarlier}
+                                        hitSlop={8}
+                                        className="flex-row items-center gap-1.5 h-8 px-3.5 rounded-full bg-white/5 border border-white/10 active:opacity-60"
+                                    >
+                                        <Ionicons name="arrow-up" size={13} color={COLORS.slate400} />
+                                        <Text className="text-slate-300 text-xs font-bold" numberOfLines={1}>
+                                            {t('chat.loadEarlier')}
+                                        </Text>
+                                    </Pressable>
                                 )}
-                            </Pressable>
+                            </View>
                         ) : null
                     }
                     renderItem={({ item, index }) => {
                         const isMine = item.senderId === myUserId;
                         const prev = messages[index - 1];
+                        const next = messages[index + 1];
                         const showDateBreak =
                             !prev || !sameDay(prev.sentAt, item.sentAt);
                         return (
@@ -481,21 +495,42 @@ export default function DirectChatScreen() {
                                 <MessageBubble
                                     message={item}
                                     isMine={isMine}
-                                    showAvatar={!isMine && (!prev || prev.senderId !== item.senderId)}
+                                    endsRun={!sameRun(item, next)}
                                 />
                             </>
                         );
                     }}
                     ListEmptyComponent={
-                        <View className="items-center mt-32 px-6">
-                            <View className="w-20 h-20 rounded-3xl bg-white/[0.03] items-center justify-center mb-4">
-                                <Ionicons name="chatbubble-ellipses-outline" size={36} color="#1E293B" />
+                        messagesLoaded ? (
+                            <View className="items-center mt-24 px-6">
+                                <View style={EMPTY_AVATAR_RING}>
+                                    <PlayerAvatar
+                                        src={chat.otherAvatarUrl ?? undefined}
+                                        name={chat.otherUsername}
+                                        size="lg"
+                                        className="border-0"
+                                    />
+                                </View>
+                                <Text className="text-white font-black text-lg tracking-tight mt-4" numberOfLines={1}>
+                                    {chat.otherUsername}
+                                </Text>
+                                {chat.otherNickname?.trim() ? (
+                                    <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
+                                        <Ionicons name="game-controller" size={14} color={COLORS.primary} />
+                                        <Text className="text-slate-400 text-[13px] font-medium" numberOfLines={1}>
+                                            {chat.otherNickname}
+                                        </Text>
+                                    </View>
+                                ) : null}
+                                <Text className="text-slate-500 text-[13px] font-medium text-center mt-4">
+                                    {t('chatPanel.sayHi')}
+                                </Text>
                             </View>
-                            <Text className="text-white font-black text-base">{t('chat.startConversation')}</Text>
-                            <Text className="text-slate-500 text-xs text-center font-medium mt-1">
-                                Say hi to {chat.otherUsername}
-                            </Text>
-                        </View>
+                        ) : (
+                            <View className="items-center mt-24">
+                                <ActivityIndicator size="small" color={COLORS.primary} />
+                            </View>
+                        )
                     }
                 />
 
@@ -570,22 +605,27 @@ function Header({
     onAvatarPress?: () => void;
 }) {
     const { t } = useTranslation('match');
+    const nickname = chat?.otherNickname?.trim();
+    // The row stays h-11 (44) so the header keeps its old height — the composer's iOS
+    // keyboardVerticalOffset (70) was tuned against it.
     return (
         <View
-            className="flex-row items-center px-3 py-3 border-b border-white/[0.04] bg-background-deep"
+            className="flex-row items-center px-3 py-3 border-b border-white/5 bg-background-deep"
         >
             <Pressable
                 onPress={onBack}
-                className="w-11 h-11 rounded-2xl items-center justify-center"
                 hitSlop={8}
+                accessibilityRole="button"
+                className="w-10 h-10 rounded-2xl items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
             >
-                <Ionicons name="arrow-back" size={24} color="#FAFAFA" />
+                <Ionicons name="arrow-back" size={20} color={COLORS.foreground} />
             </Pressable>
 
             {chat ? (
                 <Pressable
-                    className="flex-row items-center flex-1 ml-1"
+                    className="flex-row items-center flex-1 h-11 ml-3 active:opacity-70"
                     onPress={onAvatarPress}
+                    accessibilityRole="button"
                 >
                     <PlayerAvatar
                         src={chat.otherAvatarUrl ?? undefined}
@@ -593,45 +633,77 @@ function Header({
                         size="md"
                     />
                     <View className="ml-3 flex-1">
-                        <Text className="text-white font-black text-base" numberOfLines={1}>
+                        <Text className="text-white font-black text-base tracking-tight" numberOfLines={1}>
                             {chat.otherUsername}
                         </Text>
-                        {chat.otherNickname ? (
-                            <Text className="text-slate-500 text-xs font-medium" numberOfLines={1}>
-                                {chat.otherNickname}
-                            </Text>
+                        {nickname ? (
+                            <View className="flex-row items-center mt-0.5" style={{ gap: 4 }}>
+                                <Ionicons name="game-controller" size={13} color={COLORS.primary} />
+                                <Text className="flex-1 text-slate-400 text-xs font-medium" numberOfLines={1}>
+                                    {nickname}
+                                </Text>
+                            </View>
                         ) : null}
                     </View>
                 </Pressable>
             ) : (
-                <Text className="text-white font-black text-lg ml-1">{t('chat.chat')}</Text>
+                <View className="h-11 justify-center ml-3">
+                    <Text className="text-white font-black text-lg">{t('chat.chat')}</Text>
+                </View>
             )}
         </View>
     );
 }
 
-// Memoized so a new incoming message re-renders only itself, not every visible
-// bubble. Props are primitives + a stable message ref (existing messages keep
-// identity when we append), so the default shallow compare is effective.
+// A run is consecutive messages from one sender on the same day. Its last bubble
+// carries the sender's avatar and a wider gap before the other side speaks; every
+// bubble keeps its own spacing, tail, time and receipt.
+function sameRun(a?: DirectMessage, b?: DirectMessage): boolean {
+    return !!a && !!b && a.senderId === b.senderId && sameDay(a.sentAt, b.sentAt);
+}
+
+// emerald-900 at 70% — the time and receipt ticks on an emerald (own) bubble.
+const OWN_META_COLOR = 'rgba(6, 78, 59, 0.7)';
+
+const EMPTY_AVATAR_RING = {
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: 'rgba(16,185,129,0.5)',
+    padding: 3,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+} as const;
+
+// Memoized so a new incoming message re-renders only itself (plus the previous bubble
+// when it stops ending the run), not every visible bubble. Props are primitives + a stable
+// message ref (existing messages keep identity when we append), so shallow compare works.
 const MessageBubble = React.memo(function MessageBubble({
     message,
     isMine,
-    showAvatar,
+    endsRun,
 }: {
     message: DirectMessage;
     isMine: boolean;
-    showAvatar: boolean;
+    /** Last bubble of a sender's run: gets the avatar and the wider gap below. */
+    endsRun: boolean;
 }) {
     const { t } = useTranslation('match');
-    const time = formatTime(message.sentAt);
     const { copied, copy } = useCopyToClipboard();
     return (
         <View
-            className={`flex-row items-end mb-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}
+            className={cn(
+                'flex-row items-end',
+                endsRun ? 'mb-3' : 'mb-1.5',
+                isMine ? 'justify-end' : 'justify-start',
+            )}
         >
             {!isMine && (
-                <View className="w-7 mr-2" style={{ opacity: showAvatar ? 1 : 0 }}>
-                    {showAvatar && (
+                // The column is reserved on every incoming bubble so a run stays aligned.
+                <View className="w-7 mr-2">
+                    {endsRun && (
                         <PlayerAvatar
                             src={message.senderAvatarUrl ?? undefined}
                             name={message.senderUsername}
@@ -646,27 +718,37 @@ const MessageBubble = React.memo(function MessageBubble({
                 delayLongPress={250}
                 accessibilityRole="text"
                 accessibilityHint={t('chat.longPressToCopy')}
-                className={`max-w-[78%] rounded-[18px] px-3.5 py-2 ${
+                className={cn(
+                    'max-w-[78%] rounded-[18px] px-3.5 py-2',
                     isMine
-                        ? 'bg-emerald-500 rounded-br-md'
-                        : 'bg-[#1A2438] border border-white/[0.04] rounded-bl-md'
-                }`}
+                        ? 'bg-primary rounded-br-md'
+                        : 'bg-card-elevated border border-white/5 rounded-bl-md',
+                )}
             >
                 <Text
-                    className={`text-[14px] leading-5 ${
-                        isMine ? 'text-slate-900 font-medium' : 'text-white'
-                    }`}
+                    className={cn(
+                        'text-[15px] leading-5',
+                        isMine ? 'text-slate-900 font-medium' : 'text-white',
+                    )}
                 >
                     {message.content}
                 </Text>
-                <Text
-                    className={`text-[9px] mt-0.5 font-bold ${
-                        isMine ? 'text-emerald-900/60 text-right' : 'text-slate-500'
-                    }`}
-                >
-                    {time}
-                    {isMine && message.isRead ? t('chat.readSuffix') : ''}
-                </Text>
+                <View className="flex-row items-center self-end mt-0.5" style={{ gap: 3 }}>
+                    <Text
+                        className={cn('text-[10px] font-semibold', !isMine && 'text-slate-500')}
+                        style={isMine ? { color: OWN_META_COLOR } : undefined}
+                    >
+                        {formatTime(message.sentAt)}
+                    </Text>
+                    {isMine && (
+                        <Ionicons
+                            name={message.isRead ? 'checkmark-done' : 'checkmark'}
+                            size={14}
+                            color={OWN_META_COLOR}
+                            accessibilityLabel={message.isRead ? t('chat.read') : t('chat.sent')}
+                        />
+                    )}
+                </View>
                 {copied && <CopiedOverlay />}
             </Pressable>
         </View>
@@ -676,8 +758,8 @@ const MessageBubble = React.memo(function MessageBubble({
 function DateBreak({ date }: { date: string }) {
     return (
         <View className="items-center my-3">
-            <View className="bg-white/[0.04] px-3 py-1 rounded-full">
-                <Text className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+            <View className="bg-white/5 border border-white/5 px-3 py-1 rounded-full">
+                <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
                     {formatDay(date)}
                 </Text>
             </View>

@@ -267,11 +267,11 @@
     "messageNotSent": "Mensagem não enviada",
     "couldNotSend": "Não foi possível enviar a mensagem.",
     "loadEarlier": "Carregar mensagens anteriores",
-    "startConversation": "Comece a conversa",
     "typeAMessage": "Escreva uma mensagem...",
     "chat": "Chat",
     "longPressToCopy": "Toque e segure para copiar esta mensagem",
-    "readSuffix": " • Lida",
+    "read": "Lida",
+    "sent": "Enviada",
     "today": "Hoje",
     "yesterday": "Ontem"
   },

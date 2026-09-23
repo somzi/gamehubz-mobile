@@ -7,14 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
-import { LinearGradient } from 'expo-linear-gradient';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, cn } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { PressableScale } from '../components/ui/PressableScale';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { COLORS } from '../lib/theme';
 import { EmptyState as EmptyStateBase } from '../components/ui/EmptyState';
 import { useBadges } from '../context/BadgesContext';
 import { useAuth } from '../context/AuthContext';
@@ -176,30 +177,37 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
             ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             renderItem={({ item }) => (
                 <CardSurface onPress={() => navigation.navigate('PlayerProfile', { id: item.userId })}>
-                    <View className="flex-row items-center p-3.5">
+                    <View className="flex-row items-center px-3.5 py-3">
                         <RingAvatar src={item.avatarUrl ?? undefined} name={item.username} />
-                        <View className="flex-1 ml-3.5">
+                        <View className="flex-1 ml-3">
                             <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
                                 {item.username}
                             </Text>
-                            <Text className="text-slate-500 text-[11px] font-semibold mt-0.5" numberOfLines={1}>
-                                {item.nickname ? `@${item.nickname}` : t('friendsSince', { date: monthYear(item.friendsSince) })}
-                            </Text>
+                            {/* Same gamepad line as the profile header; a friend without an in-game
+                                nickname gets the friendship date instead. */}
+                            {item.nickname?.trim() ? (
+                                <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
+                                    <Ionicons name="game-controller" size={14} color={COLORS.primary} />
+                                    <Text className="flex-1 text-slate-400 text-[12px] font-medium" numberOfLines={1}>
+                                        {item.nickname}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <Text className="text-slate-500 text-[12px] font-medium mt-1" numberOfLines={1}>
+                                    {t('friendsSince', { date: monthYear(item.friendsSince) })}
+                                </Text>
+                            )}
                         </View>
-                        <Pressable
+                        <PressableScale
                             onPress={() => openChat(item)}
                             hitSlop={8}
-                            className="w-10 h-10 rounded-2xl items-center justify-center mr-1.5"
-                            style={({ pressed }) => ({
-                                backgroundColor: 'rgba(16,185,129,0.10)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(16,185,129,0.22)',
-                                opacity: pressed ? 0.7 : 1,
-                            })}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('profile:friend.message')}
+                            containerStyle={{ marginLeft: 12 }}
+                            className="w-10 h-10 rounded-full items-center justify-center bg-white/5 border border-white/10"
                         >
-                            <Ionicons name="chatbubble-ellipses" size={17} color="#10B981" />
-                        </Pressable>
-                        <Ionicons name="chevron-forward" size={16} color="#334155" />
+                            <Ionicons name="chatbubble-ellipses" size={18} color={COLORS.primary} />
+                        </PressableScale>
                     </View>
                 </CardSurface>
             )}
@@ -347,7 +355,7 @@ function RequestsTab() {
                                         name={username}
                                         ringColor={isIncoming ? 'rgba(16,185,129,0.30)' : 'rgba(255,255,255,0.10)'}
                                     />
-                                    <View className="flex-1 ml-3.5">
+                                    <View className="flex-1 ml-3">
                                         <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
                                             {username}
                                         </Text>
@@ -480,8 +488,18 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
         { enabled: !!user?.id },
     );
 
-    const onRefresh = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+    // Pull-to-refresh only — the control must not follow background refetches. Opening a chat
+    // marks it read and invalidates this query while the list sits covered by the chat screen;
+    // on iOS a `refreshing` flip that happens off-screen leaves the list pushed down by the
+    // control's height, a blank band above the search bar on the way back.
+    const [isPulling, setIsPulling] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsPulling(true);
+        try {
+            await queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+        } finally {
+            setIsPulling(false);
+        }
     }, [queryClient]);
 
     if (chatsQuery.isPending && chats.length === 0) return <Loading />;
@@ -501,9 +519,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
             }
             refreshControl={
                 <RefreshControl
-                    // isFetching (not isPending) so pull-to-refresh spins for background
-                    // refetches too, not just the very first load.
-                    refreshing={chatsQuery.isFetching}
+                    refreshing={isPulling}
                     onRefresh={onRefresh}
                     tintColor="#10B981"
                 />
@@ -532,50 +548,50 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                             },
                         })}
                     >
-                        <View className="flex-row items-center p-3.5">
-                            <View>
-                                <RingAvatar
-                                    src={item.otherAvatarUrl ?? undefined}
-                                    name={item.otherUsername}
-                                    ringColor={unread ? 'rgba(16,185,129,0.55)' : 'rgba(255,255,255,0.10)'}
-                                />
-                                {unread && (
-                                    <View
-                                        style={{
-                                            position: 'absolute', top: -3, right: -3,
-                                            backgroundColor: '#10B981',
-                                            minWidth: 18, height: 18, borderRadius: 999,
-                                            paddingHorizontal: 4,
-                                            alignItems: 'center', justifyContent: 'center',
-                                            borderWidth: 2, borderColor: '#0F172A',
-                                        }}
+                        <View className="flex-row items-center px-3.5 py-3">
+                            <RingAvatar
+                                src={item.otherAvatarUrl ?? undefined}
+                                name={item.otherUsername}
+                                ringColor={unread ? 'rgba(16,185,129,0.55)' : 'rgba(255,255,255,0.10)'}
+                            />
+                            <View className="flex-1 ml-3">
+                                <View className="flex-row items-center" style={{ gap: 8 }}>
+                                    <Text
+                                        className={cn(
+                                            'flex-1 text-[15px] tracking-tight',
+                                            unread ? 'text-white font-black' : 'text-slate-200 font-bold',
+                                        )}
+                                        numberOfLines={1}
                                     >
-                                        <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 9 }}>
-                                            {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                            <View className="flex-1 ml-3.5">
-                                <View className="flex-row items-center justify-between">
-                                    <Text className="text-white font-black text-[15px] tracking-tight flex-1" numberOfLines={1}>
                                         {item.otherUsername}
                                     </Text>
                                     {item.lastMessageAt && (
-                                        <Text className={cn('text-[10px] font-bold ml-2', unread ? 'text-emerald-400' : 'text-slate-600')}>
+                                        <Text
+                                            className={cn('text-[11px] font-bold', unread ? 'text-primary-bright' : 'text-slate-500')}
+                                            style={{ fontVariant: ['tabular-nums'] }}
+                                        >
                                             {formatChatTime(item.lastMessageAt)}
                                         </Text>
                                     )}
                                 </View>
-                                {item.lastMessage ? (
+                                <View className="flex-row items-center mt-1" style={{ gap: 8 }}>
                                     <Text
-                                        className={cn('text-[12.5px] mt-1', unread ? 'text-slate-100 font-semibold' : 'text-slate-500 font-medium')}
+                                        className={cn('flex-1 text-[13px]', unread ? 'text-slate-200 font-semibold' : 'text-slate-400 font-medium')}
                                         numberOfLines={1}
                                     >
                                         {fromMe ? <Text className="text-slate-500 font-medium">{t('youPrefix')}</Text> : null}
                                         {item.lastMessage}
                                     </Text>
-                                ) : null}
+                                    {/* Count sits at the end of the preview line, like any chat app —
+                                        the avatar stays clean. */}
+                                    {unread && (
+                                        <View className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary items-center justify-center">
+                                            <Text className="text-primary-foreground text-[11px] font-black">
+                                                {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
                         </View>
                     </CardSurface>
@@ -697,8 +713,9 @@ function monthYear(iso?: string): string {
     return parseUtcDate(iso).toLocaleDateString(dateLocale(), { month: 'short', year: 'numeric' });
 }
 
-// Premium card chrome shared across all Social rows: soft gradient, hairline
-// border, lift shadow. `highlight` gives unread chats an emerald accent + edge strip.
+// Card chrome shared by every Social row: a flat card surface with a crisp hairline
+// border, like the notification inbox. `highlight` (unread chat) adds the inbox's
+// quiet marker — an emerald wash, an emerald edge and a rail on the leading edge.
 function CardSurface({
     onPress,
     children,
@@ -711,41 +728,37 @@ function CardSurface({
     const surface = (
         <View
             style={{
-                borderRadius: 20,
+                borderRadius: 18,
                 overflow: 'hidden',
-                backgroundColor: '#131B2E',
+                backgroundColor: COLORS.card,
                 borderWidth: 1,
-                borderColor: highlight ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.06)',
-                shadowColor: highlight ? '#10B981' : '#000',
-                shadowOpacity: highlight ? 0.15 : 0.18,
-                shadowRadius: highlight ? 10 : 7,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 3,
+                borderColor: highlight ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.07)',
             }}
         >
-            <LinearGradient
-                colors={highlight ? ['rgba(16,185,129,0.10)', 'transparent'] : ['rgba(255,255,255,0.04)', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0.8, y: 0.7 }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            />
             {highlight && (
-                <View
-                    style={{
-                        position: 'absolute', left: 0, top: 12, bottom: 12, width: 3,
-                        backgroundColor: '#10B981',
-                        borderTopRightRadius: 3, borderBottomRightRadius: 3,
-                    }}
-                />
+                <>
+                    <View
+                        pointerEvents="none"
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(16,185,129,0.06)' }}
+                    />
+                    <View
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
+                            backgroundColor: COLORS.primary,
+                            borderTopRightRadius: 3, borderBottomRightRadius: 3,
+                        }}
+                    />
+                </>
             )}
             {children}
         </View>
     );
     if (!onPress) return surface;
     return (
-        <Pressable onPress={onPress} style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.985 : 1 }] })}>
+        <PressableScale onPress={onPress} pressedScale={0.98}>
             {surface}
-        </Pressable>
+        </PressableScale>
     );
 }
 
