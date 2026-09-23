@@ -3,7 +3,6 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CircularProgress } from '../ui/CircularProgress';
-import { COLORS } from '../../lib/theme';
 import { cn } from '../../lib/utils';
 import type { PlayerMatchesDto } from '../../types/user';
 
@@ -12,9 +11,8 @@ interface ProfileStatsTabProps {
 }
 
 /**
- * Stats tab of both profiles (own tab and PlayerProfileScreen). The top row only carries numbers the
- * cards below don't show: wins and win rate already live in the chart, and the match total sits in
- * the chart's own header.
+ * Stats tab of both profiles (own tab and PlayerProfileScreen). The top row leaves out wins and win
+ * rate: the chart below already shows both.
  */
 export function ProfileStatsTab({ playerMatches }: ProfileStatsTabProps) {
     const { t } = useTranslation('profile');
@@ -34,6 +32,8 @@ export function ProfileStatsTab({ playerMatches }: ProfileStatsTabProps) {
         <View style={{ gap: 10 }}>
             {/* ─── Career ─── */}
             <View className="flex-row bg-card rounded-2xl p-1" style={{ gap: 2 }}>
+                <CareerStat value={stats ? totalMatches : undefined} label={t('matches')} valueClassName="text-white" />
+                <View className="w-[1px] bg-white/[0.04] my-2" />
                 <CareerStat value={stats?.tournamentsPlayed} label={t('tournaments')} valueClassName="text-white" />
                 <View className="w-[1px] bg-white/[0.04] my-2" />
                 <CareerStat value={stats ? stats.tournamentsWon : undefined} label={t('trophies')} valueClassName="text-amber-400" />
@@ -113,18 +113,8 @@ export function ProfileStatsTab({ playerMatches }: ProfileStatsTabProps) {
                 )}
             </View>
 
-            {/* ─── Matches: total, win rate, W / D / L ─── */}
-            <View className="bg-card rounded-3xl p-4 items-center">
-                <View className="w-full flex-row items-center justify-between mb-3">
-                    <View className="flex-row items-center" style={{ gap: 8 }}>
-                        <View className="w-7 h-7 rounded-xl bg-primary/10 items-center justify-center">
-                            <Ionicons name="game-controller" size={14} color={COLORS.primary} />
-                        </View>
-                        <Text className="text-[11px] font-black text-white uppercase tracking-widest">{t('matches')}</Text>
-                    </View>
-                    <Text className="text-white text-sm font-black">{totalMatches}</Text>
-                </View>
-
+            {/* ─── Win Rate + W / D / L ─── */}
+            <View className="bg-card rounded-3xl p-5 items-center">
                 <View style={{
                     width: 100,
                     height: 100,
@@ -203,7 +193,7 @@ function CareerStat({ value, label, valueClassName }: { value: number | undefine
                 {value === undefined ? '–' : value}
             </Text>
             <Text
-                className="w-full text-center text-slate-500 text-[8px] uppercase font-black tracking-[1.5px]"
+                className="w-full text-center text-slate-500 text-[8px] uppercase font-black tracking-[1px]"
                 numberOfLines={1}
                 adjustsFontSizeToFit
             >
