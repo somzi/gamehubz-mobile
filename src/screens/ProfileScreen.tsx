@@ -2,10 +2,9 @@ import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
 import { CircularProgress } from '../components/ui/CircularProgress';
-import { SocialLinks } from '../components/profile/SocialLinks';
+import { ProfileHeaderCard } from '../components/profile/ProfileHeaderCard';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -31,7 +30,6 @@ const TAB_DEFS = [
 export default function ProfileScreen() {
     const { t } = useTranslation('profile');
     const { t: tCommon } = useTranslation('common');
-    const { t: tAuth } = useTranslation('auth');
     const tabs: PremiumTabItem[] = TAB_DEFS.map(d => ({ ...d, label: t(d.labelKey) })) as PremiumTabItem[];
     const { user, refreshUser } = useAuth();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -178,24 +176,8 @@ export default function ProfileScreen() {
         }, [user?.id, refreshUser, fetchDetailedData])
     );
 
-    const getRegionName = (region?: number) => {
-        switch (region) {
-            case 1: return tAuth('region.northAmerica');
-            case 2: return tAuth('region.europe');
-            case 3: return tAuth('region.asia');
-            case 4: return tAuth('region.southAmerica');
-            case 5: return tAuth('region.africa');
-            case 6: return tAuth('region.oceania');
-            default: return t('regionGlobal');
-        }
-    };
-
     const displayData = {
         username: user?.username || t('guest'),
-        nickName: user?.nickName || t('noNickname'),
-        region: getRegionName(user?.region),
-        countryName: user?.countryName || null,
-        countryFlag: user?.countryFlag || null,
         totalMatches: playerMatches?.stats?.totalMatches || 0,
         winPercentage: playerMatches?.stats?.winRate || 0,
         wins: playerMatches?.stats?.wins || 0,
@@ -280,91 +262,20 @@ export default function ProfileScreen() {
                 scrollEventThrottle={16}
             >
                 {/* ─── Profile Card ─── */}
-                <View className="mx-5 mt-3">
-                    <View className="bg-card rounded-3xl p-5">
-                        {/* Header: Avatar + Info side by side */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                            {/* Avatar with glow border */}
-                            <View style={{
-                                borderRadius: 999,
-                                borderWidth: 2.5,
-                                borderColor: 'rgba(16,185,129,0.5)',
-                                padding: 3,
-                                shadowColor: '#10B981',
-                                shadowOffset: { width: 0, height: 0 },
-                                shadowOpacity: 0.35,
-                                shadowRadius: 10,
-                                elevation: 6,
-                            }}>
-                                <PlayerAvatar src={user?.avatarUrl} name={displayData.username} size="xl" className="border-0" />
-                            </View>
-                            {/* Text info - flex: 1 prevents overlapping */}
-                            <View style={{ flex: 1, flexShrink: 1 }}>
-                                <Text
-                                    className="text-xl font-black text-white tracking-tight"
-                                    numberOfLines={1}
-                                    style={{ flexShrink: 1 }}
-                                >
-                                    {displayData.username}
-                                </Text>
-                                <View style={{ alignSelf: 'flex-start', marginTop: 6 }}>
-                                    <View className="flex-row items-center bg-emerald-500/10 px-2.5 py-1 rounded-lg" style={{ flexShrink: 1 }}>
-                                        <Ionicons name="game-controller" size={12} color="#10B981" />
-                                        <Text
-                                            className="text-primary font-bold text-xs ml-1.5"
-                                            numberOfLines={1}
-                                            style={{ flexShrink: 1 }}
-                                        >
-                                            {displayData.nickName}
-                                        </Text>
-                                    </View>
-                                </View>
-                                {displayData.countryName ? (
-                                    <View className="mt-2">
-                                        <View className="flex-row items-center mb-1">
-                                            <View style={{ width: 18, alignItems: 'center' }}>
-                                                <Text style={{ fontSize: 13 }}>
-                                                    {displayData.countryFlag ?? '🌐'}
-                                                </Text>
-                                            </View>
-                                            <Text className="text-slate-200 font-black text-[11px] ml-1.5 uppercase tracking-[2px]">
-                                                {displayData.countryName}
-                                            </Text>
-                                        </View>
-                                        <View className="flex-row items-center">
-                                            <View style={{ width: 18, alignItems: 'center' }}>
-                                                <Ionicons name="globe-outline" size={11} color="#94A3B8" />
-                                            </View>
-                                            <Text className="text-slate-400 font-bold text-[10px] ml-1.5 uppercase tracking-[2px]">
-                                                {displayData.region}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <View className="flex-row items-center mt-1.5">
-                                        <Ionicons name="globe-outline" size={11} color="#64748B" />
-                                        <Text className="text-slate-500 font-bold text-[10px] ml-1.5 uppercase tracking-widest">
-                                            {displayData.region}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        </View>
-                        {(() => {
-                            const socialLinks = withDiscordProfileLink(
-                                mapSocialsToLinks(displayData.socials),
-                                user?.discordUserId,
-                                user?.discordUsername,
-                            );
-                            if (socialLinks.length === 0) return null;
-                            return (
-                                <View className="mt-4 pt-3" style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)' }}>
-                                    <SocialLinks links={socialLinks} className="justify-center" />
-                                </View>
-                            );
-                        })()}
-                    </View>
-                </View>
+                <ProfileHeaderCard
+                    className="mx-5 mt-3"
+                    avatarUrl={user?.avatarUrl}
+                    username={displayData.username}
+                    nickname={user?.nickName}
+                    countryFlag={user?.countryFlag}
+                    countryName={user?.countryName}
+                    region={user?.region}
+                    socialLinks={withDiscordProfileLink(
+                        mapSocialsToLinks(displayData.socials),
+                        user?.discordUserId,
+                        user?.discordUsername,
+                    )}
+                />
 
                 {/* ─── Tabs ─── */}
                 <View className="mt-2">
