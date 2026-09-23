@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, Pressable } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -52,10 +53,18 @@ function VideoPreview({ uri }: { uri: string }) {
 interface EvidencePreviewModalProps {
     item: EvidenceItem | null;
     onClose: () => void;
+    /**
+     * Render as a plain absolute-fill view inside the caller's own Modal instead of a Modal of its
+     * own. For a caller that is itself a Modal and renders this beside it: iOS presents a Modal from
+     * the screen underneath, which is already presenting the caller's — so the preview never
+     * appeared. (Nested inside the caller's Modal, as MatchDetailsModal does, a Modal is fine.)
+     * The caller owns Android's back key — route it to onClose while this is up.
+     */
+    overlay?: boolean;
 }
 
 /** Fullscreen viewer for one piece of evidence, image or clip. */
-export function EvidencePreviewModal({ item, onClose }: EvidencePreviewModalProps) {
+export function EvidencePreviewModal({ item, onClose, overlay = false }: EvidencePreviewModalProps) {
     const { t } = useTranslation('match');
     const canPlayVideo = getVideoModule() !== null;
 
@@ -87,6 +96,32 @@ export function EvidencePreviewModal({ item, onClose }: EvidencePreviewModalProp
         return <VideoPreview uri={item.url} />;
     };
 
+    const body = (
+        <View className="flex-1 bg-black/95 items-center justify-center p-4">
+            <Pressable
+                className="absolute top-12 right-6 z-10 w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/20"
+                onPress={onClose}
+            >
+                <Ionicons name="close" size={24} color="white" />
+            </Pressable>
+
+            {renderContent()}
+        </View>
+    );
+
+    if (overlay) {
+        return item ? (
+            <Animated.View
+                entering={FadeIn.duration(150)}
+                className="absolute inset-0"
+                style={{ elevation: 30, zIndex: 60 }}
+                accessibilityViewIsModal
+            >
+                {body}
+            </Animated.View>
+        ) : null;
+    }
+
     return (
         <Modal
             visible={!!item}
@@ -94,16 +129,7 @@ export function EvidencePreviewModal({ item, onClose }: EvidencePreviewModalProp
             animationType="fade"
             onRequestClose={onClose}
         >
-            <View className="flex-1 bg-black/95 items-center justify-center p-4">
-                <Pressable
-                    className="absolute top-12 right-6 z-10 w-10 h-10 rounded-full bg-white/10 items-center justify-center border border-white/20"
-                    onPress={onClose}
-                >
-                    <Ionicons name="close" size={24} color="white" />
-                </Pressable>
-
-                {renderContent()}
-            </View>
+            {body}
         </Modal>
     );
 }

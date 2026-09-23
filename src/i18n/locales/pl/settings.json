@@ -1,7 +1,6 @@
 {
   "title": "Ustawienia",
   "sections": {
-    "notifications": "Powiadomienia",
     "account": "Konto",
     "preferences": "Preferencje",
     "support": "Pomoc",
@@ -38,14 +37,12 @@
     "message": "Nie udało się usunąć konta. Spróbuj ponownie później."
   },
   "notifications": {
-    "inbox": "Skrzynka powiadomień",
+    "title": "Powiadomienia",
     "push": "Powiadomienia push",
     "pushOn": "Wł.",
     "pushOff": "Wył.",
-    "pushOffHint": "Powiadomienia push są wyłączone na tym urządzeniu, więc nic nie wyskakuje — wszystko i tak trafia do skrzynki powiadomień. Naciśnij Powiadomienia push, aby je włączyć.",
     "moderatedChats": "Czaty, które moderuję",
-    "moderatedChatsHint": "Powiadamiaj mnie, gdy gracze odpowiadają na czacie meczu, w którym uczestniczę jako organizator. To ustawienie nigdy nie wycisza czatów Twoich własnych meczów.",
-    "perMatchHint": "Aby wyciszyć tylko jeden konkretny mecz, otwórz jego czat i naciśnij Wyciszony.",
+    "moderatedChatsHint": "Powiadamiaj mnie, gdy gracze odpowiadają na czacie meczu, w którym uczestniczę jako organizator.",
     "saveFailedTitle": "Nie udało się zapisać",
     "saveFailedMessage": "Ustawienie powiadomień nie zostało zaktualizowane. Spróbuj ponownie za chwilę."
   }

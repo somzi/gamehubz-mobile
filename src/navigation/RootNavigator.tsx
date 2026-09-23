@@ -19,6 +19,7 @@ import RegisterScreen from '../screens/RegisterScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import UpdateProfileScreen from '../screens/UpdateProfileScreen';
 import ManageHubScreen from '../screens/ManageHubScreen';
 import HubMembersScreen from '../screens/HubMembersScreen';
@@ -80,6 +81,10 @@ export function RootNavigator() {
                     <Stack.Screen
                         name="Settings"
                         component={SettingsScreen}
+                    />
+                    <Stack.Screen
+                        name="NotificationSettings"
+                        component={NotificationSettingsScreen}
                     />
                     <Stack.Screen
                         name="NotFound"

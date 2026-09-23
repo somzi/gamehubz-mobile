@@ -26,6 +26,8 @@ export type RootStackParamList = {
     Settings: undefined;
     /** The notification inbox. */
     Notifications: undefined;
+    /** Settings → Notifications: push permission + notification switches. */
+    NotificationSettings: undefined;
     ChangePassword: undefined;
     HelpCenter: undefined;
     AboutUs: undefined;

@@ -1,8 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, Alert, AppState, Linking } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { View, Text, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
@@ -15,12 +13,8 @@ import Constants from 'expo-constants';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
-import { Toggle } from '../components/ui/Toggle';
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
-import { NotificationSettings } from '../types/social';
 import { useLanguage } from '../i18n/useLanguage';
-import { usePushNotifications } from '../hooks/usePushNotifications';
-import { useNotifications } from '../context/NotificationsContext';
+import { usePushPermission } from '../hooks/usePushPermission';
 
 type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -32,6 +26,9 @@ export default function SettingsScreen() {
     const { t } = useTranslation('settings');
     const { t: tc } = useTranslation('common');
     const { current, options, language, change } = useLanguage();
+    // Only read here, to flag push that is off on this device; changing it lives on the
+    // Notifications screen.
+    const { permission: pushPermission } = usePushPermission();
 
     const [showLanguageSheet, setShowLanguageSheet] = React.useState(false);
     const [showStatusModal, setShowStatusModal] = React.useState(false);
@@ -40,87 +37,6 @@ export default function SettingsScreen() {
         title: string;
         message: string;
     }>({ type: 'success', title: '', message: '' });
-
-    // Notification switches. Loaded lazily on mount — one tiny GET, and the section simply
-    // stays out of the way until it arrives rather than rendering a toggle in a guessed state.
-    const [notificationSettings, setNotificationSettings] = React.useState<NotificationSettings | null>(null);
-    const [isSavingNotifications, setIsSavingNotifications] = React.useState(false);
-
-    React.useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const response = await authenticatedFetch(ENDPOINTS.NOTIFICATION_SETTINGS);
-                if (!response.ok) return;
-                const data = (await response.json()) as NotificationSettings;
-                if (!cancelled) setNotificationSettings(data);
-            } catch { /* best-effort — the section stays hidden */ }
-        })();
-        return () => { cancelled = true; };
-    }, []);
-
-    // Inbox entry + the OS push permission. The permission is only read here, never requested on
-    // mount, and it is re-read whenever the app returns to the foreground — which is how a user coming
-    // back from the system settings page sees their change straight away.
-    const { summary: notificationSummary } = useNotifications();
-    const { requestAndSync } = usePushNotifications();
-    const [pushPermission, setPushPermission] = React.useState<{ granted: boolean; canAskAgain: boolean } | null>(null);
-
-    const readPushPermission = React.useCallback(async () => {
-        try {
-            const permission = await Notifications.getPermissionsAsync();
-            setPushPermission({
-                granted: permission.granted || permission.status === 'granted',
-                canAskAgain: permission.canAskAgain,
-            });
-        } catch { /* best-effort — the row stays hidden */ }
-    }, []);
-
-    React.useEffect(() => {
-        readPushPermission();
-        const subscription = AppState.addEventListener('change', (next) => {
-            if (next === 'active') readPushPermission();
-        });
-        return () => subscription.remove();
-    }, [readPushPermission]);
-
-    // Off but still askable → the OS prompt (and the token sync that follows a yes). Off for good, or
-    // already on → the system settings page, the only place either can be changed.
-    const handlePushPermissionPress = async () => {
-        if (pushPermission && !pushPermission.granted && pushPermission.canAskAgain) {
-            await requestAndSync();
-            await readPushPermission();
-            return;
-        }
-        Linking.openSettings().catch(() => { /* nothing more to do */ });
-    };
-
-    // Optimistic, with rollback: the toggle is the whole interaction, so it must not wait on
-    // a round-trip to move.
-    const handleToggleModeratedChats = async (enabled: boolean) => {
-        if (isSavingNotifications || !notificationSettings) return;
-        const previous = notificationSettings;
-        setNotificationSettings({ ...previous, moderatedChatNotifications: enabled });
-        setIsSavingNotifications(true);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.NOTIFICATION_SETTINGS, {
-                method: 'PUT',
-                body: JSON.stringify({ ...previous, moderatedChatNotifications: enabled }),
-            });
-            if (!response.ok) throw new Error(`NOTIFICATION_SETTINGS failed: ${response.status}`);
-        } catch (error) {
-            console.error('Error updating notification settings:', error);
-            setNotificationSettings(previous);
-            setStatusModalConfig({
-                type: 'error',
-                title: t('notifications.saveFailedTitle'),
-                message: t('notifications.saveFailedMessage'),
-            });
-            setShowStatusModal(true);
-        } finally {
-            setIsSavingNotifications(false);
-        }
-    };
 
     const handleLogout = () => {
         Alert.alert(
@@ -195,79 +111,20 @@ export default function SettingsScreen() {
                     </View>
 
                     <View>
-                        <SectionLabel icon="notifications" title={t('sections.notifications')} color={COLORS.warning} />
+                        <SectionLabel icon="options" title={t('sections.preferences')} color={COLORS.highlight} />
                         <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
-                                icon="file-tray-full-outline"
-                                label={t('notifications.inbox')}
-                                onPress={() => navigation.navigate('Notifications')}
-                                isLast={!pushPermission && !notificationSettings}
-                                rightElement={notificationSummary.unread > 0 ? (
-                                    <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: COLORS.primary + '1F' }}>
-                                        <Text className="text-[11px] font-black" style={{ color: COLORS.primaryBright }}>
-                                            {notificationSummary.unread > 99 ? '99+' : notificationSummary.unread}
+                                icon="notifications-outline"
+                                label={t('notifications.title')}
+                                onPress={() => navigation.navigate('NotificationSettings')}
+                                rightElement={pushPermission && !pushPermission.granted ? (
+                                    <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: COLORS.warning + '1F' }}>
+                                        <Text className="text-[11px] font-black" style={{ color: COLORS.warning }}>
+                                            {t('notifications.pushOff')}
                                         </Text>
                                     </View>
                                 ) : undefined}
                             />
-                            {pushPermission && (
-                                <MenuItem
-                                    icon="phone-portrait-outline"
-                                    label={t('notifications.push')}
-                                    onPress={handlePushPermissionPress}
-                                    isLast={!notificationSettings}
-                                    rightElement={
-                                        <View
-                                            className="px-2 py-0.5 rounded-full"
-                                            style={{ backgroundColor: (pushPermission.granted ? COLORS.primary : COLORS.warning) + '1F' }}
-                                        >
-                                            <Text
-                                                className="text-[11px] font-black"
-                                                style={{ color: pushPermission.granted ? COLORS.primaryBright : COLORS.warning }}
-                                            >
-                                                {pushPermission.granted ? t('notifications.pushOn') : t('notifications.pushOff')}
-                                            </Text>
-                                        </View>
-                                    }
-                                />
-                            )}
-                            {notificationSettings && (
-                                <View className="flex-row items-center justify-between py-3.5 px-4">
-                                    <View className="flex-row items-center gap-3 flex-1 pr-3">
-                                        <View className="w-9 h-9 rounded-xl items-center justify-center border bg-white/[0.04] border-white/[0.06]">
-                                            <Ionicons name="shield-checkmark-outline" size={17} color={COLORS.slate300} />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="font-semibold text-[15px] text-white">{t('notifications.moderatedChats')}</Text>
-                                            <Text className="text-xs text-slate-500 mt-0.5">
-                                                {t('notifications.moderatedChatsHint')}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Toggle
-                                        size="sm"
-                                        value={notificationSettings.moderatedChatNotifications}
-                                        onValueChange={handleToggleModeratedChats}
-                                        disabled={isSavingNotifications}
-                                    />
-                                </View>
-                            )}
-                        </View>
-                        {pushPermission && !pushPermission.granted && (
-                            <Text className="text-[11px] text-slate-600 mt-2 px-1 leading-4">
-                                {t('notifications.pushOffHint')}
-                            </Text>
-                        )}
-                        {notificationSettings && (
-                            <Text className="text-[11px] text-slate-600 mt-2 px-1 leading-4">
-                                {t('notifications.perMatchHint')}
-                            </Text>
-                        )}
-                    </View>
-
-                    <View>
-                        <SectionLabel icon="options" title={t('sections.preferences')} color={COLORS.highlight} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
                             <MenuItem
                                 icon="language-outline"
                                 label={t('language')}
@@ -326,7 +183,7 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                <View className="py-12 items-center opacity-30">
+                <View className="py-8 items-center opacity-30">
                     <Text className="text-white text-xs">
                         {t('version', { version: Constants.expoConfig?.version || '1.0.0' })}
                     </Text>

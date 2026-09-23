@@ -141,7 +141,10 @@
     "readyCheckHint": "Los jugadores confirman que están frente al teclado cuando hay una hora acordada. Quien aparezca solo gana por incomparecencia; si no aparece nadie, la partida se anula.",
     "checkInGrace": "Periodo de gracia",
     "checkInGraceHint": "Minutos que tiene el rival para confirmar antes de perder, contados desde la hora acordada.",
-    "summaryReadyCheck": "Confirmación de listos"
+    "summaryReadyCheck": "Confirmación de listos",
+    "resultVerification": "Verificación del resultado",
+    "resultVerificationHint": "Antes de reportar un resultado, los jugadores confirman su identidad con Face ID o huella en un teléfono registrado y adjuntan una grabación de pantalla del marcador final. Los organizadores siempre pueden cargar resultados.",
+    "summaryResultVerification": "Resultados verificados"
   },
   "validation": {
     "nameAndHubRequired": "El nombre del torneo y el hub son obligatorios",

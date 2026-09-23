@@ -1,7 +1,6 @@
 {
   "title": "Podešavanja",
   "sections": {
-    "notifications": "Obaveštenja",
     "account": "Nalog",
     "preferences": "Preferencije",
     "support": "Podrška",
@@ -38,14 +37,12 @@
     "message": "Nije uspelo brisanje naloga. Pokušaj ponovo kasnije."
   },
   "notifications": {
-    "inbox": "Sanduče obaveštenja",
+    "title": "Obaveštenja",
     "push": "Push obaveštenja",
     "pushOn": "Uklj.",
     "pushOff": "Isklj.",
-    "pushOffHint": "Push je isključen na ovom uređaju, pa ništa ne iskače — sve i dalje stiže u sanduče obaveštenja. Dodirni Push obaveštenja da ga uključiš.",
     "moderatedChats": "Četovi koje moderiram",
-    "moderatedChatsHint": "Obavesti me kad igrači odgovore u četu meča koji moderiram kao organizator. Četove tvojih mečeva ovo nikad ne utišava.",
-    "perMatchHint": "Da utišaš samo jedan meč, otvori njegov čet i dodirni Utišano.",
+    "moderatedChatsHint": "Obavesti me kad igrači odgovore u četu meča koji moderiram kao organizator.",
     "saveFailedTitle": "Čuvanje nije uspelo",
     "saveFailedMessage": "Podešavanje obaveštenja nije sačuvano. Pokušaj ponovo za trenutak."
   }

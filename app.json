@@ -135,7 +135,12 @@
       }
     },
     "plugins": [
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "GameHubz uses Face ID to confirm it’s you when you verify a match result. Your face data never leaves your iPhone — GameHubz only learns that the check succeeded."
+        }
+      ],
       "expo-font",
       [
         "expo-notifications",

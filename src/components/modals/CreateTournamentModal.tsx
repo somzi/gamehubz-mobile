@@ -175,6 +175,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Kept as text so the field can be emptied while typing; blank means "server default".
     const [checkInGraceMinutes, setCheckInGraceMinutes] = useState('10');
 
+    // Result verification — when on, a participant proves the final score (biometric unlock on a
+    // registered phone + a screen recording) before their report is accepted.
+    const [requireResultVerification, setRequireResultVerification] = useState(false);
+
     // Series format: how many games a single match is played over, how those games decide the
     // match, and what settles a level knockout series. 1 = one game, the pre-series default.
     const [bestOf, setBestOf] = useState(1);
@@ -578,6 +582,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 RequireMatchCheckIn: requireMatchCheckIn,
                 // Null with the check on = the server's own default window.
                 CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
+                RequireResultVerification: requireResultVerification,
                 IsExclusive: isExclusive,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
             };
@@ -713,6 +718,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
         bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
         requireResultApproval ? t('form.summaryResultApproval') : null,
         requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
+        requireResultVerification ? t('form.summaryResultVerification') : null,
         canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? t('form.summaryDoubleRoundRobin') : null,
     ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
@@ -1102,6 +1108,20 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             </Text>
                                         </View>
                                     )}
+
+                                    {/* Result verification — Face ID / fingerprint on a registered phone
+                                        plus a recording of the final score before a player's report counts. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.resultVerification')}</Text>
+                                        <SegmentedToggle
+                                            options={yesNoOptions}
+                                            value={requireResultVerification ? 'yes' : 'no'}
+                                            onChange={(v) => setRequireResultVerification(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            {t('form.resultVerificationHint')}
+                                        </Text>
+                                    </View>
 
                                     {/* Third Place Match — hidden for League, double-elim brackets, and pure Swiss */}
                                     {canShowThirdPlace && (

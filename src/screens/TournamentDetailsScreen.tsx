@@ -1097,8 +1097,9 @@ export default function TournamentDetailsScreen() {
     };
 
     // First-round knockout teams a manual swap can touch: both teams of an unplayed real match, plus
-    // teams sitting on a bye (the backend re-seeds those via a regenerate). Played real matches are
-    // excluded — the swap only works before play.
+    // teams sitting on a bye (the backend moves them together with the match the bye advanced them
+    // into). Real matches already under way are left out; the backend has the final say (it also
+    // refuses pending proposals, evidence and a bye team whose next match was played).
     const getSwappableBracketTeams = (): SwapTeam[] => {
         const norm = (s: any) => s.type ?? s.Type;
         const out: SwapTeam[] = [];
@@ -1118,7 +1119,8 @@ export default function TournamentDetailsScreen() {
                 const home = m.home ?? m.Home;
                 const away = m.away ?? m.Away;
                 if (home && away) {
-                    if (status === 3 || status === 4) return; // real match already played
+                    // Live, Completed, or a level series waiting for its tiebreak (TieBreakRequired).
+                    if (status === 3 || status === 4 || status === 6) return;
                     add(home);
                     add(away);
                 } else {

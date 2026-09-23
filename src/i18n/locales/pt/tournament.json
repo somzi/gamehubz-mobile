@@ -141,7 +141,10 @@
     "readyCheckHint": "Os jogadores confirmam que estão no teclado assim que o horário da partida é combinado. Quem aparecer sozinho vence por W.O.; se ninguém aparecer, a partida é anulada.",
     "checkInGrace": "Tolerância",
     "checkInGraceHint": "Minutos que o adversário tem para fazer check-in antes de levar W.O., contados a partir do horário combinado.",
-    "summaryReadyCheck": "Check-in de presença"
+    "summaryReadyCheck": "Check-in de presença",
+    "resultVerification": "Verificação do resultado",
+    "resultVerificationHint": "Antes de informar um resultado, os jogadores confirmam a identidade com Face ID ou digital em um celular registrado e anexam uma gravação de tela do placar final. Os organizadores sempre podem lançar resultados.",
+    "summaryResultVerification": "Resultados verificados"
   },
   "validation": {
     "nameAndHubRequired": "Nome do torneio e Hub são obrigatórios",

@@ -142,7 +142,10 @@
     "readyCheckHint": "Igrači potvrđuju prisutnost kad je termin meča dogovoren. Ko se jedini pojavi, pobeđuje bez borbe; ako se ne pojavi niko, meč se otpisuje.",
     "checkInGrace": "Rok za potvrdu",
     "checkInGraceHint": "Broj minuta od dogovorenog vremena koje protivnik ima da potvrdi spremnost pre poraza bez borbe.",
-    "summaryReadyCheck": "Potvrda spremnosti"
+    "summaryReadyCheck": "Potvrda spremnosti",
+    "resultVerification": "Verifikacija rezultata",
+    "resultVerificationHint": "Pre prijave rezultata igrači potvrđuju identitet preko Face ID-a ili otiska prsta na registrovanom telefonu i prilažu snimak ekrana sa konačnim rezultatom. Organizatori uvek mogu da unesu rezultat.",
+    "summaryResultVerification": "Verifikovani rezultati"
   },
   "validation": {
     "nameAndHubRequired": "Ime turnira i hub su obavezni",

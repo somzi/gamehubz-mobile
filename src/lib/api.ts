@@ -179,6 +179,15 @@ export const ENDPOINTS = {
     // keeps the first stamp — and answers with the whole check-in state of the match.
     MATCH_CHECK_IN: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/checkin`,
 
+    // ─── Result verification ────────────────────────────────────────────
+    // Biometric proof from a registered phone + the recording of the final score, bound into one
+    // server record (see lib/resultVerification). The device key is returned by REGISTER only.
+    VERIFICATION_REGISTER_DEVICE: `${API_BASE_URL}/api/match/verification/device`,
+    VERIFICATION_PANEL: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/verification`,
+    VERIFICATION_START: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/verification/start`,
+    VERIFICATION_BIOMETRIC: (verificationId: string) => `${API_BASE_URL}/api/match/verification/${verificationId}/biometric`,
+    VERIFICATION_EVIDENCE: (verificationId: string) => `${API_BASE_URL}/api/match/verification/${verificationId}/evidence`,
+
     // ─── Match streaming ────────────────────────────────────────────────
     GET_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream`,
     GET_MATCH_STREAMS: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/streams`,

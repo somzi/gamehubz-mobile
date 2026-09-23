@@ -18,6 +18,9 @@ import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { MatchInsightsPanel, type MatchInsightPlayer } from '../match/MatchInsightsPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
 import { AdminAvailabilityPanel, type AdminAvailability } from '../match/AdminAvailabilityPanel';
+import { ResultVerificationCard } from '../match/ResultVerificationCard';
+import { VerifyResultSheet } from '../match/VerifyResultSheet';
+import { useResultVerification } from '../../hooks/useResultVerification';
 import { ConfirmationModal } from './ConfirmationModal';
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { Button } from '../ui/Button';
@@ -115,6 +118,11 @@ export interface MatchResultDetailDto {
     awayCheckedInOn?: string | null;
     checkInOpensAt?: string | null;
     checkInDeadline?: string | null;
+    /** Tournament setting: a participant verifies the result before reporting it. The records
+     *  themselves come from the verification panel, fetched only while this is on. */
+    requireResultVerification?: boolean;
+    /** This match already carries verification records — kept visible after the setting goes off. */
+    hasResultVerifications?: boolean;
     /** True when this match is one game of a team tie (resolved out of the parent team-match DTO).
      *  Drives the team-aware double-walkover copy — a voided game only counts for neither team;
      *  the tie itself is voided only if NO game ends up played. */
@@ -287,6 +295,14 @@ export function MatchDetailsModal({
     // Image preview state
     const [previewItem, setPreviewItem] = useState<EvidenceItem | null>(null);
 
+    // Result verification: the panel and the flow sheet. Shown while the tournament requires it — and,
+    // once an organizer switches it off, still for matches that carry records, so what they were
+    // verified with does not vanish with the setting. Keyed on `visible` too, so reopening a match reads
+    // a verification made since it was last shown.
+    const showVerification = !!matchDetails?.requireResultVerification || !!matchDetails?.hasResultVerifications;
+    const verification = useResultVerification(matchId, visible && showVerification);
+    const [showVerifySheet, setShowVerifySheet] = useState(false);
+
     // Edit mode state
     const [isEditMode, setIsEditMode] = useState(false);
 
@@ -359,6 +375,7 @@ export function MatchDetailsModal({
         setIsEditMode(false);
         setIsEditingProposal(false);
         setShowResolveHelpPrompt(false);
+        setShowVerifySheet(false);
         // Timing is per-match too — without this the previous match's deadline stayed on
         // screen until (and unless) the new one's details came back with its own.
         setLocalDeadline(deadline);
@@ -371,6 +388,12 @@ export function MatchDetailsModal({
     useEffect(() => {
         if (visible) setActiveTab(defaultTab);
     }, [matchId, visible, defaultTab]);
+
+    // A verification never outlives the modal it was started from: reopening the same match must not
+    // bring the sheet straight back up (the per-match reset above only runs when the match changes).
+    useEffect(() => {
+        if (!visible) setShowVerifySheet(false);
+    }, [visible]);
 
     useEffect(() => {
         if (visible && matchId) {
@@ -452,6 +475,9 @@ export function MatchDetailsModal({
             awayCheckedInOn: sub?.awayCheckedInOn ?? sub?.AwayCheckedInOn ?? null,
             checkInOpensAt: sub?.checkInOpensAt ?? sub?.CheckInOpensAt ?? null,
             checkInDeadline: sub?.checkInDeadline ?? sub?.CheckInDeadline ?? null,
+            // Tournament-wide, like the ready check; the nominated player of THIS game verifies it.
+            requireResultVerification: data.requireResultVerification ?? data.RequireResultVerification ?? false,
+            hasResultVerifications: Boolean(sub?.hasResultVerifications ?? sub?.HasResultVerifications ?? false),
             isTeamSub: true,
         };
     };
@@ -541,6 +567,8 @@ export function MatchDetailsModal({
                         games: seriesGamesFrom(data),
                         proposedGames: seriesGamesFrom({ games: data.proposedGames ?? data.ProposedGames }),
                         allowsTieBreak: Boolean(data.allowsTieBreak ?? data.AllowsTieBreak ?? false),
+                        requireResultVerification: Boolean(data.requireResultVerification ?? data.RequireResultVerification ?? false),
+                        hasResultVerifications: Boolean(data.hasResultVerifications ?? data.HasResultVerifications ?? false),
                     };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
@@ -1258,6 +1286,9 @@ export function MatchDetailsModal({
     // the pair played anyway. Mirrors the server-side refusal, so the button never promises
     // something the API will reject.
     const checkInBlocksReport = checkInLive && !bothCheckedIn && !isPrivileged;
+    // Result verification: the server says whether THIS viewer's report would be refused right now
+    // (it knows who is an organizer better than this screen can), so the button follows its word.
+    const verificationBlocksReport = !!verification.panel?.reportBlocked;
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
@@ -1526,6 +1557,19 @@ export function MatchDetailsModal({
                         <SeriesBreakdown className="mt-5" games={reportedGames} format={seriesFormat} />
                     </View>
                 </View>
+
+                {/* What the result was verified with — the record an organizer reviews after the fact. */}
+                {showVerification && (
+                    <ResultVerificationCard
+                        className="mx-5 mb-5"
+                        panel={verification.panel}
+                        isLoading={verification.isLoading}
+                        currentUserId={user?.id}
+                        onVerify={() => setShowVerifySheet(true)}
+                        onOpenEvidence={setPreviewItem}
+                        onOpenProfile={navigateToProfile}
+                    />
+                )}
 
                 {/* Evidence Gallery — same collapsed row as the reporting view. */}
                 <EvidenceSection
@@ -1929,6 +1973,20 @@ export function MatchDetailsModal({
                     />
                 )}
 
+                {/* Result verification — above the result it gates, and above a pending proposal too:
+                    whether the reported score is backed by a verified recording is part of deciding it. */}
+                {showVerification && (
+                    <ResultVerificationCard
+                        className="mb-5"
+                        panel={verification.panel}
+                        isLoading={verification.isLoading}
+                        currentUserId={user?.id}
+                        onVerify={() => setShowVerifySheet(true)}
+                        onOpenEvidence={setPreviewItem}
+                        onOpenProfile={navigateToProfile}
+                    />
+                )}
+
                 {/* Pending proposal card — hidden while the user is editing so the edit form gets the full stage. */}
                 {hasPendingProposal && !isEditingProposal && renderPendingProposalCard()}
 
@@ -2078,10 +2136,10 @@ export function MatchDetailsModal({
                     )}
                     <Pressable
                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
-                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport}
+                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocksReport}
                         className={cn(
                             "flex-1 rounded-2xl py-4 items-center active:opacity-80",
-                            ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport) ? "bg-white/5 border border-white/[0.06]" : "bg-primary"
+                            ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocksReport) ? "bg-white/5 border border-white/[0.06]" : "bg-primary"
                         )}
                     >
                         {isSubmitting ? (
@@ -2089,7 +2147,7 @@ export function MatchDetailsModal({
                         ) : (
                             <Text numberOfLines={1} className={cn(
                                 "text-sm font-black uppercase tracking-wider w-full text-center",
-                                ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport) ? "text-slate-500" : "text-primary-foreground"
+                                ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocksReport) ? "text-slate-500" : "text-primary-foreground"
                             )}>
                                 {(isRoundLocked && !isHubOwner)
                                     ? t('details.locked')
@@ -2097,6 +2155,8 @@ export function MatchDetailsModal({
                                         ? t('details.viewOnly')
                                         : checkInBlocksReport
                                             ? t('checkIn.blockedShort')
+                                            : verificationBlocksReport
+                                            ? t('verification.blockedShort')
                                             : isEditingProposal
                                                 ? t('details.updateReport')
                                                 : (approvalRequired && !isPrivileged ? t('details.report') : t('details.submit'))}
@@ -2210,7 +2270,15 @@ export function MatchDetailsModal({
             animationType="slide"
             transparent={false}
             visible={visible}
-            onRequestClose={onClose}
+            onRequestClose={() => {
+                // The Verify Result sheet is an overlay inside this window, not a Modal of its own, so
+                // Android's back key arrives here — it closes the sheet, not the match under it.
+                if (showVerifySheet) {
+                    setShowVerifySheet(false);
+                    return;
+                }
+                onClose();
+            }}
         >
             <View
                 className="flex-1 bg-background-deep"
@@ -2528,6 +2596,23 @@ export function MatchDetailsModal({
                 isLoading={isResolvingHelp}
                 stacked
             />
+
+            {/* Verify Result: biometric proof, then the recording. An overlay over this window —
+                not a Modal of its own, which is what failed on iOS (see VerifyResultSheet). */}
+            {!!user?.id && (
+                <VerifyResultSheet
+                    visible={showVerifySheet}
+                    onClose={() => setShowVerifySheet(false)}
+                    matchId={matchId}
+                    userId={user.id}
+                    opponentName={isAway ? homeIdentity.username : awayIdentity.username}
+                    onVerified={() => {
+                        verification.refresh();
+                        // The clip is ordinary evidence as well, so the gallery count moves with it.
+                        fetchMatchDetails(true);
+                    }}
+                />
+            )}
 
             {/* Fullscreen evidence preview — image or clip. */}
             <EvidencePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />

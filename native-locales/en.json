@@ -1,5 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "GameHubz requires access to your photo library so you can upload profile pictures for your account and hubs, as well as screenshots and short video clips as proof of match results. Selected photos and videos are used only within the app and are not shared with third parties."
+    "NSPhotoLibraryUsageDescription": "GameHubz requires access to your photo library so you can upload profile pictures for your account and hubs, as well as screenshots and short video clips as proof of match results. Selected photos and videos are used only within the app and are not shared with third parties.",
+    "NSFaceIDUsageDescription": "GameHubz uses Face ID to confirm it’s you when you verify a match result. Your face data never leaves your iPhone — GameHubz only learns that the check succeeded."
   }
 }

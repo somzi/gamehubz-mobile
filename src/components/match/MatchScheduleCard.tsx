@@ -27,6 +27,9 @@ import { PendingEvidenceStrip } from './PendingEvidenceStrip';
 import { startSignalRWithRetry } from '../../lib/signalR';
 import { EvidenceThumb } from './EvidenceThumb';
 import { EvidencePreviewModal } from './EvidencePreviewModal';
+import { ResultVerificationCard } from './ResultVerificationCard';
+import { VerifyResultSheet } from './VerifyResultSheet';
+import { useResultVerification } from '../../hooks/useResultVerification';
 import { ConfirmationModal } from '../modals/ConfirmationModal';
 import {
     EvidenceItem,
@@ -210,6 +213,16 @@ function MatchScheduleCardBase({
         checkInOpensAt: checkIn?.checkInOpensAt ?? null,
         checkInDeadline: checkIn?.checkInDeadline ?? null,
     });
+
+    // Result verification. The setting arrives with the details the sheet fetches on open; the panel
+    // is only fetched while the sheet is open and the tournament requires it — a list of these cards
+    // costs nothing extra.
+    const [requireResultVerification, setRequireResultVerification] = useState(false);
+    // Records already on the match keep the card up after an organizer switches the setting off.
+    const [hasResultVerifications, setHasResultVerifications] = useState(false);
+    const showVerification = requireResultVerification || hasResultVerifications;
+    const verification = useResultVerification(matchId, modalVisible && showVerification);
+    const [showVerifySheet, setShowVerifySheet] = useState(false);
 
     // The card outlives a list refetch (same key), so a check-in the opponent made in the
     // meantime has to reach it — the same reason the deadline is synced above.
@@ -531,6 +544,8 @@ function MatchScheduleCardBase({
                 let proposed = seriesGamesFrom({ games: data.proposedGames ?? data.ProposedGames });
                 // Only a solo knockout match can park in a tiebreak; the server says which.
                 let allowsTie = Boolean(data.allowsTieBreak ?? data.AllowsTieBreak ?? false);
+                // Per game on a team tie, like the evidence it points at.
+                let hasVerifications = Boolean(data.hasResultVerifications ?? data.HasResultVerifications ?? false);
 
                 if (!homeUserId) {
                     const subs = data.subMatches || data.SubMatches || [];
@@ -561,6 +576,7 @@ function MatchScheduleCardBase({
                         proposed = seriesGamesFrom({ games: sub.proposedGames ?? sub.ProposedGames });
                         // A level sub-match is never replayed — the tie resolves it one level up.
                         allowsTie = false;
+                        hasVerifications = Boolean(sub.hasResultVerifications ?? sub.HasResultVerifications ?? false);
                     }
                 }
 
@@ -585,6 +601,9 @@ function MatchScheduleCardBase({
 
                 setCheckInEnabled(Boolean(data.requireMatchCheckIn ?? data.RequireMatchCheckIn ?? false));
                 setCheckInGraceMinutes(data.checkInGraceMinutes ?? data.CheckInGraceMinutes ?? null);
+                // Tournament-wide, so on a team game it is read off the parent DTO like the ready check.
+                setRequireResultVerification(Boolean(data.requireResultVerification ?? data.RequireResultVerification ?? false));
+                setHasResultVerifications(hasVerifications);
                 setCheckInState({
                     homeCheckedInOn: checkInSource.homeCheckedInOn ?? checkInSource.HomeCheckedInOn ?? null,
                     awayCheckedInOn: checkInSource.awayCheckedInOn ?? checkInSource.AwayCheckedInOn ?? null,
@@ -672,6 +691,10 @@ function MatchScheduleCardBase({
             // A trip to a player's profile is not a real close: the sheet comes straight back on
             // this match, so it keeps showing what it had while the fetches below refresh it.
             if (!reopenOnFocusRef.current) setDetailsLoaded(false);
+            // A verification is always started fresh; it never survives the sheet it was opened from.
+            setShowVerifySheet(false);
+            // The preview lives inside the sheet now: left set, it would be back up on the next opening.
+            setPreviewItem(null);
             return;
         }
 
@@ -1011,6 +1034,15 @@ function MatchScheduleCardBase({
             });
 
             console.log('[MatchScheduleCard] Response status:', response.status);
+
+            // authenticatedFetch resolves on an HTTP error instead of throwing, so a refused report
+            // (ready check, verification, a result already confirmed) used to fall through to the
+            // success path below: success haptic, evidence uploaded, sheet closed — nothing saved.
+            // The server's reason is localized and belongs on screen.
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                throw new Error(text || t('card.reportError'));
+            }
 
             console.log('[MatchScheduleCard] Success! Checking for images to upload');
 
@@ -1380,11 +1412,6 @@ function MatchScheduleCardBase({
             </Pressable>
 
             {renderModal()}
-
-            {/* Fullscreen evidence preview. Mounted beside the report modal rather than
-                inside it: a nested Modal over another Modal is the arrangement that
-                glitches on iOS. */}
-            <EvidencePreviewModal item={previewItem} onClose={() => setPreviewItem(null)} />
         </>
     );
 
@@ -1407,9 +1434,17 @@ function MatchScheduleCardBase({
                 transparent={false}
                 visible={modalVisible}
                 onRequestClose={() => {
-                    // The confirmation is an overlay inside this window, not its own Modal, so
-                    // Android's back key arrives here — it has to dismiss the dialog rather than
-                    // the whole match sheet underneath it.
+                    // The evidence preview, the Verify Result sheet and the confirmation are overlays
+                    // inside this window, not Modals of their own, so Android's back key arrives
+                    // here — it has to dismiss them rather than the whole match sheet underneath.
+                    if (previewItem) {
+                        setPreviewItem(null);
+                        return;
+                    }
+                    if (showVerifySheet) {
+                        setShowVerifySheet(false);
+                        return;
+                    }
                     if (confirmMarkScheduled) {
                         setConfirmMarkScheduled(false);
                         return;
@@ -1617,6 +1652,11 @@ function MatchScheduleCardBase({
                                                 && !!checkInState.checkInDeadline
                                                 && !(checkInState.homeCheckedInOn && checkInState.awayCheckedInOn)
                                                 && !isPrivileged;
+                                            // Verification: the server says whether this viewer's report
+                                            // would be refused right now — hub admins are exempt, and this
+                                            // card cannot see who is one.
+                                            const verificationBlocksReport = !!verification.panel?.reportBlocked;
+                                            const reportBlocked = checkInBlocksReport || verificationBlocksReport;
                                             const visualLeftScore = isUserDbHome ? proposedHomeScore : proposedAwayScore;
                                             const visualRightScore = isUserDbHome ? proposedAwayScore : proposedHomeScore;
                                             const proposerName = !!proposedByUserId && dbHomeUserId && proposedByUserId.toLowerCase() === dbHomeUserId.toLowerCase()
@@ -1652,6 +1692,18 @@ function MatchScheduleCardBase({
                                                         homeLabel={dbHomeUsername || t('checkIn.homeSide')}
                                                         awayLabel={dbAwayUsername || t('checkIn.awaySide')}
                                                         onCheckedIn={setCheckInState}
+                                                    />
+                                                )}
+
+                                                {/* Result verification — above the result it gates. */}
+                                                {showVerification && (
+                                                    <ResultVerificationCard
+                                                        panel={verification.panel}
+                                                        isLoading={verification.isLoading}
+                                                        currentUserId={user?.id}
+                                                        onVerify={() => setShowVerifySheet(true)}
+                                                        onOpenEvidence={setPreviewItem}
+                                                        onOpenProfile={userId => openPlayerProfile(userId)}
                                                     />
                                                 )}
 
@@ -1998,7 +2050,7 @@ function MatchScheduleCardBase({
                                                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
                                                         // Also held while the details load: the format decides what a valid
                                                         // submission even looks like.
-                                                        disabled={isSubmitting || isRoundLocked || !detailsLoaded || checkInBlocksReport}
+                                                        disabled={isSubmitting || isRoundLocked || !detailsLoaded || reportBlocked}
                                                         className={cn("h-14 rounded-2xl overflow-hidden active:opacity-90", isEditingProposal ? "flex-1" : "w-full")}
                                                         style={{
                                                             shadowColor: isRoundLocked ? '#475569' : '#10B981',
@@ -2009,7 +2061,7 @@ function MatchScheduleCardBase({
                                                         }}
                                                     >
                                                         <LinearGradient
-                                                            colors={(isRoundLocked || checkInBlocksReport) ? ['#475569', '#334155'] : ['#10B981', '#059669']}
+                                                            colors={(isRoundLocked || reportBlocked) ? ['#475569', '#334155'] : ['#10B981', '#059669']}
                                                             start={{ x: 0, y: 0 }}
                                                             end={{ x: 1, y: 1 }}
                                                             style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
@@ -2019,18 +2071,20 @@ function MatchScheduleCardBase({
                                                             ) : (
                                                                 <View className="flex-row items-center gap-2">
                                                                     <Ionicons
-                                                                        name={(isRoundLocked || checkInBlocksReport) ? "lock-closed" : "checkmark-circle"}
+                                                                        name={(isRoundLocked || reportBlocked) ? "lock-closed" : "checkmark-circle"}
                                                                         size={18}
-                                                                        color={(isRoundLocked || checkInBlocksReport) ? "#CBD5E1" : "#022C22"}
+                                                                        color={(isRoundLocked || reportBlocked) ? "#CBD5E1" : "#022C22"}
                                                                     />
                                                                     <Text numberOfLines={1} className={cn(
                                                                         "font-black uppercase tracking-widest text-xs",
-                                                                        (isRoundLocked || checkInBlocksReport) ? "text-slate-200" : "text-emerald-950"
+                                                                        (isRoundLocked || reportBlocked) ? "text-slate-200" : "text-emerald-950"
                                                                     )}>
                                                                         {isRoundLocked
                                                                             ? t('card.roundNotOpen')
                                                                             : checkInBlocksReport
                                                                             ? t('checkIn.blockedShort')
+                                                                            : verificationBlocksReport
+                                                                            ? t('verification.blockedShort')
                                                                             : isEditingProposal
                                                                                 ? t('card.updateReport')
                                                                                 // A level knockout series is reported now and decided by a
@@ -2370,6 +2424,27 @@ function MatchScheduleCardBase({
                     message={t('card.markScheduledConfirmMessage', { opponent: opponentName })}
                     confirmText={t('card.markScheduledConfirmAction')}
                 />
+
+                {/* Verify Result — an overlay in this window as well. As a Modal beside this one it
+                    never showed on iOS (see VerifyResultSheet). */}
+                {!!user?.id && requireResultVerification && (
+                    <VerifyResultSheet
+                        visible={showVerifySheet}
+                        onClose={() => setShowVerifySheet(false)}
+                        matchId={matchId}
+                        userId={user.id}
+                        opponentName={opponentName}
+                        onVerified={() => {
+                            verification.refresh();
+                            // The clip is ordinary evidence too; the gallery row counts it.
+                            fetchDbHomeUserId();
+                        }}
+                    />
+                )}
+
+                {/* Fullscreen evidence preview (the verified clip included) — an overlay too, and
+                    last so it sits on top. As a Modal beside this one it never opened on iOS. */}
+                <EvidencePreviewModal overlay item={previewItem} onClose={() => setPreviewItem(null)} />
             </Modal>
         );
     }

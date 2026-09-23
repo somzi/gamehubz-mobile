@@ -141,7 +141,10 @@
     "readyCheckHint": "Players confirm they're at the keyboard once a match time is agreed. Whoever shows up alone wins by walkover; if neither does, the match is written off.",
     "checkInGrace": "Grace period",
     "checkInGraceHint": "Minutes the opponent has to check in before forfeiting, counted from the agreed time.",
-    "summaryReadyCheck": "Ready check"
+    "summaryReadyCheck": "Ready check",
+    "resultVerification": "Result verification",
+    "resultVerificationHint": "Before reporting a result, players confirm it's them with Face ID or fingerprint on a registered phone and attach a screen recording of the final score. Organizers can always enter results.",
+    "summaryResultVerification": "Verified results"
   },
   "validation": {
     "nameAndHubRequired": "Tournament name and Hub are required",

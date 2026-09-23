@@ -156,6 +156,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [checkInGraceMinutes, setCheckInGraceMinutes] = useState(
         String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10),
     );
+    // Result verification, likewise editable for the whole tournament: it only gates reports that
+    // have not been made yet.
+    const [requireResultVerification, setRequireResultVerification] = useState(
+        Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification),
+    );
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
     const [doubleRoundRobin, setDoubleRoundRobin] = useState(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
     const [teamSize, setTeamSize] = useState(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
@@ -332,6 +337,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setRequireResultApproval(Boolean(tournament?.requireResultApproval ?? tournament?.RequireResultApproval));
         setRequireMatchCheckIn(Boolean(tournament?.requireMatchCheckIn ?? tournament?.RequireMatchCheckIn));
         setCheckInGraceMinutes(String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10));
+        setRequireResultVerification(Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification));
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
         setTeamSize(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
@@ -529,6 +535,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 RequireResultApproval: requireResultApproval,
                 RequireMatchCheckIn: requireMatchCheckIn,
                 CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
+                // Always sent: the server reads its absence as "an older app, keep what is stored".
+                RequireResultVerification: requireResultVerification,
                 // Series format — applied whenever AllowStructuralEdits is set, with no start-date
                 // gate: already-played matches carry their own frozen format, so this can only
                 // change fixtures that have yet to be reported.
@@ -648,6 +656,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
         requireResultApproval ? t('form.summaryResultApproval') : null,
         requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
+        requireResultVerification ? t('form.summaryResultVerification') : null,
         canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
         (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? t('form.summaryDoubleRoundRobin') : null,
     ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
@@ -1035,6 +1044,20 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             </Text>
                                         </View>
                                     )}
+
+                                    {/* Result verification — safe to switch mid-tournament like the two
+                                        above: it only gates results still to be reported. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.resultVerification')}</Text>
+                                        <SegmentedToggle
+                                            options={yesNoOptions}
+                                            value={requireResultVerification ? 'yes' : 'no'}
+                                            onChange={(v) => setRequireResultVerification(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            {t('form.resultVerificationHint')}
+                                        </Text>
+                                    </View>
 
                                     {canShowThirdPlace && (
                                         <View>

@@ -143,7 +143,10 @@
     "readyCheckHint": "Gracze potwierdzają obecność, gdy termin meczu jest uzgodniony. Kto zgłosi się sam, wygrywa walkowerem; jeśli nikt się nie zgłosi, mecz zostaje anulowany.",
     "checkInGrace": "Czas na zgłoszenie",
     "checkInGraceHint": "Ile minut od uzgodnionej godziny ma przeciwnik na zgłoszenie gotowości, zanim przegra walkowerem.",
-    "summaryReadyCheck": "Potwierdzenie gotowości"
+    "summaryReadyCheck": "Potwierdzenie gotowości",
+    "resultVerification": "Weryfikacja wyników",
+    "resultVerificationHint": "Przed zgłoszeniem wyniku gracze potwierdzają tożsamość przez Face ID lub odcisk palca na zarejestrowanym telefonie i dołączają nagranie ekranu z wynikiem końcowym. Organizatorzy zawsze mogą wpisać wynik.",
+    "summaryResultVerification": "Weryfikowane wyniki"
   },
   "validation": {
     "nameAndHubRequired": "Nazwa turnieju i hub są wymagane",
