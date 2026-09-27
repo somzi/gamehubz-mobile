@@ -53,7 +53,8 @@
     "tryAgain": "Попробовать снова",
     "unexpectedCrash": "В приложении произошла непредвиденная ошибка.",
     "victory": "ПОБЕДА",
-    "winRate": "% ПОБЕД"
+    "winRate": "% ПОБЕД",
+    "private": "Закрытый"
   },
   "back": "Назад",
   "cancel": "Отмена",
@@ -136,7 +137,8 @@
     "playerProfile": "Профиль игрока",
     "tournament": "Турнир",
     "viewPlayer": "Посмотри профиль {{name}} на GameHubz.",
-    "viewPlayerGeneric": "Посмотри этого игрока на GameHubz."
+    "viewPlayerGeneric": "Посмотри этого игрока на GameHubz.",
+    "privateInvite": "Приглашение в «{{name}}» на GameHubz. Входи по коду {{code}} или открой ссылку:"
   },
   "status": {
     "completed": "Завершён",

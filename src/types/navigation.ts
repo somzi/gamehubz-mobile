@@ -19,6 +19,13 @@ export type RootStackParamList = {
         focusTeamId?: string;
         focusTeamName?: string;
         focusTeamRequiresApproval?: boolean;
+        /** Join-with-code landing: start registration as soon as the tournament has loaded —
+         *  sign up a solo player, or open team registration. The code sheet already showed a
+         *  preview, so this is the player's confirmed intent, not a surprise. */
+        autoJoin?: boolean;
+        /** A private tournament's join code: from the organiser's invite link (`?code=`) or the
+         *  join-with-code sheet. Sent with the registration so the player isn't asked for it. */
+        code?: string;
     };
     HubProfile: { id: string };
     PlayerProfile: { id: string };

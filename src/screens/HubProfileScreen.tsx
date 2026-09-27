@@ -418,6 +418,7 @@ export default function HubProfileScreen() {
                             badgeCount={tournamentApprovals(tournament.id)?.total ?? 0}
                             hubName={hubData.name}
                             hubAvatarUrl={hubData.avatarUrl || hubData.logoUrl}
+                            isPrivate={!!tournament.isPrivate}
                         />
                     </View>
                 ))}

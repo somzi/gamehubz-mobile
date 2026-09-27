@@ -24,6 +24,7 @@ import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
 import { dateLocale } from '../../i18n';
+import { PRIVATE_COLORS } from '../ui/PrivateBadge';
 
 // Values stay at module scope; labels are resolved per render so a language switch applies.
 const YES_NO_OPTIONS = [
@@ -162,6 +163,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification),
     );
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
+    // Invite-only. Editable for the whole life of the tournament — it only changes who can find it.
+    const [isPrivate, setIsPrivate] = useState(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
     const [doubleRoundRobin, setDoubleRoundRobin] = useState(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
     const [teamSize, setTeamSize] = useState(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
     // Bench slots on top of the lineup — structural, so only editable before the tournament starts.
@@ -339,6 +342,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setCheckInGraceMinutes(String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10));
         setRequireResultVerification(Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification));
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
+        setIsPrivate(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
         setTeamSize(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
         setAllowReserves(Boolean(tournament?.allowReserves ?? tournament?.AllowReserves));
@@ -554,6 +558,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 MaxReserves: isTeamTournament && allowReserves ? (parseInt(maxReserves) || null) : null,
                 TeamWinCondition: parseInt(teamWinCondition) || 0,
                 IsExclusive: isExclusive,
+                // Always sent by this build; an older one omits it and the server keeps the stored value.
+                IsPrivate: isPrivate,
                 DoubleRoundRobin: isLeagueOrGroup ? doubleRoundRobin : false,
                 AllowStructuralEdits: true,
             };
@@ -642,6 +648,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     // Collapsed-header recaps so a skimmed form still reads at a glance.
     const basicsSummary = [
         name.trim() || t('form.summaryUnnamed'),
+        isPrivate ? t('form.summaryPrivate') : null,
         getFormatLabel(),
         maxPlayers ? t('form.summaryPlayers', { count: Number(maxPlayers) }) : null,
     ].filter(Boolean).join(' · ');
@@ -723,6 +730,31 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             onChangeText={setName}
                                             editable={canEditAll}
                                         />
+                                    </View>
+
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.visibility')}</Text>
+                                        <SegmentedToggle
+                                            options={[
+                                                { value: 'public', label: t('form.visibilityPublic') },
+                                                { value: 'private', label: t('form.visibilityPrivate') },
+                                            ]}
+                                            value={isPrivate ? 'private' : 'public'}
+                                            onChange={(v) => setIsPrivate(v === 'private')}
+                                        />
+                                        {isPrivate ? (
+                                            <View
+                                                className="flex-row items-start gap-2 mt-2 px-3 py-2.5 rounded-xl"
+                                                style={{ backgroundColor: PRIVATE_COLORS.bg, borderWidth: 1, borderColor: PRIVATE_COLORS.border }}
+                                            >
+                                                <Ionicons name="lock-closed" size={13} color={PRIVATE_COLORS.icon} style={{ marginTop: 1 }} />
+                                                <Text className="flex-1 text-[11px] leading-4" style={{ color: PRIVATE_COLORS.text }}>
+                                                    {t('form.visibilityPrivateEditHint')}
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text className={FIELD_HINT}>{t('form.visibilityPublicEditHint')}</Text>
+                                        )}
                                     </View>
 
                                     <View className="flex-row gap-3">

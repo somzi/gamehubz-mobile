@@ -145,7 +145,18 @@
     "summaryReadyCheck": "Potvrda spremnosti",
     "resultVerification": "Verifikacija rezultata",
     "resultVerificationHint": "Pre prijave rezultata igrači potvrđuju identitet preko Face ID-a ili otiska prsta na registrovanom telefonu i prilažu snimak ekrana sa konačnim rezultatom. Organizatori uvek mogu da unesu rezultat.",
-    "summaryResultVerification": "Verifikovani rezultati"
+    "summaryResultVerification": "Verifikovani rezultati",
+    "visibility": "Vidljivost",
+    "visibilityPublic": "Javni",
+    "visibilityPrivate": "Privatni",
+    "visibilityPublicHint": "Svako iz huba može da se prijavi, a članovi huba dobijaju obaveštenje.",
+    "visibilityPrivateHint": "Vidi se u hubu kao svaki turnir, ali prijaviti se mogu samo igrači sa šestocifrenim kodom ili tvojim linkom za poziv. Članovi huba ne dobijaju obaveštenje o novom turniru ni podsetnik da ističe rok za prijavu — kod i link dobijaš odmah posle pravljenja.",
+    "visibilityPublicEditHint": "Svako iz huba može da se prijavi. Prebacivanje na javni ne šalje obaveštenja.",
+    "visibilityPrivateEditHint": "Prijaviti se mogu samo igrači sa šestocifrenim kodom ili tvojim linkom za poziv — oba su na stranici turnira. Obaveštenje o novom turniru i podsetnik da ističe rok za prijavu se ne šalju.",
+    "summaryPrivate": "Privatni",
+    "createdTitle": "Turnir je napravljen",
+    "createdPrivateHint": "Vidi se u hubu, ali prijaviti se mogu samo igrači sa kodom ili linkom za poziv. Pošalji ga igračima koje želiš.",
+    "openTournament": "Otvori turnir"
   },
   "validation": {
     "nameAndHubRequired": "Ime turnira i hub su obavezni",
@@ -351,7 +362,11 @@
     "shareBracketPdf": "Podeli žreb (PDF)",
     "liveBadge": "UŽIVO",
     "noConfirmedMatch": "Nijedan potvrđeni igrač ne odgovara pretrazi „{{query}}”.",
-    "noRegistrationMatch": "Nijedna prijava ne odgovara pretrazi „{{query}}”."
+    "noRegistrationMatch": "Nijedna prijava ne odgovara pretrazi „{{query}}”.",
+    "visibilityLabel": "Vidljivost",
+    "privateInviteOnly": "Privatni · potreban kod",
+    "enterCodeToJoin": "Unesi kod za prijavu",
+    "privateJoinHint": "Privatni turnir — za prijavu ti treba kod od organizatora."
   },
   "manage": {
     "title": "Upravljanje turnirom",
@@ -427,7 +442,8 @@
     "tabLive": "Uživo",
     "tabUpcoming": "Predstojeći",
     "tabOpen": "Otvoreni",
-    "tabCompleted": "Završeni"
+    "tabCompleted": "Završeni",
+    "haveCode": "Imaš kod za poziv?"
   },
   "format": {
     "league": "Liga",
@@ -555,5 +571,42 @@
       "locked": "Runda zaključana",
       "tbd": "Čeka se prethodna runda"
     }
+  },
+  "invite": {
+    "title": "Pozovi igrače",
+    "subtitle": "Prijaviti se mogu samo igrači sa ovim kodom ili tvojim linkom za poziv. Članovi huba nisu dobili obaveštenje da je turnir napravljen.",
+    "codeLabel": "Kod za pristup",
+    "copyCode": "Kopiraj kod",
+    "copied": "Kopirano!",
+    "share": "Podeli poziv",
+    "newCode": "Napravi novi kod",
+    "newCodeConfirmTitle": "Napraviti novi kod?",
+    "newCodeConfirmMessage": "Trenutni kod odmah prestaje da radi. Igrači koji su se već prijavili ostaju u turniru, a link za poziv i dalje radi.",
+    "newCodeConfirm": "Napravi novi kod",
+    "loadFailed": "Kod nije učitan. Dodirni za ponovni pokušaj."
+  },
+  "joinCode": {
+    "button": "Unesi kod",
+    "title": "Uđi sa kodom",
+    "subtitle": "Unesi šestocifreni kod od organizatora.",
+    "checking": "Proveravam kod…",
+    "invalid": "Nijedan turnir nema taj kod.",
+    "join": "Prijavi se na turnir",
+    "registerTeam": "Prijavi tim",
+    "open": "Otvori turnir",
+    "alreadyIn": "Tvoja prijava je već poslata.",
+    "youManage": "Ovim turnirom upravljaš ti.",
+    "registrationClosed": "Prijave su zatvorene.",
+    "full": "Turnir je popunjen.",
+    "opensAt": "Prijave se otvaraju {{date}}.",
+    "approvalNote": "Organizator odobrava svaku prijavu.",
+    "tryAnother": "Probaj drugi kod",
+    "paste": "Nalepi kod",
+    "verifyTitle": "Unesi kod turnira",
+    "verifySubtitle": "Ovaj turnir je privatan. Unesi šestocifreni kod od organizatora za prijavu.",
+    "otherTournament": "Taj kod pripada drugom turniru.",
+    "codeApplied": "Kod za poziv {{code}} je primenjen",
+    "teamCodeLabel": "Kod turnira",
+    "teamCodeHint": "Ovaj turnir je privatan — unesi šestocifreni kod od organizatora da napraviš tim."
   }
 }

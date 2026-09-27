@@ -72,7 +72,8 @@
     "viewPlayer": "Zobacz gracza {{name}} na GameHubz.",
     "viewPlayerGeneric": "Zobacz tego gracza na GameHubz.",
     "joinTeam": "Dołącz do drużyny {{name}} na GameHubz.",
-    "joinTeamGeneric": "Dołącz do tej drużyny na GameHubz."
+    "joinTeamGeneric": "Dołącz do tej drużyny na GameHubz.",
+    "privateInvite": "Zaproszenie do turnieju {{name}} na GameHubz. Dołącz kodem {{code}} albo otwórz link:"
   },
   "zeroBytes": "0 bajtów",
   "translationEmpty": "Odpowiedź tłumaczenia nie zawierała przetłumaczonego tekstu.",
@@ -144,7 +145,8 @@
     "notAvailableShort": "N/D",
     "victory": "WYGRANA",
     "defeat": "PORAŻKA",
-    "drawResult": "REMIS"
+    "drawResult": "REMIS",
+    "private": "Prywatny"
   },
   "nav": {
     "home": "Główna",

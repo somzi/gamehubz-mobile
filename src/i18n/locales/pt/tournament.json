@@ -144,7 +144,18 @@
     "summaryReadyCheck": "Check-in de presença",
     "resultVerification": "Verificação do resultado",
     "resultVerificationHint": "Antes de informar um resultado, os jogadores confirmam a identidade com Face ID ou digital em um celular registrado e anexam uma gravação de tela do placar final. Os organizadores sempre podem lançar resultados.",
-    "summaryResultVerification": "Resultados verificados"
+    "summaryResultVerification": "Resultados verificados",
+    "visibility": "Visibilidade",
+    "visibilityPublic": "Público",
+    "visibilityPrivate": "Privado",
+    "visibilityPublicHint": "Qualquer pessoa do hub pode se inscrever, e os membros do hub recebem notificação.",
+    "visibilityPrivateHint": "Aparece no hub como qualquer torneio, mas só se inscreve quem tiver o código de 6 dígitos ou seu link de convite. Os membros do hub não recebem o aviso de torneio novo nem o lembrete de fim das inscrições — você recebe o código e o link logo depois de criar.",
+    "visibilityPublicEditHint": "Qualquer pessoa do hub pode se inscrever. Tornar público não envia notificações.",
+    "visibilityPrivateEditHint": "Só se inscreve quem tiver o código de 6 dígitos ou seu link de convite — os dois estão na página do torneio. O aviso de torneio novo e o lembrete de fim das inscrições não são enviados.",
+    "summaryPrivate": "Privado",
+    "createdTitle": "Torneio criado",
+    "createdPrivateHint": "Ele aparece no hub, mas só se inscreve quem tiver o código ou o link de convite. Mande para os jogadores que você quiser.",
+    "openTournament": "Abrir torneio"
   },
   "validation": {
     "nameAndHubRequired": "Nome do torneio e Hub são obrigatórios",
@@ -346,7 +357,11 @@
     "shareBracketPdf": "Compartilhar PDF do chaveamento",
     "liveBadge": "AO VIVO",
     "noConfirmedMatch": "Nenhum jogador confirmado corresponde a “{{query}}”.",
-    "noRegistrationMatch": "Nenhuma inscrição corresponde a “{{query}}”."
+    "noRegistrationMatch": "Nenhuma inscrição corresponde a “{{query}}”.",
+    "visibilityLabel": "Visibilidade",
+    "privateInviteOnly": "Privado · exige código",
+    "enterCodeToJoin": "Inserir código para entrar",
+    "privateJoinHint": "Torneio privado: você precisa do código do organizador para se inscrever."
   },
   "manage": {
     "title": "Gerenciar torneio",
@@ -419,7 +434,8 @@
     "tabLive": "Ao vivo",
     "tabUpcoming": "Próximos",
     "tabOpen": "Abertos",
-    "tabCompleted": "Concluídos"
+    "tabCompleted": "Concluídos",
+    "haveCode": "Tem um código de convite?"
   },
   "format": {
     "league": "Liga",
@@ -537,5 +553,42 @@
       "locked": "Rodada bloqueada",
       "tbd": "Aguardando a rodada anterior"
     }
+  },
+  "invite": {
+    "title": "Convidar jogadores",
+    "subtitle": "Só se inscreve quem tiver este código ou seu link de convite. Os membros do hub não foram avisados de que este torneio foi criado.",
+    "codeLabel": "Código de acesso",
+    "copyCode": "Copiar código",
+    "copied": "Copiado!",
+    "share": "Compartilhar convite",
+    "newCode": "Gerar um código novo",
+    "newCodeConfirmTitle": "Gerar um código novo?",
+    "newCodeConfirmMessage": "O código atual para de funcionar na hora. Quem já se inscreveu continua no torneio, e seu link de convite continua funcionando.",
+    "newCodeConfirm": "Gerar código novo",
+    "loadFailed": "Não foi possível carregar o código. Toque para tentar de novo."
+  },
+  "joinCode": {
+    "button": "Inserir código",
+    "title": "Entrar com código",
+    "subtitle": "Digite o código de 6 dígitos que o organizador enviou.",
+    "checking": "Verificando código…",
+    "invalid": "Nenhum torneio corresponde a esse código.",
+    "join": "Entrar no torneio",
+    "registerTeam": "Inscrever um time",
+    "open": "Abrir torneio",
+    "alreadyIn": "Sua inscrição já foi enviada.",
+    "youManage": "Você gerencia este torneio.",
+    "registrationClosed": "As inscrições estão encerradas.",
+    "full": "Este torneio está lotado.",
+    "opensAt": "As inscrições abrem em {{date}}.",
+    "approvalNote": "O organizador aprova cada inscrição.",
+    "tryAnother": "Usar outro código",
+    "paste": "Colar código",
+    "verifyTitle": "Digite o código do torneio",
+    "verifySubtitle": "Este torneio é privado. Digite o código de 6 dígitos do organizador para se inscrever.",
+    "otherTournament": "Esse código é de outro torneio.",
+    "codeApplied": "Código de convite {{code}} aplicado",
+    "teamCodeLabel": "Código do torneio",
+    "teamCodeHint": "Este torneio é privado: digite o código de 6 dígitos do organizador para criar um time."
   }
 }

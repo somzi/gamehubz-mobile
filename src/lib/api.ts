@@ -45,6 +45,13 @@ export const ENDPOINTS = {
     // v3: same as v2 plus HasUserRegistered so the client can render the Join / Registered state
     // without firing a second CHECK_REGISTRATION request on open.
     GET_TOURNAMENT_OVERVIEW_V3: (id: string) => `${API_BASE_URL}/api/tournament/${id}/overview/v3`,
+    // Private (invite-only) tournaments. POST { code } → the same payload as overview v3, so the
+    // join sheet can preview the tournament before sending the player into it. The code rides in
+    // the body to keep it out of URLs; the server rate-limits misses per account.
+    RESOLVE_JOIN_CODE: `${API_BASE_URL}/api/tournament/join-code`,
+    // Managers only: the private tournament's code, and a fresh one when it has leaked.
+    GET_TOURNAMENT_JOIN_CODE: (id: string) => `${API_BASE_URL}/api/tournament/${id}/join-code`,
+    REGENERATE_TOURNAMENT_JOIN_CODE: (id: string) => `${API_BASE_URL}/api/tournament/${id}/join-code/regenerate`,
     REGISTER_TOURNAMENT: `${API_BASE_URL}/api/tournamentRegistration`,
     REGISTER_TEAM_IN_TOURNAMENT: (tournamentId: string, teamId: string) => `${API_BASE_URL}/api/tournamentRegistration/tournament/${tournamentId}/team/${teamId}/register`,
     GET_PENDING_REGISTRATIONS: (tournamentId: string) => `${API_BASE_URL}/api/tournamentRegistration/tournament/${tournamentId}/pending`,

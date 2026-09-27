@@ -144,7 +144,18 @@
     "summaryReadyCheck": "Ready check",
     "resultVerification": "Result verification",
     "resultVerificationHint": "Before reporting a result, players confirm it's them with Face ID or fingerprint on a registered phone and attach a screen recording of the final score. Organizers can always enter results.",
-    "summaryResultVerification": "Verified results"
+    "summaryResultVerification": "Verified results",
+    "visibility": "Visibility",
+    "visibilityPublic": "Public",
+    "visibilityPrivate": "Private",
+    "visibilityPublicHint": "Anyone in the hub can register, and hub members get notified.",
+    "visibilityPrivateHint": "Listed in the hub like any other tournament, but only players with the 6-digit code or your invite link can register. Hub members don't get the new-tournament notification or the registration-deadline reminder — you'll get the code and link right after creating it.",
+    "visibilityPublicEditHint": "Anyone in the hub can register. Switching to public doesn't send any notifications.",
+    "visibilityPrivateEditHint": "Only players with the 6-digit code or your invite link can register — you'll find both on the tournament page. No new-tournament notification or registration-deadline reminder goes out.",
+    "summaryPrivate": "Private",
+    "createdTitle": "Tournament created",
+    "createdPrivateHint": "It's listed in the hub, but only players with the code or the invite link can register. Send it to the players you want.",
+    "openTournament": "Open tournament"
   },
   "validation": {
     "nameAndHubRequired": "Tournament name and Hub are required",
@@ -346,7 +357,11 @@
     "shareBracketPdf": "Share Bracket PDF",
     "liveBadge": "LIVE",
     "noConfirmedMatch": "No confirmed player matches “{{query}}”.",
-    "noRegistrationMatch": "No registration matches “{{query}}”."
+    "noRegistrationMatch": "No registration matches “{{query}}”.",
+    "visibilityLabel": "Visibility",
+    "privateInviteOnly": "Private · code required",
+    "enterCodeToJoin": "Enter code to join",
+    "privateJoinHint": "Private tournament — you need the organizer's code to register."
   },
   "manage": {
     "title": "Manage Tournament",
@@ -419,7 +434,8 @@
     "tabLive": "Live",
     "tabUpcoming": "Upcoming",
     "tabOpen": "Open",
-    "tabCompleted": "Completed"
+    "tabCompleted": "Completed",
+    "haveCode": "Have an invite code?"
   },
   "format": {
     "league": "League",
@@ -537,5 +553,42 @@
       "locked": "Round locked",
       "tbd": "Waiting on previous round"
     }
+  },
+  "invite": {
+    "title": "Invite players",
+    "subtitle": "Only players with this code or your invite link can register. Hub members weren't notified that this tournament was created.",
+    "codeLabel": "Join code",
+    "copyCode": "Copy code",
+    "copied": "Copied!",
+    "share": "Share invite",
+    "newCode": "Generate a new code",
+    "newCodeConfirmTitle": "Generate a new code?",
+    "newCodeConfirmMessage": "The current code stops working right away. Players who already joined stay in, and your invite link keeps working.",
+    "newCodeConfirm": "Generate new code",
+    "loadFailed": "Couldn't load the join code. Tap to retry."
+  },
+  "joinCode": {
+    "button": "Enter code",
+    "title": "Join with code",
+    "subtitle": "Enter the 6-digit code from the organizer.",
+    "checking": "Checking code…",
+    "invalid": "No tournament matches that code.",
+    "join": "Join tournament",
+    "registerTeam": "Register a team",
+    "open": "Open tournament",
+    "alreadyIn": "Your registration is already in.",
+    "youManage": "You manage this tournament.",
+    "registrationClosed": "Registration is closed.",
+    "full": "This tournament is full.",
+    "opensAt": "Registration opens {{date}}.",
+    "approvalNote": "The organizer approves every registration.",
+    "tryAnother": "Use a different code",
+    "paste": "Paste code",
+    "verifyTitle": "Enter the tournament code",
+    "verifySubtitle": "This tournament is private. Enter the 6-digit code from the organizer to register.",
+    "otherTournament": "That code belongs to a different tournament.",
+    "codeApplied": "Invite code {{code}} applied",
+    "teamCodeLabel": "Tournament code",
+    "teamCodeHint": "This tournament is private — enter the organizer's 6-digit code to create a team."
   }
 }

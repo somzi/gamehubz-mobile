@@ -8,11 +8,19 @@ import type {
 
 // --- Team CRUD ---
 
-export async function createTeam(tournamentId: string, teamName: string, requiresApproval: boolean = false): Promise<TeamDto> {
+export async function createTeam(
+    tournamentId: string,
+    teamName: string,
+    requiresApproval: boolean = false,
+    // Private tournaments only: creating a team is how a captain enters one, so the server checks
+    // the join code here. Omitted everywhere else.
+    joinCode?: string | null,
+): Promise<TeamDto> {
     const response = await apiClient.post<TeamDto>(`/api/teams`, {
         tournamentId,
         teamName,
         requiresApproval,
+        ...(joinCode ? { joinCode } : {}),
     });
     return response.data;
 }

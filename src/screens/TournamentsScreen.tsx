@@ -16,6 +16,8 @@ import { formatDateSafe, formatLocalDateTime, getCurrencySymbol } from '../lib/u
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
+import { JoinByCodeModal } from '../components/modals/JoinByCodeModal';
+import { PRIVATE_COLORS } from '../components/ui/PrivateBadge';
 
 type TournamentsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -58,6 +60,9 @@ export default function TournamentsScreen() {
     const insets = useSafeAreaInsets();
 
     const [activeTab, setActiveTab] = useState('live');
+    // Private tournaments never appear in these lists — a code (or the organiser's link) is the
+    // only way to one, so the entry point sits in the header of every tab.
+    const [showJoinByCode, setShowJoinByCode] = useState(false);
 
     // useInfiniteQuery: pages are keyed by (activeTab, userId) so switching tabs
     // isolates a separate cache entry — the previous tab's page cursor never
@@ -186,6 +191,7 @@ export default function TournamentsScreen() {
                 index={index}
                 hubName={tournament.HubName || tournament.hubName}
                 hubAvatarUrl={tournament.HubAvatarUrl || tournament.hubAvatarUrl}
+                isPrivate={!!(tournament.IsPrivate ?? tournament.isPrivate)}
             />
         </View>
         );
@@ -200,9 +206,18 @@ export default function TournamentsScreen() {
                         <Text className="text-2xl font-black text-white tracking-tight">{t('common:nav.tournaments')}</Text>
                         <Text className="text-xs text-slate-600 font-medium mt-0.5">{t('list.competeConquer')}</Text>
                     </View>
-                    <View className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 items-center justify-center">
-                        <Ionicons name="trophy" size={18} color="#818CF8" />
-                    </View>
+                    <Pressable
+                        onPress={() => setShowJoinByCode(true)}
+                        className="h-10 px-3.5 rounded-2xl flex-row items-center gap-2 active:opacity-70"
+                        style={{ backgroundColor: PRIVATE_COLORS.bg, borderWidth: 1, borderColor: PRIVATE_COLORS.border }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('joinCode.title')}
+                    >
+                        <Ionicons name="keypad" size={16} color={PRIVATE_COLORS.icon} />
+                        <Text className="text-xs font-black" style={{ color: PRIVATE_COLORS.text }}>
+                            {t('joinCode.button')}
+                        </Text>
+                    </Pressable>
                 </View>
             </View>
 
@@ -259,6 +274,18 @@ export default function TournamentsScreen() {
                             color={COLORS.info}
                             title={t('list.noneFound')}
                             description={t('list.noneFoundHint')}
+                            action={activeTab === 'open' ? (
+                                <Pressable
+                                    onPress={() => setShowJoinByCode(true)}
+                                    className="flex-row items-center gap-2 px-4 py-2.5 rounded-xl active:opacity-70"
+                                    style={{ backgroundColor: PRIVATE_COLORS.bg, borderWidth: 1, borderColor: PRIVATE_COLORS.border }}
+                                >
+                                    <Ionicons name="keypad" size={14} color={PRIVATE_COLORS.icon} />
+                                    <Text className="text-xs font-black" style={{ color: PRIVATE_COLORS.text }}>
+                                        {t('list.haveCode')}
+                                    </Text>
+                                </Pressable>
+                            ) : undefined}
                         />
                     }
                     ListFooterComponent={
@@ -271,6 +298,8 @@ export default function TournamentsScreen() {
                     removeClippedSubviews
                 />
             )}
+
+            <JoinByCodeModal visible={showJoinByCode} onClose={() => setShowJoinByCode(false)} />
         </SafeAreaView>
     );
 }

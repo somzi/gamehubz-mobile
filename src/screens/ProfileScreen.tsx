@@ -291,6 +291,7 @@ export default function ProfileScreen() {
                                                 onClick={() => openTournament(row.id)}
                                                 hubName={row.hubName || row.HubName}
                                                 hubAvatarUrl={row.hubAvatarUrl || row.HubAvatarUrl}
+                                                isPrivate={!!(row.isPrivate ?? row.IsPrivate)}
                                             />
                                         ))}
                                         {hasMoreTournaments && isLoadingMoreTournaments && (

@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
+import { PrivateBadge, PRIVATE_COLORS } from '../ui/PrivateBadge';
 
 interface TournamentCardProps {
     name: string;
@@ -29,6 +30,8 @@ interface TournamentCardProps {
     hubAvatarUrl?: string;
     /** Pending items the organizer has to approve in this tournament — red corner badge. */
     badgeCount?: number;
+    /** Invite-only tournament: lock on the logo tile plus a "Private" pill beside the hub name. */
+    isPrivate?: boolean;
 }
 
 const STATUS_THEME: Record<string, { main: string; tint: string; text: string; ring: string }> = {
@@ -79,6 +82,7 @@ export const TournamentCard = React.memo(function TournamentCard({
     hubName,
     hubAvatarUrl,
     badgeCount = 0,
+    isPrivate = false,
 }: TournamentCardProps) {
     const { t } = useTranslation('common');
     const theme = STATUS_THEME[status] || STATUS_THEME.upcoming;
@@ -116,41 +120,63 @@ export const TournamentCard = React.memo(function TournamentCard({
                 <View className="p-5">
                     {/* Top row */}
                     <View className="flex-row items-center gap-3">
-                        <View
-                            className="w-12 h-12 rounded-2xl items-center justify-center overflow-hidden"
-                            style={
-                                hubAvatarUrl
-                                    ? {
-                                          // Real logo: stay neutral so the image isn't fighting a
-                                          // mismatched colored frame — let it read as a clean cropped tile.
-                                          backgroundColor: 'rgba(255,255,255,0.04)',
-                                      }
-                                    : {
-                                          backgroundColor: avatarStyle.bg,
-                                          borderWidth: 1,
-                                          borderColor: avatarStyle.border,
-                                      }
-                            }
-                        >
-                            {hubAvatarUrl ? (
-                                <>
-                                    <Image
-                                        source={{ uri: hubAvatarUrl }}
-                                        style={{ width: '100%', height: '100%' }}
-                                        contentFit="cover"
-                                        cachePolicy="memory-disk"
-                                        transition={150}
-                                    />
-                                    {/* Crisp hairline ring on top of the image so the tile has a clean
-                                        cut-out edge against the card instead of a hard square. */}
-                                    <View
-                                        pointerEvents="none"
-                                        className="absolute inset-0 rounded-2xl"
-                                        style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
-                                    />
-                                </>
-                            ) : (
-                                <Ionicons name="trophy" size={22} color={avatarStyle.icon} />
+                        {/* Wrapper gives the corner lock a box to sit on without being cut by the
+                            tile's own overflow clip. */}
+                        <View>
+                            <View
+                                className="w-12 h-12 rounded-2xl items-center justify-center overflow-hidden"
+                                style={
+                                    hubAvatarUrl
+                                        ? {
+                                              // Real logo: stay neutral so the image isn't fighting a
+                                              // mismatched colored frame — let it read as a clean cropped tile.
+                                              backgroundColor: 'rgba(255,255,255,0.04)',
+                                          }
+                                        : {
+                                              backgroundColor: avatarStyle.bg,
+                                              borderWidth: 1,
+                                              borderColor: avatarStyle.border,
+                                          }
+                                }
+                            >
+                                {hubAvatarUrl ? (
+                                    <>
+                                        <Image
+                                            source={{ uri: hubAvatarUrl }}
+                                            style={{ width: '100%', height: '100%' }}
+                                            contentFit="cover"
+                                            cachePolicy="memory-disk"
+                                            transition={150}
+                                        />
+                                        {/* Crisp hairline ring on top of the image so the tile has a clean
+                                            cut-out edge against the card instead of a hard square. */}
+                                        <View
+                                            pointerEvents="none"
+                                            className="absolute inset-0 rounded-2xl"
+                                            style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' }}
+                                        />
+                                    </>
+                                ) : (
+                                    <Ionicons name="trophy" size={22} color={avatarStyle.icon} />
+                                )}
+                            </View>
+                            {/* Lock on the logo's corner — the first thing the eye lands on in a list. */}
+                            {isPrivate && (
+                                <View
+                                    pointerEvents="none"
+                                    className="absolute items-center justify-center rounded-full"
+                                    style={{
+                                        right: -6,
+                                        bottom: -6,
+                                        width: 20,
+                                        height: 20,
+                                        backgroundColor: '#1A1410',
+                                        borderWidth: 1.5,
+                                        borderColor: PRIVATE_COLORS.border,
+                                    }}
+                                >
+                                    <Ionicons name="lock-closed" size={10} color={PRIVATE_COLORS.icon} />
+                                </View>
                             )}
                         </View>
 
@@ -166,12 +192,17 @@ export const TournamentCard = React.memo(function TournamentCard({
                             <View className="flex-row items-center gap-1 mt-1">
                                 <Ionicons name="people" size={12} color="#34D399" />
                                 <Text
-                                    className="text-[11px] font-bold uppercase tracking-wider flex-1"
-                                    style={{ color: '#34D399' }}
-                                    numberOfLines={2}
+                                    className={cn('text-[11px] font-bold uppercase tracking-wider', !isPrivate && 'flex-1')}
+                                    style={{ color: '#34D399', flexShrink: 1 }}
+                                    numberOfLines={isPrivate ? 1 : 2}
                                 >
                                     {hubName || t('app.officialHub')}
                                 </Text>
+                                {isPrivate && (
+                                    <View className="ml-1">
+                                        <PrivateBadge />
+                                    </View>
+                                )}
                             </View>
                         </View>
 

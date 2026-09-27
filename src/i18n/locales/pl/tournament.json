@@ -146,7 +146,18 @@
     "summaryReadyCheck": "Potwierdzenie gotowości",
     "resultVerification": "Weryfikacja wyników",
     "resultVerificationHint": "Przed zgłoszeniem wyniku gracze potwierdzają tożsamość przez Face ID lub odcisk palca na zarejestrowanym telefonie i dołączają nagranie ekranu z wynikiem końcowym. Organizatorzy zawsze mogą wpisać wynik.",
-    "summaryResultVerification": "Weryfikowane wyniki"
+    "summaryResultVerification": "Weryfikowane wyniki",
+    "visibility": "Widoczność",
+    "visibilityPublic": "Publiczny",
+    "visibilityPrivate": "Prywatny",
+    "visibilityPublicHint": "Każdy z huba może się zapisać, a członkowie huba dostają powiadomienie.",
+    "visibilityPrivateHint": "Widoczny w hubie jak każdy turniej, ale zapisać się mogą tylko gracze z 6-cyfrowym kodem albo linkiem z zaproszeniem. Członkowie huba nie dostają powiadomienia o nowym turnieju ani przypomnienia o końcu zapisów — kod i link pojawią się zaraz po utworzeniu.",
+    "visibilityPublicEditHint": "Każdy z huba może się zapisać. Zmiana na publiczny nie wysyła powiadomień.",
+    "visibilityPrivateEditHint": "Zapisać się mogą tylko gracze z 6-cyfrowym kodem albo linkiem z zaproszeniem — oba są na stronie turnieju. Powiadomienie o nowym turnieju i przypomnienie o końcu zapisów nie są wysyłane.",
+    "summaryPrivate": "Prywatny",
+    "createdTitle": "Turniej utworzony",
+    "createdPrivateHint": "Jest widoczny w hubie, ale zapisać się mogą tylko gracze z kodem albo linkiem z zaproszeniem. Wyślij go wybranym graczom.",
+    "openTournament": "Otwórz turniej"
   },
   "validation": {
     "nameAndHubRequired": "Nazwa turnieju i hub są wymagane",
@@ -356,7 +367,11 @@
     "shareBracketPdf": "Udostępnij drabinkę (PDF)",
     "liveBadge": "NA ŻYWO",
     "noConfirmedMatch": "Żaden potwierdzony gracz nie pasuje do „{{query}}”.",
-    "noRegistrationMatch": "Żaden zapis nie pasuje do „{{query}}”."
+    "noRegistrationMatch": "Żaden zapis nie pasuje do „{{query}}”.",
+    "visibilityLabel": "Widoczność",
+    "privateInviteOnly": "Prywatny · wymaga kodu",
+    "enterCodeToJoin": "Wpisz kod, aby dołączyć",
+    "privateJoinHint": "Turniej prywatny — do zapisu potrzebny jest kod od organizatora."
   },
   "manage": {
     "title": "Zarządzaj turniejem",
@@ -435,7 +450,8 @@
     "tabLive": "Na żywo",
     "tabUpcoming": "Nadchodzące",
     "tabOpen": "Otwarte",
-    "tabCompleted": "Zakończone"
+    "tabCompleted": "Zakończone",
+    "haveCode": "Masz kod zaproszenia?"
   },
   "format": {
     "league": "Liga",
@@ -573,5 +589,42 @@
       "locked": "Runda zablokowana",
       "tbd": "Czeka na poprzednią rundę"
     }
+  },
+  "invite": {
+    "title": "Zaproś graczy",
+    "subtitle": "Zapisać się mogą tylko gracze z tym kodem albo Twoim linkiem z zaproszeniem. Członkowie huba nie dostali powiadomienia o utworzeniu tego turnieju.",
+    "codeLabel": "Kod dołączenia",
+    "copyCode": "Kopiuj kod",
+    "copied": "Skopiowano!",
+    "share": "Udostępnij zaproszenie",
+    "newCode": "Wygeneruj nowy kod",
+    "newCodeConfirmTitle": "Wygenerować nowy kod?",
+    "newCodeConfirmMessage": "Obecny kod od razu przestaje działać. Zapisani gracze zostają w turnieju, a link z zaproszeniem nadal działa.",
+    "newCodeConfirm": "Wygeneruj nowy kod",
+    "loadFailed": "Nie udało się wczytać kodu. Stuknij, aby spróbować ponownie."
+  },
+  "joinCode": {
+    "button": "Wpisz kod",
+    "title": "Dołącz kodem",
+    "subtitle": "Wpisz 6-cyfrowy kod od organizatora.",
+    "checking": "Sprawdzanie kodu…",
+    "invalid": "Żaden turniej nie ma takiego kodu.",
+    "join": "Dołącz do turnieju",
+    "registerTeam": "Zgłoś drużynę",
+    "open": "Otwórz turniej",
+    "alreadyIn": "Twoje zgłoszenie jest już wysłane.",
+    "youManage": "Zarządzasz tym turniejem.",
+    "registrationClosed": "Zapisy są zamknięte.",
+    "full": "Ten turniej jest pełny.",
+    "opensAt": "Zapisy ruszają {{date}}.",
+    "approvalNote": "Organizator zatwierdza każde zgłoszenie.",
+    "tryAnother": "Użyj innego kodu",
+    "paste": "Wklej kod",
+    "verifyTitle": "Wpisz kod turnieju",
+    "verifySubtitle": "Ten turniej jest prywatny. Wpisz 6-cyfrowy kod od organizatora, aby się zapisać.",
+    "otherTournament": "Ten kod należy do innego turnieju.",
+    "codeApplied": "Kod zaproszenia {{code}} jest aktywny",
+    "teamCodeLabel": "Kod turnieju",
+    "teamCodeHint": "Ten turniej jest prywatny — wpisz 6-cyfrowy kod od organizatora, aby utworzyć drużynę."
   }
 }

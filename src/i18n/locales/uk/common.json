@@ -53,7 +53,8 @@
     "tryAgain": "Спробувати ще раз",
     "unexpectedCrash": "У застосунку сталася неочікувана помилка.",
     "victory": "ПЕРЕМОГА",
-    "winRate": "% ПЕРЕМОГ"
+    "winRate": "% ПЕРЕМОГ",
+    "private": "Закритий"
   },
   "back": "Назад",
   "cancel": "Скасувати",
@@ -136,7 +137,8 @@
     "playerProfile": "Профіль гравця",
     "tournament": "Турнір",
     "viewPlayer": "Переглянь профіль {{name}} на GameHubz.",
-    "viewPlayerGeneric": "Переглянь профіль цього гравця на GameHubz."
+    "viewPlayerGeneric": "Переглянь профіль цього гравця на GameHubz.",
+    "privateInvite": "Запрошення до турніру {{name}} на GameHubz. Заходь за кодом {{code}} або відкрий посилання:"
   },
   "status": {
     "completed": "Завершено",

@@ -24,6 +24,11 @@ import { SegmentedToggle } from '../ui/SegmentedToggle';
 import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../../types/navigation';
+import { PrivateInviteCard } from '../tournament/PrivateInviteCard';
+import { PRIVATE_COLORS } from '../ui/PrivateBadge';
 
 // Option arrays keep their VALUES at module scope (types below depend on them) but carry
 // i18n keys instead of labels — labels are resolved per render so a language switch applies.
@@ -96,6 +101,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const { user } = useAuth();
     const { t } = useTranslation('tournament');
     const { t: tTeam } = useTranslation('team');
+    const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
     // Labels resolved here rather than at module scope so switching language re-renders them.
     const swissKnockoutOptions = useMemo(
@@ -190,6 +196,17 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
     // Exclusive — when on, only Exclusive-or-higher hub members can see/join the tournament.
     const [isExclusive, setIsExclusive] = useState(false);
+
+    // Private — invite-only: hidden from the feed, the hub page and every notification. Players get
+    // in with the six-digit code or the share link, both handed over on the step after creation.
+    const [isPrivate, setIsPrivate] = useState(false);
+    // Set once a private tournament is created: the form gives way to its code, because without
+    // that code (or the link) nobody will ever find the tournament.
+    const [createdPrivate, setCreatedPrivate] = useState<{ id: string; name: string } | null>(null);
+
+    useEffect(() => {
+        if (!visible) setCreatedPrivate(null);
+    }, [visible]);
 
     // Data State
     const [hubs, setHubs] = useState<{ id: string; name: string }[]>([]);
@@ -584,6 +601,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
                 RequireResultVerification: requireResultVerification,
                 IsExclusive: isExclusive,
+                IsPrivate: isPrivate,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
             };
 
@@ -618,6 +636,16 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             }
 
             console.log('Tournament created successfully');
+
+            if (isPrivate) {
+                const created = await response.json().catch(() => null);
+                const createdId = created?.result?.id ?? created?.id ?? created?.Id;
+                if (createdId) {
+                    setCreatedPrivate({ id: createdId, name });
+                    return;
+                }
+            }
+
             onClose();
         } catch (err: any) {
             console.error('Error creating tournament:', err);
@@ -704,6 +732,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Collapsed-header recaps so a skimmed form still reads at a glance.
     const basicsSummary = [
         name.trim() || t('form.summaryNoName'),
+        isPrivate ? t('form.summaryPrivate') : null,
         getFormatLabel(),
         maxPlayers ? t('form.summaryPlayers', { count: Number(maxPlayers) }) : null,
     ].filter(Boolean).join(' · ');
@@ -778,6 +807,33 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             value={name}
                                             onChangeText={setName}
                                         />
+                                    </View>
+
+                                    {/* Visibility — up front, because it decides whether anyone hears
+                                        about the tournament at all. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.visibility')}</Text>
+                                        <SegmentedToggle
+                                            options={[
+                                                { value: 'public', label: t('form.visibilityPublic') },
+                                                { value: 'private', label: t('form.visibilityPrivate') },
+                                            ]}
+                                            value={isPrivate ? 'private' : 'public'}
+                                            onChange={(v) => setIsPrivate(v === 'private')}
+                                        />
+                                        {isPrivate ? (
+                                            <View
+                                                className="flex-row items-start gap-2 mt-2 px-3 py-2.5 rounded-xl"
+                                                style={{ backgroundColor: PRIVATE_COLORS.bg, borderWidth: 1, borderColor: PRIVATE_COLORS.border }}
+                                            >
+                                                <Ionicons name="lock-closed" size={13} color={PRIVATE_COLORS.icon} style={{ marginTop: 1 }} />
+                                                <Text className="flex-1 text-[11px] leading-4" style={{ color: PRIVATE_COLORS.text }}>
+                                                    {t('form.visibilityPrivateHint')}
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text className={FIELD_HINT}>{t('form.visibilityPublicHint')}</Text>
+                                        )}
                                     </View>
 
                                     <View className="flex-row gap-3">
@@ -1253,6 +1309,49 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                             {t('form.createTournament')}
                         </Button>
                     </View>
+
+                    {/* Private tournament created: its code replaces the form. Drawn over the card
+                        instead of swapping the tree, so the long form below needs no restructuring. */}
+                    {createdPrivate && (
+                        <View className="absolute inset-0 bg-background">
+                            <View className="flex-row justify-end px-6 pt-5">
+                                <TouchableOpacity onPress={onClose} className="bg-white/5 p-2 rounded-full">
+                                    <Ionicons name="close" size={20} color="#94A3B8" />
+                                </TouchableOpacity>
+                            </View>
+                            <ScrollView
+                                className="px-5"
+                                contentContainerStyle={{ paddingBottom: 28 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                <View className="items-center mb-5">
+                                    <View className="w-16 h-16 rounded-full items-center justify-center mb-3" style={{ backgroundColor: 'rgba(16,185,129,0.10)' }}>
+                                        <Ionicons name="checkmark-circle" size={40} color="#10B981" />
+                                    </View>
+                                    <Text className="text-xl font-black text-white text-center">{t('form.createdTitle')}</Text>
+                                    <Text className="text-xs text-slate-400 text-center mt-1.5 px-4 leading-5">
+                                        {t('form.createdPrivateHint')}
+                                    </Text>
+                                </View>
+
+                                <PrivateInviteCard tournamentId={createdPrivate.id} tournamentName={createdPrivate.name} />
+
+                                <Button
+                                    className="w-full h-14 rounded-2xl"
+                                    onPress={() => {
+                                        const id = createdPrivate.id;
+                                        onClose();
+                                        navigation.navigate('TournamentDetails', { id });
+                                    }}
+                                >
+                                    {t('form.openTournament')}
+                                </Button>
+                                <Button variant="ghost" className="w-full mt-2" onPress={onClose}>
+                                    {t('common:done')}
+                                </Button>
+                            </ScrollView>
+                        </View>
+                    )}
                     {renderOptionsModal(
                         showHubPicker,
                         () => setShowHubPicker(false),

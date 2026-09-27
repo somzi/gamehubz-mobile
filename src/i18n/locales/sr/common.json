@@ -72,7 +72,8 @@
     "viewPlayer": "Pogledaj igrača {{name}} na GameHubz-u.",
     "viewPlayerGeneric": "Pogledaj ovog igrača na GameHubz-u.",
     "joinTeam": "Pridruži se timu {{name}} na GameHubz-u.",
-    "joinTeamGeneric": "Pridruži se ovom timu na GameHubz-u."
+    "joinTeamGeneric": "Pridruži se ovom timu na GameHubz-u.",
+    "privateInvite": "Poziv za turnir {{name}} na GameHubz-u. Uđi sa kodom {{code}} ili otvori link:"
   },
   "zeroBytes": "0 bajtova",
   "translationEmpty": "Odgovor prevoda nije sadržao preveden tekst.",
@@ -143,7 +144,8 @@
     "notAvailableShort": "N/D",
     "victory": "POBEDA",
     "defeat": "PORAZ",
-    "drawResult": "NEREŠENO"
+    "drawResult": "NEREŠENO",
+    "private": "Privatni"
   },
   "nav": {
     "home": "Početna",

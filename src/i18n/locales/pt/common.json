@@ -72,7 +72,8 @@
     "viewPlayer": "Veja {{name}} no GameHubz.",
     "viewPlayerGeneric": "Veja este jogador no GameHubz.",
     "joinTeam": "Participe de {{name}} no GameHubz.",
-    "joinTeamGeneric": "Participe deste time no GameHubz."
+    "joinTeamGeneric": "Participe deste time no GameHubz.",
+    "privateInvite": "Tem um convite para você: {{name}} no GameHubz. Entre com o código {{code}} ou abra o link:"
   },
   "zeroBytes": "0 Bytes",
   "translationEmpty": "A resposta da tradução não continha texto traduzido.",
@@ -142,7 +143,8 @@
     "notAvailableShort": "N/D",
     "victory": "VITÓRIA",
     "defeat": "DERROTA",
-    "drawResult": "EMPATE"
+    "drawResult": "EMPATE",
+    "private": "Privado"
   },
   "nav": {
     "home": "Início",

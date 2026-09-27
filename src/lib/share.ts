@@ -69,6 +69,33 @@ export function shareTournament(id: string, name?: string) {
     });
 }
 
+/** "482 913" — a six-digit code read out or typed in two halves is far harder to get wrong. */
+export function formatJoinCode(code?: string | null) {
+    if (!code) return '';
+    return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+}
+
+/**
+ * The organiser's invite link for a private tournament. Private tournaments are listed publicly,
+ * so the plain tournament link is no key — this one carries the join code, which the share page
+ * forwards into the app so registration works without typing anything.
+ */
+export function buildTournamentInviteUrl(id: string, code: string) {
+    return `${buildShareUrl('tournament', id)}?code=${encodeURIComponent(code)}`;
+}
+
+/**
+ * Invite to a private tournament: the message carries the code (for typing it in) and the invite
+ * link (one tap opens the tournament with the code applied), so it works either way.
+ */
+export function shareTournamentInvite(id: string, name: string, code: string) {
+    return shareLink({
+        title: name,
+        description: i18n.t('common:shareLinks.privateInvite', { name, code: formatJoinCode(code) }),
+        url: buildTournamentInviteUrl(id, code),
+    });
+}
+
 export function shareHub(id: string, name?: string) {
     return shareLink({
         title: name || i18n.t('common:shareLinks.hub'),
