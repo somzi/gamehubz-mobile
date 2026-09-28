@@ -73,7 +73,9 @@
     "viewPlayerGeneric": "Veja este jogador no GameHubz.",
     "joinTeam": "Participe de {{name}} no GameHubz.",
     "joinTeamGeneric": "Participe deste time no GameHubz.",
-    "privateInvite": "Tem um convite para você: {{name}} no GameHubz. Entre com o código {{code}} ou abra o link:"
+    "privateInvite": "Tem um convite para você: {{name}} no GameHubz. Entre com o código {{code}} ou abra o link:",
+    "viewTournament": "Confira {{name}} no GameHubz.",
+    "viewTournamentGeneric": "Confira este torneio no GameHubz."
   },
   "zeroBytes": "0 Bytes",
   "translationEmpty": "A resposta da tradução não continha texto traduzido.",

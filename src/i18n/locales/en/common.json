@@ -73,7 +73,9 @@
     "viewPlayerGeneric": "View this player on GameHubz.",
     "joinTeam": "Join {{name}} on GameHubz.",
     "joinTeamGeneric": "Join this team on GameHubz.",
-    "privateInvite": "You're invited to {{name}} on GameHubz. Join with code {{code}} or open the link:"
+    "privateInvite": "You're invited to {{name}} on GameHubz. Join with code {{code}} or open the link:",
+    "viewTournament": "Check out {{name}} on GameHubz.",
+    "viewTournamentGeneric": "Check out this tournament on GameHubz."
   },
   "zeroBytes": "0 Bytes",
   "translationEmpty": "Translation response did not contain translated text.",

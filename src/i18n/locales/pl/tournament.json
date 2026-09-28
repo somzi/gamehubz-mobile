@@ -606,6 +606,8 @@
   "joinCode": {
     "button": "Wpisz kod",
     "title": "Dołącz kodem",
+    "previewTitle": "Znajdź turniej",
+    "previewSubtitle": "Wpisz kod, aby znaleźć turniej. Dołączenie to osobny krok.",
     "subtitle": "Wpisz 6-cyfrowy kod od organizatora.",
     "checking": "Sprawdzanie kodu…",
     "invalid": "Żaden turniej nie ma takiego kodu.",

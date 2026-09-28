@@ -69,6 +69,7 @@ import { PrivateBadge, PRIVATE_COLORS } from '../components/ui/PrivateBadge';
 import { PrivateInviteCard } from '../components/tournament/PrivateInviteCard';
 import { JoinByCodeModal } from '../components/modals/JoinByCodeModal';
 import { formatJoinCode } from '../lib/share';
+import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -179,10 +180,16 @@ export default function TournamentDetailsScreen() {
     // organiser's invite link (`?code=`) or the join-with-code sheet. It rides along with the
     // registration; without it a private tournament asks for the code before signing anyone up.
     const [inviteCode, setInviteCode] = useState<string | null>(() => normalizeInviteCode(route.params.code));
+    const inviteTournamentIdRef = useRef(id);
     useEffect(() => {
         const next = normalizeInviteCode(route.params.code);
-        if (next) setInviteCode(next);
-    }, [route.params.code]);
+        if (inviteTournamentIdRef.current !== id) {
+            inviteTournamentIdRef.current = id;
+            setInviteCode(next);
+        } else if (next) {
+            setInviteCode(next);
+        }
+    }, [id, route.params.code]);
     // The "enter this tournament's code" sheet (solo sign-up to a private tournament).
     const [showCodePrompt, setShowCodePrompt] = useState(false);
     const { tournamentApprovals, refresh: refreshBadges } = useBadges();
@@ -293,6 +300,7 @@ export default function TournamentDetailsScreen() {
     const [joiningTeamId, setJoiningTeamId] = useState<string | null>(null);
     // Share deep-link: confirm prompt before joining/requesting the shared team.
     const [joinPrompt, setJoinPrompt] = useState<{ teamId: string; teamName: string; requiresApproval: boolean } | null>(null);
+    const [pendingPrivateTeamJoin, setPendingPrivateTeamJoin] = useState<{ teamId: string; requiresApproval: boolean } | null>(null);
 
     // Owner-level permission for this tournament: hub owner, hub admin or platform admin.
     // Resolved by the v2 overview/structure endpoints (tournament.canManage / bracketCanManage).
@@ -387,10 +395,7 @@ export default function TournamentDetailsScreen() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                // A refused sign-up to a private tournament most likely means the code (say, from an
-                // invite link sent before the organiser made a new one) no longer matches: drop it so
-                // the next tap asks for the current code instead of failing the same way again.
-                if (tournament?.isPrivate && response.status === 400) setInviteCode(null);
+                if (isRejectedTournamentJoinCode(errorData)) setInviteCode(null);
                 // The server's error body is PascalCase ("Message"); reading only `message` used to
                 // replace every reason (region, full, closed…) with the generic "join failed".
                 throw new Error(errorData.message || errorData.Message || t('details.joinFailed'));
@@ -425,18 +430,24 @@ export default function TournamentDetailsScreen() {
         </View>
     );
 
-    const handleJoinTeam = async (teamId: string, requiresApproval?: boolean) => {
+    const handleJoinTeam = async (teamId: string, requiresApproval?: boolean, codeOverride?: string) => {
+        if (!tournament || joiningTeamId) return;
+        const joinCode = codeOverride ?? inviteCode;
+        if (tournament?.isPrivate && !canManage && !joinCode) {
+            setPendingPrivateTeamJoin({ teamId, requiresApproval: !!requiresApproval });
+            return;
+        }
         setJoiningTeamId(teamId);
         try {
             if (requiresApproval) {
-                await requestJoinTeam(teamId);
+                await requestJoinTeam(teamId, tournament?.isPrivate ? joinCode : null);
                 setStatusModalConfig({
                     type: 'success',
                     title: t('details.requestSent'),
                     message: t('details.requestSentMessage')
                 });
             } else {
-                await joinTeam(teamId);
+                await joinTeam(teamId, tournament?.isPrivate ? joinCode : null);
                 setStatusModalConfig({
                     type: 'success',
                     title: t('details.successExclaim'),
@@ -449,6 +460,7 @@ export default function TournamentDetailsScreen() {
                 fetchOpenTeams();
             }
         } catch (err: unknown) {
+            if (isRejectedTournamentJoinCode(err)) setInviteCode(null);
             setStatusModalConfig({
                 type: 'error',
                 title: requiresApproval ? t('details.requestFailed') : t('details.joinFailedTitle'),
@@ -961,45 +973,17 @@ export default function TournamentDetailsScreen() {
     const handleJoinPromptConfirm = async () => {
         if (!joinPrompt) return;
         const { teamId, requiresApproval } = joinPrompt;
+        if (tournament?.isPrivate && !canManage && !inviteCode) {
+            // The code sheet is a second native Modal. Present it only once this prompt has
+            // animated out — iOS drops a Modal presented while another one is still dismissing,
+            // which would leave the player with nothing on screen after tapping Join.
+            setJoinPrompt(null);
+            setTimeout(() => setPendingPrivateTeamJoin({ teamId, requiresApproval }), 400);
+            return;
+        }
         await handleJoinTeam(teamId, requiresApproval);
         setJoinPrompt(null);
     };
-
-    // Join-with-code landing: the player already saw the preview and tapped Join, so registration
-    // starts as soon as the tournament (and, for teams, the roster state) has loaded. Runs once;
-    // anything that would make the tap pointless — already in, managing it, not open, full, or
-    // outside the tournament's region/exclusivity — just leaves the player on the screen, where
-    // the usual banner explains why.
-    const { autoJoin } = route.params;
-    const autoJoinHandledRef = useRef(false);
-    useEffect(() => {
-        if (!autoJoin || autoJoinHandledRef.current || !tournament || isLoading) return;
-        if (tournament.isTeamTournament && isLoadingTeams) return;
-
-        autoJoinHandledRef.current = true;
-        navigation.setParams({ autoJoin: undefined });
-
-        const status = Number(tournament.status);
-        const isOpen = (status === 0 || status === 1) && !isWaitingToOpen;
-        const attendeeCount = tournament.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0);
-        const isFull = tournament.maxPlayers > 0 && attendeeCount >= tournament.maxPlayers;
-        const countries: string[] = tournament.countries || [];
-        const isRegionEligible = countries.length > 0
-            ? (!!user?.country && countries.includes(user.country))
-            : (tournament.region === TournamentRegion.Global || tournament.region === user?.region);
-        const isExclusiveEligible = !tournament.isExclusive || tournament.hasExclusiveAccess === true;
-
-        if (canManage || isUserRegistered || !isOpen || isFull || !isRegionEligible || !isExclusiveEligible) return;
-
-        if (tournament.isTeamTournament) {
-            if (!userTeam) setShowTeamRegistration(true);
-        } else if (tournament.isPrivate && !inviteCode) {
-            setShowCodePrompt(true);
-        } else {
-            handleJoin();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoJoin, tournament, isLoading, isLoadingTeams]);
 
     // Guards the entrant count before we bother the organiser with the draw picker (or the server)
     // — Double Elimination can't build a losers bracket with fewer than 4.
@@ -3916,7 +3900,8 @@ export default function TournamentDetailsScreen() {
                         : t('details.joinPromptDirect', { teamName: joinPrompt?.teamName })
                 }
                 confirmText={joinPrompt?.requiresApproval ? t('details.requestToJoin') : t('details.joinThisTeam')}
-                isLoading={joiningTeamId !== null && joiningTeamId === joinPrompt?.teamId}
+                isLoading={!tournament || (joiningTeamId !== null && joiningTeamId === joinPrompt?.teamId)}
+                stacked
             />
 
             {showStatusModal && (
@@ -3963,9 +3948,24 @@ export default function TournamentDetailsScreen() {
                 visible={showCodePrompt}
                 onClose={() => setShowCodePrompt(false)}
                 tournamentId={id}
+                confirmLabel={t('details.joinTournament')}
                 onVerified={async (code) => {
                     setInviteCode(code);
                     await handleJoin(code);
+                }}
+            />
+
+            {/* A team roster is part of a private tournament too. Verify the code only after
+                the player chooses Join/Request, then let them confirm that specific action. */}
+            <JoinByCodeModal
+                visible={!!pendingPrivateTeamJoin}
+                onClose={() => setPendingPrivateTeamJoin(null)}
+                tournamentId={id}
+                confirmLabel={pendingPrivateTeamJoin?.requiresApproval ? t('details.requestToJoin') : t('details.joinThisTeam')}
+                onVerified={async (code) => {
+                    if (!pendingPrivateTeamJoin) return;
+                    setInviteCode(code);
+                    await handleJoinTeam(pendingPrivateTeamJoin.teamId, pendingPrivateTeamJoin.requiresApproval, code);
                 }}
             />
 
@@ -4071,6 +4071,8 @@ export default function TournamentDetailsScreen() {
                     countries={tournament.countries}
                     countryFlags={tournament.countryFlags}
                     hubName={tournament.hubName || null}
+                    isPrivate={!!tournament.isPrivate}
+                    canInvite={canManage}
                 />
             )}
         </SafeAreaView>

@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { shareTournament } from '../../lib/share';
+import { shareTournament, shareTournamentInvite } from '../../lib/share';
+import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
+import { PrivateBadge } from '../ui/PrivateBadge';
 import { getCurrencyLabel } from '../../lib/utils';
 import { TournamentRegion } from '../../types/tournament';
 import {
@@ -42,6 +44,8 @@ interface ShareTournamentCardModalProps {
     countries?: string[] | null;
     countryFlags?: string[] | null;
     hubName?: string | null;
+    isPrivate?: boolean;
+    canInvite?: boolean;
 }
 
 const STATUS_META: Record<number, { labelKey: string; color: string; bg: string; border: string }> = {
@@ -73,7 +77,7 @@ const REGION_SHORT: Record<number, string> = {
     [TournamentRegion.Oceania]: 'OCE',
 };
 
-function TournamentCardPoster({ name, status, isTeam, participants, teamSize, prize, prizeCurrency, format, startDate, region, countries, countryFlags, hubName, width }: {
+function TournamentCardPoster({ name, status, isTeam, participants, teamSize, prize, prizeCurrency, format, startDate, region, countries, countryFlags, hubName, isPrivate, width }: {
     width: number;
 } & Omit<ShareTournamentCardModalProps, 'visible' | 'onClose' | 'tournamentId'>) {
     const { t } = useTranslation('common');
@@ -135,6 +139,7 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
                         <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 1.6, color: statusMeta.color }}>{t(statusMeta.labelKey)}</Text>
                     </View>
                 </View>
+                {isPrivate && <View style={{ alignItems: 'center', marginTop: 9 }}><PrivateBadge size="md" /></View>}
 
                 {/* Prize takes the center column when there is one; otherwise participants do. */}
                 <View style={{ marginTop: 24, flexDirection: 'row', alignItems: 'center' }}>
@@ -201,8 +206,21 @@ function TournamentCardPoster({ name, status, isTeam, participants, teamSize, pr
     );
 }
 
-export function ShareTournamentCardModal({ visible, onClose, tournamentId, name, ...poster }: ShareTournamentCardModalProps) {
+export function ShareTournamentCardModal({ visible, onClose, tournamentId, name, isPrivate, canInvite, ...poster }: ShareTournamentCardModalProps) {
     const { t } = useTranslation('common');
+    const shareLink = async () => {
+        if (!isPrivate || !canInvite) return shareTournament(tournamentId, name, { viewOnly: !!isPrivate });
+        try {
+            const response = await authenticatedFetch(ENDPOINTS.GET_TOURNAMENT_JOIN_CODE(tournamentId));
+            if (!response.ok) throw new Error('Invite unavailable');
+            const data = await response.json();
+            const code = data?.joinCode ?? data?.JoinCode ?? data?.result?.joinCode ?? data?.result?.JoinCode;
+            if (!code) throw new Error('Invite unavailable');
+            await shareTournamentInvite(tournamentId, name, code);
+        } catch {
+            Alert.alert(t('share.shareFailed'), t('tournament:invite.loadFailed'));
+        }
+    };
     return (
         <ShareCardShell
             visible={visible}
@@ -210,9 +228,10 @@ export function ShareTournamentCardModal({ visible, onClose, tournamentId, name,
             headerTitle={t('share.tournamentCard')}
             dialogTitle={t('share.tournamentDialogTitle', { name })}
             fileName={name || 'tournament'}
-            onShareLink={() => shareTournament(tournamentId, name)}
+            onShareLink={shareLink}
+            linkLabel={isPrivate && canInvite ? t('tournament:invite.share') : undefined}
             renderPoster={(width) => (
-                <TournamentCardPoster name={name} width={width} {...poster} />
+                <TournamentCardPoster name={name} width={width} isPrivate={isPrivate} {...poster} />
             )}
         />
     );

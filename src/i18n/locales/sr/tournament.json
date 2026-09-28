@@ -588,6 +588,8 @@
   "joinCode": {
     "button": "Unesi kod",
     "title": "Uđi sa kodom",
+    "previewTitle": "Pronađi turnir",
+    "previewSubtitle": "Unesi kod da pronađeš turnir. Prijava je poseban korak.",
     "subtitle": "Unesi šestocifreni kod od organizatora.",
     "checking": "Proveravam kod…",
     "invalid": "Nijedan turnir nema taj kod.",

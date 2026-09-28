@@ -23,10 +23,11 @@ interface ShareCardShellProps {
     fileName: string;
     /** Link-share fallback, also wired to the "Share Link" button. */
     onShareLink: () => void | Promise<void>;
+    linkLabel?: string;
     renderPoster: (width: number) => React.ReactNode;
 }
 
-export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fileName, onShareLink, renderPoster }: ShareCardShellProps) {
+export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fileName, onShareLink, linkLabel, renderPoster }: ShareCardShellProps) {
     const { t } = useTranslation('common');
     const posterRef = useRef<View>(null);
     const [isSharing, setIsSharing] = useState(false);
@@ -110,7 +111,7 @@ export function ShareCardShell({ visible, onClose, headerTitle, dialogTitle, fil
                                 className="mt-3 py-3 rounded-lg border border-white/10 bg-white/5 flex-row items-center justify-center active:opacity-60"
                             >
                                 <Ionicons name="link-outline" size={16} color="#94A3B8" />
-                                <Text className="text-slate-300 font-bold text-sm ml-2">{t('share.shareLink')}</Text>
+                                <Text className="text-slate-300 font-bold text-sm ml-2">{linkLabel || t('share.shareLink')}</Text>
                             </Pressable>
                         </View>
                     </Pressable>

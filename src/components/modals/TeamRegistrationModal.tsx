@@ -17,6 +17,7 @@ import { Button } from '../ui/Button';
 import { useTranslation } from 'react-i18next';
 import { createTeam, joinTeam, getPendingTournamentTeams } from '../../lib/teamApi';
 import { getErrorMessage } from '../../lib/api';
+import { isRejectedTournamentJoinCode } from '../../lib/tournamentJoinCode';
 import { formatJoinCode } from '../../lib/share';
 import { PRIVATE_COLORS } from '../ui/PrivateBadge';
 import type { TeamDto } from '../../types/team';
@@ -92,11 +93,8 @@ export function TeamRegistrationModal({
         } catch (err: unknown) {
             const message = getErrorMessage(err);
             setCreateError(message);
-            // A refused create while sending the held code most likely means that code went stale.
-            // Open the field so the current one can be typed in — the message above says why — and
-            // tell the parent to forget the old code.
-            const status = (err as { response?: { status?: number } } | null)?.response?.status;
-            if (requiresCode && !needsTypedCode && status === 400) {
+            // Keep valid codes on capacity, eligibility, or throttle errors.
+            if (requiresCode && !needsTypedCode && isRejectedTournamentJoinCode(err)) {
                 startEditingCode();
                 onCodeRejected?.();
             }
@@ -208,7 +206,7 @@ export function TeamRegistrationModal({
                                                 placeholderTextColor="#6b7280"
                                                 keyboardType="number-pad"
                                                 inputMode="numeric"
-                                                maxLength={6}
+                                                maxLength={32}
                                                 value={typedCode}
                                                 onChangeText={(text) => setTypedCode(text.replace(/\D/g, '').slice(0, 6))}
                                             />

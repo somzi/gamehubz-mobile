@@ -570,6 +570,8 @@
   "joinCode": {
     "button": "Enter code",
     "title": "Join with code",
+    "previewTitle": "Find a tournament",
+    "previewSubtitle": "Enter a code to find the tournament. Joining is a separate step.",
     "subtitle": "Enter the 6-digit code from the organizer.",
     "checking": "Checking code…",
     "invalid": "No tournament matches that code.",

@@ -24,6 +24,7 @@ import { hapticError, hapticSuccess } from '../../lib/haptics';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { Button } from '../ui/Button';
 import { PrivateBadge, PRIVATE_COLORS } from '../ui/PrivateBadge';
+import { formatJoinCode } from '../../lib/share';
 
 const CODE_LENGTH = 6;
 
@@ -31,13 +32,12 @@ interface JoinByCodeModalProps {
     visible: boolean;
     onClose: () => void;
     /**
-     * Verify mode: the player is already on this private tournament and only needs to prove they
-     * hold its code. No preview — a code for any other tournament is rejected, and a matching one
-     * goes to onVerified. The sheet stays up (spinner) until onVerified settles, so whatever
-     * modal that step opens appears on top of it rather than racing its dismissal.
+     * Verify mode: the player is already on a private tournament. A matching code reveals a
+     * confirmation step; opening the sheet or typing six digits never submits a registration.
      */
     tournamentId?: string;
     onVerified?: (code: string) => Promise<void> | void;
+    confirmLabel?: string;
 }
 
 interface CodePreview {
@@ -78,25 +78,28 @@ function toPreview(raw: any): CodePreview {
 }
 
 /**
- * "Join with code" for private tournaments. The six digits are checked the moment the last one
- * lands, the tournament is previewed so a mistyped code can't sign anyone up for the wrong thing,
- * and one tap sends the player straight into registration on the tournament screen.
+ * The six digits are checked when entered, but verification only previews the tournament.
+ * Registration is a separate, explicit action on its details screen or this confirmation sheet.
  *
  * Pinned to the upper part of the screen rather than centred: the number pad covers roughly the
  * bottom half, and KeyboardAvoidingView mismeasures inside a Modal under edge-to-edge (see
  * KeyboardAvoider), so staying clear of the keyboard beats trying to dodge it.
  */
-export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: JoinByCodeModalProps) {
+export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified, confirmLabel }: JoinByCodeModalProps) {
     const { t } = useTranslation('tournament');
     const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const insets = useSafeAreaInsets();
     const reduceMotion = useReduceMotion();
     const inputRef = useRef<TextInput>(null);
+    const lookupVersion = useRef(0);
+    const resolving = useRef(false);
+    const submitting = useRef(false);
     const shake = useRef(new Animated.Value(0)).current;
 
     const [code, setCode] = useState('');
     const [isChecking, setIsChecking] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [preview, setPreview] = useState<CodePreview | null>(null);
     // The code behind the preview — handed to the tournament screen so registration doesn't ask
@@ -107,14 +110,23 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
     // Every open starts clean — a half-typed code or an old preview is never what the player
     // came back for.
     useEffect(() => {
+        lookupVersion.current++;
+        resolving.current = false;
         if (visible) {
             setCode('');
             setError(null);
             setPreview(null);
             setResolvedCode(null);
             setIsChecking(false);
+            setIsSubmitting(false);
+            submitting.current = false;
         }
-    }, [visible]);
+        return () => { lookupVersion.current++; };
+    }, [visible, tournamentId]);
+
+    const requestClose = () => {
+        if (!submitting.current) onClose();
+    };
 
     const runShake = () => {
         if (reduceMotion) return;
@@ -129,6 +141,9 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
     };
 
     const resolve = async (value: string) => {
+        if (resolving.current) return;
+        resolving.current = true;
+        const version = ++lookupVersion.current;
         setIsChecking(true);
         setError(null);
         try {
@@ -141,16 +156,12 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
                 throw new Error(body.message || body.Message || t('joinCode.invalid'));
             }
             const next = toPreview(await response.json());
+            if (version !== lookupVersion.current) return;
 
             if (tournamentId) {
                 if (String(next.id).toLowerCase() !== tournamentId.toLowerCase()) {
                     throw new Error(t('joinCode.otherTournament'));
                 }
-                Keyboard.dismiss();
-                hapticSuccess();
-                await onVerified?.(value);
-                onClose();
-                return;
             }
 
             setPreview(next);
@@ -158,13 +169,17 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
             Keyboard.dismiss();
             hapticSuccess();
         } catch (err) {
+            if (version !== lookupVersion.current) return;
             setError(getErrorMessage(err));
             setCode('');
             hapticError();
             runShake();
             inputRef.current?.focus();
         } finally {
-            setIsChecking(false);
+            if (version === lookupVersion.current) {
+                resolving.current = false;
+                setIsChecking(false);
+            }
         }
     };
 
@@ -178,8 +193,10 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
     };
 
     const handlePaste = async () => {
+        const version = lookupVersion.current;
         try {
             const text = await Clipboard.getStringAsync();
+            if (version !== lookupVersion.current) return;
             handleChange(text ?? '');
         } catch {
             // Clipboard refused (permission / empty) — typing still works.
@@ -187,58 +204,82 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
     };
 
     const resetToEntry = () => {
+        if (submitting.current) return;
+        lookupVersion.current++;
+        resolving.current = false;
         setPreview(null);
+        setResolvedCode(null);
         setCode('');
         setError(null);
         // Wait a frame so the input is mounted again before focusing it.
         requestAnimationFrame(() => inputRef.current?.focus());
     };
 
-    const openTournament = (autoJoin: boolean) => {
+    const openTournament = () => {
         if (!preview) return;
         const id = preview.id;
         const code = resolvedCode ?? undefined;
         onClose();
-        navigation.navigate('TournamentDetails', autoJoin ? { id, code, autoJoin: true } : { id, code });
+        navigation.navigate('TournamentDetails', { id, code });
     };
 
-    // What the preview can offer. Everything but a live, open, not-full registration the player
-    // isn't already in ends in "Open tournament" with a line saying why.
+    const confirmAction = async () => {
+        if (!resolvedCode || !onVerified || submitting.current) return;
+        submitting.current = true;
+        setIsSubmitting(true);
+        try {
+            await onVerified(resolvedCode);
+            onClose();
+        } catch (err) {
+            setError(getErrorMessage(err));
+        } finally {
+            submitting.current = false;
+            setIsSubmitting(false);
+        }
+    };
+
+    // Global lookup only opens the details screen. Verify mode confirms the action the player
+    // already chose (solo registration or joining/requesting a specific team).
     const renderPreviewAction = (p: CodePreview) => {
         const isWaitingToOpen = p.status === 0 && !!p.registrationOpensAt;
         const isOpen = (p.status === 0 || p.status === 1) && !isWaitingToOpen;
         const isFull = p.maxPlayers > 0 && p.participants >= p.maxPlayers;
 
         let note: string | null = null;
-        let canJoin = false;
 
         if (p.canManage) note = t('joinCode.youManage');
         else if (p.hasUserRegistered) note = t('joinCode.alreadyIn');
         else if (isWaitingToOpen) note = t('joinCode.opensAt', { date: formatLocalDateTime(p.registrationOpensAt) });
         else if (!isOpen) note = t('joinCode.registrationClosed');
         else if (isFull) note = t('joinCode.full');
-        else canJoin = true;
 
         return (
             <View className="mt-5 gap-3">
-                {note ? (
+                {!isVerifyMode && note && (
                     <View className="flex-row items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                         <Ionicons name="information-circle" size={16} color="#94A3B8" />
                         <Text className="flex-1 text-slate-300 text-xs font-semibold">{note}</Text>
                     </View>
-                ) : (
-                    <Text className="text-slate-500 text-[11px] text-center">{t('joinCode.approvalNote')}</Text>
                 )}
-                {canJoin ? (
-                    <Button className="w-full" onPress={() => openTournament(true)}>
-                        {p.isTeamTournament ? t('joinCode.registerTeam') : t('joinCode.join')}
+                {isVerifyMode && resolvedCode && (
+                    <View className="flex-row items-center justify-center gap-1.5">
+                        <Ionicons name="lock-open" size={14} color="#34D399" />
+                        <Text className="text-xs font-semibold text-emerald-300">
+                            {t('joinCode.codeApplied', { code: formatJoinCode(resolvedCode) })}
+                        </Text>
+                    </View>
+                )}
+                {isVerifyMode ? (
+                    <Button className="w-full" onPress={confirmAction} loading={isSubmitting} disabled={isSubmitting}>
+                        {confirmLabel || t('joinCode.join')}
                     </Button>
                 ) : (
-                    <Button className="w-full" onPress={() => openTournament(false)}>
+                    <Button className="w-full" onPress={openTournament}>
                         {t('joinCode.open')}
                     </Button>
                 )}
-                <Pressable onPress={resetToEntry} className="self-center px-3 py-1.5 active:opacity-60">
+                {error && <Text className="text-xs font-semibold text-red-400 text-center">{error}</Text>}
+                <Pressable onPress={resetToEntry} disabled={isSubmitting} className="self-center px-3 py-1.5 active:opacity-60">
                     <Text className="text-xs font-bold text-slate-500">{t('joinCode.tryAnother')}</Text>
                 </Pressable>
             </View>
@@ -250,11 +291,11 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
             visible={visible}
             transparent
             animationType="fade"
-            onRequestClose={onClose}
+            onRequestClose={requestClose}
             onShow={() => inputRef.current?.focus()}
         >
             <View className="flex-1 bg-black/70 px-4" style={{ paddingTop: insets.top + 48 }}>
-                <Pressable className="absolute inset-0" onPress={onClose} accessibilityLabel={tCommon('close')} />
+                <Pressable className="absolute inset-0" onPress={requestClose} accessibilityLabel={tCommon('close')} />
 
                 <View className="bg-background w-full rounded-[32px] border border-white/10 overflow-hidden">
                     {/* Header */}
@@ -268,16 +309,16 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
                             </View>
                             <View className="flex-1">
                                 <Text className="text-lg font-black text-white">
-                                    {isVerifyMode ? t('joinCode.verifyTitle') : t('joinCode.title')}
+                                    {isVerifyMode ? t('joinCode.verifyTitle') : t('joinCode.previewTitle')}
                                 </Text>
                                 {!preview && (
                                     <Text className="text-xs text-slate-400 mt-0.5">
-                                        {isVerifyMode ? t('joinCode.verifySubtitle') : t('joinCode.subtitle')}
+                                        {isVerifyMode ? t('joinCode.verifySubtitle') : t('joinCode.previewSubtitle')}
                                     </Text>
                                 )}
                             </View>
                         </View>
-                        <Pressable onPress={onClose} className="bg-white/5 p-2 rounded-full active:opacity-60">
+                        <Pressable onPress={requestClose} disabled={isSubmitting} accessibilityLabel={tCommon('close')} className="bg-white/5 p-2 rounded-full active:opacity-60">
                             <Ionicons name="close" size={18} color="#94A3B8" />
                         </Pressable>
                     </View>
@@ -289,7 +330,7 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
                                     one-time-code autofill and paste both land in it, and deleting works
                                     like any text field. */}
                                 <Animated.View style={{ transform: [{ translateX: shake }] }}>
-                                    <View className="flex-row justify-center" style={{ gap: 8 }}>
+                                    <View className="flex-row justify-center" style={{ gap: 6 }}>
                                         {Array.from({ length: CODE_LENGTH }).map((_, index) => {
                                             const digit = code[index] ?? '';
                                             const isActive = !isChecking && index === Math.min(code.length, CODE_LENGTH - 1);
@@ -299,7 +340,8 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
                                                     <View
                                                         className="items-center justify-center rounded-2xl"
                                                         style={{
-                                                            width: 44,
+                                                            flex: 1,
+                                                            maxWidth: 44,
                                                             height: 56,
                                                             backgroundColor: 'rgba(255,255,255,0.04)',
                                                             borderWidth: 1.5,
@@ -328,7 +370,7 @@ export function JoinByCodeModal({ visible, onClose, tournamentId, onVerified }: 
                                         inputMode="numeric"
                                         textContentType="oneTimeCode"
                                         autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
-                                        maxLength={CODE_LENGTH}
+                                        maxLength={32}
                                         caretHidden
                                         accessibilityLabel={t('joinCode.title')}
                                         style={{

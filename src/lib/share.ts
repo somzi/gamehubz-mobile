@@ -61,10 +61,15 @@ export async function shareLink({ title, description, url }: ShareLinkOptions) {
     }
 }
 
-export function shareTournament(id: string, name?: string) {
+/**
+ * `viewOnly`: a private tournament shared by someone who can't hand out its code. The plain link
+ * only opens the tournament, so the message invites a look rather than promising a spot.
+ */
+export function shareTournament(id: string, name?: string, options?: { viewOnly?: boolean }) {
+    const key = options?.viewOnly ? 'viewTournament' : 'joinTournament';
     return shareLink({
         title: name || i18n.t('common:shareLinks.tournament'),
-        description: name ? i18n.t('common:shareLinks.joinTournament', { name }) : i18n.t('common:shareLinks.joinTournamentGeneric'),
+        description: name ? i18n.t(`common:shareLinks.${key}`, { name }) : i18n.t(`common:shareLinks.${key}Generic`),
         url: buildShareUrl('tournament', id),
     });
 }

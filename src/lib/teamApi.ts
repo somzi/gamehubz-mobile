@@ -48,19 +48,13 @@ export async function getTeamShareSummary(teamId: string): Promise<TeamShareSumm
     };
 }
 
-export async function joinTeam(teamId: string): Promise<TeamDto> {
-    const response = await apiClient.post<TeamDto>(`/api/teams/${teamId}/join`);
+export async function joinTeam(teamId: string, joinCode?: string | null): Promise<TeamDto> {
+    const response = await apiClient.post<TeamDto>(`/api/teams/${teamId}/join`, joinCode ? { joinCode } : {});
     return response.data;
 }
 
-export async function requestJoinTeam(teamId: string): Promise<void> {
-    const response = await authenticatedFetch(`/api/teams/${teamId}/request-join`, {
-        method: 'POST'
-    });
-    if (!response.ok) {
-        const text = await response.text().catch(() => i18n.t('team:errors.requestJoin'));
-        throw new Error(text);
-    }
+export async function requestJoinTeam(teamId: string, joinCode?: string | null): Promise<void> {
+    await apiClient.post(`/api/teams/${teamId}/request-join`, joinCode ? { joinCode } : {});
 }
 
 export async function getTeamJoinRequests(teamId: string): Promise<import('../types/team').TeamJoinRequestDto[]> {

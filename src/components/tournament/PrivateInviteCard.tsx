@@ -132,7 +132,8 @@ export function PrivateInviteCard({ tournamentId, tournamentName }: PrivateInvit
                             <View
                                 className="items-center justify-center rounded-xl"
                                 style={{
-                                    width: 42,
+                                    flex: 1,
+                                    maxWidth: 42,
                                     height: 54,
                                     backgroundColor: 'rgba(255,255,255,0.04)',
                                     borderWidth: 1,

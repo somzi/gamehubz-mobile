@@ -73,7 +73,9 @@
     "viewPlayerGeneric": "Pogledaj ovog igrača na GameHubz-u.",
     "joinTeam": "Pridruži se timu {{name}} na GameHubz-u.",
     "joinTeamGeneric": "Pridruži se ovom timu na GameHubz-u.",
-    "privateInvite": "Poziv za turnir {{name}} na GameHubz-u. Uđi sa kodom {{code}} ili otvori link:"
+    "privateInvite": "Poziv za turnir {{name}} na GameHubz-u. Uđi sa kodom {{code}} ili otvori link:",
+    "viewTournament": "Pogledaj turnir {{name}} na GameHubz-u.",
+    "viewTournamentGeneric": "Pogledaj ovaj turnir na GameHubz-u."
   },
   "zeroBytes": "0 bajtova",
   "translationEmpty": "Odgovor prevoda nije sadržao preveden tekst.",

@@ -570,6 +570,8 @@
   "joinCode": {
     "button": "Inserir código",
     "title": "Entrar com código",
+    "previewTitle": "Encontrar torneio",
+    "previewSubtitle": "Digite o código para encontrar o torneio. A inscrição é uma etapa separada.",
     "subtitle": "Digite o código de 6 dígitos que o organizador enviou.",
     "checking": "Verificando código…",
     "invalid": "Nenhum torneio corresponde a esse código.",

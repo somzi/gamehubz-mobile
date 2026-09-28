@@ -138,7 +138,9 @@
     "tournament": "Турнир",
     "viewPlayer": "Посмотри профиль {{name}} на GameHubz.",
     "viewPlayerGeneric": "Посмотри этого игрока на GameHubz.",
-    "privateInvite": "Приглашение в «{{name}}» на GameHubz. Входи по коду {{code}} или открой ссылку:"
+    "privateInvite": "Приглашение в «{{name}}» на GameHubz. Входи по коду {{code}} или открой ссылку:",
+    "viewTournament": "Посмотри турнир «{{name}}» на GameHubz.",
+    "viewTournamentGeneric": "Посмотри этот турнир на GameHubz."
   },
   "status": {
     "completed": "Завершён",
