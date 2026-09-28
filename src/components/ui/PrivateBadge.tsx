@@ -13,31 +13,40 @@ export const PRIVATE_COLORS = {
 } as const;
 
 interface PrivateBadgeProps {
-    /** 'sm' for list cards, 'md' for the tournament screen's hero. */
-    size?: 'sm' | 'md';
+    /**
+     * 'sm' for tight inline spots, 'md' for the tournament screen's hero, 'pill' to sit under the
+     * status pill on a tournament card — same height, type and tracking, so the two read as a pair.
+     */
+    size?: 'sm' | 'md' | 'pill';
 }
+
+const SIZES = {
+    sm: { paddingHorizontal: 7, paddingVertical: 2, gap: 3, icon: 9, fontSize: 9, letterSpacing: 0.8 },
+    md: { paddingHorizontal: 10, paddingVertical: 4, gap: 5, icon: 12, fontSize: 11, letterSpacing: 0.8 },
+    pill: { paddingHorizontal: 10, paddingVertical: 5, gap: 4, icon: 10, fontSize: 10, letterSpacing: 1.4 },
+} as const;
 
 /** Lock pill marking an invite-only tournament — reachable only by its code or share link. */
 export function PrivateBadge({ size = 'sm' }: PrivateBadgeProps) {
     const { t } = useTranslation('common');
-    const isSmall = size === 'sm';
+    const s = SIZES[size];
 
     return (
         <View
             className="flex-row items-center rounded-full"
             style={{
-                paddingHorizontal: isSmall ? 7 : 10,
-                paddingVertical: isSmall ? 2 : 4,
-                gap: isSmall ? 3 : 5,
+                paddingHorizontal: s.paddingHorizontal,
+                paddingVertical: s.paddingVertical,
+                gap: s.gap,
                 backgroundColor: PRIVATE_COLORS.bg,
                 borderWidth: 1,
                 borderColor: PRIVATE_COLORS.border,
             }}
         >
-            <Ionicons name="lock-closed" size={isSmall ? 9 : 12} color={PRIVATE_COLORS.icon} />
+            <Ionicons name="lock-closed" size={s.icon} color={PRIVATE_COLORS.icon} />
             <Text
                 className="font-black uppercase"
-                style={{ color: PRIVATE_COLORS.text, fontSize: isSmall ? 9 : 11, letterSpacing: 0.8 }}
+                style={{ color: PRIVATE_COLORS.text, fontSize: s.fontSize, letterSpacing: s.letterSpacing }}
                 numberOfLines={1}
             >
                 {t('app.private')}

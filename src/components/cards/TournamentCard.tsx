@@ -192,48 +192,48 @@ export const TournamentCard = React.memo(function TournamentCard({
                             <View className="flex-row items-center gap-1 mt-1">
                                 <Ionicons name="people" size={12} color="#34D399" />
                                 <Text
-                                    className={cn('text-[11px] font-bold uppercase tracking-wider', !isPrivate && 'flex-1')}
-                                    style={{ color: '#34D399', flexShrink: 1 }}
-                                    numberOfLines={isPrivate ? 1 : 2}
+                                    className="text-[11px] font-bold uppercase tracking-wider flex-1"
+                                    style={{ color: '#34D399' }}
+                                    numberOfLines={2}
                                 >
                                     {hubName || t('app.officialHub')}
                                 </Text>
-                                {isPrivate && (
-                                    <View className="ml-1">
-                                        <PrivateBadge />
-                                    </View>
-                                )}
                             </View>
                         </View>
 
-                        {/* Status pill */}
-                        <View className="rounded-full overflow-hidden">
-                            <LinearGradient
-                                colors={[theme.tint.replace('0.05', '0.20'), theme.tint.replace('0.05', '0.08')]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 0, y: 1 }}
-                                style={{ paddingHorizontal: 12, paddingVertical: 5 }}
-                            >
-                                <View
-                                    pointerEvents="none"
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        right: 0,
-                                        bottom: 0,
-                                        borderWidth: 1,
-                                        borderColor: theme.ring,
-                                        borderRadius: 999,
-                                    }}
-                                />
-                                <Text
-                                    className="text-[10px] font-black uppercase"
-                                    style={{ color: theme.text, letterSpacing: 1.4 }}
+                        {/* Status pill, with the Private pill stacked under it: the right column is as
+                            wide as the status pill either way, so the lock never takes width from
+                            the tournament or hub name. */}
+                        <View className="items-end" style={{ gap: 6 }}>
+                            <View className="rounded-full overflow-hidden">
+                                <LinearGradient
+                                    colors={[theme.tint.replace('0.05', '0.20'), theme.tint.replace('0.05', '0.08')]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 0, y: 1 }}
+                                    style={{ paddingHorizontal: 12, paddingVertical: 5 }}
                                 >
-                                    {t(`status.${status}`)}
-                                </Text>
-                            </LinearGradient>
+                                    <View
+                                        pointerEvents="none"
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            borderWidth: 1,
+                                            borderColor: theme.ring,
+                                            borderRadius: 999,
+                                        }}
+                                    />
+                                    <Text
+                                        className="text-[10px] font-black uppercase"
+                                        style={{ color: theme.text, letterSpacing: 1.4 }}
+                                    >
+                                        {t(`status.${status}`)}
+                                    </Text>
+                                </LinearGradient>
+                            </View>
+                            {isPrivate && <PrivateBadge size="pill" />}
                         </View>
                     </View>
 
