@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PressableScale } from '../ui/PressableScale';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { RaisedCard } from '../ui/RaisedCard';
 import { COLORS } from '../../lib/theme';
 import { HubActivityType } from '../../types/dashboard';
 
@@ -35,7 +36,9 @@ const FALLBACK_EVENT = { labelKey: 'activity.updated', icon: 'sparkles' as IconN
 
 /**
  * One hub event, laid out like the match cards above it on Home: what happened and when on top,
- * then the tournament it happened to — the thing a tap opens — with its hub underneath.
+ * then the tournament it happened to — the thing a tap opens — with its hub underneath. The
+ * event's colour lights the card from the left edge, the way a match card carries its section's.
+ * The hub logo is a rounded square, where players are circles.
  *
  * Memoized: every prop is a primitive except onClick, which callers should keep stable.
  */
@@ -58,32 +61,20 @@ export const FeedCard = React.memo(function FeedCard({
         <PressableScale
             onPress={tappable ? onClick : undefined}
             disabled={!tappable}
+            pressedScale={0.98}
             accessibilityRole={tappable ? 'button' : undefined}
             accessibilityLabel={[label, tournament, hubName, time].filter(Boolean).join('. ')}
         >
-            <View
-                className="rounded-[22px] overflow-hidden"
-                style={{
-                    backgroundColor: COLORS.card,
-                    shadowColor: event.color,
-                    shadowOpacity: 0.12,
-                    shadowRadius: 14,
-                    shadowOffset: { width: 0, height: 6 },
-                    elevation: 6,
-                }}
-            >
+            <RaisedCard style={{ overflow: 'hidden' }}>
                 <LinearGradient
-                    colors={[event.color + '14', 'transparent']}
+                    pointerEvents="none"
+                    colors={[event.color + '1A', 'transparent']}
                     start={{ x: 0, y: 0 }}
-                    end={{ x: 0.7, y: 0 }}
+                    end={{ x: 0.65, y: 0 }}
                     style={StyleSheet.absoluteFill}
                 />
                 <View
                     pointerEvents="none"
-                    className="absolute inset-0 rounded-[22px]"
-                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}
-                />
-                <View
                     style={{
                         position: 'absolute',
                         left: 0,
@@ -94,19 +85,19 @@ export const FeedCard = React.memo(function FeedCard({
                         borderTopRightRadius: 3,
                         borderBottomRightRadius: 3,
                         shadowColor: event.color,
-                        shadowOpacity: 0.7,
+                        shadowOpacity: 0.8,
                         shadowRadius: 8,
                         shadowOffset: { width: 0, height: 0 },
                     }}
                 />
 
-                <View className="pt-3 pb-3 pr-3.5 pl-4">
+                <View style={{ paddingLeft: 16, paddingRight: 14, paddingVertical: 12 }}>
                     {/* What happened, and when */}
-                    <View className="flex-row items-center justify-between mb-2.5">
-                        <View className="flex-row items-center gap-1.5 flex-1 mr-2">
+                    <View className="flex-row items-center" style={{ gap: 10 }}>
+                        <View className="flex-1 flex-row items-center" style={{ gap: 6 }}>
                             <Ionicons name={event.icon} size={11} color={event.color} />
                             <Text
-                                className="text-[10px] font-black uppercase tracking-[2px] flex-1"
+                                className="flex-1 text-[10.5px] font-black uppercase tracking-[1.5px]"
                                 style={{ color: event.color }}
                                 numberOfLines={1}
                             >
@@ -114,18 +105,29 @@ export const FeedCard = React.memo(function FeedCard({
                             </Text>
                         </View>
                         {!!time && (
-                            <Text className="text-[10px] font-bold text-slate-500 tracking-wider" numberOfLines={1}>
+                            <Text className="text-[11px] font-bold text-slate-500" numberOfLines={1}>
                                 {time}
                             </Text>
                         )}
                     </View>
 
                     {/* Which tournament, in which hub */}
-                    <View className="flex-row items-center">
-                        <View style={{ borderWidth: 1, borderColor: event.color + '55', borderRadius: 13, padding: 1.5 }}>
-                            <PlayerAvatar src={hubAvatar} name={hubName} size="sm" className="rounded-[10px]" />
+                    <View className="flex-row items-center" style={{ marginTop: 9, gap: 11 }}>
+                        <View
+                            style={{
+                                borderRadius: 13,
+                                padding: 1.5,
+                                borderWidth: 1,
+                                borderColor: event.color + '66',
+                                shadowColor: event.color,
+                                shadowOpacity: 0.35,
+                                shadowRadius: 8,
+                                shadowOffset: { width: 0, height: 0 },
+                            }}
+                        >
+                            <PlayerAvatar src={hubAvatar} name={hubName} size="md" className="rounded-[10px] border-0" />
                         </View>
-                        <View className="flex-1 ml-3 min-w-0">
+                        <View className="flex-1 min-w-0">
                             <Text className="text-[17px] leading-[22px] font-black text-white tracking-tight" numberOfLines={1}>
                                 {tournament || hubName}
                             </Text>
@@ -138,21 +140,10 @@ export const FeedCard = React.memo(function FeedCard({
                                 </View>
                             )}
                         </View>
-                        {tappable && (
-                            <View
-                                className="w-7 h-7 rounded-full items-center justify-center ml-1.5"
-                                style={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.07)',
-                                }}
-                            >
-                                <Ionicons name="chevron-forward" size={12} color={COLORS.slate400} />
-                            </View>
-                        )}
+                        {tappable && <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />}
                     </View>
                 </View>
-            </View>
+            </RaisedCard>
         </PressableScale>
     );
 });

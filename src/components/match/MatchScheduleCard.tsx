@@ -15,6 +15,9 @@ import { PlayerIdentity, hasNickname } from './PlayerIdentity';
 import { EvidenceSection } from './EvidenceSection';
 import { Button } from '../ui/Button';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { PressableScale } from '../ui/PressableScale';
+import { RaisedCard } from '../ui/RaisedCard';
+import { COLORS } from '../../lib/theme';
 import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
 import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
@@ -101,6 +104,27 @@ interface MatchScheduleCardProps {
     /** Series format from the match list, so the collapsed card can show "BO3" before it is opened. */
     bestOf?: number;
 }
+
+// Card-face colour per status. It follows the Home section the match sits in: no agreed time is
+// amber (Needs Attention), a booked kick-off is emerald (Active Matches). `text` is the shade that
+// reads on the dark card.
+const FACE_TONES: Record<MatchStatus, { accent: string; text: string }> = {
+    pending_availability: { accent: COLORS.warning, text: '#FBBF24' },
+    scheduled: { accent: COLORS.primary, text: COLORS.primaryBright },
+    ready_phase: { accent: '#6366F1', text: '#A5B4FC' },
+    completed: { accent: COLORS.slate500, text: COLORS.slate400 },
+};
+
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
+// 24-hour, like the Match Time box inside the sheet.
+const formatKickOffClock = (d: Date) =>
+    d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
+
+// The kick-off date on the clock tile's band: day and short month in the locale's order
+// ("30. sep", "Sep 30").
+const formatKickOffDate = (d: Date) =>
+    d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
 
 /**
  * The card itself. Exported below wrapped in React.memo — see the note there; call sites import
@@ -1094,61 +1118,6 @@ function MatchScheduleCardBase({
         }
     };
 
-    const getStatusContent = () => {
-        switch (currentStatus) {
-            case 'pending_availability':
-                return (
-                    <View
-                        className="flex-row items-center gap-1.5 self-start px-2 py-[3px] rounded-lg"
-                        style={{
-                            backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(245, 158, 11, 0.28)',
-                        }}
-                    >
-                        <Ionicons name="calendar" size={11} color="#FBBF24" />
-                        <Text className="text-[10px] font-black text-amber-300 uppercase tracking-tight">
-                            {t('card.setAvailability')}
-                        </Text>
-                    </View>
-                );
-            case 'scheduled':
-                return (
-                    <View
-                        className="flex-row items-center gap-1.5 self-start px-2 py-[3px] rounded-lg"
-                        style={{
-                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(16, 185, 129, 0.28)',
-                        }}
-                    >
-                        <Ionicons name="time" size={11} color="#34D399" />
-                        <Text className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">
-                            {matchTime}
-                        </Text>
-                    </View>
-                );
-            case 'ready_phase':
-                return (
-                    <View
-                        className="flex-row items-center gap-1.5 self-start px-2 py-[3px] rounded-lg"
-                        style={{
-                            backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(99, 102, 241, 0.28)',
-                        }}
-                    >
-                        <Ionicons name="flash" size={11} color="#A5B4FC" />
-                        <Text className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">
-                            {t('card.readyCheck')}
-                        </Text>
-                    </View>
-                );
-            default:
-                return null;
-        }
-    };
-
     const isSetAvailability = currentStatus === 'pending_availability';
 
     if (variant === 'compact') {
@@ -1224,160 +1193,189 @@ function MatchScheduleCardBase({
         );
     }
 
-    const statusColor = currentStatus === 'pending_availability' ? '#F59E0B'
-        : currentStatus === 'scheduled' ? '#10B981' : '#6366F1';
+    const tone = FACE_TONES[currentStatus];
+    // The tile on the right is the card's clock, drawn like a small calendar page: the date on a
+    // coloured band, the kick-off time underneath. A match with no agreed time shows an empty
+    // clock, which is exactly why it sits under Needs Attention. "Agreed outside the app" is
+    // booked but has no time to print.
+    const kickOff = matchTimeIso ? parseUtcDate(matchTimeIso) : null;
+    const hasKickOff = !!kickOff && !isNaN(kickOff.getTime());
+    const kickOffClock = kickOff && hasKickOff ? formatKickOffClock(kickOff) : null;
+    const kickOffDate = kickOff && hasKickOff ? formatKickOffDate(kickOff) : null;
+    const opponentGameName = !isSetAvailability && hasNickname(opponentNickname) ? opponentNickname!.trim() : null;
 
     return (
         <>
-            <Pressable
+            <PressableScale
                 onPress={() => setModalVisible(true)}
-                className="active:opacity-90"
+                pressedScale={0.98}
+                accessibilityRole="button"
+                accessibilityLabel={[
+                    `vs ${opponentName}`,
+                    isSetAvailability ? t('card.setAvailability') : [kickOffDate, kickOffClock].filter(Boolean).join(' '),
+                    tournamentName,
+                    roundName,
+                ].filter(Boolean).join('. ')}
             >
-                <View
-                    className={cn(
-                        "rounded-[22px] overflow-hidden",
-                        currentStatus === 'ready_phase' && "border border-indigo-500/30"
-                    )}
-                    style={{
-                        backgroundColor: '#131B2E',
-                        shadowColor: statusColor,
-                        shadowOpacity: 0.12,
-                        shadowRadius: 14,
-                        shadowOffset: { width: 0, height: 6 },
-                        elevation: 6,
-                    }}
-                >
-                    {/* Subtle status-tinted gradient (left-to-right) */}
+                <RaisedCard style={{ overflow: 'hidden' }}>
+                    {/* The section's colour lights the card from its left edge: a soft wash and a
+                        glowing rail. */}
                     <LinearGradient
-                        colors={[statusColor + '14', 'transparent']}
+                        pointerEvents="none"
+                        colors={[tone.accent + '1A', 'transparent']}
                         start={{ x: 0, y: 0 }}
-                        end={{ x: 0.7, y: 0 }}
+                        end={{ x: 0.65, y: 0 }}
                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                     />
-
-                    {/* Soft hairline border */}
                     <View
                         pointerEvents="none"
-                        className="absolute inset-0 rounded-[22px]"
-                        style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' }}
-                    />
-
-                    {/* Left accent line (glowing) */}
-                    <View
                         style={{
                             position: 'absolute',
                             left: 0,
                             top: 12,
                             bottom: 12,
                             width: 3,
-                            backgroundColor: statusColor,
+                            backgroundColor: tone.accent,
                             borderTopRightRadius: 3,
                             borderBottomRightRadius: 3,
-                            shadowColor: statusColor,
-                            shadowOpacity: 0.7,
+                            shadowColor: tone.accent,
+                            shadowOpacity: 0.8,
                             shadowRadius: 8,
                             shadowOffset: { width: 0, height: 0 },
                         }}
                     />
 
-                    <View className="pt-3 pb-3 pr-3.5 pl-4">
-                        {/* Top row: hub badge + tournament */}
-                        <View className="flex-row items-center justify-between mb-2.5">
-                            <View className="flex-row items-center gap-1.5 flex-1 mr-2">
-                                <View
-                                    style={{
-                                        width: 4,
-                                        height: 4,
-                                        borderRadius: 2,
-                                        backgroundColor: statusColor,
-                                    }}
-                                />
+                    <View style={{ paddingLeft: 16, paddingRight: 14, paddingVertical: 12 }}>
+                        {/* Where: the hub top-left in the section's colour, the tournament top-right */}
+                        <View className="flex-row items-center" style={{ gap: 10 }}>
+                            <View className="flex-1 flex-row items-center" style={{ gap: 6 }}>
+                                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: tone.accent }} />
                                 <Text
-                                    className="text-[10px] font-black uppercase tracking-[2px] flex-1"
-                                    style={{ color: statusColor + 'DD' }}
+                                    className="flex-1 text-[10.5px] font-black uppercase tracking-[1.5px]"
+                                    style={{ color: tone.text }}
                                     numberOfLines={1}
                                 >
                                     {roundName}
                                 </Text>
                             </View>
-                            <Text
-                                className="text-[10px] font-bold text-slate-500 tracking-wider"
-                                numberOfLines={1}
-                            >
-                                {tournamentName}
-                            </Text>
+                            <View className="flex-row items-center" style={{ gap: 4, maxWidth: '50%' }}>
+                                <Ionicons name="trophy" size={11} color={COLORS.slate400} />
+                                <Text className="shrink text-[11px] font-bold text-slate-300" numberOfLines={1}>
+                                    {tournamentName}
+                                </Text>
+                            </View>
                         </View>
 
-                        {/* Main content row */}
-                        <View className="flex-row items-center">
+                        {/* Who, and when */}
+                        <View className="flex-row items-center" style={{ marginTop: 9, gap: 11 }}>
                             <View
                                 style={{
-                                    shadowColor: statusColor,
+                                    borderRadius: 999,
+                                    padding: 1.5,
+                                    borderWidth: 1,
+                                    borderColor: tone.accent + '66',
+                                    shadowColor: tone.accent,
                                     shadowOpacity: 0.35,
-                                    shadowRadius: 10,
-                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowRadius: 8,
+                                    shadowOffset: { width: 0, height: 0 },
                                 }}
                             >
-                                <View
-                                    style={{
-                                        borderWidth: 1,
-                                        borderColor: statusColor + '55',
-                                        borderRadius: 13,
-                                        padding: 1.5,
-                                    }}
-                                >
-                                    <PlayerAvatar
-                                        src={opponentAvatarUrl}
-                                        name={opponentName}
-                                        size="sm"
-                                        className="rounded-[10px]"
-                                    />
-                                </View>
+                                <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="border-0" />
                             </View>
 
-                            <View className="flex-1 ml-3 min-w-0">
-                                <View className="flex-row items-baseline gap-1.5">
-                                    <Text
-                                        className="text-[11px] font-black uppercase tracking-widest"
-                                        style={{ color: statusColor }}
-                                    >
+                            <View className="flex-1 min-w-0">
+                                <View className="flex-row items-baseline" style={{ gap: 6 }}>
+                                    <Text className="text-[11px] font-black uppercase tracking-[1px]" style={{ color: tone.text }}>
                                         vs
                                     </Text>
-                                    {/* Same size as the tournament title on the Highlights card below —
-                                        one type scale for the headline of every Home card. */}
+                                    {/* Same size as the tournament title on the Highlights card — one type
+                                        scale for the headline of every Home card. A long name shrinks to
+                                        fit before it is cut. */}
                                     <Text
-                                        className="text-[17px] leading-[22px] font-black text-white tracking-tight flex-1"
+                                        className="flex-1 text-[17px] leading-[22px] font-black text-white tracking-tight"
                                         numberOfLines={1}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.7}
                                     >
                                         {opponentName}
                                     </Text>
                                 </View>
-                                <View className="flex-row items-center mt-1.5">
-                                    {getStatusContent()}
-                                </View>
+
+                                {isSetAvailability ? (
+                                    <Text className="text-[12px] font-bold mt-1" style={{ color: tone.text }} numberOfLines={1}>
+                                        {t('card.setAvailability')}
+                                    </Text>
+                                ) : !hasKickOff && !!matchTime ? (
+                                    <Text className="text-[12px] font-semibold text-slate-400 mt-1" numberOfLines={1}>
+                                        {matchTime}
+                                    </Text>
+                                ) : opponentGameName ? (
+                                    // The name to look for in the game, drawn like the profile header's gamepad line.
+                                    <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
+                                        <Ionicons name="game-controller" size={13} color={tone.accent} />
+                                        <Text className="shrink text-[12px] font-semibold text-slate-400" numberOfLines={1}>
+                                            {opponentGameName}
+                                        </Text>
+                                    </View>
+                                ) : null}
                             </View>
 
+                            {/* Unread chat, as information only: the whole card opens the match. */}
                             {showUnreadBadge && (
-                                <View
-                                    className="flex-row items-center gap-1 ml-1.5 px-2 h-5 rounded-full"
-                                    style={{ backgroundColor: '#EF4444' }}
-                                >
-                                    <Ionicons name="chatbubble" size={10} color="#FFFFFF" />
-                                    <Text className="text-white font-black" style={{ fontSize: 10 }}>
+                                <View className="flex-row items-center h-5 px-[7px] rounded-full bg-destructive" style={{ gap: 3 }}>
+                                    <Ionicons name="chatbubble" size={9} color={COLORS.foreground} />
+                                    <Text style={TABULAR} className="text-[10px] font-black text-white">
                                         {unreadMessages > 99 ? '99+' : unreadMessages}
                                     </Text>
                                 </View>
                             )}
 
                             <View
-                                className="w-7 h-7 rounded-full items-center justify-center ml-1.5"
                                 style={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                    width: 68,
+                                    height: 44,
+                                    borderRadius: 12,
+                                    overflow: 'hidden',
                                     borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.07)',
+                                    borderColor: tone.accent + '66',
+                                    backgroundColor: 'rgba(2, 6, 23, 0.55)',
                                 }}
                             >
-                                <Ionicons name="chevron-forward" size={12} color="#94A3B8" />
+                                <View
+                                    className="items-center justify-center px-1"
+                                    style={{ height: 15, backgroundColor: tone.accent }}
+                                >
+                                    {kickOffDate ? (
+                                        <Text
+                                            className="text-[9px] leading-[11px] font-black uppercase tracking-[0.6px]"
+                                            style={{ color: COLORS.background }}
+                                            numberOfLines={1}
+                                            adjustsFontSizeToFit
+                                            minimumFontScale={0.75}
+                                        >
+                                            {kickOffDate}
+                                        </Text>
+                                    ) : (
+                                        <Ionicons
+                                            name={isSetAvailability ? 'calendar' : 'checkmark'}
+                                            size={10}
+                                            color={COLORS.background}
+                                        />
+                                    )}
+                                </View>
+                                <View className="flex-1 items-center justify-center">
+                                    {kickOffClock ? (
+                                        <Text style={TABULAR} className="text-[16px] leading-[20px] font-black text-white" numberOfLines={1}>
+                                            {kickOffClock}
+                                        </Text>
+                                    ) : isSetAvailability ? (
+                                        <Text style={[TABULAR, { color: tone.text }]} className="text-[16px] leading-[20px] font-black">
+                                            --:--
+                                        </Text>
+                                    ) : (
+                                        <Ionicons name="checkmark-done" size={18} color={COLORS.foreground} />
+                                    )}
+                                </View>
                             </View>
                         </View>
 
@@ -1396,7 +1394,7 @@ function MatchScheduleCardBase({
                                 state={checkInState}
                                 isHome={checkInSide}
                                 onCheckedIn={setCheckInState}
-                                className="mt-2"
+                                className="mt-2.5"
                             />
                         )}
 
@@ -1406,12 +1404,12 @@ function MatchScheduleCardBase({
                         {currentStatus !== 'completed' && (
                             <MatchDeadlineBar
                                 deadline={localDeadline}
-                                className="mt-2 pt-2 border-t border-white/[0.05]"
+                                className="mt-2 pt-2 border-t border-white/[0.06]"
                             />
                         )}
                     </View>
-                </View>
-            </Pressable>
+                </RaisedCard>
+            </PressableScale>
 
             {renderModal()}
         </>

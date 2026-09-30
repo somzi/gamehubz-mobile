@@ -7,6 +7,9 @@ const COLORS = {
     background: '#0F172A',
     backgroundDeep: '#0B1120', // tab bar, chat composer, darkest chrome
     card: '#131B2E',
+    // Home's list cards (matches, highlights): one step above the page in the same navy, so the
+    // card edge reads on its own instead of needing a glow.
+    cardRaised: '#172036',
     cardElevated: '#1E293B',
 
     // Text

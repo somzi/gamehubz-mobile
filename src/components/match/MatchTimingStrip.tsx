@@ -228,20 +228,24 @@ export function MatchDeadlineBar({
 
     const remaining = describeRemaining(deadlineDate, now, t);
 
+    // One quiet line: the countdown's colour (grey, amber, red) is the only urgency signal, so it
+    // carries no box of its own.
     return (
-        <View className={cn('flex-row items-center gap-1.5', className)}>
-            <Ionicons name="hourglass-outline" size={11} color={TONE_ICON[remaining.tone]} />
-            <Text numberOfLines={1} className="text-[9px] font-black uppercase tracking-[1.5px] text-slate-500">
+        <View className={cn('flex-row items-center', className)} style={{ gap: 5 }}>
+            <Ionicons name="hourglass-outline" size={12} color={TONE_ICON[remaining.tone]} />
+            <Text numberOfLines={1} className="text-[11px] font-medium text-slate-500">
                 {t('timing.deadline')}
             </Text>
-            <Text numberOfLines={1} className="flex-1 text-[11px] font-bold text-slate-300">
+            <Text
+                numberOfLines={1}
+                style={{ fontVariant: ['tabular-nums'] }}
+                className="flex-1 text-[11px] font-semibold text-slate-300"
+            >
                 {formatShortStamp(deadlineDate)}
             </Text>
-            <View className={cn('px-2 py-0.5 rounded-md border', CHIP_BG[remaining.tone])}>
-                <Text numberOfLines={1} className={cn('text-[9px] font-black uppercase tracking-wider', CHIP_TEXT[remaining.tone])}>
-                    {remaining.label}
-                </Text>
-            </View>
+            <Text numberOfLines={1} className={cn('text-[11px] font-bold', CHIP_TEXT[remaining.tone])}>
+                {remaining.label}
+            </Text>
         </View>
     );
 }

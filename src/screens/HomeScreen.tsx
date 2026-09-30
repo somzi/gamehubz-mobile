@@ -17,6 +17,8 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { EmptyState } from '../components/ui/EmptyState';
 import { NotificationBell } from '../components/ui/NotificationBell';
+import { RaisedCard } from '../components/ui/RaisedCard';
+import { Skeleton } from '../components/ui/Skeleton';
 import { COLORS } from '../lib/theme';
 import { DashboardActivityDto } from '../types/dashboard';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
@@ -63,7 +65,13 @@ interface MatchOverviewDto {
     };
 }
 
-const SECTION_GAP = 22;
+const SECTION_GAP = 28;
+
+// An empty section reads as an unfilled slot: the dashed outline the match card uses for a
+// kick-off nobody has agreed yet.
+const EMPTY_SECTION_CLASS = 'py-9 bg-transparent border-dashed border-white/10 rounded-[20px]';
+
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
 // Stable fallbacks used when a query is still loading. Reusing the same array
 // reference keeps the useMemo below from re-computing on every render before
@@ -199,9 +207,20 @@ export default function HomeScreen() {
         hubActivitiesQuery.dataUpdatedAt,
     );
 
-    const onRefresh = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ['home-matches'] });
-        queryClient.invalidateQueries({ queryKey: ['hub-activities'] });
+    // The spinner follows the pull only. Bound to isFetching, it also flipped on the background
+    // refetches (tab focus, a match update under an open sheet), and on iOS a flip while Home is
+    // covered leaves the list pushed down by the control's height: a blank band above the greeting.
+    const [isPulling, setIsPulling] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsPulling(true);
+        try {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['home-matches'] }),
+                queryClient.invalidateQueries({ queryKey: ['hub-activities'] }),
+            ]);
+        } finally {
+            setIsPulling(false);
+        }
     }, [queryClient]);
 
     // Stable callback so MatchScheduleCard's React.memo actually skips
@@ -264,9 +283,9 @@ export default function HomeScreen() {
                 keyboardShouldPersistTaps="handled"
                 refreshControl={
                     <RefreshControl
-                        refreshing={homeMatchesQuery.isFetching}
+                        refreshing={isPulling}
                         onRefresh={onRefresh}
-                        tintColor="#10B981"
+                        tintColor={COLORS.primary}
                     />
                 }
                 contentContainerStyle={{ paddingBottom: 32 }}
@@ -315,12 +334,9 @@ export default function HomeScreen() {
                     {actionRequiredMatches.length > 0 && (
                         <Animated.View layout={LinearTransition.duration(200)}>
                             <SectionHeader
-                                icon="alert-circle"
-                                iconColor="#F59E0B"
-                                iconBg="rgba(245, 158, 11, 0.01)"
-                                iconBorder="rgba(245, 158, 11, 0.1)"
+                                icon="alert"
+                                color={COLORS.warning}
                                 title={t('needsAttention')}
-                                subtitle={t('needsAttentionSub')}
                                 count={actionRequiredMatches.length}
                                 onSeeAll={() => navigation.navigate('MyMatches')}
                                 collapsed={collapsed.attention}
@@ -359,11 +375,8 @@ export default function HomeScreen() {
                     >
                         <SectionHeader
                             icon="game-controller"
-                            iconColor="#10B981"
-                            iconBg="rgba(16, 185, 129, 0.01)"
-                            iconBorder="rgba(16, 185, 129, 0.1)"
+                            color={COLORS.primary}
                             title={t('activeMatches')}
-                            subtitle={t('activeMatchesSub')}
                             count={sortedActiveMatches.length}
                             onSeeAll={() => navigation.navigate('MyMatches')}
                             collapsed={collapsed.active}
@@ -372,7 +385,12 @@ export default function HomeScreen() {
 
                         {!collapsed.active && (
                         <Animated.View entering={FadeIn.duration(150)}>
-                        {sortedActiveMatches.length > 0 ? (
+                        {homeMatchesQuery.isLoading ? (
+                            <View className="gap-2.5">
+                                <MatchCardSkeleton />
+                                <MatchCardSkeleton />
+                            </View>
+                        ) : sortedActiveMatches.length > 0 ? (
                             <View className="gap-2.5">
                                 {sortedActiveMatches.slice(0, 3).map((match) => (
                                     <MatchScheduleCard
@@ -411,6 +429,7 @@ export default function HomeScreen() {
                                 color={COLORS.primary}
                                 title={t('noActiveMatches')}
                                 description={t('noActiveMatchesHint')}
+                                className={EMPTY_SECTION_CLASS}
                             />
                         )}
                         </Animated.View>
@@ -421,11 +440,8 @@ export default function HomeScreen() {
                     <Animated.View layout={LinearTransition.duration(200)} style={{ marginTop: SECTION_GAP }}>
                         <SectionHeader
                             icon="sparkles"
-                            iconColor="#A78BFA"
-                            iconBg="rgba(167, 139, 250, 0.01)"
-                            iconBorder="rgba(167, 139, 250, 0.1)"
+                            color={COLORS.highlight}
                             title={t('highlights')}
-                            subtitle={t('highlightsSub')}
                             onSeeAll={() => setShowHighlightsModal(true)}
                             collapsed={collapsed.highlights}
                             onToggle={() => toggleSection('highlights')}
@@ -433,7 +449,12 @@ export default function HomeScreen() {
 
                         {!collapsed.highlights && (
                         <Animated.View entering={FadeIn.duration(150)}>
-                        {hubActivities.length > 0 ? (
+                        {hubActivitiesQuery.isLoading ? (
+                            <View className="gap-2.5">
+                                <FeedCardSkeleton />
+                                <FeedCardSkeleton />
+                            </View>
+                        ) : hubActivities.length > 0 ? (
                             <View className="gap-2.5">
                                 {hubActivities.slice(0, 3).map((item, index) => (
                                     <FeedCard
@@ -460,6 +481,7 @@ export default function HomeScreen() {
                                 color={COLORS.highlight}
                                 title={t('noHighlights')}
                                 description={t('noHighlightsHint')}
+                                className={EMPTY_SECTION_CLASS}
                             />
                         )}
                         </Animated.View>
@@ -478,11 +500,9 @@ export default function HomeScreen() {
 
 interface SectionHeaderProps {
     icon: keyof typeof Ionicons.glyphMap;
-    iconColor: string;
-    iconBg: string;
-    iconBorder: string;
+    /** The section's colour: it fills the tile and tints "See all", the same colour its cards carry. */
+    color: string;
     title: string;
-    subtitle: string;
     /** How many items the section holds in total — the list itself only shows the top few. */
     count?: number;
     onSeeAll?: () => void;
@@ -492,11 +512,8 @@ interface SectionHeaderProps {
 
 function SectionHeader({
     icon,
-    iconColor,
-    iconBg,
-    iconBorder,
+    color,
     title,
-    subtitle,
     count,
     onSeeAll,
     collapsed,
@@ -504,87 +521,100 @@ function SectionHeader({
 }: SectionHeaderProps) {
     const { t } = useTranslation('home');
     return (
-        <View className="flex-row items-center justify-between mb-3">
+        <View className="flex-row items-center gap-3 mb-3">
             {/* Tapping the title cluster collapses/expands the section. */}
             <Pressable
                 onPress={onToggle}
                 disabled={!onToggle}
-                className="flex-row items-center gap-2.5 flex-1 active:opacity-70"
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !collapsed }}
+                className="flex-1 flex-row items-center gap-2.5 active:opacity-70"
             >
                 <View
-                    className="w-9 h-9 rounded-[14px] items-center justify-center"
-                    style={{
-                        backgroundColor: iconBg,
-                        borderWidth: 1,
-                        borderColor: iconBorder,
-                    }}
+                    className="w-7 h-7 rounded-[9px] items-center justify-center"
+                    style={{ backgroundColor: color }}
                 >
-                    <Ionicons name={icon} size={16} color={iconColor} />
+                    <Ionicons name={icon} size={15} color={COLORS.background} />
                 </View>
-                <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                        <Text
-                            className="text-white font-black text-base tracking-tight flex-shrink"
-                            numberOfLines={1}
-                        >
-                            {title}
-                        </Text>
-                        {/* Only three cards ever render per section, so the tally says how much
-                            is actually waiting behind "See All". */}
-                        {!!count && count > 0 && (
-                            <View
-                                className="min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center"
-                                style={{
-                                    backgroundColor: iconColor + '22',
-                                    borderWidth: 1,
-                                    borderColor: iconColor + '4D',
-                                }}
-                            >
-                                <Text
-                                    className="text-[10px] font-black"
-                                    style={{ color: iconColor }}
-                                >
-                                    {count > 99 ? '99+' : count}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                    {/* One line in every language: at 9px with light tracking the longest subtitle
-                        fits beside the collapse and See All buttons, and anything longer shrinks
-                        instead of wrapping. */}
-                    <Text
-                        className="text-slate-500 text-[9px] font-bold uppercase tracking-[1px] mt-0.5"
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.8}
-                    >
-                        {subtitle}
+                <Text
+                    className="shrink text-[20px] leading-[26px] font-bold text-white tracking-tight"
+                    numberOfLines={1}
+                >
+                    {title}
+                </Text>
+                {/* Only three cards ever render per section, so the tally says how much is
+                    actually waiting behind "See all". */}
+                {!!count && count > 0 && (
+                    <Text style={TABULAR} className="text-[15px] font-semibold text-slate-400">
+                        {count > 99 ? '99+' : count}
                     </Text>
-                </View>
+                )}
                 {onToggle && (
-                    <View className="w-7 h-7 rounded-full bg-white/[0.04] items-center justify-center border border-white/[0.06] mr-1.5">
-                        <Ionicons
-                            name={collapsed ? 'chevron-down' : 'chevron-up'}
-                            size={14}
-                            color="#94A3B8"
-                        />
-                    </View>
+                    <Ionicons
+                        name={collapsed ? 'chevron-down' : 'chevron-up'}
+                        size={14}
+                        color={COLORS.slate500}
+                    />
                 )}
             </Pressable>
             {onSeeAll && (
                 <Pressable
                     onPress={onSeeAll}
-                    className="bg-white/[0.04] py-2 px-3.5 rounded-xl border border-white/[0.06] active:opacity-70 flex-row items-center gap-1"
-                    hitSlop={6}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    className="active:opacity-60"
                 >
-                    <Text className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                    <Text className="text-[14px] font-semibold" style={{ color }}>
                         {t('seeAll')}
                     </Text>
-                    <Ionicons name="chevron-forward" size={12} color="#CBD5E1" />
                 </Pressable>
             )}
         </View>
     );
 }
 
+// Placeholders in the shape of the cards, so a cold start shows cards arriving instead of
+// flashing "No active matches" / "No highlights yet" before the first response lands.
+function MatchCardSkeleton() {
+    return (
+        <RaisedCard>
+            <View style={{ paddingLeft: 16, paddingRight: 14, paddingVertical: 12 }}>
+                <View className="flex-row items-center gap-3">
+                    <Skeleton width="36%" height={10} radius={5} />
+                    <View className="flex-1" />
+                    <Skeleton width="28%" height={10} radius={5} />
+                </View>
+                <View className="flex-row items-center gap-3" style={{ marginTop: 11 }}>
+                    <Skeleton width={45} height={45} radius={23} />
+                    <View className="flex-1" style={{ gap: 8 }}>
+                        <Skeleton width="64%" height={14} radius={7} />
+                        <Skeleton width="42%" height={10} radius={5} />
+                    </View>
+                    <Skeleton width={68} height={44} radius={12} />
+                </View>
+            </View>
+        </RaisedCard>
+    );
+}
+
+function FeedCardSkeleton() {
+    return (
+        <RaisedCard>
+            <View style={{ paddingLeft: 16, paddingRight: 14, paddingVertical: 12 }}>
+                <View className="flex-row items-center gap-3">
+                    <Skeleton width="34%" height={10} radius={5} />
+                    <View className="flex-1" />
+                    <Skeleton width={40} height={10} radius={5} />
+                </View>
+                <View className="flex-row items-center gap-3" style={{ marginTop: 11 }}>
+                    <Skeleton width={45} height={45} radius={13} />
+                    <View className="flex-1" style={{ gap: 8 }}>
+                        <Skeleton width="70%" height={14} radius={7} />
+                        <Skeleton width="40%" height={10} radius={5} />
+                    </View>
+                </View>
+            </View>
+        </RaisedCard>
+    );
+}
