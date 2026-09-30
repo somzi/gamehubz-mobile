@@ -395,7 +395,6 @@
     "replacePlayer": "Reemplazar jugador",
     "replaceHint": "El reemplazo hereda la plaza, la siembra y todos los resultados hasta ahora.",
     "leaving": "Sale",
-    "checkingEligibility": "Verificando elegibilidad…",
     "limitPercent": "Límite {{limit}}%",
     "mustBeUnplayed": "No debe haber jugado",
     "meterPlayed_one": "{{played}} de {{count}} partido jugado",

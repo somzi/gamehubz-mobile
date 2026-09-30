@@ -405,7 +405,6 @@
     "replacePlayer": "Zamień gracza",
     "replaceHint": "Zmiennik przejmuje miejsce, rozstawienie i wszystkie dotychczasowe wyniki.",
     "leaving": "Odchodzi",
-    "checkingEligibility": "Sprawdzanie uprawnień…",
     "limitPercent": "Limit {{limit}}%",
     "mustBeUnplayed": "Bez rozegranych meczów",
     "meterPlayed_one": "Rozegrane: {{played}} z {{count}} meczu",

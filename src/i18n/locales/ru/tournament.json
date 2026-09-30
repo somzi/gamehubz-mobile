@@ -509,7 +509,6 @@
   "swap": {
     "alreadyInHidden": "Все, кто уже в турнире, скрыты из списка.",
     "checkEligibilityFailed": "Не удалось проверить возможность замены",
-    "checkingEligibility": "Проверяем возможность замены…",
     "clear": "Сбросить",
     "comingIn": "Заходит",
     "confirmTitle": "Подтверди замену",

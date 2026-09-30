@@ -14,8 +14,11 @@
   "subTabOutgoing": "Poslati",
   "searchIncoming": "Pretraži primljene zahteve...",
   "searchOutgoing": "Pretraži poslate zahteve...",
+  "searchRequests": "Pretraži zahteve...",
   "noIncoming": "Nema primljenih zahteva",
   "noOutgoing": "Nema poslatih zahteva",
+  "noRequests": "Nema zahteva za prijateljstvo",
+  "noRequestsMatched": "Nijedan zahtev ne odgovara",
   "requestsHint": "Novi zahtevi pojaviće se ovde",
   "wantsToConnect": "Želi da te doda za prijatelja",
   "requestSent": "Zahtev poslat",
@@ -26,6 +29,7 @@
   "noChatsMatched": "Nema četova koji odgovaraju pretrazi",
   "noChatsYet": "Još nema četova",
   "chatsHint": "Otvori profil prijatelja i dodirni Poruka da započneš",
+  "chatsHintRail": "Dodirni prijatelja iznad da započneš razgovor",
   "youPrefix": "Ti: ",
   "yesterday": "Juče"
 }

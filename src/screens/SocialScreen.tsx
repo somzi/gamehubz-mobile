@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import i18n, { dateLocale } from '../i18n';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
@@ -11,12 +12,13 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, cn } from '../lib/utils';
-import { Friend, FriendRequest, DirectChat } from '../types/social';
+import { Friend, FriendRequest, DirectChat, BadgeCounts } from '../types/social';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
-import { PressableScale } from '../components/ui/PressableScale';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { Panel } from '../components/ui/Panel';
+import { Skeleton } from '../components/ui/Skeleton';
 import { COLORS } from '../lib/theme';
-import { EmptyState as EmptyStateBase } from '../components/ui/EmptyState';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useBadges } from '../context/BadgesContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -24,16 +26,38 @@ type TabKey = 'friends' | 'requests' | 'chats';
 type NavProp = StackNavigationProp<RootStackParamList>;
 type SocialRoute = RouteProp<MainTabParamList, 'Social'>;
 
-// Stable fallback so the derived useMemo below doesn't churn on every render
+interface FriendRequests {
+    incoming: FriendRequest[];
+    outgoing: FriendRequest[];
+}
+
+// Stable fallbacks so the derived useMemos below don't churn on every render
 // before the first response lands.
 const EMPTY_CHATS: DirectChat[] = [];
+const EMPTY_FRIENDS: Friend[] = [];
+const EMPTY_REQUESTS: FriendRequests = { incoming: [], outgoing: [] };
+
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+const LIST_PADDING = { paddingHorizontal: 20, paddingBottom: 120 };
+
+// A gradient ring around an avatar means one thing across Social: this person sent you
+// something you haven't read. Same emerald → cyan as the share cards.
+const UNREAD_RING = ['#34D399', '#22D3EE'] as const;
+const INCOMING = '#F59E0B';
+
+/** Where Social opens when nothing asked for a tab: wherever the badge points. */
+function landingTab(badges: BadgeCounts): TabKey {
+    if (badges.unreadDirectMessages > 0) return 'chats';
+    if (badges.friendRequests > 0) return 'requests';
+    return 'friends';
+}
 
 export default function SocialScreen() {
     const { t } = useTranslation('social');
     const navigation = useNavigation<NavProp>();
     const route = useRoute<SocialRoute>();
     const { badges } = useBadges();
-    const [activeTab, setActiveTab] = useState<TabKey>(route.params?.initialTab ?? 'friends');
+    const [activeTab, setActiveTab] = useState<TabKey>(() => route.params?.initialTab ?? landingTab(badges));
 
     const tabs: PremiumTabItem[] = [
         { value: 'friends', label: t('tabFriends'), icon: 'people' },
@@ -71,7 +95,7 @@ export default function SocialScreen() {
             {/* ─── Tab Content ─────────────────────────────────── */}
             <View className="flex-1">
                 {activeTab === 'friends' && <FriendsTab navigation={navigation} />}
-                {activeTab === 'requests' && <RequestsTab />}
+                {activeTab === 'requests' && <RequestsTab navigation={navigation} />}
                 {activeTab === 'chats' && <ChatsTab navigation={navigation} />}
             </View>
         </SafeAreaView>
@@ -79,531 +103,859 @@ export default function SocialScreen() {
 }
 
 // ═════════════════════════════════════════════════════════════════════
-// FRIENDS TAB
+// DATA
 // ═════════════════════════════════════════════════════════════════════
 
-function FriendsTab({ navigation }: { navigation: NavProp }) {
-    const { t } = useTranslation('social');
-    const [friends, setFriends] = useState<Friend[]>([]);
+/** The live value drives the input; the debounced one drives the query key, so typing
+ *  doesn't fire a request per keystroke. */
+function useDebouncedSearch() {
     const [search, setSearch] = useState('');
-    // Debounced value drives the actual fetch; live `search` only drives the input.
-    // Keeping `search` out of the load path stops the useFocusEffect below from
-    // re-firing on every keystroke (its callback identity changes on each search
-    // update, and useFocusEffect re-runs the callback while the screen is focused
-    // — that was flooding the API with one immediate + one debounced request per
-    // typed character).
-    const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const reqSeqRef = useRef(0);
-
+    const [debounced, setDebounced] = useState('');
     useEffect(() => {
-        if (search === debouncedSearch) return;
-        const t = setTimeout(() => setDebouncedSearch(search), 300);
-        return () => clearTimeout(t);
-    }, [search, debouncedSearch]);
-
-    const load = useCallback(async (q: string = '') => {
-        const seq = ++reqSeqRef.current;
-        try {
-            const res = await authenticatedFetch(ENDPOINTS.GET_FRIENDS(q));
-            if (seq !== reqSeqRef.current) return;
-            if (res.ok) {
-                const data = await res.json();
-                if (seq !== reqSeqRef.current) return;
-                setFriends(Array.isArray(data) ? data : []);
-                setError(null);
-            } else {
-                setError(t('loadFriendsFailed'));
-            }
-        } catch (e: any) {
-            if (seq !== reqSeqRef.current) return;
-            setError(getErrorMessage(e));
-        } finally {
-            if (seq === reqSeqRef.current) {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        }
-    }, []);
-
-    // Single loader: useFocusEffect re-runs its callback both on focus AND whenever
-    // debouncedSearch changes while focused (typing requires focus), so one effect
-    // covers mount, tab re-entry and search settle without firing duplicates.
-    useFocusEffect(useCallback(() => { load(debouncedSearch); }, [load, debouncedSearch]));
-
-    const openChat = async (friend: Friend) => {
-        navigation.navigate('DirectChat', {
-            otherUserId: friend.userId,
-            header: {
-                otherUserId: friend.userId,
-                otherUsername: friend.username,
-                otherNickname: friend.nickname,
-                otherAvatarUrl: friend.avatarUrl,
-            },
-        });
-    };
-
-    if (loading) return <Loading />;
-
-    return (
-        <FlatList
-            keyboardShouldPersistTaps="handled"
-            data={friends}
-            keyExtractor={(item) => item.userId}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
-            ListHeaderComponent={
-                <SearchBar
-                    value={search}
-                    onChange={setSearch}
-                    placeholder={t('searchFriends')}
-                />
-            }
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={() => { setRefreshing(true); load(debouncedSearch); }}
-                    tintColor="#10B981"
-                />
-            }
-            ListEmptyComponent={
-                <EmptyState
-                    icon="people-outline"
-                    title={search ? t('noFriendsMatched') : t('noFriendsYet')}
-                    subtitle={search ? t('tryDifferentSearch') : t('growCircle')}
-                />
-            }
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-            renderItem={({ item }) => (
-                <CardSurface onPress={() => navigation.navigate('PlayerProfile', { id: item.userId })}>
-                    <View className="flex-row items-center px-3.5 py-3">
-                        <RingAvatar src={item.avatarUrl ?? undefined} name={item.username} />
-                        <View className="flex-1 ml-3">
-                            <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
-                                {item.username}
-                            </Text>
-                            {/* Same gamepad line as the profile header; a friend without an in-game
-                                nickname gets the friendship date instead. */}
-                            {item.nickname?.trim() ? (
-                                <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
-                                    <Ionicons name="game-controller" size={14} color={COLORS.primary} />
-                                    <Text className="flex-1 text-slate-400 text-[12px] font-medium" numberOfLines={1}>
-                                        {item.nickname}
-                                    </Text>
-                                </View>
-                            ) : (
-                                <Text className="text-slate-500 text-[12px] font-medium mt-1" numberOfLines={1}>
-                                    {t('friendsSince', { date: monthYear(item.friendsSince) })}
-                                </Text>
-                            )}
-                        </View>
-                        <PressableScale
-                            onPress={() => openChat(item)}
-                            hitSlop={8}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('profile:friend.message')}
-                            containerStyle={{ marginLeft: 12 }}
-                            className="w-10 h-10 rounded-full items-center justify-center bg-white/5 border border-white/10"
-                        >
-                            <Ionicons name="chatbubble-ellipses" size={18} color={COLORS.primary} />
-                        </PressableScale>
-                    </View>
-                </CardSurface>
-            )}
-        />
-    );
+        if (search === debounced) return;
+        const timer = setTimeout(() => setDebounced(search), 300);
+        return () => clearTimeout(timer);
+    }, [search, debounced]);
+    return { search, setSearch, debounced };
 }
 
-// ═════════════════════════════════════════════════════════════════════
-// REQUESTS TAB (incoming + outgoing)
-// ═════════════════════════════════════════════════════════════════════
-
-function RequestsTab() {
-    const { t } = useTranslation('social');
-    const { refresh: refreshBadges } = useBadges();
-    const [subTab, setSubTab] = useState<'incoming' | 'outgoing'>('incoming');
-    const [incoming, setIncoming] = useState<FriendRequest[]>([]);
-    const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
-    const [search, setSearch] = useState('');
-    // Debounced value drives the query; live `search` only drives the input.
-    // Same reasoning as FriendsTab — keeping `search` out of the load path
-    // stops useFocusEffect from re-firing on every keystroke.
-    const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const reqSeqRef = useRef(0);
-
-    useEffect(() => {
-        if (search === debouncedSearch) return;
-        const t = setTimeout(() => setDebouncedSearch(search), 300);
-        return () => clearTimeout(t);
-    }, [search, debouncedSearch]);
-
-    const load = useCallback(async (q: string = '') => {
-        const seq = ++reqSeqRef.current;
-        try {
-            const [inRes, outRes] = await Promise.all([
-                authenticatedFetch(ENDPOINTS.GET_INCOMING_REQUESTS(q)),
-                authenticatedFetch(ENDPOINTS.GET_OUTGOING_REQUESTS(q)),
-            ]);
-            if (seq !== reqSeqRef.current) return;
-            if (inRes.ok) {
-                const inData = await inRes.json();
-                if (seq !== reqSeqRef.current) return;
-                setIncoming(inData);
-            }
-            if (outRes.ok) {
-                const outData = await outRes.json();
-                if (seq !== reqSeqRef.current) return;
-                setOutgoing(outData);
-            }
-        } finally {
-            if (seq === reqSeqRef.current) {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        }
-    }, []);
-
-    // Single loader — same reasoning as FriendsTab: the focus effect re-runs on
-    // focus and on every debouncedSearch settle, so no separate effect is needed.
-    useFocusEffect(useCallback(() => { load(debouncedSearch); }, [load, debouncedSearch]));
-
-    const accept = async (req: FriendRequest) => {
-        try {
-            await authenticatedFetch(ENDPOINTS.ACCEPT_FRIEND_REQUEST(req.id), { method: 'POST' });
-            setIncoming((prev) => prev.filter((r) => r.id !== req.id));
-            refreshBadges();
-        } catch { /* ignore */ }
-    };
-
-    const reject = async (req: FriendRequest) => {
-        try {
-            await authenticatedFetch(ENDPOINTS.REJECT_FRIEND_REQUEST(req.id), { method: 'POST' });
-            setIncoming((prev) => prev.filter((r) => r.id !== req.id));
-            refreshBadges();
-        } catch { /* ignore */ }
-    };
-
-    const cancel = async (req: FriendRequest) => {
-        try {
-            await authenticatedFetch(ENDPOINTS.CANCEL_FRIEND_REQUEST(req.id), { method: 'POST' });
-            setOutgoing((prev) => prev.filter((r) => r.id !== req.id));
-            refreshBadges();
-        } catch { /* ignore */ }
-    };
-
-    if (loading) return <Loading />;
-
-    const list = subTab === 'incoming' ? incoming : outgoing;
-
-    return (
-        <View className="flex-1">
-            <View className="px-5 mb-2">
-                <PremiumTabs
-                    tabs={[
-                        { value: 'incoming', label: t('subTabIncoming'), icon: 'arrow-down-circle-outline', badge: incoming.length > 0 ? incoming.length : undefined, badgeTone: 'alert' },
-                        { value: 'outgoing', label: t('subTabOutgoing'), icon: 'arrow-up-circle-outline', badge: outgoing.length > 0 ? outgoing.length : undefined },
-                    ]}
-                    activeTab={subTab}
-                    onTabChange={(v) => setSubTab(v as 'incoming' | 'outgoing')}
-                />
-            </View>
-
-            <FlatList
-                keyboardShouldPersistTaps="handled"
-                data={list}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
-                ListHeaderComponent={
-                    <SearchBar
-                        value={search}
-                        onChange={setSearch}
-                        placeholder={subTab === 'incoming' ? t('searchIncoming') : t('searchOutgoing')}
-                    />
-                }
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={() => { setRefreshing(true); load(debouncedSearch); }}
-                        tintColor="#10B981"
-                    />
-                }
-                ListEmptyComponent={
-                    <EmptyState
-                        icon="mail-open-outline"
-                        title={
-                            subTab === 'incoming'
-                                ? t('noIncoming')
-                                : t('noOutgoing')
-                        }
-                        subtitle={t('requestsHint')}
-                    />
-                }
-                ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-                renderItem={({ item }) => {
-                    const isIncoming = subTab === 'incoming';
-                    const username = isIncoming ? item.fromUsername : item.toUsername;
-                    const avatarUrl = isIncoming ? item.fromAvatarUrl : item.toAvatarUrl;
-                    return (
-                        <CardSurface>
-                            <View className="p-3.5">
-                                <View className="flex-row items-center">
-                                    <RingAvatar
-                                        src={avatarUrl ?? undefined}
-                                        name={username}
-                                        ringColor={isIncoming ? 'rgba(16,185,129,0.30)' : 'rgba(255,255,255,0.10)'}
-                                    />
-                                    <View className="flex-1 ml-3">
-                                        <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
-                                            {username}
-                                        </Text>
-                                        <View className="flex-row items-center mt-0.5" style={{ gap: 5 }}>
-                                            <Ionicons
-                                                name={isIncoming ? 'arrow-down' : 'arrow-up'}
-                                                size={11}
-                                                color={isIncoming ? '#10B981' : '#64748B'}
-                                            />
-                                            <Text className="text-slate-500 text-[11px] font-semibold">
-                                                {isIncoming ? t('wantsToConnect') : t('requestSent')}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text className="text-slate-600 text-[10px] font-bold ml-2">
-                                        {formatChatTime(item.createdOn)}
-                                    </Text>
-                                </View>
-                                {/* Action row — full-width split buttons. flex-1 via className (NativeWind
-                                    applies it reliably; an inline flex inside a function style does NOT here,
-                                    which left them content-width). Green = accept, red = decline. */}
-                                <View className="flex-row" style={{ marginTop: 16, gap: 10 }}>
-                                    {isIncoming ? (
-                                        <>
-                                            <Pressable
-                                                onPress={() => accept(item)}
-                                                className="flex-1"
-                                                style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                                            >
-                                                <View
-                                                    style={{
-                                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-                                                        backgroundColor: '#10B981', borderRadius: 14, paddingVertical: 14,
-                                                        shadowColor: '#10B981', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3,
-                                                    }}
-                                                >
-                                                    <Ionicons name="checkmark-circle" size={18} color="#04130D" />
-                                                    <Text style={{ color: '#04130D', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>{t('accept')}</Text>
-                                                </View>
-                                            </Pressable>
-                                            <Pressable
-                                                onPress={() => reject(item)}
-                                                className="flex-1"
-                                                style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                                            >
-                                                <View
-                                                    style={{
-                                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-                                                        backgroundColor: 'rgba(239,68,68,0.12)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.40)',
-                                                        borderRadius: 14, paddingVertical: 13,
-                                                    }}
-                                                >
-                                                    <Ionicons name="close-circle" size={17} color="#F87171" />
-                                                    <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>{t('decline')}</Text>
-                                                </View>
-                                            </Pressable>
-                                        </>
-                                    ) : (
-                                        <Pressable
-                                            onPress={() => cancel(item)}
-                                            className="flex-1"
-                                            style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
-                                        >
-                                            <View
-                                                style={{
-                                                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-                                                    backgroundColor: 'rgba(239,68,68,0.10)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.30)',
-                                                    borderRadius: 14, paddingVertical: 13,
-                                                }}
-                                            >
-                                                <Ionicons name="close-circle" size={17} color="#F87171" />
-                                                <Text style={{ color: '#F87171', fontWeight: '900', fontSize: 14, letterSpacing: 0.3 }}>{t('cancelRequest')}</Text>
-                                            </View>
-                                        </Pressable>
-                                    )}
-                                </View>
-                            </View>
-                        </CardSurface>
-                    );
-                }}
-            />
-        </View>
-    );
+async function readJsonOrThrow(res: Response) {
+    if (!res.ok) throw new Error(getErrorMessage(await res.text().catch(() => '')));
+    return res.json();
 }
 
-// ═════════════════════════════════════════════════════════════════════
-// CHATS TAB
-// ═════════════════════════════════════════════════════════════════════
-
-function ChatsTab({ navigation }: { navigation: NavProp }) {
-    const { t } = useTranslation('social');
+// Cold-start cache is handled globally by PersistQueryClientProvider in App.tsx — the last
+// snapshot for each key restores before render, so every tab paints at once.
+function useFriends(search: string) {
     const { user } = useAuth();
-    const queryClient = useQueryClient();
-
-    // Immediate value drives the input; debounced value drives the query key so
-    // we don't fire a fresh network round-trip on every keystroke. Same 300ms
-    // window the old manual load() used, just moved into a single ref.
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
-    useEffect(() => {
-        if (search === debouncedSearch) return;
-        const t = setTimeout(() => setDebouncedSearch(search), 300);
-        return () => clearTimeout(t);
-    }, [search, debouncedSearch]);
-
-    // Cold-start cache is handled globally by PersistQueryClientProvider in App.tsx —
-    // the last snapshot for each (userId, search) key restores before render, so no
-    // manual hydration effect is needed here.
-    const chatsQuery = useQuery<DirectChat[]>({
-        queryKey: ['direct-chats', user?.id, debouncedSearch],
+    return useQuery<Friend[]>({
+        queryKey: ['friends', user?.id, search],
         queryFn: async () => {
-            const res = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHATS(debouncedSearch));
-            if (!res.ok) throw new Error(`GET_DIRECT_CHATS failed: ${res.status}`);
-            const data = await res.json();
+            const data = await readJsonOrThrow(await authenticatedFetch(ENDPOINTS.GET_FRIENDS(search)));
+            return Array.isArray(data) ? data : [];
+        },
+        enabled: !!user?.id,
+        staleTime: 30_000,
+        refetchOnMount: true,
+        // Keep showing the previous list while the new search key is fetching.
+        placeholderData: keepPreviousData,
+    });
+}
+
+function useDirectChats(search: string) {
+    const { user } = useAuth();
+    return useQuery<DirectChat[]>({
+        queryKey: ['direct-chats', user?.id, search],
+        queryFn: async () => {
+            const data = await readJsonOrThrow(await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHATS(search)));
             return Array.isArray(data) ? sortChats(data) : [];
         },
         enabled: !!user?.id,
         staleTime: 30_000,
         refetchOnMount: true,
-        // Keep showing the previous chats while the new search key is fetching.
         placeholderData: keepPreviousData,
     });
+}
 
-    const chats = chatsQuery.data ?? EMPTY_CHATS;
+function useFriendRequests(search: string) {
+    const { user } = useAuth();
+    return useQuery<FriendRequests>({
+        queryKey: ['friend-requests', user?.id, search],
+        queryFn: async () => {
+            const [inRes, outRes] = await Promise.all([
+                authenticatedFetch(ENDPOINTS.GET_INCOMING_REQUESTS(search)),
+                authenticatedFetch(ENDPOINTS.GET_OUTGOING_REQUESTS(search)),
+            ]);
+            const [incoming, outgoing] = await Promise.all([readJsonOrThrow(inRes), readJsonOrThrow(outRes)]);
+            return {
+                incoming: Array.isArray(incoming) ? incoming : [],
+                outgoing: Array.isArray(outgoing) ? outgoing : [],
+            };
+        },
+        enabled: !!user?.id,
+        staleTime: 30_000,
+        refetchOnMount: true,
+        placeholderData: keepPreviousData,
+    });
+}
 
-    // Bottom tabs keep this screen mounted; useRefetchOnFocusIfStale bridges the gap.
-    useRefetchOnFocusIfStale(
-        chatsQuery.refetch,
-        chatsQuery.dataUpdatedAt,
-        { enabled: !!user?.id },
-    );
+/** Unread count per friend, from the unfiltered chat list. */
+function useUnreadByUser(chats: DirectChat[]) {
+    return useMemo(() => {
+        const map = new Map<string, DirectChat>();
+        for (const chat of chats) map.set(chat.otherUserId.toLowerCase(), chat);
+        return map;
+    }, [chats]);
+}
 
-    // Pull-to-refresh only — the control must not follow background refetches. Opening a chat
-    // marks it read and invalidates this query while the list sits covered by the chat screen;
-    // on iOS a `refreshing` flip that happens off-screen leaves the list pushed down by the
-    // control's height, a blank band above the search bar on the way back.
+/**
+ * Pull-to-refresh only — the control must not follow background refetches. Opening a chat
+ * marks it read and invalidates the chat list while it sits covered by the chat screen; on iOS
+ * a `refreshing` flip that happens off-screen leaves the list pushed down by the control's
+ * height, a blank band above the search bar on the way back.
+ */
+function usePullToRefresh(refetch: () => Promise<unknown>) {
     const [isPulling, setIsPulling] = useState(false);
     const onRefresh = useCallback(async () => {
         setIsPulling(true);
         try {
-            await queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+            await refetch();
         } finally {
             setIsPulling(false);
         }
-    }, [queryClient]);
+    }, [refetch]);
+    return { isPulling, onRefresh };
+}
 
-    if (chatsQuery.isPending && chats.length === 0) return <Loading />;
+/** Refetch when a live badge count moves (a message or a request arrived while the list is open). */
+function useRefetchWhenCountMoves(count: number, refetch: () => unknown) {
+    const previous = useRef(count);
+    useEffect(() => {
+        if (previous.current === count) return;
+        previous.current = count;
+        refetch();
+    }, [count, refetch]);
+}
+
+function openChatWith(navigation: NavProp, friend: Friend, chat?: DirectChat) {
+    navigation.navigate('DirectChat', {
+        ...(chat ? { chatId: chat.id } : { otherUserId: friend.userId }),
+        header: {
+            otherUserId: friend.userId,
+            otherUsername: friend.username,
+            otherNickname: friend.nickname,
+            otherAvatarUrl: friend.avatarUrl,
+        },
+    });
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// FRIENDS TAB — the roster: one panel, a row per friend
+// ═════════════════════════════════════════════════════════════════════
+
+function FriendsTab({ navigation }: { navigation: NavProp }) {
+    const { t } = useTranslation('social');
+    const { user } = useAuth();
+    const { search, setSearch, debounced } = useDebouncedSearch();
+    const friendsQuery = useFriends(debounced);
+    const chatsQuery = useDirectChats('');
+    const friends = friendsQuery.data ?? EMPTY_FRIENDS;
+    const chatByUser = useUnreadByUser(chatsQuery.data ?? EMPTY_CHATS);
+
+    useRefetchOnFocusIfStale(friendsQuery.refetch, friendsQuery.dataUpdatedAt, { enabled: !!user?.id });
+    const { isPulling, onRefresh } = usePullToRefresh(
+        useCallback(() => Promise.all([friendsQuery.refetch(), chatsQuery.refetch()]), [friendsQuery.refetch, chatsQuery.refetch]),
+    );
+
+    const openProfile = useCallback((userId: string) => navigation.navigate('PlayerProfile', { id: userId }), [navigation]);
+    const message = useCallback(
+        (friend: Friend) => openChatWith(navigation, friend, chatByUser.get(friend.userId.toLowerCase())),
+        [navigation, chatByUser],
+    );
+
+    const searching = search.length > 0;
+
+    if (friendsQuery.isPending && friends.length === 0) {
+        return (
+            <View style={LIST_PADDING}>
+                <SearchBar value={search} onChange={setSearch} placeholder={t('searchFriends')} />
+                <ListLabelSkeleton />
+                <RosterSkeleton rows={6} />
+            </View>
+        );
+    }
 
     return (
         <FlatList
             keyboardShouldPersistTaps="handled"
-            data={chats}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+            data={friends.length > 0 ? [friends] : []}
+            keyExtractor={() => 'roster'}
+            contentContainerStyle={LIST_PADDING}
             ListHeaderComponent={
-                <SearchBar
-                    value={search}
-                    onChange={setSearch}
-                    placeholder={t('searchChats')}
-                />
+                <>
+                    <SearchBar value={search} onChange={setSearch} placeholder={t('searchFriends')} />
+                    {!searching && friends.length > 0 && <ListLabel title={t('tabFriends')} count={friends.length} />}
+                </>
             }
-            refreshControl={
-                <RefreshControl
-                    refreshing={isPulling}
-                    onRefresh={onRefresh}
-                    tintColor="#10B981"
-                />
-            }
+            refreshControl={<RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor={COLORS.primary} />}
             ListEmptyComponent={
-                <EmptyState
-                    icon="chatbubbles-outline"
-                    title={search ? t('noChatsMatched') : t('noChatsYet')}
-                    subtitle={t('chatsHint')}
-                />
+                friendsQuery.isError ? (
+                    <LoadError title={t('loadFriendsFailed')} onRetry={() => friendsQuery.refetch()} />
+                ) : (
+                    <EmptyState
+                        icon={searching ? 'search-outline' : 'people-outline'}
+                        title={searching ? t('noFriendsMatched') : t('noFriendsYet')}
+                        description={searching ? t('tryDifferentSearch') : t('growCircle')}
+                        variant="plain"
+                        className="mt-6"
+                    />
+                )
             }
-            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-            renderItem={({ item }) => {
-                const unread = item.unreadCount > 0;
-                const fromMe = !!user?.id && item.lastMessageSenderId === user.id;
-                return (
-                    <CardSurface
-                        highlight={unread}
-                        onPress={() => navigation.navigate('DirectChat', {
-                            chatId: item.id,
-                            header: {
-                                otherUserId: item.otherUserId,
-                                otherUsername: item.otherUsername,
-                                otherNickname: item.otherNickname,
-                                otherAvatarUrl: item.otherAvatarUrl,
-                            },
-                        })}
-                    >
-                        <View className="flex-row items-center px-3.5 py-3">
-                            <RingAvatar
-                                src={item.otherAvatarUrl ?? undefined}
-                                name={item.otherUsername}
-                                ringColor={unread ? 'rgba(16,185,129,0.55)' : 'rgba(255,255,255,0.10)'}
-                            />
-                            <View className="flex-1 ml-3">
-                                <View className="flex-row items-center" style={{ gap: 8 }}>
-                                    <Text
-                                        className={cn(
-                                            'flex-1 text-[15px] tracking-tight',
-                                            unread ? 'text-white font-black' : 'text-slate-200 font-bold',
-                                        )}
-                                        numberOfLines={1}
-                                    >
-                                        {item.otherUsername}
-                                    </Text>
-                                    {item.lastMessageAt && (
-                                        <Text
-                                            className={cn('text-[11px] font-bold', unread ? 'text-primary-bright' : 'text-slate-500')}
-                                            style={{ fontVariant: ['tabular-nums'] }}
-                                        >
-                                            {formatChatTime(item.lastMessageAt)}
-                                        </Text>
-                                    )}
-                                </View>
-                                <View className="flex-row items-center mt-1" style={{ gap: 8 }}>
-                                    <Text
-                                        className={cn('flex-1 text-[13px]', unread ? 'text-slate-200 font-semibold' : 'text-slate-400 font-medium')}
-                                        numberOfLines={1}
-                                    >
-                                        {fromMe ? <Text className="text-slate-500 font-medium">{t('youPrefix')}</Text> : null}
-                                        {item.lastMessage}
-                                    </Text>
-                                    {/* Count sits at the end of the preview line, like any chat app —
-                                        the avatar stays clean. */}
-                                    {unread && (
-                                        <View className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary items-center justify-center">
-                                            <Text className="text-primary-foreground text-[11px] font-black">
-                                                {item.unreadCount > 99 ? '99+' : item.unreadCount}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
+            // The whole roster is one panel, so it renders as a single item; rows inside are cheap
+            // (memoized avatar, no images beyond it).
+            renderItem={({ item }) => (
+                <Panel>
+                    {item.map((friend, index) => (
+                        <FriendRow
+                            key={friend.userId}
+                            friend={friend}
+                            first={index === 0}
+                            unread={(chatByUser.get(friend.userId.toLowerCase())?.unreadCount ?? 0) > 0}
+                            onOpenProfile={openProfile}
+                            onMessage={message}
+                        />
+                    ))}
+                </Panel>
+            )}
+        />
+    );
+}
+
+const FriendRow = React.memo(function FriendRow({
+    friend,
+    first,
+    unread,
+    onOpenProfile,
+    onMessage,
+}: {
+    friend: Friend;
+    first: boolean;
+    unread: boolean;
+    onOpenProfile: (userId: string) => void;
+    onMessage: (friend: Friend) => void;
+}) {
+    const { t } = useTranslation('social');
+    const nickname = friend.nickname?.trim();
+
+    return (
+        <View className={cn('flex-row items-center pl-4 pr-3 py-2.5', !first && 'border-t border-white/[0.05]')}>
+            <Pressable
+                onPress={() => onOpenProfile(friend.userId)}
+                accessibilityRole="button"
+                className="flex-1 flex-row items-center active:opacity-70"
+            >
+                <AvatarRing src={friend.avatarUrl} name={friend.username} tone={unread ? 'unread' : 'neutral'} />
+                <View className="flex-1 ml-3">
+                    <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
+                        {friend.username}
+                    </Text>
+                    {/* Same gamepad line as the profile header; a friend without an in-game
+                        nickname gets the friendship date instead. */}
+                    {nickname ? (
+                        <View className="flex-row items-center mt-0.5" style={{ gap: 5 }}>
+                            <Ionicons name="game-controller" size={13} color={COLORS.primary} />
+                            <Text className="flex-1 text-slate-400 text-[12px] font-semibold" numberOfLines={1}>
+                                {nickname}
+                            </Text>
                         </View>
-                    </CardSurface>
+                    ) : (
+                        <Text className="text-slate-500 text-[12px] font-medium mt-0.5" numberOfLines={1}>
+                            {t('friendsSince', { date: monthYear(friend.friendsSince) })}
+                        </Text>
+                    )}
+                </View>
+            </Pressable>
+            {/* Lights up solid when this friend's messages are waiting. */}
+            <Pressable
+                onPress={() => onMessage(friend)}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile:friend.message')}
+                className={cn(
+                    'w-9 h-9 ml-3 rounded-xl items-center justify-center active:opacity-60',
+                    unread ? 'bg-primary' : 'bg-primary/10 border border-primary/25',
+                )}
+            >
+                <Ionicons
+                    name="chatbubble-ellipses"
+                    size={16}
+                    color={unread ? COLORS.primaryForeground : COLORS.primaryBright}
+                />
+            </Pressable>
+        </View>
+    );
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// REQUESTS TAB — received and sent on one page, no sub-tabs
+// ═════════════════════════════════════════════════════════════════════
+
+type RequestAction = 'accept' | 'reject' | 'cancel';
+
+function RequestsTab({ navigation }: { navigation: NavProp }) {
+    const { t } = useTranslation('social');
+    const { user } = useAuth();
+    const queryClient = useQueryClient();
+    const { badges, refresh: refreshBadges } = useBadges();
+    const { search, setSearch, debounced } = useDebouncedSearch();
+    const requestsQuery = useFriendRequests(debounced);
+    const { incoming, outgoing } = requestsQuery.data ?? EMPTY_REQUESTS;
+    const [busy, setBusy] = useState<{ id: string; action: RequestAction } | null>(null);
+
+    useRefetchOnFocusIfStale(requestsQuery.refetch, requestsQuery.dataUpdatedAt, { enabled: !!user?.id });
+    useRefetchWhenCountMoves(badges.friendRequests, requestsQuery.refetch);
+    const { isPulling, onRefresh } = usePullToRefresh(requestsQuery.refetch);
+
+    const act = async (req: FriendRequest, action: RequestAction) => {
+        if (busy) return;
+        setBusy({ id: req.id, action });
+        try {
+            const url =
+                action === 'accept' ? ENDPOINTS.ACCEPT_FRIEND_REQUEST(req.id)
+                    : action === 'reject' ? ENDPOINTS.REJECT_FRIEND_REQUEST(req.id)
+                        : ENDPOINTS.CANCEL_FRIEND_REQUEST(req.id);
+            const res = await authenticatedFetch(url, { method: 'POST' });
+            if (!res.ok) throw new Error(getErrorMessage(await res.text().catch(() => '')));
+            // Drop it from every cached search at once, so clearing the search doesn't bring it back.
+            queryClient.setQueriesData<FriendRequests>({ queryKey: ['friend-requests'] }, (prev) =>
+                prev && {
+                    incoming: prev.incoming.filter((r) => r.id !== req.id),
+                    outgoing: prev.outgoing.filter((r) => r.id !== req.id),
+                },
+            );
+            if (action === 'accept') queryClient.invalidateQueries({ queryKey: ['friends'] });
+            refreshBadges();
+        } catch (e) {
+            Alert.alert(t('common:error'), getErrorMessage(e));
+            // It may have been answered elsewhere in the meantime — show what's really there.
+            requestsQuery.refetch();
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    const searching = search.length > 0;
+    const sections = [
+        ...(incoming.length > 0 ? [{ key: 'incoming' as const, items: incoming }] : []),
+        ...(outgoing.length > 0 ? [{ key: 'outgoing' as const, items: outgoing }] : []),
+    ];
+
+    if (requestsQuery.isPending && sections.length === 0) {
+        return (
+            <View style={LIST_PADDING}>
+                <SearchBar value={search} onChange={setSearch} placeholder={t('searchRequests')} />
+                <ListLabelSkeleton />
+                <RosterSkeleton rows={3} action="pair" />
+            </View>
+        );
+    }
+
+    return (
+        <FlatList
+            keyboardShouldPersistTaps="handled"
+            data={sections}
+            keyExtractor={(section) => section.key}
+            contentContainerStyle={LIST_PADDING}
+            ListHeaderComponent={<SearchBar value={search} onChange={setSearch} placeholder={t('searchRequests')} />}
+            refreshControl={<RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+            ListEmptyComponent={
+                requestsQuery.isError ? (
+                    <LoadError title={t('common:unexpectedError')} onRetry={() => requestsQuery.refetch()} />
+                ) : (
+                    <EmptyState
+                        icon={searching ? 'search-outline' : 'mail-open-outline'}
+                        title={searching ? t('noRequestsMatched') : t('noRequests')}
+                        description={searching ? t('tryDifferentSearch') : t('requestsHint')}
+                        variant="plain"
+                        className="mt-6"
+                    />
+                )
+            }
+            ItemSeparatorComponent={() => <View style={{ height: 22 }} />}
+            renderItem={({ item: section }) => {
+                const isIncoming = section.key === 'incoming';
+                return (
+                    <View>
+                        <ListLabel
+                            title={isIncoming ? t('subTabIncoming') : t('subTabOutgoing')}
+                            count={section.items.length}
+                            countColor={isIncoming ? '#FBBF24' : undefined}
+                        />
+                        {/* Received requests wait on you — the panel carries the amber edge the
+                            organizer's registration requests use. */}
+                        <Panel style={isIncoming ? { borderColor: 'rgba(245,158,11,0.22)' } : undefined}>
+                            {section.items.map((req, index) => (
+                                <RequestRow
+                                    key={req.id}
+                                    request={req}
+                                    incoming={isIncoming}
+                                    first={index === 0}
+                                    busyAction={busy?.id === req.id ? busy.action : null}
+                                    disabled={busy !== null}
+                                    onOpenProfile={(id) => navigation.navigate('PlayerProfile', { id })}
+                                    onAct={act}
+                                />
+                            ))}
+                        </Panel>
+                    </View>
                 );
             }}
         />
     );
 }
 
+function RequestRow({
+    request,
+    incoming,
+    first,
+    busyAction,
+    disabled,
+    onOpenProfile,
+    onAct,
+}: {
+    request: FriendRequest;
+    incoming: boolean;
+    first: boolean;
+    busyAction: RequestAction | null;
+    disabled: boolean;
+    onOpenProfile: (userId: string) => void;
+    onAct: (req: FriendRequest, action: RequestAction) => void;
+}) {
+    const { t } = useTranslation('social');
+    const userId = incoming ? request.fromUserId : request.toUserId;
+    const username = incoming ? request.fromUsername : request.toUsername;
+    const nickname = (incoming ? request.fromNickname : request.toNickname)?.trim();
+    const avatarUrl = incoming ? request.fromAvatarUrl : request.toAvatarUrl;
+
+    return (
+        <View className={cn('flex-row items-center pl-4 pr-3 py-2.5', !first && 'border-t border-white/[0.05]')}>
+            {/* Avatar + name open the profile, so you can see who it is before answering. */}
+            <Pressable
+                onPress={() => onOpenProfile(userId)}
+                accessibilityRole="button"
+                className="flex-1 flex-row items-center active:opacity-70"
+            >
+                <View>
+                    <AvatarRing src={avatarUrl} name={username} tone={incoming ? 'incoming' : 'neutral'} />
+                    {incoming && (
+                        <View
+                            className="absolute items-center justify-center"
+                            style={{ bottom: -2, right: -2, width: 16, height: 16, borderRadius: 999, backgroundColor: INCOMING, borderWidth: 2, borderColor: COLORS.card }}
+                        >
+                            <Ionicons name="person-add" size={8} color={COLORS.primaryForeground} />
+                        </View>
+                    )}
+                </View>
+                <View className="flex-1 ml-3">
+                    <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>
+                        {username}
+                    </Text>
+                    <View className="flex-row items-center mt-0.5" style={{ gap: 5 }}>
+                        {nickname ? (
+                            <>
+                                <Ionicons name="game-controller" size={13} color={COLORS.primary} />
+                                <Text className="shrink text-slate-400 text-[12px] font-semibold" numberOfLines={1}>
+                                    {nickname}
+                                </Text>
+                            </>
+                        ) : (
+                            <Text className="shrink text-slate-500 text-[12px] font-medium" numberOfLines={1}>
+                                {incoming ? t('wantsToConnect') : t('requestSent')}
+                            </Text>
+                        )}
+                        <Text className="text-slate-600 text-[11px] font-bold ml-1" style={TABULAR}>
+                            {formatChatTime(request.createdOn)}
+                        </Text>
+                    </View>
+                </View>
+            </Pressable>
+
+            <View className="flex-row items-center ml-2" style={{ gap: 6 }}>
+                {incoming ? (
+                    <>
+                        <RowAction
+                            icon="close"
+                            tone="danger"
+                            label={t('decline')}
+                            busy={busyAction === 'reject'}
+                            disabled={disabled}
+                            onPress={() => onAct(request, 'reject')}
+                        />
+                        <RowAction
+                            icon="checkmark"
+                            tone="primary"
+                            label={t('accept')}
+                            busy={busyAction === 'accept'}
+                            disabled={disabled}
+                            onPress={() => onAct(request, 'accept')}
+                        />
+                    </>
+                ) : (
+                    <RowAction
+                        icon="close"
+                        tone="quiet"
+                        label={t('cancelRequest')}
+                        busy={busyAction === 'cancel'}
+                        disabled={disabled}
+                        onPress={() => onAct(request, 'cancel')}
+                    />
+                )}
+            </View>
+        </View>
+    );
+}
+
+const ROW_ACTION_TONES = {
+    primary: { box: 'bg-primary', icon: COLORS.primaryForeground },
+    danger: { box: 'bg-red-500/10 border border-red-500/25', icon: '#F87171' },
+    quiet: { box: 'bg-white/[0.05] border border-white/10', icon: COLORS.slate400 },
+} as const;
+
+/** 36px square action on a roster row — the same buttons the registration requests use. */
+function RowAction({
+    icon,
+    tone,
+    label,
+    busy,
+    disabled,
+    onPress,
+}: {
+    icon: keyof typeof Ionicons.glyphMap;
+    tone: keyof typeof ROW_ACTION_TONES;
+    label: string;
+    busy: boolean;
+    disabled: boolean;
+    onPress: () => void;
+}) {
+    const style = ROW_ACTION_TONES[tone];
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={disabled}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ disabled, busy }}
+            className={cn('w-9 h-9 rounded-xl items-center justify-center active:opacity-60', style.box, disabled && !busy && 'opacity-50')}
+        >
+            {busy ? (
+                <ActivityIndicator size="small" color={style.icon} />
+            ) : (
+                <Ionicons name={icon} size={tone === 'primary' ? 18 : 17} color={style.icon} />
+            )}
+        </Pressable>
+    );
+}
+
 // ═════════════════════════════════════════════════════════════════════
-// HELPERS
+// CHATS TAB — a friends rail to start one, then every conversation in its own card
 // ═════════════════════════════════════════════════════════════════════
+
+function ChatsTab({ navigation }: { navigation: NavProp }) {
+    const { t } = useTranslation('social');
+    const { user } = useAuth();
+    const { badges } = useBadges();
+    const { search, setSearch, debounced } = useDebouncedSearch();
+    const chatsQuery = useDirectChats(debounced);
+    const friendsQuery = useFriends('');
+    const chats = chatsQuery.data ?? EMPTY_CHATS;
+    const friends = friendsQuery.data ?? EMPTY_FRIENDS;
+    const searching = search.length > 0;
+
+    // Bottom tabs keep this screen mounted; useRefetchOnFocusIfStale bridges the gap, and a
+    // message landing while the list is open moves the unread badge, which refetches it.
+    useRefetchOnFocusIfStale(chatsQuery.refetch, chatsQuery.dataUpdatedAt, { enabled: !!user?.id });
+    useRefetchWhenCountMoves(badges.unreadDirectMessages, chatsQuery.refetch);
+    const { isPulling, onRefresh } = usePullToRefresh(
+        useCallback(() => Promise.all([chatsQuery.refetch(), friendsQuery.refetch()]), [chatsQuery.refetch, friendsQuery.refetch]),
+    );
+
+    // The rail is ordered by who you talk to: unread first, then the latest conversation,
+    // then friends you haven't written to yet. Only built from the unfiltered chat list.
+    const chatByUser = useUnreadByUser(debounced ? EMPTY_CHATS : chats);
+    const railFriends = useMemo(() => {
+        const lastAt = (f: Friend) => {
+            const at = chatByUser.get(f.userId.toLowerCase())?.lastMessageAt;
+            return at ? parseUtcDate(at).getTime() : 0;
+        };
+        const unread = (f: Friend) => ((chatByUser.get(f.userId.toLowerCase())?.unreadCount ?? 0) > 0 ? 1 : 0);
+        return [...friends].sort((a, b) => unread(b) - unread(a) || lastAt(b) - lastAt(a));
+    }, [friends, chatByUser]);
+
+    const openChat = useCallback((chat: DirectChat) => {
+        navigation.navigate('DirectChat', {
+            chatId: chat.id,
+            header: {
+                otherUserId: chat.otherUserId,
+                otherUsername: chat.otherUsername,
+                otherNickname: chat.otherNickname,
+                otherAvatarUrl: chat.otherAvatarUrl,
+            },
+        });
+    }, [navigation]);
+
+    const showRail = !searching && railFriends.length > 0;
+
+    if (chatsQuery.isPending && chats.length === 0) {
+        return (
+            <View style={LIST_PADDING}>
+                <SearchBar value={search} onChange={setSearch} placeholder={t('searchChats')} />
+                <ListLabelSkeleton />
+                <RailSkeleton />
+                <ListLabelSkeleton />
+                <View style={{ gap: 8 }}>
+                    {[0, 1, 2, 3].map((i) => <ChatCardSkeleton key={i} />)}
+                </View>
+            </View>
+        );
+    }
+
+    return (
+        <FlatList
+            keyboardShouldPersistTaps="handled"
+            data={chats}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={LIST_PADDING}
+            ListHeaderComponent={
+                <>
+                    <SearchBar value={search} onChange={setSearch} placeholder={t('searchChats')} />
+                    {showRail && (
+                        <View className="mb-5">
+                            <ListLabel title={t('tabFriends')} />
+                            <FlatList
+                                horizontal
+                                data={railFriends}
+                                keyExtractor={(f) => f.userId}
+                                showsHorizontalScrollIndicator={false}
+                                keyboardShouldPersistTaps="handled"
+                                // Bleeds to the screen edges so the rail reads as scrollable.
+                                style={{ marginHorizontal: -20 }}
+                                contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                                renderItem={({ item: friend }) => {
+                                    const chat = chatByUser.get(friend.userId.toLowerCase());
+                                    return (
+                                        <RailFriend
+                                            friend={friend}
+                                            unread={(chat?.unreadCount ?? 0) > 0}
+                                            onPress={() => openChatWith(navigation, friend, chat)}
+                                        />
+                                    );
+                                }}
+                            />
+                        </View>
+                    )}
+                    {!searching && chats.length > 0 && <ListLabel title={t('tabChats')} count={chats.length} />}
+                </>
+            }
+            refreshControl={<RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+            ListEmptyComponent={
+                chatsQuery.isError ? (
+                    <LoadError title={t('common:unexpectedError')} onRetry={() => chatsQuery.refetch()} />
+                ) : (
+                    <EmptyState
+                        icon={searching ? 'search-outline' : 'chatbubbles-outline'}
+                        title={searching ? t('noChatsMatched') : t('noChatsYet')}
+                        description={searching ? t('tryDifferentSearch') : showRail ? t('chatsHintRail') : t('chatsHint')}
+                        variant="plain"
+                        className={showRail ? 'mt-0' : 'mt-6'}
+                    />
+                )
+            }
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            renderItem={({ item }) => (
+                <ChatCard chat={item} fromMe={!!user?.id && item.lastMessageSenderId === user.id} onPress={openChat} />
+            )}
+        />
+    );
+}
+
+const RAIL_ITEM_WIDTH = 64;
+
+const RailFriend = React.memo(function RailFriend({
+    friend,
+    unread,
+    onPress,
+}: {
+    friend: Friend;
+    unread: boolean;
+    onPress: () => void;
+}) {
+    const { t } = useTranslation('social');
+    return (
+        <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('profile:friend.message')}: ${friend.username}`}
+            className="items-center active:opacity-70"
+            style={{ width: RAIL_ITEM_WIDTH }}
+        >
+            <AvatarRing src={friend.avatarUrl} name={friend.username} size="lg" tone={unread ? 'unread' : 'neutral'} gapColor={COLORS.background} />
+            <Text
+                className={cn('w-full text-center text-[11px] mt-1.5', unread ? 'text-white font-black' : 'text-slate-400 font-semibold')}
+                numberOfLines={1}
+            >
+                {friend.username}
+            </Text>
+        </Pressable>
+    );
+});
+
+const CHAT_CARD_RADIUS = 18;
+
+/** Card shell shared with the notification inbox: unread trades the neutral edge for emerald. */
+function ChatShell({ unread, children }: { unread?: boolean; children: React.ReactNode }) {
+    return (
+        <View
+            style={{
+                backgroundColor: COLORS.card,
+                borderRadius: CHAT_CARD_RADIUS,
+                borderWidth: 1,
+                borderColor: unread ? COLORS.primary + '33' : 'rgba(255,255,255,0.07)',
+                borderTopColor: unread ? COLORS.primary + '4D' : 'rgba(255,255,255,0.11)',
+                overflow: 'hidden',
+            }}
+        >
+            {children}
+        </View>
+    );
+}
+
+const ChatCard = React.memo(function ChatCard({
+    chat,
+    fromMe,
+    onPress,
+}: {
+    chat: DirectChat;
+    fromMe: boolean;
+    onPress: (chat: DirectChat) => void;
+}) {
+    const { t } = useTranslation('social');
+    const unread = chat.unreadCount > 0;
+
+    return (
+        <ChatShell unread={unread}>
+            <Pressable onPress={() => onPress(chat)} accessibilityRole="button" className="active:opacity-70">
+                {unread && (
+                    <>
+                        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: COLORS.primary + '0F' }} />
+                        <View
+                            pointerEvents="none"
+                            style={{
+                                position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
+                                borderTopRightRadius: 3, borderBottomRightRadius: 3,
+                                backgroundColor: COLORS.primary,
+                                shadowColor: COLORS.primary, shadowOpacity: 0.8, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
+                            }}
+                        />
+                    </>
+                )}
+                <View className="flex-row items-center px-4 py-3" style={{ gap: 12 }}>
+                    <AvatarRing src={chat.otherAvatarUrl} name={chat.otherUsername} tone={unread ? 'unread' : 'neutral'} />
+                    <View className="flex-1">
+                        <View className="flex-row items-center" style={{ gap: 8 }}>
+                            <Text
+                                className={cn('flex-1 text-[15px] tracking-tight', unread ? 'text-white font-black' : 'text-slate-200 font-bold')}
+                                numberOfLines={1}
+                            >
+                                {chat.otherUsername}
+                            </Text>
+                            {chat.lastMessageAt && (
+                                <Text
+                                    className="text-[11px] font-bold"
+                                    style={[TABULAR, { color: unread ? COLORS.primaryBright : COLORS.slate500 }]}
+                                >
+                                    {formatChatTime(chat.lastMessageAt)}
+                                </Text>
+                            )}
+                        </View>
+                        <View className="flex-row items-center mt-0.5" style={{ gap: 8 }}>
+                            <Text
+                                className={cn('flex-1 text-[13px] leading-[18px]', unread ? 'text-slate-200 font-semibold' : 'text-slate-400 font-medium')}
+                                numberOfLines={1}
+                            >
+                                {fromMe ? <Text className="text-slate-500 font-medium">{t('youPrefix')}</Text> : null}
+                                {chat.lastMessage}
+                            </Text>
+                            {unread && (
+                                <View className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary items-center justify-center">
+                                    <Text className="text-primary-foreground text-[11px] font-black" style={TABULAR}>
+                                        {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                </View>
+            </Pressable>
+        </ChatShell>
+    );
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// SHARED PIECES
+// ═════════════════════════════════════════════════════════════════════
+
+type RingTone = 'neutral' | 'unread' | 'incoming';
+
+/**
+ * Avatar in a ring. `unread` is the gradient ring (with a soft glow on iOS) that marks someone
+ * whose messages are waiting; `incoming` is the amber of a request waiting on you. The gap
+ * between ring and photo is painted in the surface colour, so pass `gapColor` off a card.
+ */
+function AvatarRing({
+    src,
+    name,
+    size = 'md',
+    tone = 'neutral',
+    gapColor = COLORS.card,
+}: {
+    src?: string | null;
+    name: string;
+    size?: 'md' | 'lg';
+    tone?: RingTone;
+    gapColor?: string;
+}) {
+    const avatar = <PlayerAvatar src={src ?? undefined} name={name} size={size} className="border-0" />;
+
+    if (tone === 'unread') {
+        return (
+            <View
+                style={{
+                    borderRadius: 999,
+                    shadowColor: COLORS.primary, shadowOpacity: 0.55, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
+                }}
+            >
+                <LinearGradient
+                    colors={UNREAD_RING}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ borderRadius: 999, padding: 2 }}
+                >
+                    <View style={{ borderRadius: 999, padding: 1, backgroundColor: gapColor }}>{avatar}</View>
+                </LinearGradient>
+            </View>
+        );
+    }
+
+    return (
+        <View
+            style={{
+                borderRadius: 999,
+                padding: 1.5,
+                borderWidth: 1.5,
+                borderColor: tone === 'incoming' ? 'rgba(245,158,11,0.55)' : 'rgba(255,255,255,0.12)',
+            }}
+        >
+            {avatar}
+        </View>
+    );
+}
+
+/** Tracked uppercase heading over a list, with a quiet count — as on the hub's member list. */
+function ListLabel({ title, count, countColor }: { title: string; count?: number; countColor?: string }) {
+    return (
+        <View className="flex-row items-center px-1 mb-2" style={{ gap: 8 }}>
+            <Text className="text-slate-400 text-[11px] font-black uppercase tracking-[1.6px]" numberOfLines={1}>
+                {title}
+            </Text>
+            {count !== undefined && (
+                <Text className="text-[11px] font-bold" style={[TABULAR, { color: countColor ?? COLORS.slate600 }]}>
+                    {count.toLocaleString(i18n.language)}
+                </Text>
+            )}
+        </View>
+    );
+}
 
 function SearchBar({
     value,
@@ -614,65 +966,126 @@ function SearchBar({
     onChange: (v: string) => void;
     placeholder: string;
 }) {
+    const { t } = useTranslation('common');
     const active = value.length > 0;
     return (
-        <View className="mb-3 mt-1">
-            <View
-                className="flex-row items-center px-3.5"
-                style={{
-                    height: 48,
-                    borderRadius: 16,
-                    backgroundColor: '#131B2E',
-                    borderWidth: 1,
-                    borderColor: active ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)',
-                }}
-            >
-                <Ionicons name="search" size={17} color={active ? '#10B981' : '#475569'} />
-                <TextInput
-                    value={value}
-                    onChangeText={onChange}
-                    placeholder={placeholder}
-                    placeholderTextColor="#475569"
-                    className="flex-1 ml-2.5 text-white text-sm font-medium"
-                    style={{ height: 48 }}
-                />
-                {active && (
-                    <Pressable onPress={() => onChange('')} hitSlop={8}>
-                        <Ionicons name="close-circle" size={17} color="#64748B" />
-                    </Pressable>
-                )}
-            </View>
+        <View
+            className="flex-row items-center px-3.5 h-12 rounded-2xl mt-1 mb-4"
+            style={{
+                backgroundColor: COLORS.card,
+                borderWidth: 1,
+                borderColor: active ? 'rgba(16,185,129,0.30)' : 'rgba(255,255,255,0.07)',
+                borderTopColor: active ? 'rgba(16,185,129,0.40)' : 'rgba(255,255,255,0.11)',
+            }}
+        >
+            <Ionicons name="search" size={17} color={active ? COLORS.primary : COLORS.slate500} />
+            <TextInput
+                value={value}
+                onChangeText={onChange}
+                placeholder={placeholder}
+                placeholderTextColor={COLORS.slate500}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="search"
+                className="flex-1 h-12 ml-2.5 text-white text-[14px] font-medium"
+            />
+            {active && (
+                <Pressable onPress={() => onChange('')} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('close')}>
+                    <Ionicons name="close-circle" size={18} color={COLORS.slate500} />
+                </Pressable>
+            )}
         </View>
     );
 }
 
-function EmptyState({
-    icon,
-    title,
-    subtitle,
-}: {
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    subtitle: string;
-}) {
+function LoadError({ title, onRetry }: { title: string; onRetry: () => void }) {
+    const { t } = useTranslation('common');
     return (
-        <EmptyStateBase
-            icon={icon}
+        <EmptyState
+            icon="cloud-offline-outline"
             title={title}
-            description={subtitle}
+            color={COLORS.destructive}
             variant="plain"
-            className="mt-8"
+            className="mt-6"
+            action={
+                <Pressable
+                    onPress={onRetry}
+                    accessibilityRole="button"
+                    className="flex-row items-center h-10 px-4 rounded-xl bg-white/[0.05] border border-white/10 active:opacity-70"
+                    style={{ gap: 6 }}
+                >
+                    <Ionicons name="refresh" size={15} color={COLORS.slate300} />
+                    <Text className="text-slate-200 text-[13px] font-bold">{t('retry')}</Text>
+                </Pressable>
+            }
         />
     );
 }
 
-function Loading() {
+// ─── Skeletons, in the real rows' shapes ─────────────────────────────
+
+function ListLabelSkeleton() {
     return (
-        <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#10B981" />
+        <View className="px-1 mb-3">
+            <Skeleton width={72} height={10} radius={5} />
         </View>
     );
 }
+
+function RosterSkeleton({ rows, action = 'single' }: { rows: number; action?: 'single' | 'pair' }) {
+    return (
+        <Panel>
+            {Array.from({ length: rows }, (_, i) => (
+                <View key={i} className={cn('flex-row items-center pl-4 pr-3 py-2.5', i > 0 && 'border-t border-white/[0.05]')}>
+                    <Skeleton width={46} height={46} radius={23} />
+                    <View className="flex-1 ml-3" style={{ gap: 7 }}>
+                        <Skeleton width="48%" height={12} radius={6} />
+                        <Skeleton width="32%" height={10} radius={5} />
+                    </View>
+                    <View className="flex-row ml-3" style={{ gap: 6 }}>
+                        {action === 'pair' && <Skeleton width={36} height={36} radius={12} />}
+                        <Skeleton width={36} height={36} radius={12} />
+                    </View>
+                </View>
+            ))}
+        </Panel>
+    );
+}
+
+function RailSkeleton() {
+    return (
+        <View className="flex-row mb-5" style={{ gap: 12 }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+                <View key={i} className="items-center" style={{ width: RAIL_ITEM_WIDTH, gap: 8 }}>
+                    <Skeleton width={62} height={62} radius={31} />
+                    <Skeleton width={44} height={8} radius={4} />
+                </View>
+            ))}
+        </View>
+    );
+}
+
+function ChatCardSkeleton() {
+    return (
+        <ChatShell>
+            <View className="flex-row items-center px-4 py-3" style={{ gap: 12 }}>
+                <Skeleton width={46} height={46} radius={23} />
+                <View className="flex-1" style={{ gap: 8 }}>
+                    <View className="flex-row items-center">
+                        <Skeleton width="44%" height={12} radius={6} />
+                        <View className="flex-1" />
+                        <Skeleton width={34} height={10} radius={5} />
+                    </View>
+                    <Skeleton width="78%" height={10} radius={5} />
+                </View>
+            </View>
+        </ChatShell>
+    );
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═════════════════════════════════════════════════════════════════════
 
 /**
  * Drop empty chats (no message exchanged yet) so they don't clutter the list,
@@ -711,71 +1124,4 @@ function formatChatTime(iso: string): string {
 function monthYear(iso?: string): string {
     if (!iso) return '';
     return parseUtcDate(iso).toLocaleDateString(dateLocale(), { month: 'short', year: 'numeric' });
-}
-
-// Card chrome shared by every Social row: a flat card surface with a crisp hairline
-// border, like the notification inbox. `highlight` (unread chat) adds the inbox's
-// quiet marker — an emerald wash, an emerald edge and a rail on the leading edge.
-function CardSurface({
-    onPress,
-    children,
-    highlight = false,
-}: {
-    onPress?: () => void;
-    children: React.ReactNode;
-    highlight?: boolean;
-}) {
-    const surface = (
-        <View
-            style={{
-                borderRadius: 18,
-                overflow: 'hidden',
-                backgroundColor: COLORS.card,
-                borderWidth: 1,
-                borderColor: highlight ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.07)',
-            }}
-        >
-            {highlight && (
-                <>
-                    <View
-                        pointerEvents="none"
-                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(16,185,129,0.06)' }}
-                    />
-                    <View
-                        pointerEvents="none"
-                        style={{
-                            position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
-                            backgroundColor: COLORS.primary,
-                            borderTopRightRadius: 3, borderBottomRightRadius: 3,
-                        }}
-                    />
-                </>
-            )}
-            {children}
-        </View>
-    );
-    if (!onPress) return surface;
-    return (
-        <PressableScale onPress={onPress} pressedScale={0.98}>
-            {surface}
-        </PressableScale>
-    );
-}
-
-// Avatar wrapped in a subtle ring (emerald when emphasised). PlayerAvatar's own
-// border is dropped so the ring reads as a single clean band.
-function RingAvatar({
-    src,
-    name,
-    ringColor = 'rgba(255,255,255,0.10)',
-}: {
-    src?: string;
-    name: string;
-    ringColor?: string;
-}) {
-    return (
-        <View style={{ borderRadius: 999, padding: 2, borderWidth: 1.5, borderColor: ringColor }}>
-            <PlayerAvatar src={src} name={name} size="md" className="border-0" />
-        </View>
-    );
 }

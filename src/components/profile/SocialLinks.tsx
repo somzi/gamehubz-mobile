@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, Pressable, Linking, Alert, Share } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { cn } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
 import { KickIcon } from '../icons/KickIcon';
 
 interface SocialLink {
@@ -13,59 +14,26 @@ interface SocialLink {
 
 interface SocialLinksProps {
     links: SocialLink[];
+    /** 'md' — 40px buttons (hub profile); 'sm' — 32px, for a row inside the player header. */
+    size?: 'md' | 'sm';
     className?: string;
 }
 
-const platformConfig: any = {
-    discord: {
-        icon: <Ionicons name="logo-discord" size={20} />,
-        color: "text-[#5865F2]",
-        bgColor: "bg-[#5865F2]/20",
-    },
-    tiktok: {
-        icon: <Ionicons name="logo-tiktok" size={20} />,
-        color: "text-foreground",
-        bgColor: "bg-foreground/10",
-    },
-    instagram: {
-        icon: <FontAwesome name="instagram" size={20} />,
-        color: "text-[#E4405F]",
-        bgColor: "bg-[#E4405F]/20",
-    },
-    twitter: {
-        icon: <Text style={{ fontSize: 18, fontWeight: '900', color: 'white' }}>𝕏</Text>,
-        color: "text-foreground",
-        bgColor: "bg-foreground/10",
-    },
-    youtube: {
-        icon: <FontAwesome name="youtube-play" size={20} />,
-        color: "text-[#FF0000]",
-        bgColor: "bg-[#FF0000]/20",
-    },
-    facebook: {
-        icon: <FontAwesome name="facebook" size={20} />,
-        color: "text-[#1877F2]",
-        bgColor: "bg-[#1877F2]/20",
-    },
-    telegram: {
-        icon: <Ionicons name="paper-plane" size={18} />,
-        color: "text-[#0088cc]",
-        bgColor: "bg-[#0088cc]/20",
-    },
-    twitch: {
-        icon: <Ionicons name="logo-twitch" size={20} />,
-        color: "text-[#9146FF]",
-        bgColor: "bg-[#9146FF]/20",
-    },
-    kick: {
-        // SVG logo can't nest inside <Text>; rendered directly in the map below.
-        icon: <KickIcon size={20} color="#53fc18" />,
-        color: "text-[#53fc18]",
-        bgColor: "bg-[#53fc18]/20",
-    },
+// Each platform keeps its own colour on the glyph; the button around it is the same quiet glass
+// for all of them, so a row of five links doesn't turn into five coloured badges.
+const platformIcon: Record<SocialLink['platform'], (size: number) => React.ReactNode> = {
+    discord: (s) => <Ionicons name="logo-discord" size={s} color="#5865F2" />,
+    tiktok: (s) => <Ionicons name="logo-tiktok" size={s} color={COLORS.foreground} />,
+    instagram: (s) => <FontAwesome name="instagram" size={s} color="#E4405F" />,
+    twitter: (s) => <Text style={{ fontSize: s - 2, fontWeight: '900', color: COLORS.foreground }}>𝕏</Text>,
+    youtube: (s) => <FontAwesome name="youtube-play" size={s} color="#FF0000" />,
+    facebook: (s) => <FontAwesome name="facebook" size={s} color="#1877F2" />,
+    telegram: (s) => <Ionicons name="paper-plane" size={s - 2} color="#0088cc" />,
+    twitch: (s) => <Ionicons name="logo-twitch" size={s} color="#9146FF" />,
+    kick: (s) => <KickIcon size={s} color="#53fc18" />,
 };
 
-export function SocialLinks({ links, className }: SocialLinksProps) {
+export function SocialLinks({ links, size = 'md', className }: SocialLinksProps) {
     const { t } = useTranslation('profile');
     if (!links || links.length === 0) return null;
 
@@ -95,25 +63,27 @@ export function SocialLinks({ links, className }: SocialLinksProps) {
         }
     };
 
+    const small = size === 'sm';
+
     return (
-        <View className={cn("flex-row flex-wrap gap-3", className)}>
+        <View className={cn('flex-row flex-wrap', small ? 'gap-2' : 'gap-3', className)}>
             {links.map((link) => {
-                const config = platformConfig[link.platform];
-                if (!config) return null;
+                const renderIcon = platformIcon[link.platform];
+                if (!renderIcon) return null;
 
                 return (
                     <Pressable
                         key={link.platform}
                         onPress={() => handlePress(link)}
+                        accessibilityRole="link"
+                        accessibilityLabel={link.platform}
+                        hitSlop={small ? 4 : 0}
                         className={cn(
-                            "items-center justify-center w-10 h-10 rounded-full border border-border/30",
-                            config.bgColor
+                            'items-center justify-center rounded-full bg-white/[0.05] border border-white/10 active:opacity-70',
+                            small ? 'w-8 h-8' : 'w-10 h-10'
                         )}
-                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                     >
-                        {link.platform === 'kick'
-                            ? config.icon
-                            : <Text className={config.color}>{config.icon}</Text>}
+                        {renderIcon(small ? 15 : 20)}
                     </Pressable>
                 );
             })}

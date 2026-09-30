@@ -14,8 +14,11 @@
   "subTabOutgoing": "Outgoing",
   "searchIncoming": "Search incoming requests...",
   "searchOutgoing": "Search outgoing requests...",
+  "searchRequests": "Search requests...",
   "noIncoming": "No incoming requests",
   "noOutgoing": "No outgoing requests",
+  "noRequests": "No friend requests",
+  "noRequestsMatched": "No requests matched",
   "requestsHint": "When new requests arrive, they'll show up here",
   "wantsToConnect": "Wants to connect",
   "requestSent": "Request sent",
@@ -26,6 +29,7 @@
   "noChatsMatched": "No chats matched",
   "noChatsYet": "No chats yet",
   "chatsHint": "Open a friend's profile and tap message to get started",
+  "chatsHintRail": "Tap a friend above to start a conversation",
   "youPrefix": "You: ",
   "yesterday": "Yesterday"
 }

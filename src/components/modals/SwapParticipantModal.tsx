@@ -52,6 +52,8 @@ interface SwapParticipantModalProps {
     outgoing: { userId: string; username: string; avatarUrl?: string | null } | null;
     /** Fires after the swap succeeded, with the replacement's name for the toast. */
     onSwapped: (incomingUsername: string) => void;
+    /** True while the sheet is fetching before it shows, so the caller can spin the button that opened it. */
+    onLoadingChange?: (loading: boolean) => void;
 }
 
 // Keys, not text — this map is module scope.
@@ -84,6 +86,7 @@ export function SwapParticipantModal({
     tournamentId,
     outgoing,
     onSwapped,
+    onLoadingChange,
 }: SwapParticipantModalProps) {
     const { t } = useTranslation('tournament');
     const { t: tCommon } = useTranslation('common');
@@ -91,8 +94,10 @@ export function SwapParticipantModal({
     const insets = useSafeAreaInsets();
 
     const [eligibility, setEligibility] = useState<SwapEligibility | null>(null);
-    const [loadingEligibility, setLoadingEligibility] = useState(false);
     const [eligibilityError, setEligibilityError] = useState<string | null>(null);
+    // The sheet stays off screen until the verdict and the first page of members are both in, so it
+    // slides up once with its final content instead of stepping through a spinner per request.
+    const [ready, setReady] = useState(false);
 
     const [search, setSearch] = useState('');
     const [candidates, setCandidates] = useState<SwapCandidate[]>([]);
@@ -110,6 +115,11 @@ export function SwapParticipantModal({
     // Guards every async result against a stale render: the sheet can be closed, or the search term
     // retyped, while a request is still in flight.
     const requestRef = useRef(0);
+    // Term of the latest first-page request, so the debounced search doesn't re-fetch what the open
+    // already loaded (it used to, 350ms after opening, blanking the list back to a spinner).
+    const requestedTermRef = useRef('');
+    const onLoadingChangeRef = useRef(onLoadingChange);
+    onLoadingChangeRef.current = onLoadingChange;
 
     const resetState = useCallback(() => {
         setEligibility(null);
@@ -124,26 +134,38 @@ export function SwapParticipantModal({
         setConfirming(false);
     }, []);
 
+    const fetchCandidatesPage = useCallback(
+        async (term: string, pageNumber: number): Promise<SwapCandidate[]> => {
+            const response = await authenticatedFetch(
+                ENDPOINTS.PARTICIPANT_SWAP_CANDIDATES(tournamentId, term, pageNumber),
+            );
+            if (!response.ok) throw new Error(await response.text().catch(() => t('swap.loadMembersFailed')));
+
+            const data = await response.json();
+            return data?.result ?? data ?? [];
+        },
+        [tournamentId],
+    );
+
+    const applyCandidatesPage = useCallback((pageNumber: number, list: SwapCandidate[]) => {
+        setCandidates((prev) => (pageNumber === 0 ? list : [...prev, ...list]));
+        // A short page means the server ran out of members for this term.
+        setHasMore(list.length >= 20);
+        setPage(pageNumber);
+    }, []);
+
     const loadCandidates = useCallback(
         async (term: string, pageNumber: number) => {
             const token = ++requestRef.current;
-            if (pageNumber === 0) setLoadingCandidates(true);
-            else setLoadingMore(true);
+            if (pageNumber === 0) {
+                requestedTermRef.current = term;
+                setLoadingCandidates(true);
+            } else setLoadingMore(true);
 
             try {
-                const response = await authenticatedFetch(
-                    ENDPOINTS.PARTICIPANT_SWAP_CANDIDATES(tournamentId, term, pageNumber),
-                );
-                if (!response.ok) throw new Error(await response.text().catch(() => t('swap.loadMembersFailed')));
-
-                const data = await response.json();
-                const list: SwapCandidate[] = data?.result ?? data ?? [];
+                const list = await fetchCandidatesPage(term, pageNumber);
                 if (token !== requestRef.current) return;
-
-                setCandidates((prev) => (pageNumber === 0 ? list : [...prev, ...list]));
-                // A short page means the server ran out of members for this term.
-                setHasMore(list.length >= 20);
-                setPage(pageNumber);
+                applyCandidatesPage(pageNumber, list);
             } catch {
                 if (token === requestRef.current && pageNumber === 0) setCandidates([]);
             } finally {
@@ -153,48 +175,63 @@ export function SwapParticipantModal({
                 }
             }
         },
-        [tournamentId],
+        [fetchCandidatesPage, applyCandidatesPage],
     );
 
-    // Open: read the verdict first, and only go looking for replacements when a swap is actually
-    // possible — a blocked participant never needs a member list.
+    // Open: verdict and first member page in parallel — the member list doesn't depend on the
+    // verdict (a blocked participant just never shows it) — and the sheet only appears once both land.
     useEffect(() => {
-        if (!visible || !outgoing?.userId) return;
+        if (!visible || !outgoing?.userId) {
+            setReady(false);
+            return;
+        }
 
         let cancelled = false;
         resetState();
-        setLoadingEligibility(true);
+        setReady(false);
+        // Orphans any search still in flight from the previous time the sheet was open.
+        ++requestRef.current;
+        requestedTermRef.current = '';
+        onLoadingChangeRef.current?.(true);
 
         (async () => {
-            try {
-                const response = await authenticatedFetch(
-                    ENDPOINTS.PARTICIPANT_SWAP_ELIGIBILITY(tournamentId, outgoing.userId),
-                );
-                if (!response.ok) throw new Error(await response.text().catch(() => t('swap.checkEligibilityFailed')));
+            const [eligibilityResult, candidatesResult] = await Promise.allSettled([
+                (async () => {
+                    const response = await authenticatedFetch(
+                        ENDPOINTS.PARTICIPANT_SWAP_ELIGIBILITY(tournamentId, outgoing.userId),
+                    );
+                    if (!response.ok) throw new Error(await response.text().catch(() => t('swap.checkEligibilityFailed')));
 
-                const data = await response.json();
-                const result: SwapEligibility = data?.result ?? data;
-                if (cancelled) return;
+                    const data = await response.json();
+                    return (data?.result ?? data) as SwapEligibility;
+                })(),
+                fetchCandidatesPage('', 0),
+            ]);
+            if (cancelled) return;
 
-                setEligibility(result);
-                if (result?.canSwap) loadCandidates('', 0);
-            } catch (err: any) {
-                if (!cancelled) setEligibilityError(getErrorMessage(err));
-            } finally {
-                if (!cancelled) setLoadingEligibility(false);
-            }
+            if (eligibilityResult.status === 'fulfilled') setEligibility(eligibilityResult.value);
+            else setEligibilityError(getErrorMessage(eligibilityResult.reason));
+
+            if (candidatesResult.status === 'fulfilled') applyCandidatesPage(0, candidatesResult.value);
+
+            setReady(true);
+            onLoadingChangeRef.current?.(false);
         })();
 
         return () => {
             cancelled = true;
+            onLoadingChangeRef.current?.(false);
         };
-    }, [visible, outgoing?.userId, tournamentId, resetState, loadCandidates]);
+    }, [visible, outgoing?.userId, tournamentId, resetState, fetchCandidatesPage, applyCandidatesPage]);
 
     // Debounced search so typing doesn't fire a request per keystroke.
     useEffect(() => {
         if (!visible || !eligibility?.canSwap) return;
 
-        const timer = setTimeout(() => loadCandidates(search.trim(), 0), 350);
+        const term = search.trim();
+        if (term === requestedTermRef.current) return;
+
+        const timer = setTimeout(() => loadCandidates(term, 0), 350);
         return () => clearTimeout(timer);
     }, [search, visible, eligibility?.canSwap, loadCandidates]);
 
@@ -250,7 +287,7 @@ export function SwapParticipantModal({
 
     return (
         <Modal
-            visible={visible}
+            visible={visible && ready}
             transparent
             animationType="slide"
             // The confirmation no longer has a window of its own, so back has to be routed by hand.
@@ -342,21 +379,17 @@ export function SwapParticipantModal({
                                             <Text className="text-white font-black text-[15px]" numberOfLines={1}>
                                                 {eligibility?.username || outgoing?.username || tCommon('player')}
                                             </Text>
-                                            {loadingEligibility ? (
-                                                <Text className="text-slate-500 text-[11px] mt-1">{t('swap.checkingEligibility')}</Text>
-                                            ) : meter ? (
+                                            {meter && (
                                                 <Text className="text-slate-400 text-[11px] mt-1">
                                                     {t('swap.meterPlayed', {
                                                         played: meter.playedMatches,
                                                         count: meter.totalMatches,
                                                     })}
                                                 </Text>
-                                            ) : null}
+                                            )}
                                         </View>
 
-                                        {loadingEligibility ? (
-                                            <ActivityIndicator size="small" color={COLORS.slate400} />
-                                        ) : eligibility ? (
+                                        {eligibility ? (
                                             <View
                                                 className="px-2.5 py-1 rounded-full flex-row items-center gap-1"
                                                 style={{ backgroundColor: `${accent}1F`, borderWidth: 1, borderColor: `${accent}44` }}

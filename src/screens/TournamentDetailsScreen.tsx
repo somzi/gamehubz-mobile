@@ -297,6 +297,8 @@ export default function TournamentDetailsScreen() {
         username: string;
         avatarUrl?: string | null;
     } | null>(null);
+    // The sheet stays hidden until its data is in; meanwhile the tapped row's swap button spins.
+    const [participantSwapLoading, setParticipantSwapLoading] = useState(false);
     // Ejecting a participant wipes their entry and any results with it, so it asks first.
     const [removeParticipantTarget, setRemoveParticipantTarget] = useState<{
         userId: string;
@@ -3284,7 +3286,8 @@ export default function TournamentDetailsScreen() {
                                                         && (tournament?.status ?? 99) <= 3}
                                                     canRemove={canManage && (tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2)}
                                                     isProcessing={processingId === pUserId}
-                                                    actionsDisabled={processingId !== null}
+                                                    isOpeningSwap={participantSwapLoading && participantSwapTarget?.userId === pUserId}
+                                                    actionsDisabled={processingId !== null || participantSwapLoading}
                                                     onOpenProfile={openPlayerProfile}
                                                     onSwap={setParticipantSwapTarget}
                                                     onRemove={setRemoveParticipantTarget}
@@ -3670,6 +3673,7 @@ export default function TournamentDetailsScreen() {
                 tournamentId={id}
                 outgoing={participantSwapTarget}
                 onSwapped={handleParticipantSwapped}
+                onLoadingChange={setParticipantSwapLoading}
             />
 
             {/* Removing an entrant deletes their spot outright — unlike a swap, nothing inherits it. */}

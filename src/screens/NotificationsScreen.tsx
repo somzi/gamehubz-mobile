@@ -240,14 +240,16 @@ export default function NotificationsScreen() {
     const renderSectionHeader = useCallback(
         ({ section }: { section: SectionListData<NotificationItem, DaySection> }) => (
             <View
-                className="bg-background px-4 pt-4 pb-2 flex-row items-center"
-                style={{ gap: 10 }}
+                className="bg-background px-5 pt-5 pb-2 flex-row items-center"
+                style={{ gap: 8 }}
                 accessibilityRole="header"
             >
-                <Text className="text-slate-500 text-[11px] font-black uppercase tracking-[2px]">
+                <Text className="text-slate-400 text-[11px] font-black uppercase tracking-[1.6px]">
                     {section.title}
                 </Text>
-                <View className="flex-1 h-px bg-white/5" />
+                <Text className="text-slate-600 text-[11px] font-bold" style={{ fontVariant: ['tabular-nums'] }}>
+                    {section.data.length}
+                </Text>
             </View>
         ),
         [],
@@ -314,7 +316,7 @@ export default function NotificationsScreen() {
             {isPending ? (
                 // First load of a tab: rows in their real shape instead of a bare spinner.
                 <View
-                    className="px-4 pt-4"
+                    className="px-4 pt-5"
                     style={{ gap: ROW_GAP }}
                     accessible
                     accessibilityRole="progressbar"
@@ -330,8 +332,8 @@ export default function NotificationsScreen() {
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}
                     renderSectionHeader={renderSectionHeader}
-                    stickySectionHeadersEnabled
                     ItemSeparatorComponent={RowGap}
+                    stickySectionHeadersEnabled
                     ListEmptyComponent={<View className="flex-1 justify-center pb-24">{empty}</View>}
                     ListFooterComponent={footer}
                     onEndReached={handleEndReached}

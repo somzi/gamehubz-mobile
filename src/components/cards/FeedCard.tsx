@@ -128,7 +128,7 @@ export const FeedCard = React.memo(function FeedCard({
                             <PlayerAvatar src={hubAvatar} name={hubName} size="md" className="rounded-[10px] border-0" />
                         </View>
                         <View className="flex-1 min-w-0">
-                            <Text className="text-[17px] leading-[22px] font-black text-white tracking-tight" numberOfLines={1}>
+                            <Text className="text-[17px] leading-[22px] font-black text-white tracking-tight" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
                                 {tournament || hubName}
                             </Text>
                             {!!tournament && (

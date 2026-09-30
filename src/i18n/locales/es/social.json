@@ -14,8 +14,11 @@
   "subTabOutgoing": "Enviadas",
   "searchIncoming": "Buscar solicitudes recibidas...",
   "searchOutgoing": "Buscar solicitudes enviadas...",
+  "searchRequests": "Buscar solicitudes...",
   "noIncoming": "No hay solicitudes recibidas",
   "noOutgoing": "No hay solicitudes enviadas",
+  "noRequests": "No hay solicitudes de amistad",
+  "noRequestsMatched": "Ninguna solicitud coincide",
   "requestsHint": "Cuando lleguen nuevas solicitudes, aparecerán aquí",
   "wantsToConnect": "Quiere conectar",
   "requestSent": "Solicitud enviada",
@@ -26,6 +29,7 @@
   "noChatsMatched": "Ningún chat coincide",
   "noChatsYet": "Aún no hay chats",
   "chatsHint": "Abre el perfil de un amigo y toca mensaje para empezar",
+  "chatsHintRail": "Toca a un amigo arriba para empezar a chatear",
   "youPrefix": "Tú: ",
   "yesterday": "Ayer"
 }

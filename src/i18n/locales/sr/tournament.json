@@ -400,7 +400,6 @@
     "replacePlayer": "Zameni igrača",
     "replaceHint": "Zamena preuzima mesto, nosioca i sve dosadašnje rezultate.",
     "leaving": "Izlazi",
-    "checkingEligibility": "Provera uslova…",
     "limitPercent": "Limit {{limit}}%",
     "mustBeUnplayed": "Bez odigranih mečeva",
     "meterPlayed_one": "Odigrano: {{played}} od {{count}} meča",

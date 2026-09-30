@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { PressableScale } from '../ui/PressableScale';
-import { LinearGradient } from 'expo-linear-gradient';
-import { cn } from '../../lib/utils';
 import { Ionicons } from '@expo/vector-icons';
-import { PlayerAvatar } from '../ui/PlayerAvatar';
+import { RaisedCard } from '../ui/RaisedCard';
+import { HeroEmblem, EmblemImage } from '../ui/HeroCard';
+import { COLORS } from '../../lib/theme';
+import i18n from '../../i18n';
 
 interface HubCardProps {
     name: string;
@@ -25,6 +26,14 @@ interface HubCardProps {
 const NAME_SIZE = 17;
 const NAME_MIN_SIZE = 11;
 
+// The hub hero's emblem ring (HubProfileScreen): emerald → cyan.
+const HUB_EMBLEM_RING = ['#34D399', '#2DD4ED'] as const;
+
+const EMBLEM = 60;
+// The emblem minus its ring (2) and inset (3) on each side.
+const EMBLEM_IMAGE = EMBLEM - 10;
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
 /**
  * Largest size (up to NAME_SIZE) at which the longest word of the name still fits on one line of
  * the given width. Without it a long single word ("HUNDERTWASSER") gets broken mid-word across the
@@ -38,12 +47,10 @@ function nameSizeFor(name: string, width: number): number {
     return Math.max(NAME_MIN_SIZE, Math.min(NAME_SIZE, Math.floor(width / (longestWord * 0.72))));
 }
 
-const AVATAR_STYLES = [
-    { bg: 'rgba(129, 140, 248, 0.10)', border: 'rgba(129, 140, 248, 0.22)', icon: '#818CF8' },
-    { bg: 'rgba(52, 211, 153, 0.10)', border: 'rgba(52, 211, 153, 0.22)', icon: '#34D399' },
-    { bg: 'rgba(96, 165, 250, 0.10)', border: 'rgba(96, 165, 250, 0.22)', icon: '#60A5FA' },
-];
-
+/**
+ * A hub in a list: the emblem from the hub page (the same emerald → cyan ring) and, beside it,
+ * name, membership and numbers.
+ */
 // Memoized to avoid re-rendering the whole hubs list every time an unrelated piece of
 // state changes (search input, badge tick). Callers should pass a stable onClick.
 export const HubCard = React.memo(function HubCard({
@@ -55,36 +62,78 @@ export const HubCard = React.memo(function HubCard({
     isJoined,
     isVerified,
     className,
-    index = 0,
     badgeCount = 0,
 }: HubCardProps) {
     const { t } = useTranslation('common');
-    const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
     const [nameWidth, setNameWidth] = useState(0);
-    const nameSize = nameSizeFor(name, nameWidth);
-
-    // Joined hubs get an emerald-tinted gradient; non-joined get a subtle neutral indigo
-    const accentTint = isJoined ? 'rgba(16, 185, 129, 0.05)' : 'rgba(129, 140, 248, 0.04)';
+    // Room left for the name once the verified check (18 + 6 gap) sits beside it.
+    const nameSize = nameSizeFor(name, nameWidth - (isVerified ? 24 : 0));
 
     return (
-        <PressableScale onPress={onClick} className={className}>
-            <View
-                className="rounded-[24px] overflow-hidden"
-                style={{
-                    backgroundColor: '#131B2E',
-                    shadowColor: '#000000',
-                    shadowOpacity: 0.22,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 3 },
-                    elevation: 3,
-                }}
-            >
-                {/* Hairline border */}
-                <View
-                    pointerEvents="none"
-                    className="absolute inset-0 rounded-[24px]"
-                    style={{ borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}
-                />
+        <PressableScale
+            onPress={onClick}
+            className={className}
+            pressedScale={0.98}
+            accessibilityRole="button"
+            accessibilityLabel={[
+                name,
+                isJoined ? t('app.joined') : null,
+                `${numberOfUsers} ${t('app.fans')}`,
+                `${numberOfTournaments} ${t('common:nav.tournaments')}`,
+            ].filter(Boolean).join('. ')}
+        >
+            <RaisedCard style={styles.card}>
+                <View style={styles.content}>
+                    <HeroEmblem ringColors={HUB_EMBLEM_RING} glowColor={COLORS.primary} size={EMBLEM}>
+                        <EmblemImage src={avatarUrl} name={name} size={EMBLEM_IMAGE} radius={Math.round(EMBLEM * 0.31) - 5} />
+                    </HeroEmblem>
+
+                    {/* ─── Name, membership, numbers ─── */}
+                    <View className="flex-1 min-w-0" style={{ marginLeft: 14 }}>
+                        {isJoined && (
+                            <View className="flex-row items-center mb-1" style={{ gap: 4 }}>
+                                <Ionicons name="checkmark-circle" size={11} color={COLORS.primaryBright} />
+                                <Text
+                                    className="shrink text-[10.5px] font-black uppercase tracking-[1.5px]"
+                                    style={{ color: COLORS.primaryBright }}
+                                    numberOfLines={1}
+                                >
+                                    {t('app.joined')}
+                                </Text>
+                            </View>
+                        )}
+
+                        <View
+                            className="flex-row items-center"
+                            style={{ gap: 6 }}
+                            onLayout={(e) => setNameWidth(e.nativeEvent.layout.width)}
+                        >
+                            {/* Sized so the longest word stays whole on one line, then shrunk further
+                                if the whole name still needs more than two lines. */}
+                            <Text
+                                className="text-white font-black tracking-tight flex-shrink"
+                                style={{ fontSize: nameSize, lineHeight: Math.round(nameSize * 1.2) }}
+                                numberOfLines={2}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.75}
+                            >
+                                {name}
+                            </Text>
+                            {isVerified && (
+                                <View className="w-[18px] h-[18px] rounded-full bg-sky-500 items-center justify-center">
+                                    <Ionicons name="checkmark" size={12} color="#fff" />
+                                </View>
+                            )}
+                        </View>
+
+                        <View className="flex-row flex-wrap items-center mt-1.5" style={{ columnGap: 14, rowGap: 4 }}>
+                            <HubStat icon="people" value={numberOfUsers} label={t('app.fans')} />
+                            <HubStat icon="trophy" value={numberOfTournaments} label={t('common:nav.tournaments')} />
+                        </View>
+                    </View>
+
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.slate500} style={{ marginLeft: 8 }} />
+                </View>
 
                 {/* Pending-approvals badge — sits inside the card's top-right corner
                     so it isn't clipped by FlatList's removeClippedSubviews. */}
@@ -108,144 +157,33 @@ export const HubCard = React.memo(function HubCard({
                         </Text>
                     </View>
                 )}
-
-                <View className="p-5">
-                    {/* Top row */}
-                    <View className="flex-row items-center gap-4">
-                        <View
-                            className="w-14 h-14 rounded-2xl items-center justify-center overflow-hidden"
-                            style={{
-                                backgroundColor: avatarStyle.bg,
-                                borderWidth: 1,
-                                borderColor: avatarStyle.border,
-                            }}
-                        >
-                            {avatarUrl ? (
-                                <PlayerAvatar
-                                    name={name}
-                                    src={avatarUrl}
-                                    size="lg"
-                                    className="w-full h-full rounded-2xl border-0"
-                                />
-                            ) : (
-                                <Ionicons name="people" size={26} color={avatarStyle.icon} />
-                            )}
-                        </View>
-
-                        <View className="flex-1 min-w-0 pr-2" onLayout={(e) => setNameWidth(e.nativeEvent.layout.width - 34)}>
-                            <View className="flex-row items-center" style={{ gap: 6 }}>
-                                {/* Sized so the longest word stays whole on one line, then shrunk further
-                                    if the whole name still needs more than two lines. */}
-                                <Text
-                                    className="text-white font-black tracking-tight flex-shrink"
-                                    style={{ fontSize: nameSize, lineHeight: Math.round(nameSize * 1.2) }}
-                                    numberOfLines={2}
-                                    adjustsFontSizeToFit
-                                    minimumFontScale={0.75}
-                                >
-                                    {name}
-                                </Text>
-                                {isVerified && (
-                                    <View className="w-5 h-5 rounded-full bg-sky-500 items-center justify-center">
-                                        <Ionicons name="checkmark" size={13} color="#fff" />
-                                    </View>
-                                )}
-                            </View>
-                        </View>
-
-                        {isJoined && (
-                            <View className="rounded-full overflow-hidden">
-                                <LinearGradient
-                                    colors={['rgba(16, 185, 129, 0.20)', 'rgba(16, 185, 129, 0.08)']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 0, y: 1 }}
-                                    style={{
-                                        paddingHorizontal: 10,
-                                        paddingVertical: 5,
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 5,
-                                    }}
-                                >
-                                    <View
-                                        pointerEvents="none"
-                                        style={{
-                                            position: 'absolute',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            borderWidth: 1,
-                                            borderColor: 'rgba(16, 185, 129, 0.32)',
-                                            borderRadius: 999,
-                                        }}
-                                    />
-                                    <Ionicons name="checkmark-circle" size={11} color="#34D399" />
-                                    <Text
-                                        className="text-[10px] font-black uppercase text-emerald-300"
-                                        style={{ letterSpacing: 1.4 }}
-                                    >
-                                        {t('app.joined')}
-                                    </Text>
-                                </LinearGradient>
-                            </View>
-                        )}
-                    </View>
-
-                    {/* Divider */}
-                    <View
-                        style={{
-                            height: 1,
-                            backgroundColor: 'rgba(255,255,255,0.05)',
-                            marginVertical: 16,
-                        }}
-                    />
-
-                    {/* Bottom row */}
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-row items-center gap-2.5">
-                            <View
-                                className="flex-row items-center px-3 py-1.5 rounded-xl"
-                                style={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.05)',
-                                }}
-                            >
-                                <Ionicons name="people-outline" size={13} color="#34D399" />
-                                <Text className="text-[11px] font-black text-slate-300 ml-1.5">
-                                    {numberOfUsers} <Text className="text-slate-500 font-bold">{t('app.fans')}</Text>
-                                </Text>
-                            </View>
-                            <View
-                                className="flex-row items-center px-3 py-1.5 rounded-xl"
-                                style={{
-                                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.05)',
-                                }}
-                            >
-                                <Ionicons name="trophy-outline" size={13} color="#A5B4FC" />
-                                <Text className="text-[11px] font-black text-slate-300 ml-1.5">
-                                    {numberOfTournaments} <Text className="text-slate-500 font-bold">{t('common:nav.tournaments')}</Text>
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View
-                            className="w-9 h-9 rounded-full items-center justify-center"
-                            style={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(255, 255, 255, 0.06)',
-                            }}
-                        >
-                            <Ionicons name="chevron-forward" size={14} color="#94A3B8" />
-                        </View>
-                    </View>
-                </View>
-            </View>
-
+            </RaisedCard>
         </PressableScale>
     );
+});
+
+function HubStat({ icon, value, label }: { icon: keyof typeof Ionicons.glyphMap; value: number; label: string }) {
+    return (
+        <View className="flex-row items-center" style={{ gap: 5 }}>
+            <Ionicons name={icon} size={12} color={COLORS.slate400} />
+            <Text className="text-[13px] font-black text-white" style={TABULAR} numberOfLines={1}>
+                {(value || 0).toLocaleString(i18n.language)}{' '}
+                <Text className="text-[12px] font-semibold text-slate-500">{label}</Text>
+            </Text>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    card: {
+        minHeight: 88,
+        justifyContent: 'center',
+    },
+    content: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 14,
+        paddingRight: 12,
+        paddingVertical: 14,
+    },
 });

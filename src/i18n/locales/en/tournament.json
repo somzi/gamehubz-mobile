@@ -395,7 +395,6 @@
     "replacePlayer": "Replace player",
     "replaceHint": "The replacement inherits the spot, the seed and every result so far.",
     "leaving": "Leaving",
-    "checkingEligibility": "Checking eligibility…",
     "limitPercent": "Limit {{limit}}%",
     "mustBeUnplayed": "Must be unplayed",
     "meterPlayed_one": "{{played}} of {{count}} match played",

@@ -14,8 +14,11 @@
   "subTabOutgoing": "Wysłane",
   "searchIncoming": "Szukaj otrzymanych zaproszeń...",
   "searchOutgoing": "Szukaj wysłanych zaproszeń...",
+  "searchRequests": "Szukaj zaproszeń...",
   "noIncoming": "Brak otrzymanych zaproszeń",
   "noOutgoing": "Brak wysłanych zaproszeń",
+  "noRequests": "Brak zaproszeń do znajomych",
+  "noRequestsMatched": "Brak pasujących zaproszeń",
   "requestsHint": "Nowe zaproszenia pojawią się tutaj",
   "wantsToConnect": "Chce dodać Cię do znajomych",
   "requestSent": "Zaproszenie wysłane",
@@ -26,6 +29,7 @@
   "noChatsMatched": "Brak pasujących czatów",
   "noChatsYet": "Nie masz jeszcze czatów",
   "chatsHint": "Otwórz profil znajomego i naciśnij Wiadomość, aby zacząć",
+  "chatsHintRail": "Dotknij znajomego powyżej, aby zacząć rozmowę",
   "youPrefix": "Ty: ",
   "yesterday": "Wczoraj"
 }

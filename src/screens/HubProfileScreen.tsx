@@ -741,91 +741,137 @@ export default function HubProfileScreen() {
                 {/* ─── MEMBERS TAB ─── */}
                 {/* ═══════════════════════════════════════════ */}
                 {hubTab === 'members' && (
-                    <View className="px-4 pb-12">
+                    <View className="px-5 pb-12">
                         {(isFollowing || isOwner) ? (
                             <>
-                                <View className="mb-4">
-                                    <View className="flex-row items-center bg-[#0D1525] px-3 rounded-xl border border-white/5">
-                                        <Ionicons name="search-outline" size={18} color="#475569" />
-                                        <TextInput
-                                            className="flex-1 h-11 text-white ml-2 text-sm"
-                                            placeholder={t('profile.searchMembers')}
-                                            placeholderTextColor="#475569"
-                                            value={memberSearch}
-                                            onChangeText={setMemberSearch}
-                                            autoCorrect={false}
-                                            autoCapitalize="none"
-                                        />
-                                        {memberSearch.length > 0 && (
-                                            <Pressable onPress={() => setMemberSearch('')} hitSlop={10}>
-                                                <Ionicons name="close-circle" size={18} color="#475569" />
-                                            </Pressable>
-                                        )}
-                                    </View>
+                                {/* Search, on the same card surface as the list */}
+                                <View
+                                    className="flex-row items-center px-3.5 h-12 rounded-2xl mb-4"
+                                    style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.11)' }}
+                                >
+                                    <Ionicons name="search" size={17} color={COLORS.slate500} />
+                                    <TextInput
+                                        className="flex-1 h-12 text-white ml-2.5 text-[14px]"
+                                        placeholder={t('profile.searchMembers')}
+                                        placeholderTextColor={COLORS.slate500}
+                                        value={memberSearch}
+                                        onChangeText={setMemberSearch}
+                                        autoCorrect={false}
+                                        autoCapitalize="none"
+                                    />
+                                    {memberSearch.length > 0 && (
+                                        <Pressable onPress={() => setMemberSearch('')} hitSlop={10} accessibilityRole="button">
+                                            <Ionicons name="close-circle" size={18} color={COLORS.slate500} />
+                                        </Pressable>
+                                    )}
                                 </View>
 
-                                <View className="bg-card rounded-2xl border border-white/5 overflow-hidden">
+                                {/* How many there are, like a day header in the inbox */}
+                                {!memberSearch && (
+                                    <View className="flex-row items-center px-1 mb-2" style={{ gap: 8 }}>
+                                        <Text className="text-slate-400 text-[11px] font-black uppercase tracking-[1.6px]">
+                                            {t('profile.membersLabel')}
+                                        </Text>
+                                        <Text className="text-slate-600 text-[11px] font-bold" style={{ fontVariant: ['tabular-nums'] }}>
+                                            {(hubData.numberOfUsers || 0).toLocaleString(i18n.language)}
+                                        </Text>
+                                    </View>
+                                )}
+
+                                {/* The roster: one panel, a row per member */}
+                                <Panel>
                                     {members.map((member, index) => {
                                         const mId = member.userId || member.UserId;
                                         const mName = member.username || member.Username || tCommon('unknown');
                                         const mAvatar = member.avatarUrl || member.AvatarUrl;
                                         const role = member.hubRole ?? member.HubRole ?? HubRole.HubMember;
                                         const roleMeta = getRoleMeta(role);
-                                        const isLast = index === members.length - 1;
+                                        // Plain members carry no pill — on a roster it would repeat on every row.
+                                        const hasRank = role !== HubRole.HubMember;
+                                        const isMe = !!user?.id && !!mId && user.id.toLowerCase() === String(mId).toLowerCase();
+
                                         return (
                                             <Pressable
                                                 key={mId || `m-${index}`}
                                                 onPress={() => mId && navigation.navigate('PlayerProfile', { id: mId })}
-                                                className={`flex-row items-center justify-between px-4 py-3 ${isLast ? '' : 'border-b border-white/5'}`}
-                                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                                                accessibilityRole="button"
+                                                className={`flex-row items-center pl-4 pr-3 py-2.5 active:opacity-70 ${index === 0 ? '' : 'border-t border-white/[0.05]'} ${isMe ? 'bg-primary/[0.07]' : ''}`}
                                             >
-                                                <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                                    <PlayerAvatar name={mName} src={mAvatar} size="md" />
-                                                    <Text className="text-white font-semibold text-sm flex-1" numberOfLines={1}>
+                                                {isMe && (
+                                                    <View
+                                                        pointerEvents="none"
+                                                        style={{
+                                                            position: 'absolute', left: 0, top: 10, bottom: 10, width: 3,
+                                                            backgroundColor: COLORS.primary, borderTopRightRadius: 3, borderBottomRightRadius: 3,
+                                                            shadowColor: COLORS.primary, shadowOpacity: 0.7, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
+                                                        }}
+                                                    />
+                                                )}
+                                                <View
+                                                    style={{
+                                                        borderRadius: 999,
+                                                        padding: 1.5,
+                                                        borderWidth: 1.5,
+                                                        borderColor: hasRank ? roleMeta.iconColor + '80' : isMe ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)',
+                                                    }}
+                                                >
+                                                    <PlayerAvatar name={mName} src={mAvatar} size="md" className="border-0" />
+                                                </View>
+                                                <View className="flex-1 flex-row items-center ml-3" style={{ gap: 6 }}>
+                                                    <Text className="shrink text-[15px] font-black text-white" numberOfLines={1}>
                                                         {mName}
                                                     </Text>
+                                                    {isMe && (
+                                                        <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
+                                                            <Text className="text-[9px] font-black uppercase tracking-wider text-emerald-300">{tCommon('app.me')}</Text>
+                                                        </View>
+                                                    )}
                                                 </View>
-                                                <View className={`flex-row items-center px-2 py-1 rounded-full ${roleMeta.bg}`} style={{ gap: 4 }}>
-                                                    <Ionicons name={roleMeta.icon as any} size={10} color={roleMeta.iconColor} />
-                                                    <Text className={`text-[10px] font-black uppercase tracking-wide ${roleMeta.color}`}>
-                                                        {roleMeta.label}
-                                                    </Text>
-                                                </View>
+                                                {hasRank && (
+                                                    <View className={`flex-row items-center px-2 py-1 rounded-full ml-2 ${roleMeta.bg}`} style={{ gap: 4 }}>
+                                                        <Ionicons name={roleMeta.icon as any} size={10} color={roleMeta.iconColor} />
+                                                        <Text className={`text-[10px] font-black uppercase tracking-wide ${roleMeta.color}`}>
+                                                            {roleMeta.label}
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                                <Ionicons name="chevron-forward" size={14} color={COLORS.slate600} style={{ marginLeft: 6 }} />
                                             </Pressable>
                                         );
                                     })}
 
                                     {isMembersLoading && (
-                                        <View className="py-6 items-center">
-                                            <ActivityIndicator size="small" color="#818CF8" />
+                                        <View className={`py-6 items-center ${members.length > 0 ? 'border-t border-white/[0.05]' : ''}`}>
+                                            <ActivityIndicator size="small" color={COLORS.info} />
                                         </View>
                                     )}
 
                                     {!isMembersLoading && members.length === 0 && (
-                                        <View className="py-12 items-center px-6">
-                                            <View className="w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-3">
-                                                <Ionicons name="people-outline" size={24} color="#334155" />
+                                        <View className="py-10 items-center px-6">
+                                            <View className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-3">
+                                                <Ionicons name={memberSearch ? 'search-outline' : 'people-outline'} size={22} color={COLORS.slate500} />
                                             </View>
-                                            <Text className="text-sm font-semibold text-slate-500">
+                                            <Text className="text-sm font-semibold text-slate-400">
                                                 {memberSearch ? t('profile.noMatches') : t('profile.noMembersYet')}
                                             </Text>
                                             {memberSearch ? (
-                                                <Text className="text-xs text-slate-600 mt-1">{t('profile.tryDifferentSearch')}</Text>
+                                                <Text className="text-xs text-slate-500 mt-1">{t('profile.tryDifferentSearch')}</Text>
                                             ) : null}
                                         </View>
                                     )}
-                                </View>
+                                </Panel>
                             </>
                         ) : (
-                            <View className="bg-card rounded-2xl border border-white/5 overflow-hidden">
-                                <View className="py-12 items-center justify-center px-6">
-                                    <View className="w-16 h-16 rounded-2xl bg-background items-center justify-center mb-4 border border-white/5">
-                                        <Ionicons name="lock-closed-outline" size={28} color="#334155" />
-                                    </View>
-                                    <Text className="text-white font-black text-lg text-center">{t('profile.privateContent')}</Text>
-                                    <Text className="text-slate-500 mt-2 text-center text-sm px-6">{t('profile.privateMembersHint')}</Text>
+                            <Panel style={{ paddingVertical: 40, paddingHorizontal: 24, alignItems: 'center' }}>
+                                <View
+                                    className="w-14 h-14 rounded-2xl items-center justify-center mb-4"
+                                    style={{ backgroundColor: 'rgba(251,191,36,0.1)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)' }}
+                                >
+                                    <Ionicons name="lock-closed" size={24} color="#FBBF24" />
                                 </View>
-                            </View>
+                                <Text className="text-white font-black text-lg text-center">{t('profile.privateContent')}</Text>
+                                <Text className="text-slate-400 mt-2 text-center text-sm px-4">{t('profile.privateMembersHint')}</Text>
+                            </Panel>
                         )}
                     </View>
                 )}

@@ -19,6 +19,8 @@ import { getSocialUrl, withDiscordProfileLink } from '../lib/social';
 import { SharePlayerCardModal } from '../components/modals/SharePlayerCardModal';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
+import { EmptyState } from '../components/ui/EmptyState';
+import { COLORS } from '../lib/theme';
 
 
 // Module scope: keys, not text — labels are resolved per render in the component.
@@ -301,10 +303,7 @@ export default function ProfileScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
-                                        <Ionicons name="trophy-outline" size={48} color="#1E293B" />
-                                        <Text className="text-slate-600 mt-4 text-center text-sm">{t('noTournamentsFound')}</Text>
-                                    </View>
+                                    <EmptyState icon="trophy-outline" color={COLORS.warning} title={t('noTournamentsFound')} />
                                 )}
                             </View>
                         )}
@@ -341,10 +340,7 @@ export default function ProfileScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
-                                        <Ionicons name="documents-outline" size={48} color="#1E293B" />
-                                        <Text className="text-slate-600 mt-4 text-center text-sm">{t('noMatchHistory')}</Text>
-                                    </View>
+                                    <EmptyState icon="game-controller-outline" color={COLORS.primary} title={t('noMatchHistory')} />
                                 )}
                             </View>
                         )}

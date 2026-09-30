@@ -395,7 +395,6 @@
     "replacePlayer": "Substituir jogador",
     "replaceHint": "O substituto herda a vaga, a cabeça de chave e todos os resultados até agora.",
     "leaving": "Sai",
-    "checkingEligibility": "Verificando elegibilidade…",
     "limitPercent": "Limite {{limit}}%",
     "mustBeUnplayed": "Não pode ter jogado",
     "meterPlayed_one": "{{played}} de {{count}} partida jogada",

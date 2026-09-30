@@ -5,8 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
-import { ProfileHeaderCard } from '../components/profile/ProfileHeaderCard';
+import { ProfileHeaderCard, ProfileHeaderSkeleton } from '../components/profile/ProfileHeaderCard';
 import { ProfileStatsTab } from '../components/profile/ProfileStatsTab';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { COLORS } from '../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -200,17 +203,31 @@ export default function PlayerProfileScreen() {
         }
     };
 
+    // First visit to this player: the page in its own shape instead of a spinner, with the same top
+    // bar so the back button sits exactly where it will be.
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-row items-center px-6 py-2">
-                    <Pressable onPress={() => navigation.goBack()} className="p-2 -ml-2">
-                        <Ionicons name="arrow-back" size={24} color="white" />
+                <View className="flex-row items-center justify-between px-6 py-2">
+                    <Pressable
+                        onPress={() => navigation.goBack()}
+                        accessibilityRole="button"
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10"
+                    >
+                        <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                     </Pressable>
+                    <Text className="text-lg font-black text-white tracking-tight">{t('playerProfile')}</Text>
+                    <View className="w-10 h-10" />
                 </View>
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-slate-500 mt-4">{t('loadingStats')}</Text>
+                <View accessibilityLabel={t('loadingStats')}>
+                    <ProfileHeaderSkeleton className="mx-5 mt-3" />
+                    <View className="px-5 mt-3">
+                        <Skeleton height={48} radius={16} />
+                    </View>
+                    <View className="px-5 mt-4" style={{ gap: 12 }}>
+                        <Skeleton height={46} radius={16} />
+                        <Skeleton height={112} radius={20} />
+                    </View>
                 </View>
             </SafeAreaView>
         );
@@ -352,10 +369,7 @@ export default function PlayerProfileScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
-                                        <Ionicons name="trophy-outline" size={48} color="#1E293B" />
-                                        <Text className="text-slate-600 mt-4 text-center text-sm">{t('noTournamentsFound')}</Text>
-                                    </View>
+                                    <EmptyState icon="trophy-outline" color={COLORS.warning} title={t('noTournamentsFound')} />
                                 )}
                             </View>
                         )}
@@ -392,10 +406,7 @@ export default function PlayerProfileScreen() {
                                         )}
                                     </>
                                 ) : (
-                                    <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
-                                        <Ionicons name="documents-outline" size={48} color="#1E293B" />
-                                        <Text className="text-slate-600 mt-4 text-center text-sm">{t('noMatchHistory')}</Text>
-                                    </View>
+                                    <EmptyState icon="game-controller-outline" color={COLORS.primary} title={t('noMatchHistory')} />
                                 )}
                             </View>
                         )}

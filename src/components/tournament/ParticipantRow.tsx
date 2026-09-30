@@ -16,6 +16,8 @@ export interface ParticipantRowProps {
     canRemove: boolean;
     /** This row's own removal is in flight. */
     isProcessing: boolean;
+    /** The swap sheet for this row is loading before it opens. */
+    isOpeningSwap: boolean;
     /** Some row's action is in flight — every row's buttons go inert. */
     actionsDisabled: boolean;
     onOpenProfile: (userId: string) => void;
@@ -44,6 +46,7 @@ export const ParticipantRow = React.memo(function ParticipantRow({
     canSwap,
     canRemove,
     isProcessing,
+    isOpeningSwap,
     actionsDisabled,
     onOpenProfile,
     onSwap,
@@ -120,7 +123,11 @@ export const ParticipantRow = React.memo(function ParticipantRow({
                             accessibilityLabel={t('swap.swapThePlayer')}
                             className="w-9 h-9 rounded-xl items-center justify-center bg-indigo-400/10 border border-indigo-400/25 active:opacity-60"
                         >
-                            <Ionicons name="swap-horizontal" size={16} color="#818CF8" />
+                            {isOpeningSwap ? (
+                                <ActivityIndicator size="small" color="#818CF8" />
+                            ) : (
+                                <Ionicons name="swap-horizontal" size={16} color="#818CF8" />
+                            )}
                         </Pressable>
                     )}
                     {canRemove && (
