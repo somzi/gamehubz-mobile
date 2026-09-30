@@ -415,6 +415,9 @@ export default function HubProfileScreen() {
                             date={(tournament.status === 0 && tournament.registrationOpensAt)
                                 ? formatLocalDateTime(tournament.registrationOpensAt)
                                 : formatDateSafe(tournament.startDate)}
+                            dateIso={(tournament.status === 0 && tournament.registrationOpensAt)
+                                ? tournament.registrationOpensAt
+                                : tournament.startDate}
                             region={tournament.region === 1 ? tAuth('region.northAmerica') : tAuth('region.europe')}
                             prizePool={`${getCurrencySymbol(tournament.prizeCurrency)}${tournament.prize}`}
                             players={new Array(tournament.numberOfParticipants || 0).fill({})}

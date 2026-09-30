@@ -353,6 +353,7 @@ export default function PlayerProfileScreen() {
                                                 name={row.name || row.title}
                                                 status={getTournamentStatus(row.status)}
                                                 date={formatDateSafe(row.startDate, tCommon('app.notAvailableShort'))}
+                                                dateIso={row.startDate}
                                                 region={t('regionGlobal')}
                                                 prizePool={`${getCurrencySymbol(row.prizeCurrency)}${row.prize}`}
                                                 players={new Array(row.numberOfParticipants || 0).fill({})}

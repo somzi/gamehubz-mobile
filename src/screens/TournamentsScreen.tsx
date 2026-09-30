@@ -181,6 +181,7 @@ export default function TournamentsScreen() {
                 date={cardStatus === 'scheduled'
                     ? formatLocalDateTime(opensAt)
                     : formatDateSafe(tournament.StartDate || tournament.startDate)}
+                dateIso={cardStatus === 'scheduled' ? opensAt : (tournament.StartDate || tournament.startDate)}
                 region={getRegionName(tournament.Region ?? tournament.region)}
                 prizePool={`${getCurrencySymbol(tournament.PrizeCurrency ?? tournament.prizeCurrency)}${tournament.Prize ?? tournament.prize}`}
                 players={new Array(tournament.NumberOfParticipants ?? tournament.numberOfParticipants ?? tournament.participantsCount ?? tournament.tournamentParticipants?.length ?? 0).fill({})}
