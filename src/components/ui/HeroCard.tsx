@@ -3,7 +3,9 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
+import { Image } from 'expo-image';
 import { COLORS } from '../../lib/theme';
+import { getOptimizedCloudinaryUrl } from '../../lib/image';
 
 type GradientStops = readonly [string, string, ...string[]];
 
@@ -11,6 +13,11 @@ const FRAME_RADIUS = 26;
 const BANNER_HEIGHT = 84;
 // 80 image + 3 inset + 2 ring on each side.
 const EMBLEM_SIZE = 90;
+// Compact hero (a hub): a lower banner and a 68 image in the same ring.
+const COMPACT_BANNER_HEIGHT = 68;
+export const COMPACT_EMBLEM_SIZE = 78;
+/** The image inside a compact emblem: the emblem minus its ring (2) and inset (3) on each side. */
+export const COMPACT_EMBLEM_IMAGE = COMPACT_EMBLEM_SIZE - 10;
 
 /**
  * The in-app counterpart of the share cards: a card inside a gradient hairline. Hubs and
@@ -35,14 +42,16 @@ export function HeroFrame({ hairline, children, className }: {
  * Gradient banner with the share cards' concentric rings and top shine. With children it grows to
  * fit them, so it doubles as a cover the content sits on.
  */
-export function HeroBanner({ colors, watermark, children }: {
+export function HeroBanner({ colors, watermark, height = BANNER_HEIGHT, children }: {
     colors: GradientStops;
+    /** Minimum height; content on the banner can make it taller. */
+    height?: number;
     /** A faint icon at the centre of the rings (the tournament cover's trophy). */
     watermark?: keyof typeof Ionicons.glyphMap;
     children?: React.ReactNode;
 }) {
     return (
-        <View style={{ minHeight: BANNER_HEIGHT, overflow: 'hidden' }}>
+        <View style={{ minHeight: height, overflow: 'hidden' }}>
             <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.8 }} style={StyleSheet.absoluteFill} />
             <Svg width={220} height={220} style={styles.rings}>
                 <Circle cx={110} cy={110} r={52} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={1} />
@@ -63,16 +72,56 @@ export function HeroBanner({ colors, watermark, children }: {
 }
 
 /** Rounded-square emblem in a gradient ring, with a soft glow on iOS. */
-export function HeroEmblem({ ringColors, glowColor, children }: {
+export function HeroEmblem({ ringColors, glowColor, size = EMBLEM_SIZE, children }: {
     ringColors: GradientStops;
     glowColor: string;
+    size?: number;
     children: React.ReactNode;
 }) {
+    // Corner radius scales with the emblem so the compact one keeps the same shape.
+    const radius = Math.round(size * 0.31);
     return (
-        <View style={[styles.emblemGlow, { shadowColor: glowColor }]}>
-            <LinearGradient colors={ringColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emblemRing}>
-                <View style={styles.emblemInset}>{children}</View>
+        <View style={[styles.emblemGlow, { shadowColor: glowColor, borderRadius: radius }]}>
+            <LinearGradient
+                colors={ringColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.emblemRing, { width: size, height: size, borderRadius: radius }]}
+            >
+                <View style={[styles.emblemInset, { borderRadius: radius - 2 }]}>{children}</View>
             </LinearGradient>
+        </View>
+    );
+}
+
+/**
+ * Logo or photo for an emblem at any size, with initials when there is no image. Asks Cloudinary for
+ * the displayed size (x2 for retina), like PlayerAvatar.
+ */
+export function EmblemImage({ src, name, size, radius }: {
+    src?: string | null;
+    name: string;
+    size: number;
+    radius: number;
+}) {
+    const uri = src ? getOptimizedCloudinaryUrl(src, size * 2) : '';
+    const initials = (name || '')
+        .split(' ')
+        .map((part) => part?.[0] || '')
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+
+    return (
+        <View
+            style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', backgroundColor: COLORS.cardElevated }}
+            className="items-center justify-center"
+        >
+            {uri ? (
+                <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" cachePolicy="memory-disk" transition={150} />
+            ) : (
+                <Text className="text-white font-black" style={{ fontSize: Math.round(size * 0.3) }}>{initials}</Text>
+            )}
         </View>
     );
 }
@@ -119,6 +168,8 @@ export function CoverPill({ label, dotColor, glow = false, icon, iconColor, tint
 /**
  * Identity hero (a hub, like the player header): banner, the emblem overlapping it, `aside` to its
  * right under the banner, then the content. `bannerAccessory` sits in the banner's top-right corner.
+ * `compact` lowers the banner and shrinks the emblem; pass the name as a start-aligned `aside` there
+ * so it rides beside the emblem instead of taking a row of its own.
  */
 export function HeroCard({
     hairline,
@@ -127,7 +178,9 @@ export function HeroCard({
     glowColor,
     emblem,
     aside,
+    asideAlign = 'end',
     bannerAccessory,
+    compact = false,
     children,
     className,
 }: {
@@ -137,19 +190,25 @@ export function HeroCard({
     glowColor: string;
     emblem: React.ReactNode;
     aside?: React.ReactNode;
+    asideAlign?: 'start' | 'end';
     bannerAccessory?: React.ReactNode;
-    children: React.ReactNode;
+    compact?: boolean;
+    children?: React.ReactNode;
     className?: string;
 }) {
     return (
         <HeroFrame hairline={hairline} className={className}>
-            <HeroBanner colors={banner}>
+            <HeroBanner colors={banner} height={compact ? COMPACT_BANNER_HEIGHT : BANNER_HEIGHT}>
                 {bannerAccessory ? <View style={styles.bannerAccessory}>{bannerAccessory}</View> : null}
             </HeroBanner>
-            <View style={styles.identity}>
+            <View style={compact ? styles.identityCompact : styles.identity}>
                 <View className="flex-row items-end" style={{ gap: 12 }}>
-                    <HeroEmblem ringColors={emblemRing} glowColor={glowColor}>{emblem}</HeroEmblem>
-                    {aside ? <View className="flex-1 items-end pb-1">{aside}</View> : null}
+                    <HeroEmblem ringColors={emblemRing} glowColor={glowColor} size={compact ? COMPACT_EMBLEM_SIZE : EMBLEM_SIZE}>
+                        {emblem}
+                    </HeroEmblem>
+                    {aside ? (
+                        <View className={`flex-1 pb-1 ${asideAlign === 'end' ? 'items-end' : 'items-start'}`}>{aside}</View>
+                    ) : null}
                 </View>
                 {children}
             </View>
@@ -196,21 +255,21 @@ const styles = StyleSheet.create({
         // The emblem sits half on the banner.
         marginTop: -EMBLEM_SIZE / 2,
     },
+    identityCompact: {
+        paddingHorizontal: 16,
+        paddingBottom: 14,
+        marginTop: -COMPACT_EMBLEM_SIZE / 2,
+    },
     emblemGlow: {
-        borderRadius: 28,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.35,
         shadowRadius: 14,
     },
     emblemRing: {
-        width: EMBLEM_SIZE,
-        height: EMBLEM_SIZE,
-        borderRadius: 28,
         padding: 2,
     },
     emblemInset: {
         flex: 1,
-        borderRadius: 26,
         padding: 3,
         backgroundColor: COLORS.card,
     },

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import { PressableScale } from '../ui/PressableScale';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +20,22 @@ interface HubCardProps {
     index?: number;
     /** Pending items the user has to approve in this hub — shown as a red corner badge. */
     badgeCount?: number;
+}
+
+const NAME_SIZE = 17;
+const NAME_MIN_SIZE = 11;
+
+/**
+ * Largest size (up to NAME_SIZE) at which the longest word of the name still fits on one line of
+ * the given width. Without it a long single word ("HUNDERTWASSER") gets broken mid-word across the
+ * two lines, because shrinking to fit only checks that the whole name fits in two lines.
+ * ~0.72em per character covers wide uppercase glyphs in the heavy system font.
+ */
+function nameSizeFor(name: string, width: number): number {
+    if (!width) return NAME_SIZE;
+    const longestWord = (name || '').split(/\s+/).reduce((max, w) => Math.max(max, w.length), 0);
+    if (!longestWord) return NAME_SIZE;
+    return Math.max(NAME_MIN_SIZE, Math.min(NAME_SIZE, Math.floor(width / (longestWord * 0.72))));
 }
 
 const AVATAR_STYLES = [
@@ -44,6 +60,8 @@ export const HubCard = React.memo(function HubCard({
 }: HubCardProps) {
     const { t } = useTranslation('common');
     const avatarStyle = AVATAR_STYLES[index % AVATAR_STYLES.length];
+    const [nameWidth, setNameWidth] = useState(0);
+    const nameSize = nameSizeFor(name, nameWidth);
 
     // Joined hubs get an emerald-tinted gradient; non-joined get a subtle neutral indigo
     const accentTint = isJoined ? 'rgba(16, 185, 129, 0.05)' : 'rgba(129, 140, 248, 0.04)';
@@ -114,11 +132,16 @@ export const HubCard = React.memo(function HubCard({
                             )}
                         </View>
 
-                        <View className="flex-1 min-w-0 pr-2">
+                        <View className="flex-1 min-w-0 pr-2" onLayout={(e) => setNameWidth(e.nativeEvent.layout.width - 34)}>
                             <View className="flex-row items-center" style={{ gap: 6 }}>
+                                {/* Sized so the longest word stays whole on one line, then shrunk further
+                                    if the whole name still needs more than two lines. */}
                                 <Text
-                                    className="text-white font-black text-lg tracking-tight leading-tight flex-shrink"
+                                    className="text-white font-black tracking-tight flex-shrink"
+                                    style={{ fontSize: nameSize, lineHeight: Math.round(nameSize * 1.2) }}
                                     numberOfLines={2}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.75}
                                 >
                                     {name}
                                 </Text>

@@ -23,7 +23,7 @@ import { getSocialUrl } from '../lib/social';
 import { ShareHubCardModal } from '../components/modals/ShareHubCardModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
-import { HeroCard, CoverPill } from '../components/ui/HeroCard';
+import { HeroCard, CoverPill, EmblemImage, COMPACT_EMBLEM_IMAGE } from '../components/ui/HeroCard';
 import { Panel, PanelTitle, StatCell, StatDivider, ExpandableText } from '../components/ui/Panel';
 import { COLORS } from '../lib/theme';
 import i18n, { dateLocale } from '../i18n';
@@ -540,17 +540,38 @@ export default function HubProfileScreen() {
                     return (
                         <HeroCard
                             className="mx-5 mt-3"
+                            compact
                             hairline={HUB_HAIRLINE}
                             banner={HUB_BANNER}
                             emblemRing={HUB_EMBLEM_RING}
                             glowColor={COLORS.primary}
                             emblem={
-                                <PlayerAvatar
+                                <EmblemImage
                                     name={hubData.name}
                                     src={hubData.avatarUrl || hubData.logoUrl}
-                                    size="xl"
-                                    className="rounded-[23px] border-0"
+                                    size={COMPACT_EMBLEM_IMAGE}
+                                    radius={19}
                                 />
+                            }
+                            // The name rides beside the logo, on one line, with the verified tick right after it.
+                            asideAlign="start"
+                            aside={
+                                <View className="flex-row items-center self-stretch" style={{ gap: 6 }}>
+                                    {/* One line always: a longer name shrinks to fit rather than wrap. */}
+                                    <Text
+                                        className="shrink text-[22px] leading-[27px] font-extrabold text-white tracking-tight"
+                                        numberOfLines={1}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.55}
+                                    >
+                                        {hubData.name}
+                                    </Text>
+                                    {isVerified && (
+                                        <View className="w-[18px] h-[18px] rounded-full bg-sky-500 items-center justify-center">
+                                            <Ionicons name="checkmark" size={12} color="#fff" />
+                                        </View>
+                                    )}
+                                </View>
                             }
                             // Who can get in, on the banner's corner
                             bannerAccessory={
@@ -562,25 +583,9 @@ export default function HubProfileScreen() {
                                 />
                             }
                         >
-                            <View className="flex-row items-center mt-3" style={{ gap: 8 }}>
-                                <Text
-                                    className="shrink text-[26px] leading-[32px] font-black text-white tracking-tight"
-                                    numberOfLines={2}
-                                    adjustsFontSizeToFit
-                                    minimumFontScale={0.7}
-                                >
-                                    {hubData.name}
-                                </Text>
-                                {isVerified && (
-                                    <View className="w-6 h-6 rounded-full bg-sky-500 items-center justify-center">
-                                        <Ionicons name="checkmark" size={15} color="#fff" />
-                                    </View>
-                                )}
-                            </View>
-
                             {/* The hub's links, centred under a hairline */}
                             {socials.length > 0 && (
-                                <View className="mt-4 pt-4 border-t border-white/[0.06] items-center">
+                                <View className="mt-3.5 pt-3 border-t border-white/[0.06] items-center">
                                     <SocialLinks links={socials} className="justify-center" />
                                 </View>
                             )}
@@ -620,7 +625,7 @@ export default function HubProfileScreen() {
                                         : "#fff";
 
                                 return (
-                                    <View className="mt-4">
+                                    <View className="mt-3">
                                         <Pressable
                                             onPress={handleFollowToggle}
                                             disabled={isRequestingJoin}
