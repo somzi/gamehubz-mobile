@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import i18n, { dateLocale } from '../i18n';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, TextInput, Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +13,7 @@ import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, cn } from '../lib/utils';
 import { Friend, FriendRequest, DirectChat, BadgeCounts } from '../types/social';
-import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { SocialAvatar } from '../components/social/SocialAvatar';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { Panel } from '../components/ui/Panel';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -638,7 +638,7 @@ function RowAction({
 }
 
 // ═════════════════════════════════════════════════════════════════════
-// CHATS TAB — a friends rail to start one, then every conversation in its own card
+// CHATS TAB — friends you haven't written to yet, then the conversations in one panel
 // ═════════════════════════════════════════════════════════════════════
 
 function ChatsTab({ navigation }: { navigation: NavProp }) {
@@ -660,17 +660,13 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
         useCallback(() => Promise.all([chatsQuery.refetch(), friendsQuery.refetch()]), [chatsQuery.refetch, friendsQuery.refetch]),
     );
 
-    // The rail is ordered by who you talk to: unread first, then the latest conversation,
-    // then friends you haven't written to yet. Only built from the unfiltered chat list.
+    // The rail is for starting a conversation: only friends with none in the list below, so it
+    // never repeats the top of that list. Built from the unfiltered chat list only.
     const chatByUser = useUnreadByUser(debounced ? EMPTY_CHATS : chats);
-    const railFriends = useMemo(() => {
-        const lastAt = (f: Friend) => {
-            const at = chatByUser.get(f.userId.toLowerCase())?.lastMessageAt;
-            return at ? parseUtcDate(at).getTime() : 0;
-        };
-        const unread = (f: Friend) => ((chatByUser.get(f.userId.toLowerCase())?.unreadCount ?? 0) > 0 ? 1 : 0);
-        return [...friends].sort((a, b) => unread(b) - unread(a) || lastAt(b) - lastAt(a));
-    }, [friends, chatByUser]);
+    const railFriends = useMemo(
+        () => friends.filter((f) => !chatByUser.has(f.userId.toLowerCase())),
+        [friends, chatByUser],
+    );
 
     const openChat = useCallback((chat: DirectChat) => {
         navigation.navigate('DirectChat', {
@@ -683,6 +679,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
             },
         });
     }, [navigation]);
+    const startChat = useCallback((friend: Friend) => openChatWith(navigation, friend), [navigation]);
 
     const showRail = !searching && railFriends.length > 0;
 
@@ -693,9 +690,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                 <ListLabelSkeleton />
                 <RailSkeleton />
                 <ListLabelSkeleton />
-                <View style={{ gap: 8 }}>
-                    {[0, 1, 2, 3].map((i) => <ChatCardSkeleton key={i} />)}
-                </View>
+                <ChatRowsSkeleton rows={5} />
             </View>
         );
     }
@@ -703,15 +698,15 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
     return (
         <FlatList
             keyboardShouldPersistTaps="handled"
-            data={chats}
-            keyExtractor={(item) => item.id}
+            data={chats.length > 0 ? [chats] : []}
+            keyExtractor={() => 'chats'}
             contentContainerStyle={LIST_PADDING}
             ListHeaderComponent={
                 <>
                     <SearchBar value={search} onChange={setSearch} placeholder={t('searchChats')} />
                     {showRail && (
                         <View className="mb-5">
-                            <ListLabel title={t('tabFriends')} />
+                            <ListLabel title={t('startChat')} />
                             <FlatList
                                 horizontal
                                 data={railFriends}
@@ -720,17 +715,8 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                                 keyboardShouldPersistTaps="handled"
                                 // Bleeds to the screen edges so the rail reads as scrollable.
                                 style={{ marginHorizontal: -20 }}
-                                contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-                                renderItem={({ item: friend }) => {
-                                    const chat = chatByUser.get(friend.userId.toLowerCase());
-                                    return (
-                                        <RailFriend
-                                            friend={friend}
-                                            unread={(chat?.unreadCount ?? 0) > 0}
-                                            onPress={() => openChatWith(navigation, friend, chat)}
-                                        />
-                                    );
-                                }}
+                                contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}
+                                renderItem={({ item: friend }) => <RailFriend friend={friend} onPress={startChat} />}
                             />
                         </View>
                     )}
@@ -751,71 +737,79 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
                     />
                 )
             }
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            // Every conversation is a row of one panel, like the friends roster.
             renderItem={({ item }) => (
-                <ChatCard chat={item} fromMe={!!user?.id && item.lastMessageSenderId === user.id} onPress={openChat} />
+                <Panel>
+                    {item.map((chat, index) => (
+                        <ChatRow
+                            key={chat.id}
+                            chat={chat}
+                            first={index === 0}
+                            fromMe={!!user?.id && chat.lastMessageSenderId === user.id}
+                            onPress={openChat}
+                        />
+                    ))}
+                </Panel>
             )}
         />
     );
 }
 
-const RAIL_ITEM_WIDTH = 64;
+const RAIL_ITEM_WIDTH = 72;
+const RAIL_AVATAR = 56;
+
+/** First word of a name: "Teodor Ivanov" becomes "Teodor"; a single gamer tag stays whole. */
+function firstWord(name: string): string {
+    return (name || '').trim().split(/\s+/)[0] || name;
+}
 
 const RailFriend = React.memo(function RailFriend({
     friend,
-    unread,
     onPress,
 }: {
     friend: Friend;
-    unread: boolean;
-    onPress: () => void;
+    onPress: (friend: Friend) => void;
 }) {
     const { t } = useTranslation('social');
     return (
         <Pressable
-            onPress={onPress}
+            onPress={() => onPress(friend)}
             accessibilityRole="button"
             accessibilityLabel={`${t('profile:friend.message')}: ${friend.username}`}
             className="items-center active:opacity-70"
             style={{ width: RAIL_ITEM_WIDTH }}
         >
-            <AvatarRing src={friend.avatarUrl} name={friend.username} size="lg" tone={unread ? 'unread' : 'neutral'} gapColor={COLORS.background} />
+            <AvatarRing src={friend.avatarUrl} name={friend.username} size={RAIL_AVATAR} gapColor={COLORS.background} />
+            {/* Shown whole, never cut off with dots: the first word, shrunk to fit when it runs long. */}
             <Text
-                className={cn('w-full text-center text-[11px] mt-1.5', unread ? 'text-white font-black' : 'text-slate-400 font-semibold')}
+                className="w-full text-center text-[12px] leading-[15px] font-bold text-slate-300 mt-1.5"
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
             >
-                {friend.username}
+                {firstWord(friend.username)}
             </Text>
         </Pressable>
     );
 });
 
-const CHAT_CARD_RADIUS = 18;
+const CHAT_AVATAR = 48;
+// Rows are divided where the text starts, as in a messaging inbox: row padding 16, the ringed
+// avatar (48 + 3 + 3) and the 12 gap.
+const CHAT_TEXT_INSET = 16 + CHAT_AVATAR + 6 + 12;
 
-/** Card shell shared with the notification inbox: unread trades the neutral edge for emerald. */
-function ChatShell({ unread, children }: { unread?: boolean; children: React.ReactNode }) {
-    return (
-        <View
-            style={{
-                backgroundColor: COLORS.card,
-                borderRadius: CHAT_CARD_RADIUS,
-                borderWidth: 1,
-                borderColor: unread ? COLORS.primary + '33' : 'rgba(255,255,255,0.07)',
-                borderTopColor: unread ? COLORS.primary + '4D' : 'rgba(255,255,255,0.11)',
-                overflow: 'hidden',
-            }}
-        >
-            {children}
-        </View>
-    );
-}
-
-const ChatCard = React.memo(function ChatCard({
+/**
+ * One conversation, a row of the chats panel. Unread rows carry the emerald: a faint wash, a
+ * glowing rail on the leading edge, the gradient ring, the time and the count.
+ */
+const ChatRow = React.memo(function ChatRow({
     chat,
+    first,
     fromMe,
     onPress,
 }: {
     chat: DirectChat;
+    first: boolean;
     fromMe: boolean;
     onPress: (chat: DirectChat) => void;
 }) {
@@ -823,62 +817,77 @@ const ChatCard = React.memo(function ChatCard({
     const unread = chat.unreadCount > 0;
 
     return (
-        <ChatShell unread={unread}>
-            <Pressable onPress={() => onPress(chat)} accessibilityRole="button" className="active:opacity-70">
-                {unread && (
-                    <>
-                        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: COLORS.primary + '0F' }} />
-                        <View
-                            pointerEvents="none"
-                            style={{
-                                position: 'absolute', left: 0, top: 14, bottom: 14, width: 3,
-                                borderTopRightRadius: 3, borderBottomRightRadius: 3,
-                                backgroundColor: COLORS.primary,
-                                shadowColor: COLORS.primary, shadowOpacity: 0.8, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
-                            }}
-                        />
-                    </>
-                )}
-                <View className="flex-row items-center px-4 py-3" style={{ gap: 12 }}>
-                    <AvatarRing src={chat.otherAvatarUrl} name={chat.otherUsername} tone={unread ? 'unread' : 'neutral'} />
-                    <View className="flex-1">
-                        <View className="flex-row items-center" style={{ gap: 8 }}>
+        <Pressable
+            onPress={() => onPress(chat)}
+            accessibilityRole="button"
+            className={cn('active:opacity-70', unread && 'bg-primary/[0.07]')}
+        >
+            {!first && <View pointerEvents="none" style={[styles.chatDivider, { left: CHAT_TEXT_INSET }]} />}
+            {unread && <View pointerEvents="none" style={styles.unreadRail} />}
+
+            <View className="flex-row items-center pl-4 pr-3.5 py-3" style={{ gap: 12 }}>
+                <AvatarRing src={chat.otherAvatarUrl} name={chat.otherUsername} size={CHAT_AVATAR} tone={unread ? 'unread' : 'neutral'} />
+                <View className="flex-1">
+                    <View className="flex-row items-center" style={{ gap: 8 }}>
+                        <Text
+                            className={cn('flex-1 text-[15px] tracking-tight text-white', unread ? 'font-black' : 'font-bold')}
+                            numberOfLines={1}
+                        >
+                            {chat.otherUsername}
+                        </Text>
+                        {chat.lastMessageAt && (
                             <Text
-                                className={cn('flex-1 text-[15px] tracking-tight', unread ? 'text-white font-black' : 'text-slate-200 font-bold')}
-                                numberOfLines={1}
+                                className="text-[11px] font-bold"
+                                style={[TABULAR, { color: unread ? COLORS.primaryBright : COLORS.slate500 }]}
                             >
-                                {chat.otherUsername}
+                                {formatChatTime(chat.lastMessageAt)}
                             </Text>
-                            {chat.lastMessageAt && (
-                                <Text
-                                    className="text-[11px] font-bold"
-                                    style={[TABULAR, { color: unread ? COLORS.primaryBright : COLORS.slate500 }]}
-                                >
-                                    {formatChatTime(chat.lastMessageAt)}
+                        )}
+                    </View>
+                    <View className="flex-row items-center mt-1" style={{ gap: 8 }}>
+                        <Text
+                            className={cn('flex-1 text-[13px] leading-[18px]', unread ? 'text-slate-200 font-semibold' : 'text-slate-400 font-medium')}
+                            numberOfLines={1}
+                        >
+                            {fromMe ? <Text className="text-slate-500 font-medium">{t('youPrefix')}</Text> : null}
+                            {chat.lastMessage}
+                        </Text>
+                        {unread && (
+                            <View className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary items-center justify-center">
+                                <Text className="text-primary-foreground text-[11px] font-black" style={TABULAR}>
+                                    {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
                                 </Text>
-                            )}
-                        </View>
-                        <View className="flex-row items-center mt-0.5" style={{ gap: 8 }}>
-                            <Text
-                                className={cn('flex-1 text-[13px] leading-[18px]', unread ? 'text-slate-200 font-semibold' : 'text-slate-400 font-medium')}
-                                numberOfLines={1}
-                            >
-                                {fromMe ? <Text className="text-slate-500 font-medium">{t('youPrefix')}</Text> : null}
-                                {chat.lastMessage}
-                            </Text>
-                            {unread && (
-                                <View className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary items-center justify-center">
-                                    <Text className="text-primary-foreground text-[11px] font-black" style={TABULAR}>
-                                        {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
+                            </View>
+                        )}
                     </View>
                 </View>
-            </Pressable>
-        </ChatShell>
+            </View>
+        </Pressable>
     );
+});
+
+const styles = StyleSheet.create({
+    chatDivider: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    unreadRail: {
+        position: 'absolute',
+        left: 0,
+        top: 12,
+        bottom: 12,
+        width: 3,
+        borderTopRightRadius: 3,
+        borderBottomRightRadius: 3,
+        backgroundColor: COLORS.primary,
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.8,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 0 },
+    },
 });
 
 // ═════════════════════════════════════════════════════════════════════
@@ -895,17 +904,18 @@ type RingTone = 'neutral' | 'unread' | 'incoming';
 function AvatarRing({
     src,
     name,
-    size = 'md',
+    size = 40,
     tone = 'neutral',
     gapColor = COLORS.card,
 }: {
     src?: string | null;
     name: string;
-    size?: 'md' | 'lg';
+    /** The photo's size; the ring adds 3 on each side. */
+    size?: number;
     tone?: RingTone;
     gapColor?: string;
 }) {
-    const avatar = <PlayerAvatar src={src ?? undefined} name={name} size={size} className="border-0" />;
+    const avatar = <SocialAvatar src={src} name={name} size={size} />;
 
     if (tone === 'unread') {
         return (
@@ -1054,32 +1064,35 @@ function RosterSkeleton({ rows, action = 'single' }: { rows: number; action?: 's
 
 function RailSkeleton() {
     return (
-        <View className="flex-row mb-5" style={{ gap: 12 }}>
+        <View className="flex-row mb-5" style={{ gap: 8 }}>
             {[0, 1, 2, 3, 4].map((i) => (
                 <View key={i} className="items-center" style={{ width: RAIL_ITEM_WIDTH, gap: 8 }}>
-                    <Skeleton width={62} height={62} radius={31} />
-                    <Skeleton width={44} height={8} radius={4} />
+                    <Skeleton width={RAIL_AVATAR + 6} height={RAIL_AVATAR + 6} radius={(RAIL_AVATAR + 6) / 2} />
+                    <Skeleton width={44} height={9} radius={4} />
                 </View>
             ))}
         </View>
     );
 }
 
-function ChatCardSkeleton() {
+function ChatRowsSkeleton({ rows }: { rows: number }) {
     return (
-        <ChatShell>
-            <View className="flex-row items-center px-4 py-3" style={{ gap: 12 }}>
-                <Skeleton width={46} height={46} radius={23} />
-                <View className="flex-1" style={{ gap: 8 }}>
-                    <View className="flex-row items-center">
-                        <Skeleton width="44%" height={12} radius={6} />
-                        <View className="flex-1" />
-                        <Skeleton width={34} height={10} radius={5} />
+        <Panel>
+            {Array.from({ length: rows }, (_, i) => (
+                <View key={i} className="flex-row items-center pl-4 pr-3.5 py-3" style={{ gap: 12 }}>
+                    {i > 0 && <View style={[styles.chatDivider, { left: CHAT_TEXT_INSET }]} />}
+                    <Skeleton width={CHAT_AVATAR + 6} height={CHAT_AVATAR + 6} radius={(CHAT_AVATAR + 6) / 2} />
+                    <View className="flex-1" style={{ gap: 9 }}>
+                        <View className="flex-row items-center">
+                            <Skeleton width="44%" height={12} radius={6} />
+                            <View className="flex-1" />
+                            <Skeleton width={34} height={10} radius={5} />
+                        </View>
+                        <Skeleton width="72%" height={10} radius={5} />
                     </View>
-                    <Skeleton width="78%" height={10} radius={5} />
                 </View>
-            </View>
-        </ChatShell>
+            ))}
+        </Panel>
     );
 }
 

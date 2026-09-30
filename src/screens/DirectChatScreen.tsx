@@ -10,8 +10,10 @@ import {
     ActivityIndicator,
     Platform,
     Alert,
+    StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -27,7 +29,7 @@ import { mergeMessagesById } from '../lib/mergeMessages';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
 import { useTrailingDebounce } from '../hooks/useTrailingDebounce';
-import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { SocialAvatar } from '../components/social/SocialAvatar';
 import { CopiedOverlay } from '../components/chat/CopiedOverlay';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { DirectChat, DirectMessage } from '../types/social';
@@ -503,13 +505,12 @@ export default function DirectChatScreen() {
                     ListEmptyComponent={
                         messagesLoaded ? (
                             <View className="items-center mt-24 px-6">
-                                <View style={EMPTY_AVATAR_RING}>
-                                    <PlayerAvatar
-                                        src={chat.otherAvatarUrl ?? undefined}
-                                        name={chat.otherUsername}
-                                        size="lg"
-                                        className="border-0"
-                                    />
+                                <View style={styles.emptyGlow}>
+                                    <LinearGradient colors={RING_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyRing}>
+                                        <View style={styles.emptyRingGap}>
+                                            <SocialAvatar src={chat.otherAvatarUrl} name={chat.otherUsername} size={72} />
+                                        </View>
+                                    </LinearGradient>
                                 </View>
                                 <Text className="text-white font-black text-lg tracking-tight mt-4" numberOfLines={1}>
                                     {chat.otherUsername}
@@ -548,16 +549,17 @@ export default function DirectChatScreen() {
                             </Pressable>
                         </View>
                     )}
+                    {/* One rounded field with the send button nested in its right end. */}
                     <View
-                        className="flex-row items-end gap-2 bg-card border border-white/[0.06] rounded-3xl px-3 py-1.5"
-                        style={{ minHeight: 52 }}
+                        className="flex-row items-end gap-2 rounded-[28px] pl-3 pr-1.5 py-1.5"
+                        style={styles.composerField}
                     >
                         <TextInput
                             ref={inputRef}
                             value={input}
                             onChangeText={setInput}
                             placeholder={t('chat.typeAMessage')}
-                            placeholderTextColor="#475569"
+                            placeholderTextColor={COLORS.slate500}
                             multiline
                             className="flex-1 text-white text-[15px] py-2 px-1"
                             style={{ maxHeight: 120 }}
@@ -569,18 +571,24 @@ export default function DirectChatScreen() {
                             // which dismisses the keyboard and swallows the tap — extend the
                             // touch target so near-misses still send.
                             hitSlop={{ top: 14, bottom: 10, left: 6, right: 10 }}
-                            className={`w-11 h-11 rounded-full items-center justify-center ${
-                                input.trim() && !sending ? 'bg-emerald-500' : 'bg-white/5'
-                            }`}
-                            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+                            className="w-11 h-11 rounded-full items-center justify-center active:opacity-80"
+                            // Ready to send: the own-bubble gradient with a soft glow. The glow sits on
+                            // the button itself (no wrapper), so the hitSlop above keeps its reach.
+                            style={input.trim() && !sending ? styles.sendReady : styles.sendIdle}
                         >
+                            {input.trim() && !sending && (
+                                <View pointerEvents="none" style={styles.sendFill}>
+                                    <LinearGradient colors={OWN_BUBBLE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                                </View>
+                            )}
                             {sending ? (
-                                <ActivityIndicator size="small" color="#fff" />
+                                <ActivityIndicator size="small" color={COLORS.primaryBright} />
                             ) : (
                                 <Ionicons
                                     name="send"
                                     size={18}
-                                    color={input.trim() ? '#fff' : '#475569'}
+                                    color={input.trim() ? OWN_TEXT : COLORS.slate600}
+                                    style={{ marginLeft: 2 }}
                                 />
                             )}
                         </Pressable>
@@ -606,51 +614,59 @@ function Header({
 }) {
     const { t } = useTranslation('match');
     const nickname = chat?.otherNickname?.trim();
-    // The row stays h-11 (44) so the header keeps its old height — the composer's iOS
-    // keyboardVerticalOffset (70) was tuned against it.
+    // The row stays h-11 (44) and the hairline 1px, so the header keeps its old height — the
+    // composer's iOS keyboardVerticalOffset (70) was tuned against it.
     return (
-        <View
-            className="flex-row items-center px-3 py-3 border-b border-white/5 bg-background-deep"
-        >
-            <Pressable
-                onPress={onBack}
-                hitSlop={8}
-                accessibilityRole="button"
-                className="w-10 h-10 rounded-2xl items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
-            >
-                <Ionicons name="arrow-back" size={20} color={COLORS.foreground} />
-            </Pressable>
-
-            {chat ? (
+        <View className="bg-background-deep">
+            <View className="flex-row items-center px-3 py-3">
                 <Pressable
-                    className="flex-row items-center flex-1 h-11 ml-3 active:opacity-70"
-                    onPress={onAvatarPress}
+                    onPress={onBack}
+                    hitSlop={8}
                     accessibilityRole="button"
+                    className="w-10 h-10 rounded-2xl items-center justify-center bg-white/5 border border-white/10 active:opacity-60"
                 >
-                    <PlayerAvatar
-                        src={chat.otherAvatarUrl ?? undefined}
-                        name={chat.otherUsername}
-                        size="md"
-                    />
-                    <View className="ml-3 flex-1">
-                        <Text className="text-white font-black text-base tracking-tight" numberOfLines={1}>
-                            {chat.otherUsername}
-                        </Text>
-                        {nickname ? (
-                            <View className="flex-row items-center mt-0.5" style={{ gap: 4 }}>
-                                <Ionicons name="game-controller" size={13} color={COLORS.primary} />
-                                <Text className="flex-1 text-slate-400 text-xs font-medium" numberOfLines={1}>
-                                    {nickname}
-                                </Text>
-                            </View>
-                        ) : null}
-                    </View>
+                    <Ionicons name="arrow-back" size={20} color={COLORS.foreground} />
                 </Pressable>
-            ) : (
-                <View className="h-11 justify-center ml-3">
-                    <Text className="text-white font-black text-lg">{t('chat.chat')}</Text>
-                </View>
-            )}
+
+                {chat ? (
+                    <Pressable
+                        className="flex-row items-center flex-1 h-11 ml-3 active:opacity-70"
+                        onPress={onAvatarPress}
+                        accessibilityRole="button"
+                    >
+                        {/* 38 + the ring's 3 on each side = the row's 44 */}
+                        <View style={styles.headerRing}>
+                            <SocialAvatar src={chat.otherAvatarUrl} name={chat.otherUsername} size={38} />
+                        </View>
+                        <View className="ml-3 flex-1">
+                            <Text className="text-white font-black text-[16px] leading-[20px] tracking-tight" numberOfLines={1}>
+                                {chat.otherUsername}
+                            </Text>
+                            {nickname ? (
+                                <View className="flex-row items-center mt-0.5" style={{ gap: 4 }}>
+                                    <Ionicons name="game-controller" size={13} color={COLORS.primary} />
+                                    <Text className="flex-1 text-slate-400 text-xs font-semibold" numberOfLines={1}>
+                                        {nickname}
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} style={{ marginLeft: 8 }} />
+                    </Pressable>
+                ) : (
+                    <View className="h-11 justify-center ml-3">
+                        <Text className="text-white font-black text-lg">{t('chat.chat')}</Text>
+                    </View>
+                )}
+            </View>
+            {/* Emerald hairline under the header, fading out at both ends */}
+            <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(16,185,129,0)', 'rgba(16,185,129,0.45)', 'rgba(16,185,129,0)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ height: 1 }}
+            />
         </View>
     );
 }
@@ -662,20 +678,17 @@ function sameRun(a?: DirectMessage, b?: DirectMessage): boolean {
     return !!a && !!b && a.senderId === b.senderId && sameDay(a.sentAt, b.sentAt);
 }
 
-// emerald-900 at 70% — the time and receipt ticks on an emerald (own) bubble.
-const OWN_META_COLOR = 'rgba(6, 78, 59, 0.7)';
+// Own bubbles: emerald lit from the top-left, dark ink. The send button wears the same.
+// A deeper emerald with only a slight lift at the top-left, so a screen of own bubbles stays calm.
+const OWN_BUBBLE = ['#1FBF88', '#0E9F6E'] as const;
+const OWN_TEXT = '#03140E';
+// The time and the "sent" tick on an own bubble; "read" ticks go full strength.
+const OWN_META_COLOR = 'rgba(3, 20, 14, 0.55)';
+const OWN_READ_COLOR = '#03140E';
+const RING_GRADIENT = ['#34D399', '#22D3EE'] as const;
 
-const EMPTY_AVATAR_RING = {
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: 'rgba(16,185,129,0.5)',
-    padding: 3,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-} as const;
+const BUBBLE_RADIUS = 18;
+const TAIL_RADIUS = 6;
 
 // Memoized so a new incoming message re-renders only itself (plus the previous bubble
 // when it stops ending the run), not every visible bubble. Props are primitives + a stable
@@ -692,6 +705,8 @@ const MessageBubble = React.memo(function MessageBubble({
 }) {
     const { t } = useTranslation('match');
     const { copied, copy } = useCopyToClipboard();
+    const shape = isMine ? styles.mineShape : styles.theirsShape;
+
     return (
         <View
             className={cn(
@@ -704,68 +719,171 @@ const MessageBubble = React.memo(function MessageBubble({
                 // The column is reserved on every incoming bubble so a run stays aligned.
                 <View className="w-7 mr-2">
                     {endsRun && (
-                        <PlayerAvatar
-                            src={message.senderAvatarUrl ?? undefined}
-                            name={message.senderUsername}
-                            size="sm"
-                            className="!w-7 !h-7"
-                        />
+                        <SocialAvatar src={message.senderAvatarUrl} name={message.senderUsername} size={28} />
                     )}
                 </View>
             )}
-            <Pressable
-                onLongPress={() => copy(message.content)}
-                delayLongPress={250}
-                accessibilityRole="text"
-                accessibilityHint={t('chat.longPressToCopy')}
-                className={cn(
-                    'max-w-[78%] rounded-[18px] px-3.5 py-2',
-                    isMine
-                        ? 'bg-primary rounded-br-md'
-                        : 'bg-card-elevated border border-white/5 rounded-bl-md',
-                )}
-            >
-                <Text
-                    className={cn(
-                        'text-[15px] leading-5',
-                        isMine ? 'text-slate-900 font-medium' : 'text-white',
-                    )}
+            {/* The glow lives on this wrapper; the bubble itself can't clip, because the
+                "Copied" pill spills past a short bubble's edges. */}
+            <View style={[styles.bubbleBox, shape, isMine && styles.mineGlow]}>
+                <Pressable
+                    onLongPress={() => copy(message.content)}
+                    delayLongPress={250}
+                    accessibilityRole="text"
+                    accessibilityHint={t('chat.longPressToCopy')}
+                    style={[styles.bubble, shape, !isMine && styles.theirsSurface]}
                 >
-                    {message.content}
-                </Text>
-                <View className="flex-row items-center self-end mt-0.5" style={{ gap: 3 }}>
-                    <Text
-                        className={cn('text-[10px] font-semibold', !isMine && 'text-slate-500')}
-                        style={isMine ? { color: OWN_META_COLOR } : undefined}
-                    >
-                        {formatTime(message.sentAt)}
-                    </Text>
                     {isMine && (
-                        <Ionicons
-                            name={message.isRead ? 'checkmark-done' : 'checkmark'}
-                            size={14}
-                            color={OWN_META_COLOR}
-                            accessibilityLabel={message.isRead ? t('chat.read') : t('chat.sent')}
-                        />
+                        <View pointerEvents="none" style={[StyleSheet.absoluteFill, shape, { overflow: 'hidden' }]}>
+                            <LinearGradient colors={OWN_BUBBLE} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                        </View>
                     )}
-                </View>
-                {copied && <CopiedOverlay />}
-            </Pressable>
+                    <Text style={isMine ? styles.mineText : styles.theirsText}>
+                        {message.content}
+                    </Text>
+                    <View className="flex-row items-center self-end mt-0.5" style={{ gap: 3 }}>
+                        <Text
+                            className="text-[10px] font-semibold"
+                            style={[TABULAR, { color: isMine ? OWN_META_COLOR : COLORS.slate500 }]}
+                        >
+                            {formatTime(message.sentAt)}
+                        </Text>
+                        {isMine && (
+                            <Ionicons
+                                name={message.isRead ? 'checkmark-done' : 'checkmark'}
+                                size={14}
+                                color={message.isRead ? OWN_READ_COLOR : OWN_META_COLOR}
+                                accessibilityLabel={message.isRead ? t('chat.read') : t('chat.sent')}
+                            />
+                        )}
+                    </View>
+                    {copied && <CopiedOverlay />}
+                </Pressable>
+            </View>
         </View>
     );
 });
 
+/** The day, between two hairlines that fade out toward the edges. */
 function DateBreak({ date }: { date: string }) {
     return (
-        <View className="items-center my-3">
-            <View className="bg-white/5 border border-white/5 px-3 py-1 rounded-full">
-                <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-                    {formatDay(date)}
-                </Text>
-            </View>
+        <View className="flex-row items-center my-4 px-2" style={{ gap: 10 }}>
+            <LinearGradient
+                colors={['rgba(148,163,184,0)', 'rgba(148,163,184,0.22)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.dateLine}
+            />
+            <Text className="text-slate-400 text-[10px] font-black uppercase tracking-[1.6px]">
+                {formatDay(date)}
+            </Text>
+            <LinearGradient
+                colors={['rgba(148,163,184,0.22)', 'rgba(148,163,184,0)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.dateLine}
+            />
         </View>
     );
 }
+
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
+const styles = StyleSheet.create({
+    headerRing: {
+        borderRadius: 999,
+        padding: 1.5,
+        borderWidth: 1.5,
+        borderColor: 'rgba(52,211,153,0.6)',
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.45,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    bubbleBox: {
+        maxWidth: '78%',
+    },
+    mineShape: {
+        borderRadius: BUBBLE_RADIUS,
+        borderBottomRightRadius: TAIL_RADIUS,
+    },
+    theirsShape: {
+        borderRadius: BUBBLE_RADIUS,
+        borderBottomLeftRadius: TAIL_RADIUS,
+    },
+    // iOS draws the glow from the wrapper's own fill, so it carries the bubble's colour.
+    mineGlow: {
+        backgroundColor: OWN_BUBBLE[1],
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 1 },
+    },
+    bubble: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+    },
+    // The surface Home's cards use: a step above the page, a hairline edge, a brighter top edge.
+    theirsSurface: {
+        backgroundColor: COLORS.cardRaised,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.07)',
+        borderTopColor: 'rgba(255,255,255,0.11)',
+    },
+    mineText: {
+        color: OWN_TEXT,
+        fontSize: 15,
+        lineHeight: 20,
+        fontWeight: '600',
+    },
+    theirsText: {
+        color: '#F1F5F9',
+        fontSize: 15,
+        lineHeight: 20,
+    },
+    dateLine: {
+        flex: 1,
+        height: 1,
+    },
+    composerField: {
+        minHeight: 52,
+        backgroundColor: COLORS.cardRaised,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.07)',
+        borderTopColor: 'rgba(255,255,255,0.11)',
+    },
+    sendIdle: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    sendReady: {
+        backgroundColor: OWN_BUBBLE[1],
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.15,
+        shadowRadius: 5,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    sendFill: {
+        ...StyleSheet.absoluteFillObject,
+        borderRadius: 22,
+        overflow: 'hidden',
+    },
+    emptyGlow: {
+        borderRadius: 999,
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.4,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    emptyRing: {
+        borderRadius: 999,
+        padding: 2.5,
+    },
+    emptyRingGap: {
+        borderRadius: 999,
+        padding: 3,
+        backgroundColor: COLORS.background,
+    },
+});
 
 function formatTime(iso: string): string {
     try {
