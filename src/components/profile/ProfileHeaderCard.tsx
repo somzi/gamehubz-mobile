@@ -20,6 +20,8 @@ interface ProfileHeaderCardProps {
     countryName?: string | null;
     region?: RegionType | null;
     socialLinks: React.ComponentProps<typeof SocialLinks>['links'];
+    /** Drawn on the emblem's bottom-right corner — the edit screen's camera button. */
+    avatarAccessory?: React.ReactNode;
     className?: string;
 }
 
@@ -54,6 +56,7 @@ export function ProfileHeaderCard({
     countryName,
     region,
     socialLinks,
+    avatarAccessory,
     className,
 }: ProfileHeaderCardProps) {
     const nick = nickname?.trim() || '';
@@ -83,6 +86,7 @@ export function ProfileHeaderCard({
                                         />
                                     </View>
                                 </LinearGradient>
+                                {avatarAccessory ? <View style={styles.avatarAccessory}>{avatarAccessory}</View> : null}
                             </View>
 
                             <View className="flex-1">
@@ -172,6 +176,11 @@ export function ProfileHeaderSkeleton({ className }: { className?: string }) {
 }
 
 const styles = StyleSheet.create({
+    avatarAccessory: {
+        position: 'absolute',
+        right: -6,
+        bottom: -6,
+    },
     frame: {
         borderRadius: FRAME_RADIUS,
         padding: 1,

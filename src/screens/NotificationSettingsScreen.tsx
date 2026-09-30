@@ -77,7 +77,7 @@ export default function NotificationSettingsScreen() {
 
             <ScrollView className="flex-1 px-6">
                 {(pushPermission || notificationSettings) && (
-                    <View className="mt-4 bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                    <View className="mt-4 bg-card border border-white/[0.07] border-t-white/[0.11] rounded-[22px] overflow-hidden">
                         {pushPermission && (
                             <MenuItem
                                 icon="phone-portrait-outline"

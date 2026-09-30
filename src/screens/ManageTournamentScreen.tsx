@@ -10,9 +10,19 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { EditTournamentModal } from '../components/modals/EditTournamentModal';
 import { StatusModal } from '../components/modals/StatusModal';
-import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
+import { SettingsHero, SettingsGroup, SETTINGS_EMBLEM_IMAGE, SETTINGS_EMBLEM_IMAGE_RADIUS } from '../components/ui/SettingsBlocks';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../lib/theme';
+
+// The state under the name: the details screen's labels, each in its colour; live glows.
+const STATUS_TONE: Record<number, string> = {
+    0: '#A5B4FC',
+    1: '#60A5FA',
+    2: '#FBBF24',
+    3: '#EF4444',
+    4: '#10B981',
+};
 
 type ManageTournamentScreenRouteProp = RouteProp<RootStackParamList, 'ManageTournament'>;
 type ManageTournamentScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -211,61 +221,72 @@ export default function ManageTournamentScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title={t('manage.title')} showBack />
 
-            <ScrollView className="flex-1 px-6">
-                <View className="items-center py-8 mb-2">
-                    <View className="w-20 h-20 rounded-3xl bg-primary/10 items-center justify-center border border-primary/20 mb-4">
-                        <Ionicons name="trophy" size={40} color="#10B981" />
-                    </View>
-                    <Text className="text-2xl font-black text-white text-center">{tournament?.name}</Text>
-                    <Text className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-2">
-                        {tournament?.status === 0 ? (tournament?.registrationOpensAt ? t('manage.statusScheduled') : t('details.statusOpen')) : 
-                         tournament?.status === 1 ? t('details.statusUpcoming') :
-                         tournament?.status === 2 ? t('details.statusRegClosed') :
-                         tournament?.status === 3 ? t('details.statusLive') :
-                         tournament?.status === 4 ? t('details.statusCompleted') : t('details.statusIdle')}
-                    </Text>
-                </View>
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                <View style={{ gap: 22 }}>
+                    {/* The tournament, in its cover's violet and gold */}
+                    <SettingsHero
+                        theme="tournament"
+                        title={tournament?.name}
+                        emblem={
+                            <LinearGradient
+                                colors={['#1E1B4B', '#0B111D']}
+                                style={{
+                                    width: SETTINGS_EMBLEM_IMAGE,
+                                    height: SETTINGS_EMBLEM_IMAGE,
+                                    borderRadius: SETTINGS_EMBLEM_IMAGE_RADIUS,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Ionicons name="trophy" size={26} color="#FBBF24" />
+                            </LinearGradient>
+                        }
+                    >
+                        <StatusPill
+                            color={STATUS_TONE[tournament?.status] ?? COLORS.slate400}
+                            live={tournament?.status === 3}
+                            text={tournament?.status === 0 ? (tournament?.registrationOpensAt ? t('manage.statusScheduled') : t('details.statusOpen')) :
+                                tournament?.status === 1 ? t('details.statusUpcoming') :
+                                tournament?.status === 2 ? t('details.statusRegClosed') :
+                                tournament?.status === 3 ? t('details.statusLive') :
+                                tournament?.status === 4 ? t('details.statusCompleted') : t('details.statusIdle')}
+                        />
+                    </SettingsHero>
 
-                <View className="gap-5">
-                    <View>
-                        <SectionLabel icon="trophy" title={t('manage.sectionTournament')} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                            <MenuItem
-                                icon="create-outline"
-                                label={t('manage.editInfo')}
-                                onPress={() => setShowEditModal(true)}
-                                isLast
-                            />
-                        </View>
-                    </View>
+                    <SettingsGroup title={t('manage.sectionTournament')}>
+                        <MenuItem
+                            icon="create"
+                            color={COLORS.primary}
+                            label={t('manage.editInfo')}
+                            onPress={() => setShowEditModal(true)}
+                            isLast
+                        />
+                    </SettingsGroup>
 
                     {(tournament?.status === 3 ||
                         tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
-                        <View>
-                            <SectionLabel icon="exit-outline" title={t('manage.sectionAdminActions')} color={COLORS.destructive} />
-                            <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                                {tournament?.status === 3 && (
-                                    <MenuItem
-                                        icon="stop-circle-outline"
-                                        label={t('manage.cancelTitle')}
-                                        onPress={promptCancelTournament}
-                                        destructive
-                                        showChevron={false}
-                                        isLast
-                                    />
-                                )}
-                                {(tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
-                                    <MenuItem
-                                        icon="trash-outline"
-                                        label={t('manage.deleteTitle')}
-                                        onPress={promptDeleteTournament}
-                                        destructive
-                                        showChevron={false}
-                                        isLast
-                                    />
-                                )}
-                            </View>
-                        </View>
+                        <SettingsGroup title={t('manage.sectionAdminActions')} danger>
+                            {tournament?.status === 3 && (
+                                <MenuItem
+                                    icon="stop-circle-outline"
+                                    label={t('manage.cancelTitle')}
+                                    onPress={promptCancelTournament}
+                                    destructive
+                                    showChevron={false}
+                                    isLast
+                                />
+                            )}
+                            {(tournament?.status === 0 || tournament?.status === 1 || tournament?.status === 2) && (
+                                <MenuItem
+                                    icon="trash-outline"
+                                    label={t('manage.deleteTitle')}
+                                    onPress={promptDeleteTournament}
+                                    destructive
+                                    showChevron={false}
+                                    isLast
+                                />
+                            )}
+                        </SettingsGroup>
                     )}
                 </View>
 
@@ -290,5 +311,24 @@ export default function ManageTournamentScreen() {
                 message={statusModalConfig.message}
             />
         </SafeAreaView>
+    );
+}
+
+function StatusPill({ color, text, live }: { color: string; text: string; live: boolean }) {
+    return (
+        <View
+            className="self-start flex-row items-center rounded-full"
+            style={{ paddingHorizontal: 9, paddingVertical: 3.5, gap: 5, backgroundColor: color + '1F', borderWidth: 1, borderColor: color + '4D' }}
+        >
+            <View
+                style={{
+                    width: 6, height: 6, borderRadius: 3, backgroundColor: color,
+                    shadowColor: color, shadowOpacity: live ? 0.9 : 0, shadowRadius: 4, shadowOffset: { width: 0, height: 0 },
+                }}
+            />
+            <Text className="text-[10px] font-black uppercase tracking-[1.2px]" style={{ color }} numberOfLines={1}>
+                {text}
+            </Text>
+        </View>
     );
 }

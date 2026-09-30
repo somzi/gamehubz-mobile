@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { CountryPicker } from '../ui/CountryPicker';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { FIELD_LABEL, FIELD_INPUT, FIELD_MULTILINE, FIELD_HINT, FIELD_PLACEHOLDER } from '../ui/FormField';
 import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
@@ -37,10 +38,6 @@ const YES_NO_OPTIONS = [
     { value: 'yes', labelKey: 'common:yes' },
 ] as const;
 
-const FIELD_LABEL = "text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2";
-const FIELD_INPUT = "bg-white/[0.03] px-4 h-12 rounded-2xl text-white border border-white/[0.06] text-sm";
-const FIELD_MULTILINE = "bg-white/[0.03] p-4 h-24 rounded-2xl text-white border border-white/[0.06] text-sm";
-const FIELD_HINT = "text-[11px] text-slate-500 mt-2";
 
 interface CreateTournamentModalProps {
     visible: boolean;
@@ -672,12 +669,12 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             <TouchableOpacity
                 onPress={onPress}
                 disabled={isLoading || locked}
-                className="bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row justify-between items-center"
+                className="bg-black/25 px-4 h-12 rounded-[14px] border border-white/[0.08] flex-row justify-between items-center"
             >
                 {isLoading ? (
                     <ActivityIndicator size="small" color={COLORS.primary} />
                 ) : (
-                    <Text className="text-white text-sm" numberOfLines={1}>{value}</Text>
+                    <Text className="shrink text-white text-sm" numberOfLines={1}>{value}</Text>
                 )}
                 {!isLoading && !locked && <Ionicons name="chevron-down" size={16} color="#64748B" />}
             </TouchableOpacity>
@@ -803,7 +800,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         <TextInput
                                             className={FIELD_INPUT}
                                             placeholder={t('form.namePlaceholder')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             value={name}
                                             onChangeText={setName}
                                         />
@@ -842,7 +839,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             <TextInput
                                                 className={FIELD_INPUT}
                                                 placeholder={t('form.egMaxPlayers')}
-                                                placeholderTextColor="#334155"
+                                                placeholderTextColor={FIELD_PLACEHOLDER}
                                                 keyboardType="numeric"
                                                 value={maxPlayers}
                                                 onChangeText={setMaxPlayers}
@@ -859,7 +856,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 <TextInput
                                                     className={FIELD_INPUT}
                                                     placeholder={t('form.egGroups')}
-                                                    placeholderTextColor="#334155"
+                                                    placeholderTextColor={FIELD_PLACEHOLDER}
                                                     keyboardType="numeric"
                                                     value={groupsCount}
                                                     onChangeText={setGroupsCount}
@@ -873,7 +870,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 <TextInput
                                                     className={FIELD_INPUT}
                                                     placeholder={t('form.egQualifiers')}
-                                                    placeholderTextColor="#334155"
+                                                    placeholderTextColor={FIELD_PLACEHOLDER}
                                                     keyboardType="numeric"
                                                     value={qualifiersPerGroup}
                                                     onChangeText={setQualifiersPerGroup}
@@ -895,7 +892,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                         <TextInput
                                                             className={FIELD_INPUT}
                                                             placeholder={t('form.swissRoundsPlaceholder')}
-                                                            placeholderTextColor="#334155"
+                                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                                             keyboardType="numeric"
                                                             value={swissRounds}
                                                             onChangeText={setSwissRounds}
@@ -918,7 +915,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                     <TextInput
                                                         className={FIELD_INPUT}
                                                         placeholder={t('form.directQualifiersPlaceholder', { count: swissKnockoutSize })}
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={swissDirect}
                                                         onChangeText={setSwissDirect}
@@ -962,7 +959,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             multiline
                                             className={FIELD_MULTILINE}
                                             placeholder={t('form.descriptionPlaceholder')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             textAlignVertical="top"
                                             value={description}
                                             onChangeText={setDescription}
@@ -974,7 +971,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                             multiline
                                             className={FIELD_MULTILINE}
                                             placeholder={t('form.rulesPlaceholder')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             textAlignVertical="top"
                                             value={rules}
                                             onChangeText={setRules}
@@ -1006,7 +1003,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 <TextInput
                                                     className={FIELD_INPUT}
                                                     placeholder={tTeam('teamSizePlaceholder')}
-                                                    placeholderTextColor="#334155"
+                                                    placeholderTextColor={FIELD_PLACEHOLDER}
                                                     keyboardType="numeric"
                                                     value={teamSize}
                                                     onChangeText={setTeamSize}
@@ -1036,7 +1033,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                     <TextInput
                                                         className={FIELD_INPUT}
                                                         placeholder={t('form.egQualifiers')}
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={maxReserves}
                                                         onChangeText={setMaxReserves}
@@ -1149,7 +1146,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                     <TextInput
                                                         className={FIELD_INPUT}
                                                         placeholder="10"
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={checkInGraceMinutes}
                                                         onChangeText={setCheckInGraceMinutes}
@@ -1217,7 +1214,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                     <TextInput
                                                         className={FIELD_INPUT}
                                                         placeholder={t('form.egQualifiers')}
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={roundDurationValue}
                                                         onChangeText={setRoundDurationValue}
@@ -1225,7 +1222,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                                 </View>
                                                 <TouchableOpacity
                                                     onPress={() => setShowDurationUnitPicker(true)}
-                                                    className="flex-1 bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row items-center justify-between"
+                                                    className="flex-1 bg-black/25 px-4 h-12 rounded-[14px] border border-white/[0.08] flex-row items-center justify-between"
                                                 >
                                                     <Text className="text-white text-sm">{roundDurationUnit}</Text>
                                                     <Ionicons name="chevron-down" size={16} color="#64748B" />
@@ -1267,6 +1264,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         iconName="lock-open-outline"
                                         iconColor={COLORS.info}
                                         onPress={() => setShowRegOpensPicker(true)}
+                                        standalone
                                     />
                                     <Text className="text-[11px] text-slate-500 mt-2 leading-4">
                                         {t('form.scheduleHint')}
@@ -1282,13 +1280,13 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         <TextInput
                                             className={FIELD_INPUT}
                                             placeholder={t('form.egPrize')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             keyboardType="numeric"
                                             value={prizePool}
                                             onChangeText={setPrizePool}
                                         />
                                     </View>
-                                    <View className="w-32">
+                                    <View className="w-40">
                                         {renderSelectField(t('form.currency'), getCurrencyLabel(), () => setShowCurrencyPicker(true))}
                                     </View>
                                 </View>

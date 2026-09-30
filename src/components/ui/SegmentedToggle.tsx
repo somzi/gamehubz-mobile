@@ -9,12 +9,12 @@ interface SegmentedToggleProps {
     disabled?: boolean;
 }
 
-/** Pill segmented control for small exclusive choices (YES/NO, SOLO/TEAM,
- *  SINGLE/DOUBLE). Active segment fills with the primary green. */
+/** Segmented control for small exclusive choices (YES/NO, SOLO/TEAM, SINGLE/DOUBLE), set into the
+ *  form like the fields around it. The active segment fills with the primary green. */
 export function SegmentedToggle({ options, value, onChange, disabled = false }: SegmentedToggleProps) {
     return (
         <View className={cn(
-            "bg-white/[0.03] p-1 rounded-2xl flex-row border border-white/[0.06]",
+            "bg-black/25 p-1 rounded-[14px] flex-row border border-white/[0.08]",
             disabled && "opacity-50"
         )}>
             {options.map(opt => {
@@ -24,14 +24,16 @@ export function SegmentedToggle({ options, value, onChange, disabled = false }: 
                         key={opt.value}
                         onPress={() => { if (!disabled) onChange(opt.value); }}
                         disabled={disabled}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: active, disabled }}
                         className={cn(
-                            "flex-1 py-3 rounded-xl items-center justify-center",
+                            "flex-1 py-2.5 rounded-[10px] items-center justify-center",
                             active && "bg-primary"
                         )}
                     >
                         <Text numberOfLines={1} className={cn(
-                            "text-xs font-black tracking-wide uppercase w-full text-center",
-                            active ? "text-primary-foreground" : "text-slate-500"
+                            "text-[12px] font-black tracking-wide uppercase w-full text-center",
+                            active ? "text-primary-foreground" : "text-slate-400"
                         )}>
                             {opt.label}
                         </Text>

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -13,12 +13,12 @@ import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { EditHubModal } from '../components/modals/EditHubModal';
 import { CreateTournamentModal } from '../components/modals/CreateTournamentModal';
 import { RequestVerificationModal } from '../components/modals/RequestVerificationModal';
-import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { StatusModal } from '../components/modals/StatusModal';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import { COLORS } from '../lib/theme';
-import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
+import { SettingsHero, SettingsHeroLine, SettingsGroup, CameraButton, SETTINGS_EMBLEM_IMAGE, SETTINGS_EMBLEM_IMAGE_RADIUS } from '../components/ui/SettingsBlocks';
+import { EmblemImage } from '../components/ui/HeroCard';
 
 type ManageHubScreenRouteProp = RouteProp<RootStackParamList, 'ManageHub'>;
 type ManageHubScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -254,134 +254,117 @@ export default function ManageHubScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title={t('manage.title')} showBack />
 
-            <ScrollView className="flex-1 px-6">
-                {/* Hub Info Preview with Avatar Upload */}
-                <View className="items-center py-6 mb-2">
-                    <View className="relative">
-                        <PlayerAvatar
-                            name={hubData?.name || t('manage.hubFallback')}
-                            src={avatarUri || hubData?.avatarUrl || hubData?.logoUrl}
-                            size="lg"
-                            className="w-20 h-20"
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                <View style={{ gap: 22 }}>
+                    {/* The hub, as on its page; the owner changes the logo from the emblem */}
+                    <SettingsHero
+                        theme="hub"
+                        title={hubData?.name || t('manage.hubFallback')}
+                        titleAccessory={hubData?.isVerified ? (
+                            <View className="w-[18px] h-[18px] rounded-full bg-sky-500 items-center justify-center">
+                                <Ionicons name="checkmark" size={12} color="#fff" />
+                            </View>
+                        ) : null}
+                        emblem={
+                            <EmblemImage
+                                src={avatarUri || hubData?.avatarUrl || hubData?.logoUrl}
+                                name={hubData?.name || t('manage.hubFallback')}
+                                size={SETTINGS_EMBLEM_IMAGE}
+                                radius={SETTINGS_EMBLEM_IMAGE_RADIUS}
+                            />
+                        }
+                        emblemAccessory={isOwner ? (
+                            <CameraButton onPress={handlePickAvatar} busy={isUploadingAvatar} label={t('profile:edit.changePhoto')} />
+                        ) : null}
+                    >
+                        {hubData?.isPublic !== false ? (
+                            <SettingsHeroLine icon="globe-outline" iconColor={COLORS.primaryBright} text={t('profile.public')} />
+                        ) : (
+                            <SettingsHeroLine icon="lock-closed" iconColor={COLORS.warning} text={t('profile.private')} />
+                        )}
+                    </SettingsHero>
+
+                    <SettingsGroup title={t('manage.sectionCommunity')}>
+                        <MenuItem
+                            icon="people"
+                            color={COLORS.info}
+                            label={t('manage.manageMembers')}
+                            onPress={() => navigation.navigate('HubMembers', { hubId })}
+                        />
+                        <MenuItem
+                            icon="trophy"
+                            color="#FBBF24"
+                            label={t('manage.createTournament')}
+                            onPress={() => setShowCreateTournamentModal(true)}
+                            isLast
+                        />
+                    </SettingsGroup>
+
+                    <SettingsGroup title={t('manage.sectionSettings')}>
+                        {isOwner && (
+                            <MenuItem
+                                icon="create"
+                                color={COLORS.primary}
+                                label={t('manage.editHubInfo')}
+                                onPress={() => setShowEditModal(true)}
+                            />
+                        )}
+                        <MenuItem
+                            icon="share-social"
+                            color="#60A5FA"
+                            label={t('manage.manageSocials')}
+                            onPress={() => navigation.navigate('ManageHubSocials', { hubId })}
+                            isLast={!isOwner}
                         />
                         {isOwner && (
-                            <TouchableOpacity
-                                onPress={handlePickAvatar}
-                                disabled={isUploadingAvatar}
-                                className="absolute -bottom-1 -right-1 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-background shadow-sm"
-                            >
-                                {isUploadingAvatar ? (
-                                    <ActivityIndicator size="small" color="white" />
-                                ) : (
-                                    <Ionicons name="camera" size={14} color="white" />
-                                )}
-                            </TouchableOpacity>
+                            <MenuItem
+                                icon="logo-discord"
+                                color="#5865F2"
+                                label={t('manage.discord')}
+                                onPress={() => navigation.navigate('ManageHubDiscord', { hubId })}
+                                rightElement={
+                                    hubData?.discordWebhookUrl ? (
+                                        <StatusPill icon="checkmark" color="#818CF8" text={t('manage.connected')} />
+                                    ) : (
+                                        <StatusPill color={COLORS.slate500} text={t('manage.off')} />
+                                    )
+                                }
+                            />
                         )}
-                    </View>
-                    <Text className="text-xl font-bold text-white text-center mt-3">{hubData?.name || t('manage.hubFallback')}</Text>
-                </View>
-
-                {/* Management Menu — grouped cards */}
-                <View className="gap-5">
-                    <View>
-                        <SectionLabel icon="people" title={t('manage.sectionCommunity')} color={COLORS.info} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
+                        {isOwner && (
                             <MenuItem
-                                icon="person-add-outline"
-                                label={t('manage.manageMembers')}
-                                onPress={() => navigation.navigate('HubMembers', { hubId })}
-                            />
-                            <MenuItem
-                                icon="trophy-outline"
-                                label={t('manage.createTournament')}
-                                onPress={() => setShowCreateTournamentModal(true)}
+                                icon="shield-checkmark"
+                                color="#38BDF8"
+                                label={t('manage.verification')}
+                                onPress={() => setShowVerificationModal(true)}
                                 isLast
+                                rightElement={
+                                    hubData?.isVerified ? (
+                                        <StatusPill icon="checkmark" color="#38BDF8" text={t('manage.verified')} />
+                                    ) : verificationStatus === 0 ? (
+                                        <StatusPill icon="time-outline" color={COLORS.warning} text={t('manage.pending')} />
+                                    ) : verificationStatus === 2 ? (
+                                        <StatusPill icon="close" color={COLORS.destructive} text={t('manage.rejected')} />
+                                    ) : null
+                                }
                             />
-                        </View>
-                    </View>
-
-                    <View>
-                        <SectionLabel icon="settings" title={t('manage.sectionSettings')} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                            {isOwner && (
-                                <MenuItem
-                                    icon="create-outline"
-                                    label={t('manage.editHubInfo')}
-                                    onPress={() => setShowEditModal(true)}
-                                />
-                            )}
-                            <MenuItem
-                                icon="share-social-outline"
-                                label={t('manage.manageSocials')}
-                                onPress={() => navigation.navigate('ManageHubSocials', { hubId })}
-                                isLast={!isOwner}
-                            />
-                            {isOwner && (
-                                <MenuItem
-                                    icon="logo-discord"
-                                    label={t('manage.discord')}
-                                    onPress={() => navigation.navigate('ManageHubDiscord', { hubId })}
-                                    rightElement={
-                                        hubData?.discordWebhookUrl ? (
-                                            <View className="flex-row items-center bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                                <Ionicons name="checkmark" size={11} color="#818CF8" />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-indigo-300">{t('manage.connected')}</Text>
-                                            </View>
-                                        ) : (
-                                            <View className="bg-white/[0.05] border border-white/10 px-2.5 py-1 rounded-full">
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('manage.off')}</Text>
-                                            </View>
-                                        )
-                                    }
-                                />
-                            )}
-                            {isOwner && (
-                                <MenuItem
-                                    icon="shield-checkmark-outline"
-                                    label={t('manage.verification')}
-                                    onPress={() => setShowVerificationModal(true)}
-                                    isLast
-                                    rightElement={
-                                        hubData?.isVerified ? (
-                                            <View className="flex-row items-center bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                                <Ionicons name="checkmark" size={11} color="#38BDF8" />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-sky-300">{t('manage.verified')}</Text>
-                                            </View>
-                                        ) : verificationStatus === 0 ? (
-                                            <View className="flex-row items-center bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                                <Ionicons name="time-outline" size={11} color={COLORS.warning} />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-amber-300">{t('manage.pending')}</Text>
-                                            </View>
-                                        ) : verificationStatus === 2 ? (
-                                            <View className="flex-row items-center bg-red-500/15 border border-red-500/30 px-2.5 py-1 rounded-full" style={{ gap: 4 }}>
-                                                <Ionicons name="close" size={11} color={COLORS.destructive} />
-                                                <Text className="text-[10px] font-black uppercase tracking-wider text-red-300">{t('manage.rejected')}</Text>
-                                            </View>
-                                        ) : null
-                                    }
-                                />
-                            )}
-                        </View>
-                    </View>
+                        )}
+                    </SettingsGroup>
 
                     {isOwner && (
-                        <View>
-                            <SectionLabel icon="exit-outline" title={t('manage.sectionOwnerActions')} color={COLORS.destructive} />
-                            <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                                <MenuItem
-                                    icon="trash-outline"
-                                    label={t('manage.deleteHub')}
-                                    onPress={handleDeleteHub}
-                                    destructive
-                                    showChevron={false}
-                                    isLast
-                                />
-                            </View>
-                        </View>
+                        <SettingsGroup title={t('manage.sectionOwnerActions')} danger>
+                            <MenuItem
+                                icon="trash-outline"
+                                label={t('manage.deleteHub')}
+                                onPress={handleDeleteHub}
+                                destructive
+                                showChevron={false}
+                                isLast
+                            />
+                        </SettingsGroup>
                     )}
                 </View>
 
-                {/* Extra space at bottom */}
                 <View className="h-20" />
             </ScrollView>
 
@@ -414,5 +397,18 @@ export default function ManageHubScreen() {
                 message={statusModalConfig.message}
             />
         </SafeAreaView>
+    );
+}
+
+/** Small tinted state pill at the end of a menu row (Discord connected, verification state). */
+function StatusPill({ icon, color, text }: { icon?: keyof typeof Ionicons.glyphMap; color: string; text: string }) {
+    return (
+        <View
+            className="flex-row items-center px-2.5 py-1 rounded-full"
+            style={{ gap: 4, backgroundColor: color + '1F', borderWidth: 1, borderColor: color + '4D' }}
+        >
+            {icon ? <Ionicons name={icon} size={11} color={color} /> : null}
+            <Text className="text-[10px] font-black uppercase tracking-wider" style={{ color }}>{text}</Text>
+        </View>
     );
 }

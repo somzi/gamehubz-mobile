@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { Button } from '../ui/Button';
+import { View, Text, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Toggle } from '../ui/Toggle';
-import { cn } from '../../lib/utils';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FieldInput, GradientButton, GhostButton, FIELD_LABEL } from '../ui/FormField';
+import { COLORS } from '../../lib/theme';
 
 // Discord webhook + notification settings moved to their own screen
 // (ManageHubDiscordScreen) — this modal only edits the hub's identity.
@@ -76,12 +76,34 @@ export function EditHubModal({
                     className="flex-1 justify-center items-center px-5"
                 >
                     <View
-                        className="bg-[#0D1525] rounded-3xl p-6 w-full max-w-md max-h-[88%] border border-white/[0.06]"
+                        className="rounded-[28px] p-5 w-full max-w-md max-h-[88%] overflow-hidden"
+                        style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.11)' }}
                     >
-                        <View className="flex-row justify-between items-center mb-5">
-                            <Text className="text-xl font-black text-white">{t('edit.title')}</Text>
-                            <Pressable onPress={onClose} className="w-8 h-8 rounded-xl bg-white/[0.05] items-center justify-center">
-                                <Ionicons name="close" size={18} color="#64748B" />
+                        {/* The hub's emerald along the top edge */}
+                        <LinearGradient
+                            pointerEvents="none"
+                            colors={['rgba(16,185,129,0)', 'rgba(52,211,153,0.6)', 'rgba(16,185,129,0)']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={{ position: 'absolute', top: 0, left: 24, right: 24, height: 1 }}
+                        />
+
+                        <View className="flex-row items-center mb-5" style={{ gap: 12 }}>
+                            <View
+                                className="w-10 h-10 rounded-xl items-center justify-center"
+                                style={{ backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}
+                            >
+                                <Ionicons name="planet" size={19} color={COLORS.primaryBright} />
+                            </View>
+                            <Text className="flex-1 text-[19px] font-black text-white tracking-tight" numberOfLines={1}>{t('edit.title')}</Text>
+                            <Pressable
+                                onPress={onClose}
+                                hitSlop={8}
+                                accessibilityRole="button"
+                                accessibilityLabel={tCommon('close')}
+                                className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 items-center justify-center active:opacity-60"
+                            >
+                                <Ionicons name="close" size={18} color={COLORS.slate400} />
                             </Pressable>
                         </View>
 
@@ -92,89 +114,109 @@ export function EditHubModal({
                             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
                             alwaysBounceVertical={false}
                         >
-                            <View className="mb-4">
-                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('edit.hubName')}</Text>
-                                <TextInput
+                            <View style={{ gap: 16 }}>
+                                <FieldInput
+                                    label={t('edit.hubName')}
+                                    icon="planet"
                                     value={name}
                                     onChangeText={setName}
                                     placeholder={t('edit.hubNamePlaceholder')}
-                                    placeholderTextColor="#334155"
-                                    className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm"
                                 />
-                            </View>
 
-                            <View className="mb-5">
-                                <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('edit.description')}</Text>
-                                <TextInput
+                                <FieldInput
+                                    label={t('edit.description')}
                                     value={description}
                                     onChangeText={setDescription}
                                     placeholder={t('edit.descriptionPlaceholder')}
-                                    placeholderTextColor="#334155"
                                     multiline
                                     numberOfLines={4}
-                                    textAlignVertical="top"
-                                    className="bg-white/[0.03] p-3.5 rounded-2xl text-white border border-white/[0.06] text-sm h-24"
                                 />
-                            </View>
 
-                            <View className="h-[1px] bg-white/5 mb-5" />
-
-                            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">{t('edit.privacy')}</Text>
-                            <View className="bg-white/[0.03] p-4 rounded-2xl border border-white/[0.06]">
-                                <View className="flex-row items-center justify-between">
-                                    <View className="flex-row items-center gap-3 flex-1">
-                                        <View className={cn(
-                                            "w-10 h-10 rounded-2xl items-center justify-center",
-                                            isPublic ? "bg-emerald-500/10" : "bg-amber-500/10"
-                                        )}>
-                                            <Ionicons
-                                                name={isPublic ? "globe-outline" : "lock-closed-outline"}
-                                                size={18}
-                                                color={isPublic ? "#10B981" : "#F59E0B"}
-                                            />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-white font-bold text-sm">
-                                                {isPublic ? t('edit.publicHub') : t('edit.privateHub')}
-                                            </Text>
-                                            <Text className="text-slate-500 text-xs mt-0.5">
-                                                {isPublic
-                                                    ? t('edit.publicHint')
-                                                    : t('edit.privateHint')}
-                                            </Text>
-                                        </View>
+                                {/* Who can find the hub: two cards, the chosen one lit in its colour */}
+                                <View>
+                                    <Text className={FIELD_LABEL}>{t('edit.privacy')}</Text>
+                                    <View className="flex-row" style={{ gap: 10 }}>
+                                        <PrivacyOption
+                                            icon="globe-outline"
+                                            color="#10B981"
+                                            label={t('edit.publicHub')}
+                                            selected={isPublic}
+                                            onPress={() => setIsPublic(true)}
+                                        />
+                                        <PrivacyOption
+                                            icon="lock-closed-outline"
+                                            color="#F59E0B"
+                                            label={t('edit.privateHub')}
+                                            selected={!isPublic}
+                                            onPress={() => setIsPublic(false)}
+                                        />
                                     </View>
-                                    <Toggle
-                                        value={isPublic}
-                                        onValueChange={setIsPublic}
-                                        activeColor="#10B981"
-                                        inactiveColor="#F59E0B"
-                                    />
+                                    <Text className="text-[12px] leading-[17px] text-slate-400 mt-2.5 ml-0.5">
+                                        {isPublic ? t('edit.publicHint') : t('edit.privateHint')}
+                                    </Text>
                                 </View>
                             </View>
-
                         </ScrollView>
 
-                        <View className="flex-row gap-3 mt-6">
-                            <Button
-                                onPress={onClose}
-                                variant="secondary"
-                                className="flex-1"
-                                disabled={isSaving}
-                            >
-                                {tCommon('cancel')}
-                            </Button>
-                            <Button
+                        <View className="flex-row mt-6" style={{ gap: 10 }}>
+                            <GhostButton label={tCommon('cancel')} onPress={onClose} disabled={isSaving} style={{ flex: 1 }} />
+                            <GradientButton
+                                label={tCommon('save')}
                                 onPress={handleSave}
-                                className="flex-1"
-                                disabled={isSaving || !name.trim()}
-                            >
-                                {isSaving ? t('edit.saving') : tCommon('save')}
-                            </Button>
+                                loading={isSaving}
+                                disabled={!name.trim()}
+                                style={{ flex: 1 }}
+                            />
                         </View>
                     </View>
                 </KeyboardAvoidingView>
             </View>
         </Modal>
+    );
+}
+
+function PrivacyOption({
+    icon,
+    color,
+    label,
+    selected,
+    onPress,
+}: {
+    icon: keyof typeof Ionicons.glyphMap;
+    color: string;
+    label: string;
+    selected: boolean;
+    onPress: () => void;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+            accessibilityRole="radio"
+            accessibilityState={{ selected }}
+            className="flex-1 flex-row items-center rounded-2xl px-3 py-3 active:opacity-80"
+            style={{
+                gap: 9,
+                backgroundColor: selected ? color + '14' : 'rgba(0,0,0,0.25)',
+                borderWidth: 1,
+                borderColor: selected ? color + '66' : 'rgba(255,255,255,0.08)',
+            }}
+        >
+            <View
+                className="w-8 h-8 rounded-xl items-center justify-center"
+                style={{ backgroundColor: color + (selected ? '26' : '12') }}
+            >
+                <Ionicons name={icon} size={16} color={selected ? color : COLORS.slate500} />
+            </View>
+            <Text
+                className="flex-1 text-[13.5px] font-black"
+                style={{ color: selected ? COLORS.foreground : COLORS.slate400 }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+            >
+                {label}
+            </Text>
+            {selected && <Ionicons name="checkmark-circle" size={16} color={color} />}
+        </Pressable>
     );
 }

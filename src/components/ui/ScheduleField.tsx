@@ -20,6 +20,8 @@ interface ScheduleFieldProps {
     iconColor: string;
     onPress: () => void;
     disabled?: boolean;
+    /** Rendered alone in a column — drops `flex-1`, which would collapse it to height 0 there. */
+    standalone?: boolean;
 }
 
 /**
@@ -36,18 +38,19 @@ export function ScheduleField({
     iconColor,
     onPress,
     disabled,
+    standalone = false,
 }: ScheduleFieldProps) {
     const parts = formatSchedulePickerValue(value);
     return (
-        <View className="flex-1">
-            <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
+        <View className={standalone ? undefined : 'flex-1'}>
+            <Text className="text-[10.5px] font-black uppercase tracking-[1.4px] text-slate-400 mb-2 ml-0.5" numberOfLines={1}>
                 {label}
             </Text>
             <TouchableOpacity
                 onPress={onPress}
                 disabled={disabled}
                 activeOpacity={0.7}
-                className={`bg-white/[0.03] border border-white/[0.06] rounded-2xl px-3 py-2.5 flex-row items-center ${disabled ? 'opacity-50' : ''}`}
+                className={`bg-black/25 border border-white/[0.08] rounded-[14px] px-3 py-2.5 flex-row items-center ${disabled ? 'opacity-50' : ''}`}
                 style={{ minHeight: 56 }}
             >
                 <View

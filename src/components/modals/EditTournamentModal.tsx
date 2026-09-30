@@ -10,7 +10,6 @@ import {
     KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Button } from '../ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
 import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
@@ -20,6 +19,8 @@ import { DateTimePickerModal } from './DateTimePickerModal';
 import { ScheduleField } from '../ui/ScheduleField';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FIELD_LABEL, FIELD_INPUT, FIELD_MULTILINE, FIELD_HINT, FIELD_PLACEHOLDER, GradientButton } from '../ui/FormField';
 import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
@@ -32,10 +33,8 @@ const YES_NO_OPTIONS = [
     { value: 'yes', labelKey: 'common:yes' },
 ] as const;
 
-const FIELD_LABEL = "text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2";
-const FIELD_INPUT = "bg-white/[0.03] px-4 h-12 rounded-2xl text-white border border-white/[0.06] text-sm";
-const FIELD_MULTILINE = "bg-white/[0.03] p-4 h-24 rounded-2xl text-white border border-white/[0.06] text-sm";
-const FIELD_HINT = "text-[11px] text-slate-500 mt-2";
+// Violet into gold: the tournament's colours from its cover and share card.
+const TOURNAMENT_EDGE = ['rgba(167,139,250,0)', 'rgba(167,139,250,0.7)', 'rgba(251,191,36,0.6)', 'rgba(251,191,36,0)'] as const;
 
 interface EditTournamentModalProps {
     visible: boolean;
@@ -593,10 +592,10 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
             <TouchableOpacity
                 onPress={onPress}
                 disabled={disabled}
-                className={`bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
+                className={`bg-black/25 px-4 h-12 rounded-[14px] border border-white/[0.08] flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
             >
-                <Text className="text-white text-sm" numberOfLines={1}>{value}</Text>
-                {!disabled && <Ionicons name="chevron-down" size={16} color="#64748B" />}
+                <Text className="shrink text-white text-[15px]" numberOfLines={1}>{value}</Text>
+                {!disabled && <Ionicons name="chevron-down" size={16} color={COLORS.slate500} />}
             </TouchableOpacity>
         </View>
     );
@@ -613,8 +612,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         return (
             <Modal visible={visible} transparent animationType="fade">
                 <Pressable className="flex-1 bg-black/60 justify-center px-6" onPress={onCloseModal}>
-                    <View className="bg-card rounded-3xl border border-white/10 max-h-[60%] overflow-hidden shadow-2xl">
-                        <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
+                    <View
+                        className="rounded-3xl max-h-[60%] overflow-hidden"
+                        style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderTopColor: 'rgba(255,255,255,0.12)' }}
+                    >
+                        <ScrollView className="p-3" showsVerticalScrollIndicator={false}>
                             {options.map(opt => {
                                 const active = multi
                                     ? (selected as string[]).includes(opt.value)
@@ -627,12 +629,12 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             onSelect(opt.value);
                                             if (!multi) onCloseModal();
                                         }}
-                                        className={`p-4 mb-2 rounded-2xl flex-row justify-between items-center ${active ? 'bg-primary' : 'bg-card-elevated'}`}
+                                        className={`px-4 py-3.5 mb-1.5 rounded-2xl flex-row justify-between items-center border ${active ? 'bg-primary/15 border-primary/40' : 'bg-white/[0.03] border-white/[0.05]'}`}
                                     >
-                                        <Text className={`${active ? 'text-black' : 'text-white'} font-semibold`}>
+                                        <Text className={`shrink text-[15px] ${active ? 'text-white font-black' : 'text-slate-300 font-semibold'}`}>
                                             {opt.label}
                                         </Text>
-                                        {active && <Ionicons name="checkmark" size={18} color="#000" />}
+                                        {active && <Ionicons name="checkmark-circle" size={19} color={COLORS.primaryBright} />}
                                     </TouchableOpacity>
                                 );
                             })}
@@ -686,16 +688,44 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 className="flex-1 bg-black/80 justify-end"
             >
                 <View
-                    className="bg-background w-full rounded-t-[40px] border-t border-white/10 shadow-2xl overflow-hidden"
+                    className="bg-background w-full rounded-t-[32px] overflow-hidden"
                     style={{ maxHeight: '90%' }}
                 >
-                    <View className="flex-row justify-between items-center p-6 border-b border-white/5">
-                        <View>
-                            <Text className="text-[10px] font-black uppercase tracking-[2px] text-primary mb-0.5">{t('form.manageTournament')}</Text>
-                            <Text className="text-xl font-black text-white">{t('form.editTournament')}</Text>
+                    {/* The tournament's violet and gold along the sheet's top edge */}
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={TOURNAMENT_EDGE}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={{ height: 1.5 }}
+                    />
+                    <View className="items-center pt-2.5">
+                        <View className="w-10 h-1 rounded-full bg-white/15" />
+                    </View>
+
+                    <View className="flex-row items-center px-5 pt-3 pb-4 border-b border-white/[0.06]" style={{ gap: 12 }}>
+                        <LinearGradient
+                            colors={['#4C1D95', '#312E81']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)' }}
+                        >
+                            <Ionicons name="trophy" size={20} color="#FBBF24" />
+                        </LinearGradient>
+                        <View className="flex-1">
+                            <Text className="text-[19px] leading-[23px] font-black text-white tracking-tight" numberOfLines={1}>
+                                {t('form.editTournament')}
+                            </Text>
+                            <Text className="text-[13px] font-semibold mt-0.5" style={{ color: '#C4B5FD' }} numberOfLines={1}>
+                                {name.trim() || t('form.manageTournament')}
+                            </Text>
                         </View>
-                        <TouchableOpacity onPress={onClose} className="bg-white/5 p-2 rounded-full">
-                            <Ionicons name="close" size={20} color="#94A3B8" />
+                        <TouchableOpacity
+                            onPress={onClose}
+                            accessibilityRole="button"
+                            className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 items-center justify-center"
+                        >
+                            <Ionicons name="close" size={18} color={COLORS.slate400} />
                         </TouchableOpacity>
                     </View>
 
@@ -725,7 +755,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <TextInput
                                             className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                             placeholder={t('form.namePlaceholder')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             value={name}
                                             onChangeText={setName}
                                             editable={canEditAll}
@@ -763,7 +793,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             <TextInput
                                                 className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                 placeholder="e.g. 16"
-                                                placeholderTextColor="#334155"
+                                                placeholderTextColor={FIELD_PLACEHOLDER}
                                                 keyboardType="numeric"
                                                 value={maxPlayers}
                                                 onChangeText={setMaxPlayers}
@@ -780,7 +810,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                 <TextInput
                                                     className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                     placeholder="e.g. 4"
-                                                    placeholderTextColor="#334155"
+                                                    placeholderTextColor={FIELD_PLACEHOLDER}
                                                     keyboardType="numeric"
                                                     value={groupsCount}
                                                     onChangeText={setGroupsCount}
@@ -792,7 +822,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                 <TextInput
                                                     className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                     placeholder="e.g. 2"
-                                                    placeholderTextColor="#334155"
+                                                    placeholderTextColor={FIELD_PLACEHOLDER}
                                                     keyboardType="numeric"
                                                     value={qualifiersPerGroup}
                                                     onChangeText={setQualifiersPerGroup}
@@ -810,7 +840,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                     <TextInput
                                                         className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                         placeholder={t('form.swissRoundsPlaceholder')}
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={swissRounds}
                                                         onChangeText={setSwissRounds}
@@ -831,7 +861,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                     <TextInput
                                                         className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                         placeholder={t('form.directQualifiersPlaceholder', { count: swissKnockoutSize })}
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={swissDirect}
                                                         onChangeText={setSwissDirect}
@@ -876,7 +906,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             multiline
                                             className={FIELD_MULTILINE}
                                             placeholder={t('form.descriptionPlaceholder')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             textAlignVertical="top"
                                             value={description}
                                             onChangeText={setDescription}
@@ -888,7 +918,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             multiline
                                             className={FIELD_MULTILINE}
                                             placeholder={t('form.rulesPlaceholderShort')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             textAlignVertical="top"
                                             value={rules}
                                             onChangeText={setRules}
@@ -907,7 +937,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                 <TextInput
                                                     className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                     placeholder={tTeam('teamSizePlaceholder')}
-                                                    placeholderTextColor="#334155"
+                                                    placeholderTextColor={FIELD_PLACEHOLDER}
                                                     keyboardType="numeric"
                                                     value={teamSize}
                                                     onChangeText={setTeamSize}
@@ -940,7 +970,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                     <TextInput
                                                         className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                         placeholder="e.g. 2"
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={maxReserves}
                                                         onChangeText={setMaxReserves}
@@ -1061,7 +1091,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                     <TextInput
                                                         className={FIELD_INPUT}
                                                         placeholder="10"
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={checkInGraceMinutes}
                                                         onChangeText={setCheckInGraceMinutes}
@@ -1129,7 +1159,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                                     <TextInput
                                                         className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                                         placeholder="e.g. 2"
-                                                        placeholderTextColor="#334155"
+                                                        placeholderTextColor={FIELD_PLACEHOLDER}
                                                         keyboardType="numeric"
                                                         value={roundDurationValue}
                                                         onChangeText={setRoundDurationValue}
@@ -1181,6 +1211,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                             iconName="lock-open-outline"
                                             iconColor={COLORS.info}
                                             onPress={() => setShowRegOpensPicker(true)}
+                                            standalone
                                         />
                                         <Text className="text-[11px] text-slate-500 mt-2 leading-4">
                                             {t('form.opensClosedNotice')}
@@ -1197,14 +1228,14 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         <TextInput
                                             className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
                                             placeholder={t('form.amountPlaceholder')}
-                                            placeholderTextColor="#334155"
+                                            placeholderTextColor={FIELD_PLACEHOLDER}
                                             keyboardType="numeric"
                                             value={prize}
                                             onChangeText={setPrize}
                                             editable={canEditAll}
                                         />
                                     </View>
-                                    <View className="w-32">
+                                    <View className="w-40">
                                         {renderSelectField(t('form.currency'), getCurrencyLabel(), () => setShowCurrencyPicker(true), !canEditAll)}
                                     </View>
                                 </View>
@@ -1212,18 +1243,19 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                         </View>
                     </ScrollView>
 
-                    <View className="p-5 bg-card border-t border-white/5" style={{ paddingBottom: insets.bottom + 16 }}>
+                    <View className="px-5 pt-3.5 bg-background-deep border-t border-white/[0.06]" style={{ paddingBottom: insets.bottom + 14 }}>
                         {error && (
-                            <Text className="text-red-400 text-xs mb-3 text-center">{error}</Text>
+                            <View className="flex-row items-center bg-red-500/10 border border-red-500/25 rounded-2xl px-3 py-2.5 mb-3" style={{ gap: 8 }}>
+                                <Ionicons name="alert-circle" size={16} color="#F87171" />
+                                <Text className="flex-1 text-red-300 text-xs font-bold">{error}</Text>
+                            </View>
                         )}
-                        <Button
+                        <GradientButton
+                            label={t('form.saveChanges')}
+                            icon="checkmark-circle"
                             onPress={handleSave}
-                            disabled={isSubmitting}
                             loading={isSubmitting}
-                            className="w-full h-14 rounded-2xl"
-                        >
-                            {t('form.saveChanges')}
-                        </Button>
+                        />
                     </View>
                 </View>
 

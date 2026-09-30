@@ -17,10 +17,15 @@ interface MenuItemProps {
     isLast?: boolean;
     /** Extra content between the label and the chevron (e.g. a status pill). */
     rightElement?: React.ReactNode;
+    /** The row's own colour for its icon chip, so a menu scans by colour. Neutral when unset. */
+    color?: string;
 }
 
-/** Settings-menu row: tinted icon chip + label + chevron, for use inside a
- *  grouped glassy card (the SettingsScreen pattern). */
+// The hairline between rows starts where the label does: row padding 16 + chip 36 + gap 12.
+const DIVIDER_INSET = 64;
+
+/** Settings-menu row: tinted icon chip + label + chevron, for use inside a grouped card
+ *  (SettingsGroup). */
 export function MenuItem({
     icon,
     emoji,
@@ -30,33 +35,34 @@ export function MenuItem({
     showChevron = true,
     isLast = false,
     rightElement,
+    color,
 }: MenuItemProps) {
+    const tone = destructive ? COLORS.destructive : color;
+
     return (
         <PressableScale
             onPress={onPress}
             pressedScale={0.98}
-            className={cn(
-                "flex-row items-center justify-between py-3.5 px-4",
-                !isLast && "border-b border-white/5"
-            )}
+            accessibilityRole="button"
+            className="flex-row items-center justify-between py-3 px-4 active:opacity-80"
         >
-            <View className="flex-row items-center gap-3 flex-1">
+            <View className="flex-row items-center flex-1" style={{ gap: 12 }}>
                 <View
-                    className={cn(
-                        "w-9 h-9 rounded-xl items-center justify-center border",
-                        destructive
-                            ? "bg-red-500/10 border-red-500/20"
-                            : "bg-white/[0.04] border-white/[0.06]"
-                    )}
+                    className="w-9 h-9 rounded-xl items-center justify-center"
+                    style={
+                        tone
+                            ? { backgroundColor: tone + '1A', borderWidth: 1, borderColor: tone + '33' }
+                            : { backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }
+                    }
                 >
                     {emoji ? (
                         <Text className="text-[17px]">{emoji}</Text>
                     ) : icon ? (
-                        <Ionicons name={icon} size={17} color={destructive ? COLORS.destructive : COLORS.slate300} />
+                        <Ionicons name={icon} size={17} color={tone ?? COLORS.slate300} />
                     ) : null}
                 </View>
                 <Text
-                    className={cn("font-semibold text-[15px] flex-shrink", destructive ? "text-red-400" : "text-white")}
+                    className={cn('font-bold text-[15px] flex-shrink', destructive ? 'text-red-400' : 'text-white')}
                     numberOfLines={1}
                 >
                     {label}
@@ -66,6 +72,12 @@ export function MenuItem({
                 {rightElement}
                 {showChevron && <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />}
             </View>
+            {!isLast && (
+                <View
+                    pointerEvents="none"
+                    style={{ position: 'absolute', left: DIVIDER_INSET, right: 0, bottom: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.05)' }}
+                />
+            )}
         </PressableScale>
     );
 }

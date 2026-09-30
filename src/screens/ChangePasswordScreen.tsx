@@ -121,7 +121,7 @@ export default function ChangePasswordScreen() {
             <PageHeader title={t('change.title')} showBack />
             <KeyboardAvoider>
                 <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
-                    <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
+                    <View className="bg-card border border-white/[0.07] border-t-white/[0.11] rounded-[22px] p-5">
                         <SectionLabel icon="lock-closed" title={t('change.sectionSecurity')} />
                         <View className="gap-4">
                             <Input

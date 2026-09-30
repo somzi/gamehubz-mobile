@@ -254,7 +254,7 @@ export default function ManageUserSocialsScreen() {
                     {/* Discord bot link — DM notifications; separate from the public social links below */}
                     <View className="mb-6">
                         <SectionLabel icon="logo-discord" title="Discord" color={DISCORD_BLURPLE} />
-                        <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
+                        <View className="p-4 bg-card rounded-[22px] border border-white/[0.07] border-t-white/[0.11]">
                             <View className="flex-row items-center gap-3">
                                 <View
                                     className="w-10 h-10 rounded-xl items-center justify-center border"
@@ -349,7 +349,7 @@ export default function ManageUserSocialsScreen() {
                                 {socials.map((social) => (
                                     <View
                                         key={social.socialType!}
-                                        className="flex-row items-center justify-between p-4 bg-card rounded-2xl border border-white/[0.06]"
+                                        className="flex-row items-center justify-between p-4 bg-card rounded-[22px] border border-white/[0.07] border-t-white/[0.11]"
                                     >
                                         <View className="flex-row items-center gap-3">
                                             <View className="w-10 h-10 rounded-xl bg-indigo-500/10 items-center justify-center border border-indigo-500/20">
@@ -387,7 +387,7 @@ export default function ManageUserSocialsScreen() {
                     {/* Add New Account */}
                     <View className="mb-8">
                         <SectionLabel icon="add-circle" title={t('addAccount')} />
-                        <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
+                        <View className="p-4 bg-card rounded-[22px] border border-white/[0.07] border-t-white/[0.11]">
                             <SelectInput
                                 placeholder={t('selectPlatform')}
                                 options={socialTypeOptions}

@@ -232,7 +232,7 @@ export default function ManageHubSocialsScreen() {
                                     return (
                                         <View
                                             key={socialType!}
-                                            className="flex-row items-center justify-between p-4 bg-card rounded-2xl border border-white/[0.06]"
+                                            className="flex-row items-center justify-between p-4 bg-card rounded-[22px] border border-white/[0.07] border-t-white/[0.11]"
                                         >
                                             <View className="flex-row items-center gap-3">
                                                 <View className="w-10 h-10 rounded-xl bg-warning/10 items-center justify-center border border-warning/20">
@@ -265,7 +265,7 @@ export default function ManageHubSocialsScreen() {
 
                     <View className="mb-8">
                         <SectionLabel icon="add-circle" title={t('addAccount')} />
-                        <View className="p-4 bg-card rounded-2xl border border-white/[0.06]">
+                        <View className="p-4 bg-card rounded-[22px] border border-white/[0.07] border-t-white/[0.11]">
                             <SelectInput
                                 placeholder={t('selectPlatform')}
                                 options={socialTypeOptions}

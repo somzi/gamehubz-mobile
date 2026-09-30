@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useNavigation } from '@react-navigation/native';
@@ -10,17 +10,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
-import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
+import { FormPanel, FieldInput, GradientButton, FIELD_LABEL } from '../components/ui/FormField';
+import { ProfileHeaderCard } from '../components/profile/ProfileHeaderCard';
 import { StatusModal } from '../components/modals/StatusModal';
 import * as ImagePicker from 'expo-image-picker';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
-import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { ActivityIndicator } from 'react-native';
 import { MAX_FILE_SIZE, isFileSizeValid, formatFileSize } from '../lib/image';
 import { CountryPicker } from '../components/ui/CountryPicker';
-import { getRegionName } from '../lib/countries';
-import { SectionLabel } from '../components/ui/SectionLabel';
+import { getRegionName, getCountries } from '../lib/countries';
+import { Country } from '../types/auth';
 import { COLORS } from '../lib/theme';
 
 type UpdateProfileNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -43,6 +42,15 @@ export default function UpdateProfileScreen() {
         message: string;
         onClose?: () => void;
     }>({ type: 'success', title: '', message: '' });
+
+    // The preview shows a newly picked country's flag and name before it is saved.
+    const [countries, setCountries] = useState<Country[]>([]);
+    useEffect(() => {
+        let active = true;
+        getCountries().then((list) => { if (active) setCountries(list); }).catch(() => { });
+        return () => { active = false; };
+    }, []);
+    const previewCountry = useMemo(() => countries.find((c) => c.code === country), [countries, country]);
 
     // Avatar state
     const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -185,47 +193,55 @@ export default function UpdateProfileScreen() {
         <SafeAreaView className="flex-1 bg-background">
             <PageHeader title={t('edit.title')} showBack />
             <KeyboardAvoider>
-                <ScrollView className="flex-1 px-5 py-6" keyboardShouldPersistTaps="handled">
-                    {/* Avatar Section */}
-                    <View className="items-center mb-8">
-                        <View className="relative">
-                            <PlayerAvatar
-                                name={user?.username || t('edit.userFallback')}
-                                src={avatarUri || user?.avatarUrl}
-                                size="xl"
-                                className="w-24 h-24 border-4 border-primary/20"
-                            />
-                            <TouchableOpacity
+                <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+                    {/* Your profile card as other players see it, following every edit below. */}
+                    <ProfileHeaderCard
+                        avatarUrl={avatarUri || user?.avatarUrl}
+                        username={username.trim() || user?.username || t('edit.userFallback')}
+                        nickname={nickName}
+                        countryFlag={previewCountry?.flag ?? user?.countryFlag}
+                        countryName={previewCountry?.name ?? user?.countryName}
+                        region={previewCountry?.region ?? user?.region}
+                        socialLinks={[]}
+                        avatarAccessory={
+                            <Pressable
                                 onPress={handlePickAvatar}
                                 disabled={isUploadingAvatar}
-                                className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-background shadow-sm"
+                                hitSlop={8}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('edit.changePhoto')}
+                                className="w-9 h-9 rounded-full items-center justify-center bg-primary active:opacity-80"
+                                style={{ borderWidth: 3, borderColor: COLORS.card }}
                             >
                                 {isUploadingAvatar ? (
-                                    <ActivityIndicator size="small" color="white" />
+                                    <ActivityIndicator size="small" color={COLORS.primaryForeground} />
                                 ) : (
-                                    <Ionicons name="camera" size={16} color="white" />
+                                    <Ionicons name="camera" size={16} color={COLORS.primaryForeground} />
                                 )}
-                            </TouchableOpacity>
-                        </View>
-                        <Text className="text-sm font-medium text-muted-foreground mt-3">{t('edit.changePhoto')}</Text>
-                    </View>
+                            </Pressable>
+                        }
+                    />
 
-                    <View className="mb-8 bg-white/[0.02] border border-white/[0.05] rounded-3xl p-5">
-                        <SectionLabel icon="person" title={t('edit.sectionBasicInfo')} />
-                        <View className="gap-4">
-                            <Input
+                    <Text className={FIELD_LABEL} style={{ marginTop: 22 }}>{t('edit.sectionBasicInfo')}</Text>
+                    <FormPanel>
+                        <View style={{ gap: 16 }}>
+                            <FieldInput
                                 label={t('edit.usernameLabel')}
+                                icon="person"
                                 value={username}
                                 onChangeText={setUsername}
                                 placeholder={t('edit.usernamePlaceholder')}
-                                leftIcon="person-outline"
+                                autoCorrect={false}
+                                autoCapitalize="none"
                             />
-                            <Input
+                            <FieldInput
                                 label={t('edit.nicknameLabel')}
+                                icon="game-controller"
                                 value={nickName}
                                 onChangeText={setNickName}
                                 placeholder={t('edit.nicknamePlaceholder')}
-                                leftIcon="id-card-outline"
+                                autoCorrect={false}
+                                autoCapitalize="none"
                             />
                             <CountryPicker
                                 label={t('edit.countryLabel')}
@@ -242,21 +258,16 @@ export default function UpdateProfileScreen() {
                                 </View>
                             )}
                         </View>
-                    </View>
+                    </FormPanel>
                 </ScrollView>
 
-                <View className="p-5 border-t border-white/5 bg-background">
-                    <Button
+                <View className="px-5 pt-3 pb-4 border-t border-white/5 bg-background">
+                    <GradientButton
+                        label={t('edit.saveChanges')}
+                        icon="checkmark-circle"
                         onPress={handleSave}
                         loading={isLoading}
-                        size="lg"
-                        className="h-14 rounded-2xl shadow-lg shadow-primary/30"
-                    >
-                        <View className="flex-row items-center justify-center gap-2">
-                            <Text className="text-primary-foreground font-black text-base">{t('edit.saveChanges')}</Text>
-                            <Ionicons name="chevron-forward" size={16} color={COLORS.primaryForeground} />
-                        </View>
-                    </Button>
+                    />
                 </View>
             </KeyboardAvoider>
 

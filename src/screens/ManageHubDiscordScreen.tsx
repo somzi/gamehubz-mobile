@@ -204,7 +204,7 @@ export default function ManageHubDiscordScreen() {
                     {/* Webhook */}
                     <View className="mb-6">
                         <SectionLabel icon="link" title={t('discord.sectionWebhook')} color={DISCORD_BLURPLE} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-4">
+                        <View className="bg-card border border-white/[0.07] border-t-white/[0.11] rounded-[22px] p-4">
                             <Text className="text-white font-bold text-sm mb-1">{t('discord.webhookUrl')}</Text>
                             <Text className="text-slate-500 text-xs mb-3 leading-4">
                                 In Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy URL.
@@ -238,7 +238,7 @@ export default function ManageHubDiscordScreen() {
                     {webhookUrl.trim().length > 0 && (
                         <View className="mb-6">
                             <SectionLabel icon="notifications" title={t('discord.sectionEvents')} color={DISCORD_BLURPLE} />
-                            <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl px-4 py-1">
+                            <View className="bg-card border border-white/[0.07] border-t-white/[0.11] rounded-[22px] px-4 py-1">
                                 {DISCORD_EVENTS.map((event, index) => (
                                     <View
                                         key={event.key}

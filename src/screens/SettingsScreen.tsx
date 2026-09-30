@@ -11,8 +11,9 @@ import { StatusModal } from '../components/modals/StatusModal';
 import { ActionSheetModal } from '../components/modals/ActionSheetModal';
 import Constants from 'expo-constants';
 import { COLORS } from '../lib/theme';
-import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
+import { SettingsHero, SettingsHeroLine, SettingsGroup, SETTINGS_EMBLEM_IMAGE, SETTINGS_EMBLEM_IMAGE_RADIUS } from '../components/ui/SettingsBlocks';
+import { EmblemImage } from '../components/ui/HeroCard';
 import { useLanguage } from '../i18n/useLanguage';
 import { usePushPermission } from '../hooks/usePushPermission';
 
@@ -21,7 +22,7 @@ type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 // Avatar/username editing deliberately lives ONLY in Edit Profile Info
 // (UpdateProfileScreen) — this screen is a pure settings menu.
 export default function SettingsScreen() {
-    const { logout, deleteAccount } = useAuth();
+    const { logout, deleteAccount, user } = useAuth();
     const navigation = useNavigation<SettingsNavigationProp>();
     const { t } = useTranslation('settings');
     const { t: tc } = useTranslation('common');
@@ -85,106 +86,116 @@ export default function SettingsScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title={t('title')} showBack />
 
-            <ScrollView className="flex-1 px-6">
-                {/* Settings Menu — grouped cards */}
-                <View className="gap-5 pt-4">
-                    <View>
-                        <SectionLabel icon="person" title={t('sections.account')} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                            <MenuItem
-                                icon="person-outline"
-                                label={t('editProfile')}
-                                onPress={() => navigation.navigate('UpdateProfile')}
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8 }}>
+                <View style={{ gap: 22 }}>
+                    {/* You: the card opens Edit profile */}
+                    <SettingsHero
+                        theme="player"
+                        onPress={() => navigation.navigate('UpdateProfile')}
+                        accessibilityLabel={t('editProfile')}
+                        title={user?.username || ''}
+                        emblem={
+                            <EmblemImage
+                                src={user?.avatarUrl}
+                                name={user?.username || ''}
+                                size={SETTINGS_EMBLEM_IMAGE}
+                                radius={SETTINGS_EMBLEM_IMAGE_RADIUS}
                             />
-                            <MenuItem
-                                icon="share-social-outline"
-                                label={t('manageSocials')}
-                                onPress={() => navigation.navigate('ManageUserSocials')}
-                            />
-                            <MenuItem
-                                icon="lock-closed-outline"
-                                label={t('passwordSecurity')}
-                                onPress={() => navigation.navigate('ChangePassword')}
-                                isLast
-                            />
-                        </View>
-                    </View>
+                        }
+                    >
+                        {user?.nickName?.trim() ? (
+                            <SettingsHeroLine icon="game-controller" iconColor={COLORS.primary} text={user.nickName.trim()} />
+                        ) : null}
+                        <SettingsHeroLine icon="create-outline" iconColor={COLORS.primaryBright} text={t('editProfile')} textColor={COLORS.primaryBright} />
+                    </SettingsHero>
 
-                    <View>
-                        <SectionLabel icon="options" title={t('sections.preferences')} color={COLORS.highlight} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                            <MenuItem
-                                icon="notifications-outline"
-                                label={t('notifications.title')}
-                                onPress={() => navigation.navigate('NotificationSettings')}
-                                rightElement={pushPermission && !pushPermission.granted ? (
-                                    <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: COLORS.warning + '1F' }}>
-                                        <Text className="text-[11px] font-black" style={{ color: COLORS.warning }}>
-                                            {t('notifications.pushOff')}
-                                        </Text>
-                                    </View>
-                                ) : undefined}
-                            />
-                            <MenuItem
-                                icon="language-outline"
-                                label={t('language')}
-                                onPress={() => setShowLanguageSheet(true)}
-                                isLast
-                                rightElement={
-                                    <Text className="text-slate-400 text-[13px] font-semibold" numberOfLines={1}>
-                                        {current.flag}  {current.label}
+                    <SettingsGroup title={t('sections.account')}>
+                        <MenuItem
+                            icon="share-social"
+                            color="#60A5FA"
+                            label={t('manageSocials')}
+                            onPress={() => navigation.navigate('ManageUserSocials')}
+                        />
+                        <MenuItem
+                            icon="lock-closed"
+                            color={COLORS.warning}
+                            label={t('passwordSecurity')}
+                            onPress={() => navigation.navigate('ChangePassword')}
+                            isLast
+                        />
+                    </SettingsGroup>
+
+                    <SettingsGroup title={t('sections.preferences')}>
+                        <MenuItem
+                            icon="notifications"
+                            color="#F43F5E"
+                            label={t('notifications.title')}
+                            onPress={() => navigation.navigate('NotificationSettings')}
+                            rightElement={pushPermission && !pushPermission.granted ? (
+                                <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: COLORS.warning + '1F' }}>
+                                    <Text className="text-[11px] font-black" style={{ color: COLORS.warning }}>
+                                        {t('notifications.pushOff')}
                                     </Text>
-                                }
-                            />
-                        </View>
-                    </View>
+                                </View>
+                            ) : undefined}
+                        />
+                        <MenuItem
+                            icon="language"
+                            color={COLORS.highlight}
+                            label={t('language')}
+                            onPress={() => setShowLanguageSheet(true)}
+                            isLast
+                            rightElement={
+                                <Text className="text-slate-400 text-[13px] font-semibold" numberOfLines={1}>
+                                    {current.flag}  {current.label}
+                                </Text>
+                            }
+                        />
+                    </SettingsGroup>
 
-                    <View>
-                        <SectionLabel icon="help-buoy" title={t('sections.support')} color={COLORS.info} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                            <MenuItem
-                                icon="help-circle-outline"
-                                label={t('helpCenter')}
-                                onPress={() => navigation.navigate('HelpCenter')}
-                            />
-                            <MenuItem
-                                icon="mail-outline"
-                                label={t('contactUs')}
-                                onPress={() => navigation.navigate('ContactUs')}
-                            />
-                            <MenuItem
-                                icon="information-circle-outline"
-                                label={t('aboutUs')}
-                                onPress={() => navigation.navigate('AboutUs')}
-                                isLast
-                            />
-                        </View>
-                    </View>
+                    <SettingsGroup title={t('sections.support')}>
+                        <MenuItem
+                            icon="help-circle"
+                            color="#22D3EE"
+                            label={t('helpCenter')}
+                            onPress={() => navigation.navigate('HelpCenter')}
+                        />
+                        <MenuItem
+                            icon="mail"
+                            color={COLORS.primary}
+                            label={t('contactUs')}
+                            onPress={() => navigation.navigate('ContactUs')}
+                        />
+                        <MenuItem
+                            icon="information-circle"
+                            color={COLORS.slate400}
+                            label={t('aboutUs')}
+                            onPress={() => navigation.navigate('AboutUs')}
+                            isLast
+                        />
+                    </SettingsGroup>
 
-                    <View>
-                        <SectionLabel icon="exit-outline" title={t('sections.accountActions')} color={COLORS.destructive} />
-                        <View className="bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-                            <MenuItem
-                                icon="log-out-outline"
-                                label={t('logOut')}
-                                onPress={handleLogout}
-                                destructive
-                                showChevron={false}
-                            />
-                            <MenuItem
-                                icon="trash-outline"
-                                label={t('deleteAccount')}
-                                onPress={handleDeleteAccount}
-                                destructive
-                                showChevron={false}
-                                isLast
-                            />
-                        </View>
-                    </View>
+                    <SettingsGroup title={t('sections.accountActions')} danger>
+                        <MenuItem
+                            icon="log-out-outline"
+                            label={t('logOut')}
+                            onPress={handleLogout}
+                            destructive
+                            showChevron={false}
+                        />
+                        <MenuItem
+                            icon="trash-outline"
+                            label={t('deleteAccount')}
+                            onPress={handleDeleteAccount}
+                            destructive
+                            showChevron={false}
+                            isLast
+                        />
+                    </SettingsGroup>
                 </View>
 
-                <View className="py-8 items-center opacity-30">
-                    <Text className="text-white text-xs">
+                <View className="py-8 items-center">
+                    <Text className="text-slate-600 text-xs font-semibold" style={{ fontVariant: ['tabular-nums'] }}>
                         {t('version', { version: Constants.expoConfig?.version || '1.0.0' })}
                     </Text>
                 </View>

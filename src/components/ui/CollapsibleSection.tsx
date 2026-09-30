@@ -15,11 +15,11 @@ interface CollapsibleSectionProps {
     children: React.ReactNode;
 }
 
-/** Glassy expand/collapse form section: tinted icon chip + title + collapsed-state
- *  summary in the header, body revealed with a Reanimated layout transition.
+/** Expand/collapse form section on the edit forms' card surface: tinted icon chip + title +
+ *  collapsed-state summary in the header; an open section lights its chip and draws a hairline
+ *  between header and body. The body is revealed with a Reanimated layout transition.
  *  (LayoutAnimation is off-limits here — on the new architecture it leaves ghost
- *  copies of sibling text at stale positions while sections reflow.)
- *  The form-modal counterpart of the grouped settings card (MenuItem/SectionLabel pattern). */
+ *  copies of sibling text at stale positions while sections reflow.) */
 export function CollapsibleSection({
     icon,
     title,
@@ -34,40 +34,58 @@ export function CollapsibleSection({
         <Animated.View
             layout={LinearTransition.duration(200)}
             style={{
-                backgroundColor: 'rgba(255,255,255,0.02)',
+                backgroundColor: COLORS.card,
                 borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.05)',
-                borderRadius: 24,
+                borderColor: open ? color + '33' : 'rgba(255,255,255,0.07)',
+                borderTopColor: open ? color + '4D' : 'rgba(255,255,255,0.11)',
+                borderRadius: 22,
                 overflow: 'hidden',
             }}
         >
             <Pressable
                 onPress={() => setOpen(o => !o)}
-                className="flex-row items-center justify-between p-4 active:opacity-70"
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}
+                className="flex-row items-center justify-between px-4 py-3.5 active:opacity-70"
             >
-                <View className="flex-row items-center gap-3 flex-1 mr-2">
+                <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
                     <View
-                        className="w-9 h-9 rounded-xl items-center justify-center border"
-                        style={{ backgroundColor: color + '1A', borderColor: color + '33' }}
+                        className="w-9 h-9 rounded-xl items-center justify-center"
+                        style={{
+                            backgroundColor: color + (open ? '26' : '14'),
+                            borderWidth: 1,
+                            borderColor: color + (open ? '55' : '2E'),
+                        }}
                     >
                         <Ionicons name={icon} size={17} color={color} />
                     </View>
                     <View className="flex-1">
-                        <Text className="text-white font-bold text-[15px]">{title}</Text>
+                        <Text className="text-white font-black text-[15px] tracking-tight">{title}</Text>
                         {!open && summary ? (
-                            <Text className="text-slate-500 text-xs mt-0.5" numberOfLines={1}>
+                            <Text className="text-slate-500 text-[12px] font-medium mt-0.5" numberOfLines={1}>
                                 {summary}
                             </Text>
                         ) : null}
                     </View>
                 </View>
-                <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.slate600} />
+                <View
+                    className="w-7 h-7 rounded-lg items-center justify-center"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+                >
+                    <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={open ? color : COLORS.slate500} />
+                </View>
             </Pressable>
 
             {open && (
                 <Animated.View
                     entering={FadeIn.duration(150)}
-                    style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4 }}
+                    style={{
+                        paddingHorizontal: 16,
+                        paddingBottom: 16,
+                        paddingTop: 14,
+                        borderTopWidth: 1,
+                        borderTopColor: 'rgba(255,255,255,0.05)',
+                    }}
                 >
                     {children}
                 </Animated.View>
