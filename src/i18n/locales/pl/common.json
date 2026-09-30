@@ -148,7 +148,9 @@
     "victory": "WYGRANA",
     "defeat": "PORAŻKA",
     "drawResult": "REMIS",
-    "private": "Prywatny"
+    "private": "Prywatny",
+    "showMore": "Pokaż więcej",
+    "showLess": "Pokaż mniej"
   },
   "nav": {
     "home": "Główna",

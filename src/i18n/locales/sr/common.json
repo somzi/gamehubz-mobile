@@ -147,7 +147,9 @@
     "victory": "POBEDA",
     "defeat": "PORAZ",
     "drawResult": "NEREŠENO",
-    "private": "Privatni"
+    "private": "Privatni",
+    "showMore": "Prikaži više",
+    "showLess": "Prikaži manje"
   },
   "nav": {
     "home": "Početna",

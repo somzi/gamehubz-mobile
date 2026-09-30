@@ -146,7 +146,9 @@
     "victory": "VICTORY",
     "defeat": "DEFEAT",
     "drawResult": "DRAW",
-    "private": "Private"
+    "private": "Private",
+    "showMore": "Show more",
+    "showLess": "Show less"
   },
   "nav": {
     "home": "Home",

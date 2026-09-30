@@ -146,7 +146,9 @@
     "victory": "VICTORIA",
     "defeat": "DERROTA",
     "drawResult": "EMPATE",
-    "private": "Privado"
+    "private": "Privado",
+    "showMore": "Ver más",
+    "showLess": "Ver menos"
   },
   "nav": {
     "home": "Inicio",

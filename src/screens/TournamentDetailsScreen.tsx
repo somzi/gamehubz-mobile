@@ -27,7 +27,16 @@ import { useBadges } from '../context/BadgesContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
+import { HeroFrame, HeroBanner, CoverPill } from '../components/ui/HeroCard';
+import {
+    Panel,
+    PanelTitle,
+    StatCell,
+    StatDivider,
+    DetailGrid,
+    ExpandableText,
+    type DetailItem,
+} from '../components/ui/Panel';
 import { MatchDetailsModal, type MatchModalTab } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
 import { PendingApprovalsModal, PendingApprovalItem } from '../components/modals/PendingApprovalsModal';
@@ -72,6 +81,21 @@ import { formatJoinCode } from '../lib/share';
 import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
+
+// The tournament share card's colours: violet into indigo, a gold edge.
+const TOURNAMENT_HAIRLINE = ['rgba(167,139,250,0.55)', 'rgba(148,163,184,0.14)', 'rgba(245,158,11,0.45)'] as const;
+const TOURNAMENT_BANNER = ['#4C1D95', '#6D28D9', '#4338CA'] as const;
+// Secondary text on the violet cover.
+const COVER_TEXT = 'rgba(237,233,254,0.88)';
+const COVER_MUTED = 'rgba(221,214,254,0.7)';
+
+const STATUS_PILL: Record<number, { labelKey: string; dot: string }> = {
+    0: { labelKey: 'details.statusOpen', dot: '#A5B4FC' },
+    1: { labelKey: 'details.statusUpcoming', dot: '#A5B4FC' },
+    2: { labelKey: 'details.statusRegClosed', dot: '#FBBF24' },
+    3: { labelKey: 'details.liveBadge', dot: '#34D399' },
+    4: { labelKey: 'details.statusCompleted', dot: '#94A3B8' },
+};
 
 // Join codes arrive from a deep link's query string, so anything but exactly six digits is noise.
 function normalizeInviteCode(code?: string | null): string | null {
@@ -366,9 +390,6 @@ export default function TournamentDetailsScreen() {
     const [removingTeamId, setRemovingTeamId] = useState<string | null>(null);
 
     // Collapsible section states
-    const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(true);
-    const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
-    const [isRulesOpen, setIsRulesOpen] = useState(false);
     const [showCountriesModal, setShowCountriesModal] = useState(false);
 
     // `codeOverride` is the code the prompt just verified — state set in the same tick isn't visible
@@ -2479,178 +2500,183 @@ export default function TournamentDetailsScreen() {
                 }
             >
                 <View className="animate-slide-up">
-                    {/* Hero Section */}
-                    <View className="px-4 py-6 bg-background">
-                        <View className="mb-4">
-                            <View className="flex-row items-start justify-between mb-2">
-                                <Text className="text-3xl font-black text-white leading-tight flex-1 mr-3">{tournament.name}</Text>
-                                {(() => {
-                                    const s = Number(tournament.status);
-                                    if (s === 3) return (
-                                        <View className="bg-emerald-900 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-primary/20 mt-1">
-                                            <View className="w-2 h-2 rounded-full bg-primary" />
-                                            <Text className="text-[10px] font-black text-primary uppercase tracking-tighter">{t('details.liveBadge')}</Text>
-                                        </View>
-                                    );
-                                    if (s === 4) return (
-                                        <View className="bg-slate-800 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-slate-700/50 mt-1">
-                                            <View className="w-2 h-2 rounded-full bg-slate-500" />
-                                            <Text className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{t('details.statusCompleted')}</Text>
-                                        </View>
-                                    );
-                                    if (s === 2) return (
-                                        <View className="bg-yellow-500/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-yellow-500/20 mt-1">
-                                            <View className="w-2 h-2 rounded-full bg-yellow-400" />
-                                            <Text className="text-[10px] font-black text-yellow-400 uppercase tracking-tighter">{t('details.statusRegClosed')}</Text>
-                                        </View>
-                                    );
-                                    if (s === 1) return (
-                                        <View className="bg-indigo-500/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-indigo-500/20 mt-1">
-                                            <View className="w-2 h-2 rounded-full bg-indigo-400" />
-                                            <Text className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">{t('details.statusUpcoming')}</Text>
-                                        </View>
-                                    );
-                                    if (s === 0) return (
-                                        <View className="bg-indigo-500/10 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 border border-indigo-500/20 mt-1">
-                                            <View className="w-2 h-2 rounded-full bg-indigo-400" />
-                                            <Text className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">{t('details.statusOpen')}</Text>
-                                        </View>
-                                    );
-                                    return null;
-                                })()}
-                            </View>
-                            <View className="flex-row items-center gap-2">
-                                <Ionicons name="people-outline" size={16} color="#71717A" />
-                                <Text className="text-sm font-bold text-zinc-500">
-                                    {tournament?.isTeamTournament
-                                        ? t('details.teamsCount', { count: tournamentTeams.length })
-                                        : t('details.participantsCount', { count: tournament.numberOfParticipants || 0 })}
-                                </Text>
-                                {tournament.isPrivate && (
-                                    <View className="ml-1">
-                                        <PrivateBadge size="md" />
-                                    </View>
-                                )}
-                            </View>
-                        </View>
+                    {/* Hero: the tournament's cover, in its share card's violet and gold. Status and
+                        access pills, the name, how many are in and the hub hosting it; the sign-up
+                        actions sit under the cover. */}
+                    {(() => {
+                        const isCreator = canManage;
+                        const isParticipant = participants.some(p =>
+                            (p.username || p.Username)?.toLowerCase() === user?.username?.toLowerCase()
+                        );
+                        const isOpenOrUpcoming = (tournament.status === 0 || tournament.status === 1) && !isWaitingToOpen;
+                        const attendeeCount = tournament?.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0);
+                        const currentAttendeeCount = attendeeCount;
+                        const isFull = tournament.maxPlayers > 0 && currentAttendeeCount >= tournament.maxPlayers;
 
-                        {(() => {
-                            const isCreator = canManage;
-                            const isParticipant = participants.some(p =>
-                                (p.username || p.Username)?.toLowerCase() === user?.username?.toLowerCase()
+                        // Region/country eligibility — mirrors the backend feed filter so the
+                        // hub-navigation path can't surface a Join button the user can't use.
+                        const tournamentCountries: string[] = tournament.countries || [];
+                        const isCountryScoped = tournamentCountries.length > 0;
+                        const isRegionCountryEligible = isCountryScoped
+                            ? (!!user?.country && tournamentCountries.includes(user.country))
+                            : (tournament.region === TournamentRegion.Global || tournament.region === user?.region);
+                        // Exclusive tournaments need an Exclusive-or-higher hub role; the server
+                        // reports this via hasExclusiveAccess so plain members don't see Join.
+                        const isExclusiveEligible = !tournament.isExclusive || tournament.hasExclusiveAccess === true;
+                        const isEligible = isRegionCountryEligible && isExclusiveEligible;
+                        const restrictionLabel = !isExclusiveEligible
+                            ? t('details.exclusiveMembersOfHub')
+                            : isCountryScoped
+                                ? (tournamentCountries.length <= 3
+                                    ? `${(tournament.countryFlags || []).join(' ')} ${(tournament.countryNames || tournamentCountries).join(', ')}`.trim()
+                                    : t('details.countriesCount', { count: tournamentCountries.length }))
+                                : t('details.thisRegion');
+
+                        const buttons = [];
+
+                        // Surface a "restricted" note (instead of a join button) when the user
+                        // would otherwise be able to join but isn't eligible by region/country.
+                        const wouldJoin = !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull
+                            && (!tournament.isTeamTournament ? true : (!userTeam && !isLoadingTeams));
+
+                        if (wouldJoin && !isEligible) {
+                            buttons.push(
+                                <View key="restricted" className="w-full bg-[#0D1525] border border-white/[0.06] rounded-2xl p-4 flex-row items-center gap-3">
+                                    <Ionicons name="lock-closed" size={18} color="#64748B" />
+                                    <Text className="flex-1 text-slate-400 text-sm font-medium">
+                                        {t('details.restrictedNotice', { restriction: restrictionLabel })}
+                                    </Text>
+                                </View>
                             );
-                            const isOpenOrUpcoming = (tournament.status === 0 || tournament.status === 1) && !isWaitingToOpen;
-                            const attendeeCount = tournament?.isTeamTournament ? tournamentTeams.length : (tournament.numberOfParticipants || 0);
-                            const currentAttendeeCount = attendeeCount;
-                            const isFull = tournament.maxPlayers > 0 && currentAttendeeCount >= tournament.maxPlayers;
-
-                            // Region/country eligibility — mirrors the backend feed filter so the
-                            // hub-navigation path can't surface a Join button the user can't use.
-                            const tournamentCountries: string[] = tournament.countries || [];
-                            const isCountryScoped = tournamentCountries.length > 0;
-                            const isRegionCountryEligible = isCountryScoped
-                                ? (!!user?.country && tournamentCountries.includes(user.country))
-                                : (tournament.region === TournamentRegion.Global || tournament.region === user?.region);
-                            // Exclusive tournaments need an Exclusive-or-higher hub role; the server
-                            // reports this via hasExclusiveAccess so plain members don't see Join.
-                            const isExclusiveEligible = !tournament.isExclusive || tournament.hasExclusiveAccess === true;
-                            const isEligible = isRegionCountryEligible && isExclusiveEligible;
-                            const restrictionLabel = !isExclusiveEligible
-                                ? t('details.exclusiveMembersOfHub')
-                                : isCountryScoped
-                                    ? (tournamentCountries.length <= 3
-                                        ? `${(tournament.countryFlags || []).join(' ')} ${(tournament.countryNames || tournamentCountries).join(', ')}`.trim()
-                                        : t('details.countriesCount', { count: tournamentCountries.length }))
-                                    : t('details.thisRegion');
-
-                            const buttons = [];
-
-                            // Surface a "restricted" note (instead of a join button) when the user
-                            // would otherwise be able to join but isn't eligible by region/country.
-                            const wouldJoin = !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull
-                                && (!tournament.isTeamTournament ? true : (!userTeam && !isLoadingTeams));
-
-                            if (wouldJoin && !isEligible) {
-                                buttons.push(
-                                    <View key="restricted" className="w-full bg-[#0D1525] border border-white/[0.06] rounded-2xl p-4 flex-row items-center gap-3">
-                                        <Ionicons name="lock-closed" size={18} color="#64748B" />
-                                        <Text className="flex-1 text-slate-400 text-sm font-medium">
-                                            {t('details.restrictedNotice', { restriction: restrictionLabel })}
+                        } else if (!isParticipant && isUserRegistered && isOpenOrUpcoming && !tournament.isTeamTournament) {
+                            buttons.push(
+                                <View key="pending-approval" className="w-full bg-[#1A1607] border border-amber-500/20 rounded-2xl p-4 flex-row items-center gap-3">
+                                    <View className="w-9 h-9 rounded-xl bg-amber-500/10 items-center justify-center">
+                                        <Ionicons name="hourglass-outline" size={18} color="#F59E0B" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-amber-300 text-sm font-black tracking-tight">
+                                            {t('details.pendingApproval')}
+                                        </Text>
+                                        <Text className="text-slate-400 text-xs mt-0.5">
+                                            {t('details.pendingApprovalHint')}
                                         </Text>
                                     </View>
-                                );
-                            } else if (!isParticipant && isUserRegistered && isOpenOrUpcoming && !tournament.isTeamTournament) {
+                                </View>
+                            );
+                        } else if (tournament.isTeamTournament) {
+                            // Show nothing while teams are still loading (prevents flash of register button)
+                            if (isLoadingTeams) {
+                                // render nothing — button appears smoothly once data resolves
+                            } else if (!userTeam && !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
                                 buttons.push(
-                                    <View key="pending-approval" className="w-full bg-[#1A1607] border border-amber-500/20 rounded-2xl p-4 flex-row items-center gap-3">
-                                        <View className="w-9 h-9 rounded-xl bg-amber-500/10 items-center justify-center">
-                                            <Ionicons name="hourglass-outline" size={18} color="#F59E0B" />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-amber-300 text-sm font-black tracking-tight">
-                                                {t('details.pendingApproval')}
-                                            </Text>
-                                            <Text className="text-slate-400 text-xs mt-0.5">
-                                                {t('details.pendingApprovalHint')}
-                                            </Text>
-                                        </View>
-                                    </View>
+                                    <Button
+                                        key="team-register"
+                                        className="w-full"
+                                        onPress={() => setShowTeamRegistration(true)}
+                                    >
+                                        {tTeam('registerCreateJoin')}
+                                    </Button>
                                 );
-                            } else if (tournament.isTeamTournament) {
-                                // Show nothing while teams are still loading (prevents flash of register button)
-                                if (isLoadingTeams) {
-                                    // render nothing — button appears smoothly once data resolves
-                                } else if (!userTeam && !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
-                                    buttons.push(
-                                        <Button
-                                            key="team-register"
-                                            className="w-full"
-                                            onPress={() => setShowTeamRegistration(true)}
-                                        >
-                                            {tTeam('registerCreateJoin')}
-                                        </Button>
-                                    );
-                                    // Private: the team sheet asks for the code when the captain
-                                    // doesn't already hold one, so only the "applied" note lives here.
-                                    if (tournament.isPrivate && !canManage && inviteCode) {
-                                        buttons.push(renderInviteCodeApplied());
-                                    }
-                                }
-                            } else {
-                                // Solo tournament: existing flow
-                                if (!isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
-                                    // Private tournament without a code in hand: the button asks for
-                                    // it first (the sheet then signs the player up in one go).
-                                    const needsCode = !!tournament.isPrivate && !canManage && !inviteCode;
-                                    buttons.push(
-                                        <Button
-                                            key="join"
-                                            className="w-full"
-                                            onPress={() => (needsCode ? setShowCodePrompt(true) : handleJoin())}
-                                            loading={isRegistering}
-                                        >
-                                            {needsCode ? t('details.enterCodeToJoin') : t('details.joinTournament')}
-                                        </Button>
-                                    );
-                                    if (needsCode) {
-                                        buttons.push(
-                                            <View key="private-hint" className="flex-row items-center justify-center gap-1.5 -mt-1">
-                                                <Ionicons name="lock-closed" size={12} color={PRIVATE_COLORS.icon} />
-                                                <Text className="text-[11px] font-semibold" style={{ color: PRIVATE_COLORS.text }}>
-                                                    {t('details.privateJoinHint')}
-                                                </Text>
-                                            </View>
-                                        );
-                                    } else if (tournament.isPrivate && !canManage && inviteCode) {
-                                        buttons.push(renderInviteCodeApplied());
-                                    }
+                                // Private: the team sheet asks for the code when the captain
+                                // doesn't already hold one, so only the "applied" note lives here.
+                                if (tournament.isPrivate && !canManage && inviteCode) {
+                                    buttons.push(renderInviteCodeApplied());
                                 }
                             }
+                        } else {
+                            // Solo tournament: existing flow
+                            if (!isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
+                                // Private tournament without a code in hand: the button asks for
+                                // it first (the sheet then signs the player up in one go).
+                                const needsCode = !!tournament.isPrivate && !canManage && !inviteCode;
+                                buttons.push(
+                                    <Button
+                                        key="join"
+                                        className="w-full"
+                                        onPress={() => (needsCode ? setShowCodePrompt(true) : handleJoin())}
+                                        loading={isRegistering}
+                                    >
+                                        {needsCode ? t('details.enterCodeToJoin') : t('details.joinTournament')}
+                                    </Button>
+                                );
+                                if (needsCode) {
+                                    buttons.push(
+                                        <View key="private-hint" className="flex-row items-center justify-center gap-1.5 -mt-1">
+                                            <Ionicons name="lock-closed" size={12} color={PRIVATE_COLORS.icon} />
+                                            <Text className="text-[11px] font-semibold" style={{ color: PRIVATE_COLORS.text }}>
+                                                {t('details.privateJoinHint')}
+                                            </Text>
+                                        </View>
+                                    );
+                                } else if (tournament.isPrivate && !canManage && inviteCode) {
+                                    buttons.push(renderInviteCodeApplied());
+                                }
+                            }
+                        }
 
-                            return buttons.length > 0 ? <View className="gap-3 mt-4">{buttons}</View> : null;
-                        })()}
-                    </View>
+                        const statusPill = STATUS_PILL[Number(tournament.status)];
 
-                    <View className="px-5 mt-2 mb-4">
+                        return (
+                            <HeroFrame className="mx-4 mt-3" hairline={TOURNAMENT_HAIRLINE}>
+                                <HeroBanner colors={TOURNAMENT_BANNER} watermark="trophy">
+                                    <View style={{ padding: 18 }}>
+                                        {/* Clear of the trophy in the top-right corner */}
+                                        <View className="flex-row flex-wrap items-center" style={{ gap: 6, paddingRight: 64 }}>
+                                            {statusPill && (
+                                                <CoverPill
+                                                    dotColor={statusPill.dot}
+                                                    glow={Number(tournament.status) === 3}
+                                                    label={t(statusPill.labelKey)}
+                                                />
+                                            )}
+                                            {tournament.isPrivate && <PrivateBadge size="pill" />}
+                                            {tournament.isExclusive && (
+                                                <CoverPill icon="sparkles" iconColor="#F0ABFC" label={t('hub:role.exclusive')} tint="rgba(232,121,249,0.16)" border="rgba(232,121,249,0.4)" />
+                                            )}
+                                        </View>
+
+                                        <Text
+                                            className="text-[26px] leading-[31px] font-black text-white tracking-tight mt-3"
+                                            numberOfLines={3}
+                                            adjustsFontSizeToFit
+                                            minimumFontScale={0.75}
+                                        >
+                                            {tournament.name}
+                                        </Text>
+
+                                        <View className="flex-row items-center mt-2" style={{ gap: 6 }}>
+                                            <Ionicons name="people" size={14} color={COVER_MUTED} />
+                                            <Text className="text-[13px] font-semibold" style={{ color: COVER_TEXT }}>
+                                                {tournament?.isTeamTournament
+                                                    ? t('details.teamsCount', { count: tournamentTeams.length })
+                                                    : t('details.participantsCount', { count: tournament.numberOfParticipants || 0 })}
+                                            </Text>
+                                        </View>
+
+                                        {!!tournament.hubName && !!tournament.hubId && (
+                                            <Pressable
+                                                onPress={() => navigation.navigate('HubProfile', { id: tournament.hubId })}
+                                                accessibilityRole="link"
+                                                hitSlop={6}
+                                                className="flex-row items-center self-start mt-1.5 gap-1.5 active:opacity-70"
+                                            >
+                                                <Ionicons name="planet" size={14} color={COVER_MUTED} />
+                                                <Text className="text-[13px] font-bold text-white shrink" numberOfLines={1}>
+                                                    {tournament.hubName}
+                                                </Text>
+                                                <Ionicons name="chevron-forward" size={13} color={COVER_MUTED} />
+                                            </Pressable>
+                                        )}
+                                    </View>
+                                </HeroBanner>
+
+                                {buttons.length > 0 && <View className="p-4 gap-3">{buttons}</View>}
+                            </HeroFrame>
+                        );
+                    })()}
+
+                    <View className="px-5 mt-4 mb-4">
                         <PremiumTabs
                             tabs={tabs}
                             activeTab={activeTab}
@@ -2658,279 +2684,261 @@ export default function TournamentDetailsScreen() {
                         />
                     </View>
 
-                    {activeTab === 'overview' && (
-                        <View className="px-4 py-4 pb-12">
+                    {activeTab === 'overview' && (() => {
+                        const status = Number(tournament.status);
+                        const isTeam = !!tournament?.isTeamTournament;
+                        const started = status === 3 || status === 4;
+                        const attendees = isTeam ? tournamentTeams.length : (tournament.numberOfParticipants || 0);
+                        const max = Number(tournament.maxPlayers) || 0;
+                        const hasPrize = !!tournament.prize && Number(tournament.prize) > 0;
 
-                            {/* Private tournament: the organiser's code + share, while players can
-                                still get in. Nothing announces a private tournament, so this card is
-                                how it reaches anyone at all. */}
-                            {canManage && tournament.isPrivate && isPreStart && (
-                                <PrivateInviteCard tournamentId={id} tournamentName={tournament.name} />
-                            )}
+                        // Everything the old General Info listed, two per row. Prize, player count and
+                        // format sit in the numbers row above; the hub is on the cover. Each group starts a
+                        // new row: the deadline and the start date share one, the bracket draw closes the list.
+                        const opensGroup: DetailItem[] = [];
+                        const dateGroup: DetailItem[] = [];
+                        const drawGroup: DetailItem[] = [];
+                        const details: DetailItem[] = [
+                            {
+                                key: 'mode',
+                                icon: 'game-controller',
+                                color: '#34D399',
+                                label: t('details.modeLabel'),
+                                value: isTeam ? tTeam('modeTeam') : tTeam('modeSolo'),
+                            },
+                        ];
+                        if (isTeam) {
+                            details.push({
+                                key: 'teamSize',
+                                icon: 'people-circle',
+                                color: '#F472B6',
+                                label: t('details.teamSizeLabel'),
+                                value: `${tournament.teamSize || '?'}v${tournament.teamSize || '?'}`,
+                            });
+                        }
+                        if (tournament.countries && tournament.countries.length === 1) {
+                            details.push({
+                                key: 'region',
+                                icon: 'flag',
+                                color: '#34D399',
+                                label: t('details.countryLabel'),
+                                value: `${tournament.countryFlags?.[0] ? tournament.countryFlags[0] + ' ' : ''}${tournament.countryNames?.[0] ?? tournament.countries[0]}`,
+                            });
+                        } else if (tournament.countries && tournament.countries.length > 1) {
+                            details.push({
+                                key: 'region',
+                                icon: 'flag',
+                                color: '#34D399',
+                                label: t('details.countriesLabel'),
+                                value: t('details.countriesCount', { count: tournament.countries.length }),
+                                onPress: () => setShowCountriesModal(true),
+                            });
+                        } else {
+                            details.push({
+                                key: 'region',
+                                icon: 'globe',
+                                color: '#34D399',
+                                label: t('details.regionLabel'),
+                                value: tournament.region === TournamentRegion.Europe ? 'EU'
+                                    : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
+                                        : tournament.region === TournamentRegion.Asia ? 'Asia'
+                                            : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
+                                                : tournament.region === TournamentRegion.Africa ? 'AFR'
+                                                    : tournament.region === TournamentRegion.Oceania ? 'OCE'
+                                                        : t('details.regionGlobal'),
+                            });
+                        }
+                        // Only once the bracket exists (InProgress / Completed). A started tournament
+                        // with no recorded mode predates the draw picker, and every one of those was
+                        // drawn at random.
+                        if (started) {
+                            drawGroup.push({
+                                key: 'draw',
+                                icon: 'git-network',
+                                color: '#22D3EE',
+                                label: t('details.bracketDrawLabel'),
+                                value: getBracketSeedingModeLabel(tournament.bracketSeedingMode, t),
+                            });
+                        }
+                        // Dates side by side. A scheduled opening shows while sign-ups wait for it, and
+                        // the deadline turns amber for as long as sign-ups are open.
+                        if (isWaitingToOpen) {
+                            opensGroup.push({
+                                key: 'opens',
+                                icon: 'lock-open-outline',
+                                color: '#818CF8',
+                                label: t('details.registrationOpensLabel'),
+                                value: formatDateTimeShort(tournament.registrationOpensAt),
+                                valueColor: '#A5B4FC',
+                            });
+                        }
+                        if (tournament.registrationDeadline) {
+                            dateGroup.push({
+                                key: 'deadline',
+                                icon: 'time-outline',
+                                color: '#EF4444',
+                                label: t('details.regDeadlineLabel'),
+                                value: formatDateTimeShort(tournament.registrationDeadline),
+                                valueColor: (status === 0 || status === 1) ? '#FBBF24' : undefined,
+                            });
+                        }
+                        dateGroup.push({
+                            key: 'start',
+                            icon: 'calendar',
+                            color: '#60A5FA',
+                            label: t('details.startDateLabel'),
+                            value: tournament.startDate
+                                ? new Date(tournament.startDate).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
+                                : tCommon('app.tbd'),
+                        });
+                        if (isTeam && tournament.teamWinCondition !== null) {
+                            details.push({
+                                key: 'winCondition',
+                                icon: 'podium',
+                                color: '#FBBF24',
+                                label: t('details.winConditionLabel'),
+                                value: (tournament.teamWinCondition === 1 || tournament.teamWinCondition === 'AggregateScore')
+                                    ? t('teamWinCondition.aggregateScore')
+                                    : t('teamWinCondition.matchWins'),
+                            });
+                        }
+                        if (tournament.isPrivate) {
+                            details.push({
+                                key: 'visibility',
+                                icon: 'lock-closed',
+                                color: PRIVATE_COLORS.icon,
+                                label: t('details.visibilityLabel'),
+                                value: t('details.privateInviteOnly'),
+                                valueColor: PRIVATE_COLORS.text,
+                            });
+                        }
+                        if (tournament.isExclusive) {
+                            details.push({
+                                key: 'access',
+                                icon: 'sparkles',
+                                color: '#E879F9',
+                                label: t('details.accessLabel'),
+                                value: t('details.exclusiveMembers'),
+                                valueColor: '#F0ABFC',
+                            });
+                        }
 
-                            {/* Hub Owner Close Registration Button — nothing to close while a
-                                scheduled tournament is still waiting for its opening time. */}
-                            {canManage &&
-                                (tournament?.status === 0 || tournament?.status === 1) &&
-                                !isWaitingToOpen && (
-                                    <Button
-                                        className="w-full mb-4 bg-destructive"
-                                        onPress={handleCloseRegistration}
-                                        loading={isLoading}
+                        return (
+                            <View className="px-4 pb-12" style={{ gap: 10 }}>
+                                {/* Private tournament: the organiser's code + share, while players can
+                                    still get in. Nothing announces a private tournament, so this card is
+                                    how it reaches anyone at all. */}
+                                {canManage && tournament.isPrivate && isPreStart && (
+                                    <PrivateInviteCard tournamentId={id} tournamentName={tournament.name} />
+                                )}
+
+                                {/* Hub Owner Close Registration Button — nothing to close while a
+                                    scheduled tournament is still waiting for its opening time. */}
+                                {canManage &&
+                                    (tournament?.status === 0 || tournament?.status === 1) &&
+                                    !isWaitingToOpen && (
+                                        <Button
+                                            className="w-full bg-destructive"
+                                            onPress={handleCloseRegistration}
+                                            loading={isLoading}
+                                        >
+                                            {t('details.closeRegistration')}
+                                        </Button>
+                                    )}
+
+                                {/* Hub Owner Open Registration Button. Also the "open early" override for
+                                    a scheduled tournament (status 0 + an opening time), which the server
+                                    accepts as the same transition. */}
+                                {canManage &&
+                                    (tournament?.status === 2 || isWaitingToOpen) && (
+                                        <Button
+                                            className="w-full bg-primary"
+                                            onPress={handleOpenRegistration}
+                                            loading={isLoading}
+                                        >
+                                            {tournament?.status === 2 ? t('details.openRegistration') : t('details.openRegistrationNow')}
+                                        </Button>
+                                    )}
+
+                                {/* My Team — an action, so it comes before the facts */}
+                                {tournament.isTeamTournament && !isLoadingTeams && userTeam && (
+                                    <Pressable
+                                        onPress={() => navigation.navigate('TeamDashboard', { teamId: userTeam.teamId, tournamentId: id, teamSize: tournament?.teamSize, tournamentStatus: tournament?.status })}
+                                        accessibilityRole="button"
+                                        className="bg-card border border-team/30 rounded-[20px] px-4 py-3 flex-row items-center gap-3 active:opacity-80"
                                     >
-                                        {t('details.closeRegistration')}
-                                    </Button>
-                                )}
-
-                            {/* Hub Owner Open Registration Button. Also the "open early" override for
-                                a scheduled tournament (status 0 + an opening time), which the server
-                                accepts as the same transition. */}
-                            {canManage &&
-                                (tournament?.status === 2 || isWaitingToOpen) && (
-                                    <Button
-                                        className="w-full mb-4 bg-primary"
-                                        onPress={handleOpenRegistration}
-                                        loading={isLoading}
-                                    >
-                                        {tournament?.status === 2 ? t('details.openRegistration') : t('details.openRegistrationNow')}
-                                    </Button>
-                                )}
-
-                            {/* Waiting-to-open banner — replaces the Join button until the sweep opens it. */}
-                            {isWaitingToOpen && (
-                                <View className="w-full bg-[#101625]/80 p-4 rounded-2xl border border-indigo-400/20 flex-row items-center gap-3 mb-4">
-                                    <View className="w-10 h-10 rounded-xl bg-indigo-400/10 items-center justify-center">
-                                        <Ionicons name="lock-open-outline" size={20} color="#818CF8" />
-                                    </View>
-                                    <View className="flex-1 gap-0.5">
-                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t('details.registrationOpensLabel')}</Text>
-                                        <Text className="text-base font-black text-white">
-                                            {formatDateTimeShort(tournament.registrationOpensAt)}
-                                        </Text>
-                                        <Text className="text-[11px] text-slate-400 mt-0.5">
-                                            {t('details.notifyOnOpen')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Registration Deadline Alert */}
-                            {tournament.registrationDeadline && [0, 1, 2].includes(Number(tournament.status)) && (
-                                <View className="w-full bg-[#181010]/80 p-4 rounded-2xl border border-red-500/10 flex-row items-center gap-3 mb-4">
-                                    <View className="w-10 h-10 rounded-xl bg-red-500/10 items-center justify-center">
-                                        <Ionicons name="time-outline" size={20} color="#EF4444" />
-                                    </View>
-                                    <View className="flex-1 gap-0.5">
-                                        <Text className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t('details.registrationDeadlineLabel')}</Text>
-                                        <Text className="text-base font-black text-white">
-                                            {formatDateTimeShort(tournament.registrationDeadline)}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* My Team Button - Polished & Modern */}
-                            {tournament.isTeamTournament && !isLoadingTeams && userTeam && (
-                                <Pressable
-                                    onPress={() => navigation.navigate('TeamDashboard', { teamId: userTeam.teamId, tournamentId: id, teamSize: tournament?.teamSize, tournamentStatus: tournament?.status })}
-                                    className="mb-4 bg-gradient-to-r from-[#1A233A] to-[#131B2E] border border-team/30 rounded-[24px] overflow-hidden"
-                                >
-                                    <View className="px-5 py-4 flex-row items-center justify-between">
-                                        <View className="flex-row items-center gap-4">
-                                            <View className="w-12 h-12 bg-team/10 rounded-2xl items-center justify-center shadow-sm shadow-team/20 border border-team/20">
-                                                <Ionicons name="shield-half" size={24} color="#00E5A0" />
-                                            </View>
-                                            <View>
-                                                <Text className="text-white font-black text-lg tracking-wide">{tTeam('myTeamButton')}</Text>
-                                                <Text className="text-team/80 text-[11px] font-bold tracking-widest uppercase mt-0.5">{t('details.manageYourRoster')}</Text>
-                                            </View>
+                                        <View className="w-10 h-10 bg-team/10 rounded-2xl items-center justify-center border border-team/20">
+                                            <Ionicons name="shield-half" size={20} color="#00E5A0" />
                                         </View>
-                                        <View className="w-10 h-10 bg-white/5 border border-white/5 rounded-full items-center justify-center">
-                                            <Ionicons name="chevron-forward" size={18} color="#00E5A0" />
+                                        <View className="flex-1">
+                                            <Text className="text-white font-black text-base tracking-wide">{tTeam('myTeamButton')}</Text>
+                                            <Text className="text-team/80 text-[10px] font-bold tracking-widest uppercase mt-0.5">{t('details.manageYourRoster')}</Text>
                                         </View>
+                                        <Ionicons name="chevron-forward" size={18} color="#00E5A0" />
+                                    </Pressable>
+                                )}
+
+                                {/* ─── Info: the numbers, then every detail in two columns ─── */}
+                                <Panel style={{ paddingTop: 14, paddingBottom: 16 }}>
+                                    <View className="flex-row items-center" style={{ paddingHorizontal: 4 }}>
+                                        <StatCell
+                                            icon="trophy"
+                                            iconColor="rgba(251,191,36,0.85)"
+                                            value={hasPrize ? `${tournament.prize} ${getCurrencyLabel(tournament.prizeCurrency)}` : '–'}
+                                            label={t('details.prizePool')}
+                                            valueColor={hasPrize ? '#FBBF24' : COLORS.slate600}
+                                            valueSize={hasPrize ? 20 : 22}
+                                        />
+                                        <StatDivider />
+                                        <StatCell
+                                            icon="people"
+                                            iconColor="rgba(129,140,248,0.8)"
+                                            value={max > 0 ? `${attendees}/${max}` : String(attendees)}
+                                            label={isTeam ? tCommon('share.teams') : tCommon('share.players')}
+                                        />
+                                        <StatDivider />
+                                        <StatCell
+                                            icon="list"
+                                            iconColor="rgba(167,139,250,0.8)"
+                                            value={getTournamentFormatLabel(Number(tournament.format), t)}
+                                            label={t('details.formatLabel')}
+                                            valueSize={14}
+                                            lines={2}
+                                        />
                                     </View>
-                                </Pressable>
-                            )}
 
-                            {/* General Info */}
-                            <CollapsibleCard
-                                icon="information-circle"
-                                iconColor="#F59E0B"
-                                title={t('details.generalInfo')}
-                                isOpen={isGeneralInfoOpen}
-                                onToggle={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
-                            >
-                                <InfoRow
-                                    icon="trophy"
-                                    iconColor="#F59E0B"
-                                    label={t('details.prizePool')}
-                                    value={tournament.prize && Number(tournament.prize) > 0
-                                        ? `${tournament.prize} ${getCurrencyLabel(tournament.prizeCurrency)}`
-                                        : t('details.noPrize')}
-                                />
-                                <InfoRow
-                                    icon="people"
-                                    iconColor="#818CF8"
-                                    label={t('details.maxPlayersLabel')}
-                                    value={String(tournament.maxPlayers || t('details.noLimit'))}
-                                />
-                                <InfoRow
-                                    icon="list"
-                                    iconColor="#A78BFA"
-                                    label={t('details.formatLabel')}
-                                    value={getTournamentFormatLabel(Number(tournament.format), t)}
-                                />
-                                {/* Only once the bracket exists (InProgress / Completed). A started
-                                    tournament with no recorded mode predates the draw picker, and
-                                    every one of those was drawn at random. */}
-                                {(Number(tournament.status) === 3 || Number(tournament.status) === 4) && (
-                                    <InfoRow
-                                        icon="git-network"
-                                        iconColor="#22D3EE"
-                                        label={t('details.bracketDrawLabel')}
-                                        value={getBracketSeedingModeLabel(tournament.bracketSeedingMode, t)}
-                                    />
-                                )}
-                                <InfoRow
-                                    icon="game-controller"
-                                    iconColor="#34D399"
-                                    label={t('details.modeLabel')}
-                                    value={tournament.isTeamTournament ? tTeam('modeTeam') : tTeam('modeSolo')}
-                                />
-                                {tournament.isTeamTournament && (
-                                    <InfoRow
-                                        icon="people-circle"
-                                        iconColor="#F472B6"
-                                        label={t('details.teamSizeLabel')}
-                                        value={`${tournament.teamSize || '?'}v${tournament.teamSize || '?'}`}
-                                    />
-                                )}
-                                {tournament.isTeamTournament && tournament.teamWinCondition !== null && (
-                                    <InfoRow
-                                        icon="podium"
-                                        iconColor="#FBBF24"
-                                        label={t('details.winConditionLabel')}
-                                        value={(tournament.teamWinCondition === 1 || tournament.teamWinCondition === 'AggregateScore')
-                                            ? t('teamWinCondition.aggregateScore')
-                                            : t('teamWinCondition.matchWins')}
-                                    />
-                                )}
-                                <InfoRow
-                                    icon="calendar"
-                                    iconColor="#60A5FA"
-                                    label={t('details.startDateLabel')}
-                                    value={tournament.startDate ? new Date(tournament.startDate).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' }) : tCommon('app.tbd')}
-                                />
-                                {tournament.registrationDeadline && (
-                                    <InfoRow
-                                        icon="time-outline"
-                                        iconColor="#EF4444"
-                                        label={t('details.regDeadlineLabel')}
-                                        value={(() => {
-                                            const d = new Date(tournament.registrationDeadline);
-                                            return `${d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}`;
-                                        })()}
-                                    />
-                                )}
-                                {(tournament.countries && tournament.countries.length > 0) ? (
-                                    tournament.countries.length === 1 ? (
-                                        <InfoRow
-                                            icon="flag"
-                                            iconColor="#34D399"
-                                            label={t('details.countryLabel')}
-                                            value={`${tournament.countryFlags?.[0] ? tournament.countryFlags[0] + ' ' : ''}${tournament.countryNames?.[0] ?? tournament.countries[0]}`}
-                                        />
-                                    ) : (
-                                        <InfoRow
-                                            icon="flag"
-                                            iconColor="#34D399"
-                                            label={t('details.countriesLabel')}
-                                            value={t('details.countriesCount', { count: tournament.countries.length })}
-                                            onPress={() => setShowCountriesModal(true)}
-                                        />
-                                    )
-                                ) : (
-                                    <InfoRow
-                                        icon="globe"
-                                        iconColor="#34D399"
-                                        label={t('details.regionLabel')}
-                                        value={
-                                            tournament.region === TournamentRegion.Europe ? 'EU'
-                                                : tournament.region === TournamentRegion.NorthAmerica ? 'NA'
-                                                    : tournament.region === TournamentRegion.Asia ? 'Asia'
-                                                        : tournament.region === TournamentRegion.SouthAmerica ? 'SA'
-                                                            : tournament.region === TournamentRegion.Africa ? 'AFR'
-                                                                : tournament.region === TournamentRegion.Oceania ? 'OCE'
-                                                                    : t('details.regionGlobal')
-                                        }
-                                    />
-                                )}
-                                {tournament.isPrivate && (
-                                    <InfoRow
-                                        icon="lock-closed"
-                                        iconColor={PRIVATE_COLORS.icon}
-                                        label={t('details.visibilityLabel')}
-                                        value={
-                                            <Text className="text-[14px] font-black" style={{ color: PRIVATE_COLORS.text }} numberOfLines={1}>
-                                                {t('details.privateInviteOnly')}
-                                            </Text>
-                                        }
-                                    />
-                                )}
-                                {tournament.isExclusive && (
-                                    <InfoRow
-                                        icon="sparkles"
-                                        iconColor="#E879F9"
-                                        label={t('details.accessLabel')}
-                                        value={
-                                            <Text className="text-[14px] font-black text-fuchsia-300" numberOfLines={1}>
-                                                {t('details.exclusiveMembers')}
-                                            </Text>
-                                        }
-                                    />
-                                )}
-                                {tournament.hubName && tournament.hubId && (
-                                    <InfoRow
-                                        icon="home"
-                                        iconColor="#A5B4FC"
-                                        label={t('details.hubLabel')}
-                                        value={
-                                            <Text className="text-[14px] font-black text-emerald-300 text-right" numberOfLines={2}>
-                                                {tournament.hubName}
-                                            </Text>
-                                        }
-                                        onPress={() => navigation.navigate('HubProfile', { id: tournament.hubId })}
-                                    />
-                                )}
-                            </CollapsibleCard>
+                                    {/* How full it is, while spots can still fill up */}
+                                    {max > 0 && !started && (
+                                        <View className="mx-4 mt-3.5 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                                            <LinearGradient
+                                                colors={['#818CF8', '#C084FC']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 0 }}
+                                                style={{ width: `${Math.min(100, (attendees / max) * 100)}%`, height: '100%', borderRadius: 999 }}
+                                            />
+                                        </View>
+                                    )}
 
-                            {/* Description */}
-                            <CollapsibleCard
-                                icon="document-text"
-                                iconColor="#FBBF24"
-                                title={t('details.descriptionTitle')}
-                                isOpen={isDescriptionOpen}
-                                onToggle={() => setIsDescriptionOpen(!isDescriptionOpen)}
-                            >
-                                <QuoteBlock accentColor="#FBBF24">
-                                    {tournament.description || t('details.descriptionFallback')}
-                                </QuoteBlock>
-                            </CollapsibleCard>
+                                    <View className="mx-4 my-4 h-px bg-white/[0.06]" />
+                                    <View style={{ paddingHorizontal: 16 }}>
+                                        <DetailGrid groups={[details, opensGroup, dateGroup, drawGroup]} />
+                                    </View>
+                                </Panel>
 
-                            {/* Rules & Regulations */}
-                            <CollapsibleCard
-                                icon="shield-checkmark"
-                                iconColor="#A78BFA"
-                                title={t('details.rulesTitle')}
-                                isOpen={isRulesOpen}
-                                onToggle={() => setIsRulesOpen(!isRulesOpen)}
-                            >
-                                <QuoteBlock accentColor="#A78BFA">
-                                    {tournament.rules || t('details.rulesFallback')}
-                                </QuoteBlock>
-                            </CollapsibleCard>
-                        </View>
-                    )}
+                                {/* ─── Description ─── */}
+                                <Panel style={{ padding: 16 }}>
+                                    <PanelTitle icon="document-text" color="#FBBF24" title={t('details.descriptionTitle')} />
+                                    <ExpandableText text={tournament.description || t('details.descriptionFallback')} collapsedLines={4} accentColor="#C4B5FD" />
+                                </Panel>
+
+                                {/* ─── Rules ─── */}
+                                <Panel style={{ padding: 16 }}>
+                                    <PanelTitle icon="shield-checkmark" color="#A78BFA" title={t('details.rulesTitle')} />
+                                    <ExpandableText text={tournament.rules || t('details.rulesFallback')} collapsedLines={4} accentColor="#C4B5FD" />
+                                </Panel>
+                            </View>
+                        );
+                    })()}
 
                     {activeTab === 'bracket' && (
                         <View className="py-4 pb-12">

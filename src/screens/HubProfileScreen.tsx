@@ -23,10 +23,17 @@ import { getSocialUrl } from '../lib/social';
 import { ShareHubCardModal } from '../components/modals/ShareHubCardModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
-import { CollapsibleCard, InfoRow, QuoteBlock } from '../components/ui/CollapsibleCard';
-import i18n from '../i18n';
+import { HeroCard, CoverPill } from '../components/ui/HeroCard';
+import { Panel, PanelTitle, StatCell, StatDivider, ExpandableText } from '../components/ui/Panel';
+import { COLORS } from '../lib/theme';
+import i18n, { dateLocale } from '../i18n';
 
 type HubProfileRouteProp = RouteProp<RootStackParamList, 'HubProfile'>;
+
+// The hub share card's colours: emerald, turning to cyan on the emblem ring.
+const HUB_HAIRLINE = ['rgba(52,211,153,0.55)', 'rgba(148,163,184,0.14)', 'rgba(16,185,129,0.5)'] as const;
+const HUB_BANNER = ['#065F46', '#059669', '#0F766E'] as const;
+const HUB_EMBLEM_RING = ['#34D399', '#2DD4ED'] as const;
 
 export default function HubProfileScreen() {
     const { t } = useTranslation('hub');
@@ -63,8 +70,6 @@ export default function HubProfileScreen() {
     const [isListLoading, setIsListLoading] = useState(false);
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
-    const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(true);
-    const [isAboutOpen, setIsAboutOpen] = useState(true);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(false);
     const [shareCardVisible, setShareCardVisible] = useState(false);
     const [isUnfollowing, setIsUnfollowing] = useState(false);
@@ -358,7 +363,7 @@ export default function HubProfileScreen() {
     const hubTabs: PremiumTabItem[] = [
         { label: t('profile.tabOverview'), value: 'overview', icon: 'grid-outline' },
         {
-            label: 'Tournaments', value: 'tournaments', icon: 'trophy-outline',
+            label: t('profile:tabTournaments'), value: 'tournaments', icon: 'trophy-outline',
             badge: hubTournamentsCount > 0 ? hubTournamentsCount : undefined,
             badgeTone: 'alert',
         },
@@ -527,44 +532,58 @@ export default function HubProfileScreen() {
                 }}
                 scrollEventThrottle={16}
             >
-                {/* ─── Unified Hub Hero ─── */}
-                <View className="px-5 mt-4">
-                    <View className="bg-card rounded-[28px] border border-white/5 overflow-hidden">
-                        {/* Accent gradient bar */}
-                        <View className="h-1.5 bg-primary" />
+                {/* ─── Hub hero: the in-app version of the hub's share card ─── */}
+                {(() => {
+                    const socials = mapSocialsToLinks(hubData.hubSocials);
+                    const isVerified = !!(hubData.isVerified || hubData.IsVerified);
 
-                        <View className="p-5">
-                            {/* Avatar + Name + Stats row */}
-                            <View className="flex-row items-center">
-                                <View className="mr-4">
-                                    <View className="p-[3px] rounded-[22px] border-2 border-primary">
-                                        <PlayerAvatar
-                                            name={hubData.name}
-                                            src={hubData.avatarUrl || hubData.logoUrl}
-                                            size="lg"
-                                            className="border-0 rounded-[18px]"
-                                        />
+                    return (
+                        <HeroCard
+                            className="mx-5 mt-3"
+                            hairline={HUB_HAIRLINE}
+                            banner={HUB_BANNER}
+                            emblemRing={HUB_EMBLEM_RING}
+                            glowColor={COLORS.primary}
+                            emblem={
+                                <PlayerAvatar
+                                    name={hubData.name}
+                                    src={hubData.avatarUrl || hubData.logoUrl}
+                                    size="xl"
+                                    className="rounded-[23px] border-0"
+                                />
+                            }
+                            // Who can get in, on the banner's corner
+                            bannerAccessory={
+                                <CoverPill
+                                    icon={isPublic ? 'globe-outline' : 'lock-closed'}
+                                    iconColor={isPublic ? COLORS.primaryBright : '#FBBF24'}
+                                    label={isPublic ? t('profile.public') : t('profile.private')}
+                                    border={isPublic ? 'rgba(52,211,153,0.4)' : 'rgba(251,191,36,0.4)'}
+                                />
+                            }
+                        >
+                            <View className="flex-row items-center mt-3" style={{ gap: 8 }}>
+                                <Text
+                                    className="shrink text-[26px] leading-[32px] font-black text-white tracking-tight"
+                                    numberOfLines={2}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.7}
+                                >
+                                    {hubData.name}
+                                </Text>
+                                {isVerified && (
+                                    <View className="w-6 h-6 rounded-full bg-sky-500 items-center justify-center">
+                                        <Ionicons name="checkmark" size={15} color="#fff" />
                                     </View>
-                                </View>
-                                <View className="flex-1">
-                                    <View className="flex-row items-center" style={{ gap: 8 }}>
-                                        <Text className="text-2xl font-black text-white leading-tight flex-shrink" numberOfLines={2}>{hubData.name}</Text>
-                                        {(hubData.isVerified || hubData.IsVerified) && (
-                                            <View className="w-6 h-6 rounded-full bg-sky-500 items-center justify-center">
-                                                <Ionicons name="checkmark" size={16} color="#fff" />
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
+                                )}
                             </View>
 
-                            {/* Social Links */}
-                            {hubData.hubSocials && hubData.hubSocials.length > 0 && (
-                                <View className="mt-4 pt-4 border-t border-white/5 items-center">
-                                    <SocialLinks links={mapSocialsToLinks(hubData.hubSocials)} className="justify-center" />
+                            {/* The hub's links, centred under a hairline */}
+                            {socials.length > 0 && (
+                                <View className="mt-4 pt-4 border-t border-white/[0.06] items-center">
+                                    <SocialLinks links={socials} className="justify-center" />
                                 </View>
                             )}
-
 
                             {/* Follow / Request Join Button */}
                             {!isOwner && (() => {
@@ -601,26 +620,27 @@ export default function HubProfileScreen() {
                                         : "#fff";
 
                                 return (
-                                    <Pressable
-                                        onPress={handleFollowToggle}
-                                        disabled={isRequestingJoin}
-                                        className={`mt-3 w-full py-3.5 rounded-2xl flex-row items-center justify-center gap-2 ${buttonBg}`}
-                                        style={({ pressed }) => ({ opacity: (pressed || isRequestingJoin) ? 0.8 : 1 })}
-                                    >
-                                        {isRequestingJoin ? (
-                                            <ActivityIndicator size="small" color={iconColor} />
-                                        ) : (
-                                            <Ionicons name={buttonIcon as any} size={17} color={iconColor} />
-                                        )}
-                                        <Text className={`font-black text-sm tracking-wide ${textColor}`}>
-                                            {buttonLabel}
-                                        </Text>
-                                    </Pressable>
+                                    <View className="mt-4">
+                                        <Pressable
+                                            onPress={handleFollowToggle}
+                                            disabled={isRequestingJoin}
+                                            className={`w-full h-12 rounded-2xl flex-row items-center justify-center gap-2 active:opacity-80 ${buttonBg} ${isRequestingJoin ? 'opacity-80' : ''}`}
+                                        >
+                                            {isRequestingJoin ? (
+                                                <ActivityIndicator size="small" color={iconColor} />
+                                            ) : (
+                                                <Ionicons name={buttonIcon as any} size={17} color={iconColor} />
+                                            )}
+                                            <Text className={`font-black text-sm tracking-wide ${textColor}`} numberOfLines={1}>
+                                                {buttonLabel}
+                                            </Text>
+                                        </Pressable>
+                                    </View>
                                 );
                             })()}
-                        </View>
-                    </View>
-                </View>
+                        </HeroCard>
+                    );
+                })()}
 
                 {/* ─── Hub Tabs (Overview / Tournaments) ─── */}
                 <View className="px-5 mt-6 mb-5">
@@ -634,100 +654,83 @@ export default function HubProfileScreen() {
                 {/* ═══════════════════════════════════════════ */}
                 {/* ─── OVERVIEW TAB ─── */}
                 {/* ═══════════════════════════════════════════ */}
-                {hubTab === 'overview' && (
-                    <View className="px-4 pb-12">
-                        {/* General Info */}
-                        <CollapsibleCard
-                            icon="information-circle"
-                            iconColor="#F59E0B"
-                            title={t('profile.generalInfo')}
-                            isOpen={isGeneralInfoOpen}
-                            onToggle={() => setIsGeneralInfoOpen(!isGeneralInfoOpen)}
-                        >
-                            <InfoRow
-                                icon="people"
-                                iconColor="#818CF8"
-                                label={t('profile.membersLabel')}
-                                value={(hubData.numberOfUsers || 0).toLocaleString(i18n.language)}
-                            />
-                            <InfoRow
-                                icon="trophy"
-                                iconColor="#FBBF24"
-                                label="Tournaments"
-                                value={String(hubData.numberOfTournaments || 0)}
-                            />
-                            <InfoRow
-                                icon={isPublic ? 'globe-outline' : 'lock-closed'}
-                                iconColor={isPublic ? '#34D399' : '#F59E0B'}
-                                label={t('profile.accessLabel')}
-                                value={isPublic ? t('profile.public') : t('profile.private')}
-                            />
-                            {(hubData.createdOn || hubData.CreatedOn) && (
-                                <InfoRow
-                                    icon="calendar-outline"
-                                    iconColor="#38BDF8"
-                                    label={t('profile.established')}
-                                    value={formatDateSafe(hubData.createdOn || hubData.CreatedOn)}
-                                />
-                            )}
-                            {(() => {
-                                // Old backends don't send userHubRole — fall back to the flags we do have.
-                                const myRole = hubData.userHubRole ?? hubData.UserHubRole
-                                    ?? (isOwner ? HubRole.HubOwner : isAdmin ? HubRole.HubAdmin : null);
-                                if (myRole == null) return null;
-                                const roleMeta = getRoleMeta(myRole);
-                                return (
-                                    <InfoRow
-                                        icon={roleMeta.icon as any}
-                                        iconColor={roleMeta.iconColor}
-                                        label={t('profile.yourRole')}
-                                        value={
-                                            <View className={`flex-row items-center px-2 py-1 rounded-full ${roleMeta.bg}`} style={{ gap: 4 }}>
-                                                <Ionicons name={roleMeta.icon as any} size={10} color={roleMeta.iconColor} />
-                                                <Text className={`text-[10px] font-black uppercase tracking-wide ${roleMeta.color}`}>
-                                                    {roleMeta.label}
+                {hubTab === 'overview' && (() => {
+                    const createdOnRaw = hubData.createdOn || hubData.CreatedOn;
+                    const createdOn = createdOnRaw ? parseUtcDate(createdOnRaw) : null;
+                    const ownerName = hubData.ownerName || hubData.OwnerName;
+                    const ownerId = hubData.ownerId || hubData.OwnerId || hubData.userId || hubData.UserId || hubData.createdBy || hubData.CreatedBy;
+
+                    return (
+                        <View className="px-5 pb-12" style={{ gap: 10 }}>
+                            {/* The hub in numbers — the share card's row — with its owner underneath */}
+                            <Panel style={{ paddingTop: 14, paddingBottom: ownerName ? 0 : 14 }}>
+                                <View className="flex-row items-center" style={{ paddingHorizontal: 4 }}>
+                                    <StatCell
+                                        icon="trophy"
+                                        iconColor="rgba(251,191,36,0.85)"
+                                        value={String(hubData.numberOfTournaments || 0)}
+                                        label={t('profile:tabTournaments')}
+                                        valueColor="#FBBF24"
+                                    />
+                                    <StatDivider />
+                                    <StatCell
+                                        icon="people"
+                                        iconColor="rgba(52,211,153,0.8)"
+                                        value={(hubData.numberOfUsers || 0).toLocaleString(i18n.language)}
+                                        label={t('profile.membersLabel')}
+                                    />
+                                    {createdOn && !isNaN(createdOn.getTime()) && (
+                                        <>
+                                            <StatDivider />
+                                            <StatCell
+                                                icon="calendar"
+                                                iconColor="rgba(56,189,248,0.8)"
+                                                value={createdOn.toLocaleDateString(dateLocale(), { month: 'short', year: 'numeric' })}
+                                                label={t('profile.established')}
+                                                valueSize={17}
+                                            />
+                                        </>
+                                    )}
+                                </View>
+
+                                {!!ownerName && (
+                                    <>
+                                        <View className="mx-4 mt-3.5 h-px bg-white/[0.06]" />
+                                        <Pressable
+                                            onPress={() => ownerId && navigation.navigate('PlayerProfile', { id: ownerId })}
+                                            disabled={!ownerId}
+                                            accessibilityRole="button"
+                                            className="flex-row items-center gap-3 px-4 py-3 active:opacity-70"
+                                        >
+                                            <View
+                                                className="w-9 h-9 rounded-xl items-center justify-center"
+                                                style={{ backgroundColor: 'rgba(251,191,36,0.12)', borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)' }}
+                                            >
+                                                <Ionicons name="shield-checkmark" size={17} color="#FBBF24" />
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className="text-[9px] font-bold uppercase tracking-[1.2px] text-slate-500">
+                                                    {t('profile.ownerLabel')}
+                                                </Text>
+                                                <Text className="text-[15px] font-black text-white mt-0.5" numberOfLines={1}>
+                                                    {ownerName}
                                                 </Text>
                                             </View>
-                                        }
-                                    />
-                                );
-                            })()}
-                            {(hubData.ownerName || hubData.OwnerName) && (
-                                <InfoRow
-                                    icon="person"
-                                    iconColor="#34D399"
-                                    label={t('profile.ownerLabel')}
-                                    value={
-                                        <Text className="text-[14px] font-black text-emerald-300 text-right" numberOfLines={2}>
-                                            {hubData.ownerName || hubData.OwnerName}
-                                        </Text>
-                                    }
-                                    onPress={() => {
-                                        const ownerIdValue = hubData.ownerId || hubData.OwnerId || hubData.userId || hubData.UserId || hubData.createdBy || hubData.CreatedBy;
-                                        if (ownerIdValue) {
-                                            navigation.navigate('PlayerProfile', { id: ownerIdValue });
-                                        }
-                                    }}
-                                />
-                            )}
-                        </CollapsibleCard>
+                                            {!!ownerId && <Ionicons name="chevron-forward" size={16} color={COLORS.slate500} />}
+                                        </Pressable>
+                                    </>
+                                )}
+                            </Panel>
 
-                        {/* About */}
-                        {hubData.description && (
-                            <CollapsibleCard
-                                icon="document-text"
-                                iconColor="#FBBF24"
-                                title={t('profile.about')}
-                                isOpen={isAboutOpen}
-                                onToggle={() => setIsAboutOpen(!isAboutOpen)}
-                            >
-                                <QuoteBlock accentColor="#FBBF24">
-                                    {hubData.description}
-                                </QuoteBlock>
-                            </CollapsibleCard>
-                        )}
-                    </View>
-                )}
+                            {!!hubData.description && (
+                                <Panel style={{ padding: 16 }}>
+                                    <PanelTitle icon="document-text" color="#FBBF24" title={t('profile.about')} />
+                                    <ExpandableText text={hubData.description} collapsedLines={5} />
+                                </Panel>
+                            )}
+                        </View>
+                    );
+                })()}
 
                 {/* ═══════════════════════════════════════════ */}
                 {/* ─── MEMBERS TAB ─── */}
