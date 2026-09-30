@@ -10,6 +10,7 @@ import {
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 
 import { useBadges } from '../../context/BadgesContext';
@@ -55,6 +56,18 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 { paddingBottom: Math.max(insets.bottom, 8) }
             ]}
         >
+            <LinearGradient
+                pointerEvents="none"
+                colors={['#101A2F', '#0B1120']}
+                style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient
+                pointerEvents="none"
+                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.topHairline}
+            />
             <View style={styles.tabWrapper}>
                 {/* Animated Indicator Container */}
                 <Animated.View
@@ -66,11 +79,22 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                         },
                     ]}
                 >
-                    {/* Glowing Top Line */}
-                    <View style={styles.topGlowLine} />
-                    
-                    {/* Subtle Circular Glow behind Icon */}
-                    <View style={styles.activeGlowCircle} />
+                    {/* Light falling from the line onto the icon, like a spotlight */}
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(52,211,153,0.20)', 'rgba(52,211,153,0.05)', 'rgba(52,211,153,0)']}
+                        style={styles.beam}
+                    />
+
+                    {/* Glowing top line, brightest at its centre */}
+                    <View style={styles.topGlowLine}>
+                        <LinearGradient
+                            colors={['#10B981', '#A7F3D0', '#10B981']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.topGlowFill}
+                        />
+                    </View>
                 </Animated.View>
 
                 {state.routes.map((route, index) => {
@@ -123,7 +147,7 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                                     <Ionicons
                                         name={getIconName(route.name, isFocused)}
                                         size={22}
-                                        color={isFocused ? '#10B981' : '#64748B'}
+                                        color={isFocused ? '#34D399' : '#64748B'}
                                         style={isFocused && styles.activeIconGlow}
                                     />
                                     {badgeCount > 0 && (
@@ -140,7 +164,7 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
                                     minimumFontScale={0.85}
                                     style={[
                                         styles.tabLabel,
-                                        { color: isFocused ? '#FFFFFF' : '#64748B' }
+                                        isFocused ? { color: '#6EE7B7', fontWeight: '800' } : { color: '#64748B' }
                                     ]}
                                 >
                                     {label as string}
@@ -158,8 +182,6 @@ const styles = StyleSheet.create({
     container: {
         width: '100%',
         backgroundColor: '#0B1120', // Very deep premium slate
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255, 255, 255, 0.05)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.3,
@@ -177,27 +199,39 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    topHairline: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 1,
+    },
     topGlowLine: {
         position: 'absolute',
         top: -1,
-        width: '40%',
+        width: '44%',
         height: 3,
         backgroundColor: '#10B981',
         borderBottomLeftRadius: 3,
         borderBottomRightRadius: 3,
         shadowColor: '#10B981',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.8,
-        shadowRadius: 6,
+        shadowOpacity: 0.9,
+        shadowRadius: 7,
         elevation: 4,
     },
-    activeGlowCircle: {
+    topGlowFill: {
+        flex: 1,
+        borderBottomLeftRadius: 3,
+        borderBottomRightRadius: 3,
+    },
+    beam: {
         position: 'absolute',
-        top: 8,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+        top: 0,
+        width: '62%',
+        height: 46,
+        borderBottomLeftRadius: 22,
+        borderBottomRightRadius: 22,
     },
     tabButton: {
         flex: 1,
