@@ -72,16 +72,24 @@ export function HeroBanner({ colors, watermark, height = BANNER_HEIGHT, children
 }
 
 /** Rounded-square emblem in a gradient ring, with a soft glow on iOS. */
-export function HeroEmblem({ ringColors, glowColor, size = EMBLEM_SIZE, children }: {
+export function HeroEmblem({ ringColors, glowColor, glowOpacity, size = EMBLEM_SIZE, children }: {
     ringColors: GradientStops;
     glowColor: string;
+    /** Strength of the glow; the hero's own is 0.35. Lists of cards want it softer. */
+    glowOpacity?: number;
     size?: number;
     children: React.ReactNode;
 }) {
     // Corner radius scales with the emblem so the compact one keeps the same shape.
     const radius = Math.round(size * 0.31);
     return (
-        <View style={[styles.emblemGlow, { shadowColor: glowColor, borderRadius: radius }]}>
+        <View
+            style={[
+                styles.emblemGlow,
+                { shadowColor: glowColor, borderRadius: radius },
+                glowOpacity !== undefined && { shadowOpacity: glowOpacity },
+            ]}
+        >
             <LinearGradient
                 colors={ringColors}
                 start={{ x: 0, y: 0 }}

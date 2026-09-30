@@ -84,7 +84,7 @@ export const HubCard = React.memo(function HubCard({
         >
             <RaisedCard style={styles.card}>
                 <View style={styles.content}>
-                    <HeroEmblem ringColors={HUB_EMBLEM_RING} glowColor={COLORS.primary} size={EMBLEM}>
+                    <HeroEmblem ringColors={HUB_EMBLEM_RING} glowColor={COLORS.primary} glowOpacity={0.2} size={EMBLEM}>
                         <EmblemImage src={avatarUrl} name={name} size={EMBLEM_IMAGE} radius={Math.round(EMBLEM * 0.31) - 5} />
                     </HeroEmblem>
 
@@ -126,8 +126,10 @@ export const HubCard = React.memo(function HubCard({
                             )}
                         </View>
 
-                        <View className="flex-row flex-wrap items-center mt-1.5" style={{ columnGap: 14, rowGap: 4 }}>
+                        {/* A thin rule between the two numbers keeps them apart */}
+                        <View className="flex-row items-center" style={{ marginTop: 12, gap: 12 }}>
                             <HubStat icon="people" value={numberOfUsers} label={t('app.fans')} />
+                            <View style={{ width: 1, height: 14, backgroundColor: 'rgba(148,163,184,0.25)' }} />
                             <HubStat icon="trophy" value={numberOfTournaments} label={t('common:nav.tournaments')} />
                         </View>
                     </View>
@@ -164,7 +166,7 @@ export const HubCard = React.memo(function HubCard({
 
 function HubStat({ icon, value, label }: { icon: keyof typeof Ionicons.glyphMap; value: number; label: string }) {
     return (
-        <View className="flex-row items-center" style={{ gap: 5 }}>
+        <View className="flex-row items-center shrink" style={{ gap: 5 }}>
             <Ionicons name={icon} size={12} color={COLORS.slate400} />
             <Text className="text-[13px] font-black text-white" style={TABULAR} numberOfLines={1}>
                 {(value || 0).toLocaleString(i18n.language)}{' '}

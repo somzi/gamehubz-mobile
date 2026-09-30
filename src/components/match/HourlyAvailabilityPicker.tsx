@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cn, parseUtcDate } from '../../lib/utils';
@@ -254,33 +255,53 @@ export function HourlyAvailabilityPicker({
 
     return (
         <View className="flex-1">
-            {/* Opponent — who this match is against, prominent at the top */}
-            <Pressable
-                onPress={onOpponentPress}
-                disabled={!onOpponentPress}
-                accessibilityRole={onOpponentPress ? 'button' : undefined}
-                className="bg-slate-800/40 rounded-2xl p-3 border border-white/5 mb-3 flex-row items-center gap-3 active:opacity-70"
-            >
-                <View className="rounded-full p-[2px] bg-indigo-500/25">
-                    <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" />
-                </View>
-                <View className="flex-1">
-                    <Text className="text-[10px] font-black text-indigo-300/70 uppercase tracking-[2px]">{t('schedule.opponent')}</Text>
-                    <Text className="text-[17px] font-black text-white mt-0.5" numberOfLines={1}>{opponentName}</Text>
-                </View>
-                <View className="bg-white/[0.05] border border-white/[0.08] rounded-xl px-2.5 py-1.5">
-                    <Text className="text-[11px] font-black italic text-slate-300 tracking-wider">VS</Text>
-                </View>
-            </Pressable>
+            {/* The matchup: opponent and the round's deadline on one card, lit in the amber a
+                match without a time wears on Home. */}
+            <View style={styles.matchupCard}>
+                <LinearGradient
+                    pointerEvents="none"
+                    colors={[AMBER + '1A', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0.6, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                />
+                <View pointerEvents="none" style={styles.matchupRail} />
 
-            {/* Deadline */}
-            <View className="bg-slate-800/40 rounded-2xl p-3.5 border border-white/5 mb-4 flex-row items-center gap-3">
-                <View className="w-9 h-9 rounded-xl bg-amber-500/10 items-center justify-center border border-amber-500/20">
-                    <Ionicons name="calendar-outline" size={16} color="#FBBF24" />
-                </View>
-                <View className="flex-1">
-                    <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[2px]">{t('schedule.deadline')}</Text>
-                    <Text className="text-sm text-slate-200 font-bold mt-0.5">{displayDeadline}</Text>
+                <Pressable
+                    onPress={onOpponentPress}
+                    disabled={!onOpponentPress}
+                    accessibilityRole={onOpponentPress ? 'button' : undefined}
+                    className="flex-row items-center active:opacity-70"
+                    style={{ gap: 12 }}
+                >
+                    <View style={styles.opponentRing}>
+                        <PlayerAvatar src={opponentAvatarUrl} name={opponentName} size="md" className="border-0" />
+                    </View>
+                    <View className="flex-1 min-w-0">
+                        <Text className="text-[10.5px] font-black uppercase tracking-[1.5px]" style={{ color: AMBER_TEXT }}>
+                            {t('schedule.opponent')}
+                        </Text>
+                        <View className="flex-row items-baseline mt-0.5" style={{ gap: 6 }}>
+                            <Text className="text-[11px] font-black uppercase tracking-[1px]" style={{ color: AMBER_TEXT }}>vs</Text>
+                            <Text
+                                className="flex-1 text-[17px] leading-[22px] font-black text-white tracking-tight"
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.7}
+                            >
+                                {opponentName}
+                            </Text>
+                        </View>
+                    </View>
+                    {onOpponentPress && <Ionicons name="chevron-forward" size={16} color="#64748B" />}
+                </Pressable>
+
+                <View className="flex-row items-center mt-3 pt-3 border-t border-white/[0.06]" style={{ gap: 8 }}>
+                    <Ionicons name="calendar" size={14} color={AMBER} />
+                    <Text className="text-[12px] font-bold text-slate-400">{t('schedule.deadline')}</Text>
+                    <Text className="flex-1 text-right text-[13px] font-black text-slate-100" numberOfLines={1} style={{ fontVariant: ['tabular-nums'] }}>
+                        {displayDeadline}
+                    </Text>
                 </View>
             </View>
 
@@ -293,134 +314,95 @@ export function HourlyAvailabilityPicker({
 
             {hasSubmitted ? (
                 /* ───────── Submitted summary ───────── */
-                <View className="rounded-[24px] bg-emerald-500/[0.07] border border-emerald-500/20 p-5 items-center">
-                    <View className="w-14 h-14 rounded-2xl bg-emerald-500/15 items-center justify-center mb-3">
-                        <Ionicons name="checkmark-done" size={28} color="#10B981" />
+                <View style={styles.sentCard}>
+                    <View className="flex-row items-center" style={{ gap: 12 }}>
+                        <View className="w-11 h-11 rounded-2xl items-center justify-center" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
+                            <Ionicons name="checkmark-done" size={22} color="#34D399" />
+                        </View>
+                        <View className="flex-1">
+                            <Text className="text-white font-black text-[15px] tracking-tight" numberOfLines={1}>{t('schedule.availabilitySent')}</Text>
+                            <Text className="text-[12px] text-slate-400 mt-0.5" numberOfLines={2}>
+                                Waiting for {opponentName} to confirm
+                            </Text>
+                        </View>
                     </View>
-                    <Text className="text-white font-black text-base uppercase tracking-tight w-full text-center" numberOfLines={1}>{t('schedule.availabilitySent')}</Text>
-                    <Text className="text-xs text-slate-400 mt-1 text-center">
-                        Waiting for {opponentName} to confirm
-                    </Text>
 
                     {/* Mini stats */}
-                    <View className="flex-row gap-2.5 mt-4 w-full">
-                        <View className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 items-center">
-                            <Text className="text-2xl font-black text-indigo-300">{selectedSlots.size}</Text>
+                    <View className="flex-row mt-4 pt-3.5 border-t border-white/[0.06]">
+                        <View className="flex-1 items-center">
+                            <Text className="text-[24px] leading-[28px] font-black text-indigo-300" style={{ fontVariant: ['tabular-nums'] }}>{selectedSlots.size}</Text>
                             <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>{t('schedule.slots')}</Text>
                         </View>
-                        <View className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 items-center">
-                            <Text className="text-2xl font-black text-emerald-400">{mutualCount}</Text>
+                        <View style={{ width: 1, backgroundColor: 'rgba(148,163,184,0.12)' }} />
+                        <View className="flex-1 items-center">
+                            <Text className="text-[24px] leading-[28px] font-black text-emerald-400" style={{ fontVariant: ['tabular-nums'] }}>{mutualCount}</Text>
                             <Text className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 w-full text-center" numberOfLines={1}>{t('schedule.mutual')}</Text>
                         </View>
                     </View>
 
                     <Pressable
                         onPress={openPicker}
-                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                        className="mt-4 w-full h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex-row items-center justify-center gap-2"
+                        className="mt-4 w-full h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex-row items-center justify-center gap-2 active:opacity-70"
                     >
-                        <Ionicons name="create-outline" size={16} color="#94A3B8" />
-                        <Text className="text-xs font-black text-slate-300 uppercase tracking-widest" numberOfLines={1}>{t('schedule.editSlots')}</Text>
+                        <Ionicons name="create-outline" size={16} color="#CBD5E1" />
+                        <Text className="text-[13px] font-black text-slate-200" numberOfLines={1}>{t('schedule.editSlots')}</Text>
                     </Pressable>
 
                     {/* Even after availability is sent, let the user break the "waiting for opponent"
                         lock if they already agreed on a time outside the app. */}
                     {onMarkScheduled && (
                         <>
-                            <View className="flex-row items-center w-full" style={{ marginVertical: 12 }}>
-                                <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                                <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">{t('common:or')}</Text>
-                                <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                            </View>
-
-                            <Pressable
+                            <OrDivider label={t('common:or')} />
+                            <AgreedCard
+                                title={t('schedule.alreadyAgreed')}
+                                hint={t('schedule.scheduleNowHint')}
                                 onPress={onMarkScheduled}
-                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                                className="w-full rounded-2xl bg-emerald-500/[0.08] border border-emerald-500/20 flex-row items-center px-4 py-3.5 gap-3"
-                            >
-                                <View className="w-9 h-9 rounded-xl bg-emerald-500/12 border border-emerald-500/20 items-center justify-center">
-                                    <Ionicons name="checkmark-circle-outline" size={18} color="#10B981" />
-                                </View>
-                                <View className="flex-1">
-                                    <Text className="text-[13px] font-black text-white leading-tight">
-                                        {t('schedule.alreadyAgreed')}
-                                    </Text>
-                                    <Text className="text-[11px] text-slate-400 mt-0.5">
-                                        {t('schedule.scheduleNowHint')}
-                                    </Text>
-                                </View>
-                                <Ionicons name="chevron-forward" size={16} color="#64748B" />
-                            </Pressable>
+                            />
                         </>
                     )}
                 </View>
             ) : (
                 /* ───────── Choice cards ───────── */
                 <>
-                    <Text className="text-[11px] font-black text-slate-500 uppercase tracking-[2px] mb-3 ml-1">
+                    <Text className="text-[10.5px] font-black text-slate-400 uppercase tracking-[1.4px] mb-2.5 ml-1">
                         {t('schedule.howToSchedule')}
                     </Text>
 
-                    {/* Already agreed outside app */}
-                    {onMarkScheduled && (
-                        <Pressable
-                            onPress={onMarkScheduled}
-                            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.99 : 1 }] })}
-                            className="w-full rounded-[22px] border border-white/[0.07] bg-white/[0.03] flex-row items-center px-4 py-4 gap-3.5"
-                        >
-                            <View className="w-11 h-11 rounded-2xl bg-emerald-500/12 border border-emerald-500/20 items-center justify-center">
-                                <Ionicons name="checkmark-circle-outline" size={22} color="#10B981" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-[15px] font-black text-white leading-tight">
-                                    {t('schedule.alreadyAgreed')}
-                                </Text>
-                                <Text className="text-[12px] text-slate-400 mt-0.5">
-                                    {t('schedule.skipSchedulingHint')}
-                                </Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={16} color="#64748B" />
-                        </Pressable>
-                    )}
-
-                    {/* OR divider */}
-                    {onMarkScheduled && (
-                        <View className="flex-row items-center" style={{ marginVertical: 14 }}>
-                            <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">{t('common:or')}</Text>
-                            <View className="flex-1 h-[1px] bg-white/[0.06]" />
-                        </View>
-                    )}
-
-                    {/* Set availability in app — primary action that opens the picker modal */}
+                    {/* Set availability in app — the primary action, first: a card like the others,
+                        marked out by a green edge, icon and arrow rather than a green fill */}
                     <Pressable
                         onPress={openPicker}
-                        style={({ pressed }) => ({
-                            opacity: pressed ? 0.85 : 1,
-                            transform: [{ scale: pressed ? 0.99 : 1 }],
-                            shadowColor: '#6366F1',
-                            shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 0.22,
-                            shadowRadius: 16,
-                            elevation: 6,
-                        })}
-                        className="w-full rounded-[22px] border border-indigo-400/25 bg-indigo-500/[0.12] flex-row items-center px-4 py-4 gap-3.5"
+                        accessibilityRole="button"
+                        className="active:opacity-80"
+                        style={styles.primaryCard}
                     >
-                        <View className="w-11 h-11 rounded-2xl bg-indigo-500/25 border border-indigo-400/30 items-center justify-center">
-                            <Ionicons name="calendar-number-outline" size={22} color="#A5B4FC" />
+                        <View className="w-11 h-11 rounded-2xl items-center justify-center" style={{ backgroundColor: 'rgba(16,185,129,0.14)', borderWidth: 1, borderColor: 'rgba(52,211,153,0.3)' }}>
+                            <Ionicons name="calendar-number" size={21} color="#34D399" />
                         </View>
                         <View className="flex-1">
                             <Text className="text-[15px] font-black text-white leading-tight">
                                 {t('schedule.setYourAvailability')}
                             </Text>
-                            <Text className="text-[12px] text-slate-300/80 mt-0.5" numberOfLines={1}>
+                            <Text className="text-[12px] text-slate-400 mt-0.5" numberOfLines={1}>
                                 Pick times you can play vs {opponentName}
                             </Text>
                         </View>
-                        <View className="w-7 h-7 rounded-full bg-indigo-500/30 items-center justify-center">
-                            <Ionicons name="chevron-forward" size={15} color="#C7D2FE" />
+                        <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: '#10B981' }}>
+                            <Ionicons name="chevron-forward" size={16} color={INK} />
                         </View>
                     </Pressable>
+
+                    {/* Already agreed outside app */}
+                    {onMarkScheduled && (
+                        <>
+                            <OrDivider label={t('common:or')} />
+                            <AgreedCard
+                                title={t('schedule.alreadyAgreed')}
+                                hint={t('schedule.skipSchedulingHint')}
+                                onPress={onMarkScheduled}
+                            />
+                        </>
+                    )}
                 </>
             )}
 
@@ -648,3 +630,101 @@ export function HourlyAvailabilityPicker({
         </View>
     );
 }
+
+// Amber: a match that still needs a time (Home's Needs Attention). Dark ink sits on the green CTA.
+const AMBER = '#F59E0B';
+const AMBER_TEXT = '#FCD34D';
+const INK = '#03140E';
+
+function OrDivider({ label }: { label: string }) {
+    return (
+        <View className="flex-row items-center" style={{ marginVertical: 14 }}>
+            <View className="flex-1 h-[1px] bg-white/[0.06]" />
+            <Text className="text-[10px] font-black text-slate-500 uppercase tracking-[3px] px-3">{label}</Text>
+            <View className="flex-1 h-[1px] bg-white/[0.06]" />
+        </View>
+    );
+}
+
+/** The quiet choice: the time was settled outside the app, so skip straight to the result. */
+function AgreedCard({ title, hint, onPress }: { title: string; hint: string; onPress: () => void }) {
+    return (
+        <Pressable onPress={onPress} accessibilityRole="button" className="active:opacity-70" style={styles.agreedCard}>
+            <View className="w-10 h-10 rounded-2xl items-center justify-center" style={{ backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)' }}>
+                <Ionicons name="checkmark-circle" size={20} color="#34D399" />
+            </View>
+            <View className="flex-1">
+                <Text className="text-[14px] font-black text-white leading-tight">{title}</Text>
+                <Text className="text-[12px] text-slate-400 mt-0.5">{hint}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#64748B" />
+        </Pressable>
+    );
+}
+
+const styles = StyleSheet.create({
+    matchupCard: {
+        marginBottom: 18,
+        paddingLeft: 16,
+        paddingRight: 14,
+        paddingVertical: 14,
+        borderRadius: 20,
+        overflow: 'hidden',
+        backgroundColor: '#172036',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.07)',
+        borderTopColor: 'rgba(255,255,255,0.11)',
+    },
+    matchupRail: {
+        position: 'absolute',
+        left: 0,
+        top: 12,
+        bottom: 12,
+        width: 3,
+        borderTopRightRadius: 3,
+        borderBottomRightRadius: 3,
+        backgroundColor: AMBER,
+        shadowColor: AMBER,
+        shadowOpacity: 0.8,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    opponentRing: {
+        borderRadius: 999,
+        padding: 1.5,
+        borderWidth: 1,
+        borderColor: AMBER + '80',
+    },
+    primaryCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderRadius: 22,
+        backgroundColor: '#172036',
+        borderWidth: 1,
+        borderColor: 'rgba(52,211,153,0.28)',
+        borderTopColor: 'rgba(52,211,153,0.4)',
+    },
+    agreedCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 20,
+        backgroundColor: '#131B2E',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.07)',
+        borderTopColor: 'rgba(255,255,255,0.11)',
+    },
+    sentCard: {
+        padding: 16,
+        borderRadius: 22,
+        backgroundColor: '#131B2E',
+        borderWidth: 1,
+        borderColor: 'rgba(16,185,129,0.22)',
+        borderTopColor: 'rgba(16,185,129,0.35)',
+    },
+});

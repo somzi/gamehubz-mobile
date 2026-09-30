@@ -1465,18 +1465,25 @@ function MatchScheduleCardBase({
                             {/* Drag Handle */}
                             <View className="w-10 h-1 bg-white/10 rounded-full self-center mb-4" />
 
-                            {/* Header — minimal monochrome with trophy icon */}
-                            <View className="flex-row items-center mb-6">
-                                <View
-                                    className="w-12 h-12 rounded-2xl items-center justify-center mr-3.5"
+                            {/* Header — the tournament's violet-and-gold tile, the hub under the name */}
+                            <View className="flex-row items-center mb-5">
+                                <LinearGradient
+                                    colors={['#4C1D95', '#312E81']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
                                     style={{
-                                        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: 16,
+                                        marginRight: 14,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
                                         borderWidth: 1,
-                                        borderColor: 'rgba(255, 255, 255, 0.06)',
+                                        borderColor: 'rgba(251,191,36,0.35)',
                                     }}
                                 >
-                                    <Ionicons name="trophy" size={20} color="#CBD5E1" />
-                                </View>
+                                    <Ionicons name="trophy" size={21} color="#FBBF24" />
+                                </LinearGradient>
                                 <View className="flex-1 mr-3">
                                     <Text
                                         className="text-white font-black tracking-tight"
@@ -1485,32 +1492,35 @@ function MatchScheduleCardBase({
                                     >
                                         {tournamentName}
                                     </Text>
-                                    <Text
-                                        className="text-slate-500 text-[11px] font-bold uppercase tracking-[2px] mt-1"
-                                        numberOfLines={1}
-                                    >
-                                        in {roundName}
-                                    </Text>
+                                    {!!roundName && (
+                                        <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
+                                            <Ionicons name="planet" size={12} color={COLORS.primaryBright} />
+                                            <Text
+                                                className="shrink text-[10.5px] font-black uppercase tracking-[1.5px]"
+                                                style={{ color: COLORS.primaryBright }}
+                                                numberOfLines={1}
+                                            >
+                                                {roundName}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                                 <Pressable
                                     onPress={() => setModalVisible(false)}
-                                    className="w-10 h-10 rounded-2xl items-center justify-center"
-                                    style={({ pressed }) => ({
-                                        opacity: pressed ? 0.6 : 1,
-                                        transform: [{ scale: pressed ? 0.9 : 1 }],
-                                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                        borderWidth: 1,
-                                        borderColor: 'rgba(255, 255, 255, 0.07)',
-                                    })}
+                                    accessibilityRole="button"
+                                    className="w-10 h-10 rounded-2xl items-center justify-center bg-white/[0.05] border border-white/10 active:opacity-60"
                                 >
                                     <Ionicons name="close" size={18} color="#94A3B8" />
                                 </Pressable>
                             </View>
 
-                            {/* Slim divider under header */}
-                            <View
-                                className="mb-5"
-                                style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
+                            {/* Hairline under the header, fading out at both ends */}
+                            <LinearGradient
+                                pointerEvents="none"
+                                colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.09)', 'rgba(255,255,255,0)']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={{ height: 1, marginBottom: 18 }}
                             />
 
                             {/* Tab Bar — premium segmented control */}
