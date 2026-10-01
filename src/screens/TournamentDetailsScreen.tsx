@@ -80,6 +80,7 @@ import { PrivateInviteCard } from '../components/tournament/PrivateInviteCard';
 import { JoinByCodeModal } from '../components/modals/JoinByCodeModal';
 import { formatJoinCode } from '../lib/share';
 import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
+import { isPlatformAdminToken } from '../lib/platformRole';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -257,7 +258,9 @@ export default function TournamentDetailsScreen() {
     const [bracketError, setBracketError] = useState<string | null>(null);
     const [isThirdPlaceExpanded, setIsThirdPlaceExpanded] = useState(false);
 
-    const { user } = useAuth();
+    const { user, token } = useAuth();
+    // Swapping knockout seeds is platform-admin only: tournament staff live with the automatic draw.
+    const isPlatformAdmin = useMemo(() => isPlatformAdminToken(token), [token]);
     const [isRegistering, setIsRegistering] = useState(false);
     const [participants, setParticipants] = useState<any[]>([]);
     const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
@@ -1992,6 +1995,7 @@ export default function TournamentDetailsScreen() {
     // Admin-only bracket controls for the Groups + Bracket format:
     //  • Reset Bracket  — visible once the knockout is drawn; tears it down so a group result can be fixed.
     //  • Draw Bracket   — visible when the groups are complete but the knockout is empty (e.g. after a reset).
+    //  • Swap Seeds     — platform admin only; the backend refuses it for tournament staff.
     const renderBracketAdminActions = () => {
         if (!canManage || stages.length === 0) return null;
 
@@ -2029,7 +2033,7 @@ export default function TournamentDetailsScreen() {
 
         const showReset = knockoutDrawn && !anyKnockoutPlayed;
         const showDraw = !knockoutDrawn && groupComplete;
-        const canSwap = knockoutDrawn && getSwappableBracketTeams().length >= 2;
+        const canSwap = isPlatformAdmin && knockoutDrawn && getSwappableBracketTeams().length >= 2;
         if (!showReset && !showDraw) return null;
 
         return (
