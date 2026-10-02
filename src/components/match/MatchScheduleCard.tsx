@@ -181,6 +181,9 @@ function MatchScheduleCardBase({
     /** "We already agreed outside the app" is a one-way skip of the whole availability step —
      *  it schedules the match for BOTH sides — so it goes through a confirmation first. */
     const [confirmMarkScheduled, setConfirmMarkScheduled] = useState(false);
+    /** Null means the tournament setting is unknown. Scheduling choices appear together after
+     *  details and availability load, so adding this shortcut never moves the calendar card. */
+    const [allowScheduleOutsideApp, setAllowScheduleOutsideApp] = useState<boolean | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Slots state
@@ -458,6 +461,7 @@ function MatchScheduleCardBase({
         if (!matchId) {
             // Nothing to wait for, and the gate below must not strand the form behind a spinner:
             // callers build this id defensively (`match.id || match.matchId || ''`).
+            setAllowScheduleOutsideApp(null);
             setDetailsLoaded(true);
             return null;
         }
@@ -554,6 +558,9 @@ function MatchScheduleCardBase({
                 setCheckInGraceMinutes(data.checkInGraceMinutes ?? data.CheckInGraceMinutes ?? null);
                 // Tournament-wide, so on a team game it is read off the parent DTO like the ready check.
                 setRequireResultVerification(Boolean(data.requireResultVerification ?? data.RequireResultVerification ?? false));
+                // Tournament-wide as well — the parent DTO on a team tie carries it. Only an explicit
+                // false turns it off, so a server that predates the setting keeps the shortcut.
+                setAllowScheduleOutsideApp((data.allowScheduleOutsideApp ?? data.AllowScheduleOutsideApp) !== false);
                 setHasResultVerifications(hasVerifications);
                 setCheckInState({
                     homeCheckedInOn: checkInSource.homeCheckedInOn ?? checkInSource.HomeCheckedInOn ?? null,
@@ -576,8 +583,11 @@ function MatchScheduleCardBase({
                 setAdminHelpRequestedByUserId(data.adminHelpRequestedByUserId ?? data.AdminHelpRequestedByUserId ?? null);
                 return homeUserId;
             }
+            setAllowScheduleOutsideApp(null);
         } catch (error) {
             if (!isCurrent()) return null;
+            // A failed refresh must not reuse an earlier permission to skip the calendar.
+            setAllowScheduleOutsideApp(null);
             console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
         } finally {
             if (!isCurrent()) return null;
@@ -1461,17 +1471,27 @@ function MatchScheduleCardBase({
                                     >
                                         {currentStatus === 'pending_availability' && (
                                             <View className="flex-1">
-                                                <HourlyAvailabilityPicker
-                                                    matchId={matchId}
-                                                    deadline={localDeadline}
-                                                    opponentName={opponentName}
-                                                    opponentAvatarUrl={opponentAvatarUrl}
-                                                    opponentAvailability={opponentSlots}
-                                                    initialSlots={mySlots}
-                                                    onSubmit={handleAvailabilitySubmit}
-                                                    onMarkScheduled={() => setConfirmMarkScheduled(true)}
-                                                    onOpponentPress={opponentUserId ? () => openPlayerProfile(opponentUserId) : undefined}
-                                                />
+                                                {!detailsLoaded || isLoadingAvailability ? (
+                                                    <View
+                                                        className="flex-1 items-center justify-center py-10"
+                                                        accessibilityRole="progressbar"
+                                                        accessibilityLabel={t('common:loading')}
+                                                    >
+                                                        <ActivityIndicator size="small" color="#10B981" />
+                                                    </View>
+                                                ) : (
+                                                    <HourlyAvailabilityPicker
+                                                        matchId={matchId}
+                                                        deadline={localDeadline}
+                                                        opponentName={opponentName}
+                                                        opponentAvatarUrl={opponentAvatarUrl}
+                                                        opponentAvailability={opponentSlots}
+                                                        initialSlots={mySlots}
+                                                        onSubmit={handleAvailabilitySubmit}
+                                                        onMarkScheduled={allowScheduleOutsideApp === true ? () => setConfirmMarkScheduled(true) : undefined}
+                                                        onOpponentPress={opponentUserId ? () => openPlayerProfile(opponentUserId) : undefined}
+                                                    />
+                                                )}
                                             </View>
                                         )}
 

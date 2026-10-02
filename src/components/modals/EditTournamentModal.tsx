@@ -161,6 +161,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [requireResultVerification, setRequireResultVerification] = useState(
         Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification),
     );
+    // "Agreed outside the app" defaults ON, so only an explicit false switches it off — a server
+    // that predates the setting sends nothing.
+    const [allowScheduleOutsideApp, setAllowScheduleOutsideApp] = useState(
+        (tournament?.allowScheduleOutsideApp ?? tournament?.AllowScheduleOutsideApp) !== false,
+    );
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
     // Invite-only. Editable for the whole life of the tournament — it only changes who can find it.
     const [isPrivate, setIsPrivate] = useState(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
@@ -340,6 +345,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setRequireMatchCheckIn(Boolean(tournament?.requireMatchCheckIn ?? tournament?.RequireMatchCheckIn));
         setCheckInGraceMinutes(String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10));
         setRequireResultVerification(Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification));
+        setAllowScheduleOutsideApp((tournament?.allowScheduleOutsideApp ?? tournament?.AllowScheduleOutsideApp) !== false);
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
         setIsPrivate(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
@@ -540,6 +546,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
                 // Always sent: the server reads its absence as "an older app, keep what is stored".
                 RequireResultVerification: requireResultVerification,
+                AllowScheduleOutsideApp: allowScheduleOutsideApp,
                 // Series format — applied whenever AllowStructuralEdits is set, with no start-date
                 // gate: already-played matches carry their own frozen format, so this can only
                 // change fixtures that have yet to be reported.
@@ -664,6 +671,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const matchSettingsSummary = [
         bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
         requireResultApproval ? t('form.summaryResultApproval') : null,
+        allowScheduleOutsideApp ? null : t('form.summaryCalendarOnly'),
         requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
         requireResultVerification ? t('form.summaryResultVerification') : null,
         canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
@@ -1064,6 +1072,20 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         />
                                         <Text className={FIELD_HINT}>
                                             {t('form.requireApprovalHintShort')}
+                                        </Text>
+                                    </View>
+
+                                    {/* "Agreed outside the app" — safe to switch mid-tournament: it only
+                                        gates matches still waiting for a time. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.allowOutsideApp')}</Text>
+                                        <SegmentedToggle
+                                            options={yesNoOptions}
+                                            value={allowScheduleOutsideApp ? 'yes' : 'no'}
+                                            onChange={(v) => setAllowScheduleOutsideApp(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            {t('form.allowOutsideAppHint')}
                                         </Text>
                                     </View>
 
