@@ -9,7 +9,7 @@ import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ActionSheetModal } from '../components/modals/ActionSheetModal';
-import Constants from 'expo-constants';
+import { getAppReleaseLabel } from '../lib/appRelease';
 import { COLORS } from '../lib/theme';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { MenuItem } from '../components/ui/MenuItem';
@@ -184,8 +184,8 @@ export default function SettingsScreen() {
                 </View>
 
                 <View className="py-8 items-center opacity-30">
-                    <Text className="text-white text-xs">
-                        {t('version', { version: Constants.expoConfig?.version || '1.0.0' })}
+                    <Text selectable className="text-white text-xs text-center">
+                        {t('version', { version: getAppReleaseLabel() })}
                     </Text>
                 </View>
             </ScrollView>

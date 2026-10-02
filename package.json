@@ -10,7 +10,9 @@
     "start:dev": "cross-env APP_VARIANT=development expo start --dev-client",
     "start:dev:clear": "cross-env APP_VARIANT=development expo start -c --dev-client",
     "build:dev:ios": "cross-env APP_VARIANT=development eas build --profile development --platform ios",
-    "build:dev:android": "cross-env APP_VARIANT=development eas build --profile development --platform android"
+    "build:dev:android": "cross-env APP_VARIANT=development eas build --profile development --platform android",
+    "update:ota": "node scripts/publish-ota.cjs",
+    "test:ota": "node --test scripts/ota.test.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

@@ -1,8 +1,8 @@
 // Dinamicki Expo config.
 //
-// PROD JE NETAKNUT: sve produkcijske vrednosti i dalje zive u app.json, a ovaj
-// fajl ih bez izmene prosledjuje dalje. Jedini izuzetak je APP_VARIANT=development,
-// kada se pravi zasebna "GameHubz Dev" aplikacija sa svojim bundle ID-em, imenom i
+// Native vrednosti zive u app.json. OTA reviziju dodajemo samo u extra, bez
+// promene version/runtimeVersion. APP_VARIANT=development pravi zasebnu
+// "GameHubz Dev" aplikaciju sa svojim bundle ID-em, imenom i
 // ikonicom -- tako dev build i aplikacija sa App Store-a mogu da stoje jedna pored
 // druge na istom telefonu, bez ikakvog dodirivanja produkcije.
 //
@@ -11,8 +11,22 @@
 //              (APP_VARIANT je podesen u eas.json, na development profilu)
 
 const IS_DEV = process.env.APP_VARIANT === 'development';
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 
 module.exports = ({ config }) => {
+  const revisions = JSON.parse(readFileSync(path.join(__dirname, 'ota-revisions.json'), 'utf8'));
+  const revision = revisions[config.version] ?? 0;
+  if (!Number.isSafeInteger(revision) || revision < 0) {
+    throw new Error('Invalid OTA revision in ota-revisions.json');
+  }
+  config = {
+    ...config,
+    extra: {
+      ...config.extra,
+      otaRelease: { baseVersion: config.version, revision },
+    },
+  };
   if (!IS_DEV) return config;
 
   // Universal linkovi (share.codespheresolutions.dev) su vezani za produkcijski
