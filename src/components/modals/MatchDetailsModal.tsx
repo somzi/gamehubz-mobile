@@ -380,6 +380,9 @@ export function MatchDetailsModal({
         // screen until (and unless) the new one's details came back with its own.
         setLocalDeadline(deadline);
         setConfirmedTimeIso(undefined);
+        // fetchMatchDetails only ever SETS the agreed time, so an unscheduled match opened after a
+        // scheduled one kept that match's kick-off in the Match Time tile.
+        setConfirmedTime(scheduledTime);
     }, [matchId, deadline]);
 
     // Apply the host-requested starting tab whenever the modal opens or the match
