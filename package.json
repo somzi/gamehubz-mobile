@@ -12,7 +12,9 @@
     "build:dev:ios": "cross-env APP_VARIANT=development eas build --profile development --platform ios",
     "build:dev:android": "cross-env APP_VARIANT=development eas build --profile development --platform android",
     "test:nav": "node --test tests/navigation/stackRouter.test.mjs tests/navigation/stackTransitions.test.mjs",
-    "test:frontend": "node --test tests/navigation/*.test.mjs tests/behavior/*.test.mjs"
+    "test:frontend": "node --test tests/navigation/*.test.mjs tests/behavior/*.test.mjs",
+    "update:ota": "node scripts/publish-ota.cjs",
+    "test:ota": "node --test scripts/ota.test.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

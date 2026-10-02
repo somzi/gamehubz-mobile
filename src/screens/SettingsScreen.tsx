@@ -9,7 +9,7 @@ import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { StatusModal } from '../components/modals/StatusModal';
 import { ActionSheetModal } from '../components/modals/ActionSheetModal';
-import Constants from 'expo-constants';
+import { getAppReleaseLabel } from '../lib/appRelease';
 import { COLORS } from '../lib/theme';
 import { MenuItem } from '../components/ui/MenuItem';
 import { SettingsHero, SettingsHeroLine, SettingsGroup, SETTINGS_EMBLEM_IMAGE, SETTINGS_EMBLEM_IMAGE_RADIUS } from '../components/ui/SettingsBlocks';
@@ -203,7 +203,7 @@ export default function SettingsScreen() {
                         style={{ fontVariant: ['tabular-nums'] }}
                         onLongPress={() => { Share.share({ message: formatNavigationLog() || '-' }).catch(() => {}); }}
                     >
-                        {t('version', { version: Constants.expoConfig?.version || '1.0.0' })}
+                        {t('version', { version: getAppReleaseLabel() })}
                     </Text>
                 </View>
             </ScrollView>

@@ -5,7 +5,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
+import { getAppReleaseLabel } from '../lib/appRelease';
 import { SectionLabel } from '../components/ui/SectionLabel';
 import { PressableScale } from '../components/ui/PressableScale';
 import { COLORS } from '../lib/theme';
@@ -120,7 +120,7 @@ export function AboutUsScreen() {
                 </View>
 
                 <View className="mt-12 items-center">
-                    <Text className="text-slate-500 text-xs tracking-widest uppercase w-full text-center" numberOfLines={1}>Version {Constants.expoConfig?.version || '1.0.0'}</Text>
+                    <Text selectable className="text-slate-500 text-xs w-full text-center">Version {getAppReleaseLabel()}</Text>
                     <Text className="text-slate-500 text-xs mt-2">{t('copyright')}</Text>
                 </View>
             </ScrollView>
