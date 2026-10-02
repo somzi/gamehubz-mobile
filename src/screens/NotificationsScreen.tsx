@@ -146,7 +146,10 @@ export default function NotificationsScreen() {
     );
 
     const openRequest = React.useRef(0);
-    useFocusEffect(useCallback(() => () => { openRequest.current += 1; }, []));
+    // The row whose destination is still being looked up (a chat opened from its push): its spinner
+    // says the tap landed. Gone when the navigation goes, or when another tap or a blur supersedes it.
+    const [openingId, setOpeningId] = useState<string | null>(null);
+    useFocusEffect(useCallback(() => () => { openRequest.current += 1; setOpeningId(null); }, []));
     const handlePress = useCallback(async (item: NotificationItem) => {
         const request = ++openRequest.current;
         // Read first, optimistically — the navigation below never waits on the request.
@@ -160,8 +163,14 @@ export default function NotificationsScreen() {
 
         // The same router a push tap uses. A notification that outlived its target (a deleted
         // tournament, a hub the user left) lands on that screen's own not-found state.
-        const destination = await routeFromNotification(navigation, item.data,
-            () => request === openRequest.current && navigation.isFocused());
+        setOpeningId(item.id);
+        let destination;
+        try {
+            destination = await routeFromNotification(navigation, item.data,
+                () => request === openRequest.current && navigation.isFocused());
+        } finally {
+            if (request === openRequest.current) setOpeningId(null);
+        }
         if (request !== openRequest.current || !navigation.isFocused()) return;
         if (!destination) {
             // No payload, or nothing this build knows how to open. The tap has already marked the row
@@ -236,10 +245,10 @@ export default function NotificationsScreen() {
     const renderItem = useCallback<SectionListRenderItem<NotificationItem, DaySection>>(
         ({ item }) => (
             <View className="px-4">
-                <NotificationRow item={item} onPress={handlePress} />
+                <NotificationRow item={item} onPress={handlePress} opening={openingId === item.id} />
             </View>
         ),
-        [handlePress],
+        [handlePress, openingId],
     );
 
     const renderSectionHeader = useCallback(
@@ -336,6 +345,7 @@ export default function NotificationsScreen() {
                     sections={sections}
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}
+                    extraData={openingId}
                     renderSectionHeader={renderSectionHeader}
                     ItemSeparatorComponent={RowGap}
                     stickySectionHeadersEnabled

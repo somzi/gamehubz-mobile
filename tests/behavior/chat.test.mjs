@@ -58,3 +58,26 @@ test('failure of an earlier message cannot overwrite a newer pending message', a
     assert.deepEqual(rows.map(m=>[m.content,m.state]),[['A','failed'],['B','sending']]);
     b.resolve();await second;assert.deepEqual(rows.map(m=>m.content),['A']);
 });
+test('a failed message can be removed; one still on its way cannot', async () => {
+    const sending = deferred(); let rows = [];
+    const outbox = createChatOutbox(content => content === 'stuck' ? sending.promise : Promise.reject(Error('blocked')), value => { rows = value; });
+    await outbox.send('refused');
+    const pending = outbox.send('stuck');
+    const [refused, stuck] = rows;
+    assert.equal(outbox.discard(stuck.id), false);
+    assert.equal(outbox.discard(refused.id), true);
+    assert.deepEqual(rows.map(m => m.content), ['stuck']);
+    // Gone for good: a retry of it is a no-op, and removing it twice changes nothing.
+    assert.equal(await outbox.retry(refused.id), false);
+    assert.equal(outbox.discard(refused.id), false);
+    sending.resolve(); await pending; assert.deepEqual(rows, []);
+});
+test('a message being retried cannot be removed until that attempt ends', async () => {
+    const retry = deferred(); let rows = [], attempts = 0;
+    const outbox = createChatOutbox(() => (++attempts === 1 ? Promise.reject(Error('offline')) : retry.promise), value => { rows = value; });
+    await outbox.send('hello');
+    const id = rows[0].id, attempt = outbox.retry(id);
+    assert.equal(outbox.discard(id), false);
+    retry.reject(Error('offline')); await attempt;
+    assert.equal(outbox.discard(id), true); assert.deepEqual(rows, []);
+});

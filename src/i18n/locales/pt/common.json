@@ -100,6 +100,7 @@
     "invalidServerResponse": "Resposta inválida do servidor",
     "invalidCredentials": "Credenciais inválidas",
     "networkError": "Erro de conexão",
+    "requestTimedOut": "O servidor não respondeu. Tente novamente.",
     "loadBadgesFailed": "Falha ao carregar os indicadores",
     "loadApprovalsFailed": "Falha ao carregar as aprovações",
     "pushTokenFailed": "Falha ao obter o token de push. Você está em um dispositivo físico?",

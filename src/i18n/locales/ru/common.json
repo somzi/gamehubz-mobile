@@ -25,6 +25,7 @@
     "maybeLater": "Позже",
     "me": "Я",
     "networkError": "Ошибка сети",
+    "requestTimedOut": "Сервер не ответил. Попробуйте ещё раз.",
     "noHighlightsHint": "Здесь появится активность хабов и новости турниров",
     "noHighlightsYet": "Лента пока пуста",
     "noMoreActivities": "Больше активностей нет",

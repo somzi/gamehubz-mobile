@@ -270,6 +270,8 @@ export function MatchDetailsModal({
 
     // Details for completed matches
     const [matchDetails, setMatchDetails] = useState<MatchResultDetailDto | null>(null);
+    const matchDetailsRef = useRef(matchDetails);
+    matchDetailsRef.current = matchDetails;
     // Starts true: the details fetch is kicked off by an effect, which runs after the first render.
     // Defaulting to false let that first frame draw with no details at all — which for a best-of
     // match meant the single-score form appeared and was then replaced.
@@ -412,6 +414,9 @@ export function MatchDetailsModal({
         setAdminAvailability(null);
         setMySlots(myAvailability);
         setOpponentSlots(opponentAvailability);
+        // fetchMatchDetails only ever SETS the agreed time, so an unscheduled match opened after a
+        // scheduled one kept that match's kick-off in the Match Time tile.
+        setConfirmedTime(scheduledTime);
     }, [matchId]);
 
     // Apply the host-requested starting tab whenever the modal opens or the match
@@ -523,6 +528,7 @@ export function MatchDetailsModal({
         if (!matchId) return;
         const requestedId = matchId;
         const isCurrent = requests.begin('details');
+        const showLoadError = !silent || !matchDetailsRef.current;
         if (!silent) {
             setIsLoadingDetails(true);
             setError(null);
@@ -613,17 +619,18 @@ export function MatchDetailsModal({
                     // Clock stacked under the date — the tile is too narrow for one line.
                     setConfirmedTime(formatDateTimeShort(normalizedData.scheduledTime, '\n'));
                 }
-            } else if (!silent) {
+            } else if (showLoadError) {
                 setError(t('details.loadResultsFailed'));
             }
         } catch (err) {
             console.error('Error fetching match details:', err);
-            if (!silent && isCurrent()) setError(t('details.loadResultsError'));
+            if (showLoadError && isCurrent()) setError(t('details.loadResultsError'));
         } finally {
             if (isCurrent()) {
                 setDetailsSettledFor(requestedId);
+                // A quiet request may supersede the request that started the loader.
+                setIsLoadingDetails(false);
                 if (!silent) {
-                    setIsLoadingDetails(false);
                     setIsEditMode(false);
                 }
             }
@@ -2309,7 +2316,8 @@ export function MatchDetailsModal({
 
     // Held until the load for THIS match has finished — the details on hand may be another match's —
     // and the tournament is in. A failed load ends the hold too: the error belongs on screen.
-    const holding = (!!matchId && detailsSettledFor !== matchId) || (holdUntilReady && !contextReady);
+    const holding = (!!matchId && (detailsSettledFor !== matchId || (isLoadingDetails && !matchDetails)))
+        || (holdUntilReady && !contextReady);
 
     if (!presence.rendered) return null;
 
@@ -2376,6 +2384,13 @@ export function MatchDetailsModal({
                 {holding ? (
                     <View className="flex-1 items-center justify-center" accessibilityRole="progressbar">
                         <ActivityIndicator size="large" color="#10B981" />
+                    </View>
+                ) : error && !matchDetails ? (
+                    <View className="flex-1 items-center justify-center px-6">
+                        <Text className="text-red-400 text-center">{error}</Text>
+                        <Button className="mt-6" onPress={() => fetchMatchDetails()} loading={isLoadingDetails}>
+                            {t('common:retry')}
+                        </Button>
                     </View>
                 ) : (
                 <>

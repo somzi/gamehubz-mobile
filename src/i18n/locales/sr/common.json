@@ -100,6 +100,7 @@
     "invalidServerResponse": "Neispravan odgovor servera",
     "invalidCredentials": "Neispravni podaci za prijavu",
     "networkError": "Greška mreže",
+    "requestTimedOut": "Server nije odgovorio. Pokušaj ponovo.",
     "loadBadgesFailed": "Nije uspelo učitavanje bedževa",
     "loadApprovalsFailed": "Nije uspelo učitavanje odobrenja",
     "pushTokenFailed": "Nije uspelo preuzimanje push tokena. Da li koristiš fizički uređaj?",

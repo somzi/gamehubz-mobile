@@ -84,6 +84,7 @@ import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
 import { isPlatformAdminToken } from '../lib/platformRole';
 import { Skeleton } from '../components/ui/Skeleton';
 import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
+import { NO_REFRESH_FAILURES, retryFailedRefreshes, withRefreshResult, type RefreshFailures } from '../lib/refreshFailures';
 import { LoadFailedState } from '../components/ui/EmptyState';
 import { afterScreenTransition, useModalHandoff } from '../lib/modalHandoff';
 
@@ -321,8 +322,9 @@ export default function TournamentDetailsScreen() {
     const [tournament, setTournament] = useState<any>(snapshot?.tournament ?? null);
     const [isLoading, setIsLoading] = useState(!snapshot?.tournament);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    // A background refresh failed while the page was showing: it stays, with a banner on top.
-    const [refreshFailed, setRefreshFailed] = useState(false);
+    // Background refreshes that failed while the page was showing, by resource: the page stays, with
+    // a banner on top until every one of them has gone through again.
+    const [failedRefreshes, setFailedRefreshes] = useState<RefreshFailures>(NO_REFRESH_FAILURES);
     // The banner's own retry spinner: driving the pull-to-refresh flag instead would drop the page
     // by the control's height on iOS without a pull.
     const [isRetryingRefresh, setIsRetryingRefresh] = useState(false);
@@ -348,6 +350,8 @@ export default function TournamentDetailsScreen() {
     const [bracketError, setBracketError] = useState<string | null>(null);
     // Until the first structure response the bracket tab has nothing to say yet, not "no bracket".
     const [bracketLoaded, setBracketLoaded] = useState(false);
+    const bracketLoadedRef = useRef(bracketLoaded);
+    bracketLoadedRef.current = bracketLoaded;
     const [isThirdPlaceExpanded, setIsThirdPlaceExpanded] = useState(false);
 
     // Swapping knockout seeds is platform-admin only: tournament staff live with the automatic draw.
@@ -792,7 +796,7 @@ export default function TournamentDetailsScreen() {
             };
 
             setTournament(normalizedTournament);
-            setRefreshFailed(false);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'overview', true));
             rememberSnapshot(user?.id, id, { tournament: normalizedTournament });
 
             // Fold the registration flag from the v3 overview so the Join / Registered button
@@ -812,7 +816,7 @@ export default function TournamentDetailsScreen() {
             console.error('Tournament fetch error:', err);
             // Only a load with nothing on screen becomes the error page. A refresh that fails over
             // a loaded tournament (focus, pull, after an action) used to replace it with that page.
-            if (silent && tournamentRef.current) setRefreshFailed(true);
+            if (silent && tournamentRef.current) setFailedRefreshes((failures) => withRefreshResult(failures, 'overview', false));
             else setError(getErrorMessage(err));
         } finally {
             if (!isCurrent()) return;
@@ -826,6 +830,7 @@ export default function TournamentDetailsScreen() {
     const fetchBracket = async (silent = false) => {
         const isCurrent = requests.begin('fetchBracket');
         if (!id) return;
+        const showLoadError = !silent || !bracketLoadedRef.current;
         if (!silent) {
             setLoadingBracket(true);
             setBracketError(null);
@@ -840,6 +845,8 @@ export default function TournamentDetailsScreen() {
             }
             const data = await response.json();
             if (!isCurrent()) return;
+            setBracketError(null);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'bracket', true));
             const nextStages = data.stages || [];
             setStages(nextStages);
             setTournamentBestOf(normalizeBestOf(data.bestOf ?? data.BestOf));
@@ -874,10 +881,11 @@ export default function TournamentDetailsScreen() {
         } catch (err) {
             if (!isCurrent()) return;
             console.error('Bracket fetch error:', err);
-            if (!silent) setBracketError(t('details.bracketLoadFailed'));
+            if (showLoadError) setBracketError(t('details.bracketLoadFailed'));
+            else setFailedRefreshes((failures) => withRefreshResult(failures, 'bracket', false));
         } finally {
             if (!isCurrent()) return;
-            if (!silent) setLoadingBracket(false);
+            setLoadingBracket(false);
             setBracketLoaded(true);
         }
     };
@@ -2879,14 +2887,19 @@ export default function TournamentDetailsScreen() {
                 }
             >
                 <View className="animate-slide-up">
-                    {refreshFailed && (
+                    {failedRefreshes.size > 0 && (
                         <RefreshFailedBanner
                             className="mx-4 mt-3"
                             retrying={isRetryingRefresh}
                             onRetry={async () => {
                                 setIsRetryingRefresh(true);
                                 try {
-                                    await fetchTournamentDetails(true);
+                                    // What failed, and only that: a stale bracket is retried even
+                                    // when the overview is fine, and the other way round.
+                                    await retryFailedRefreshes(failedRefreshes, {
+                                        overview: () => fetchTournamentDetails(true),
+                                        bracket: () => fetchBracket(true),
+                                    });
                                 } finally {
                                     setIsRetryingRefresh(false);
                                 }
@@ -4029,5 +4042,3 @@ export default function TournamentDetailsScreen() {
         </SafeAreaView>
     );
 }
-
-

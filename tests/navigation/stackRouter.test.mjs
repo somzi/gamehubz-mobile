@@ -232,3 +232,42 @@ test('hidden chat reconciliation does not change the focused screen', () => {
     assert.equal(fromTop(s), focused);
     assert.equal(s.routes.filter(r => r.name === 'DirectChat').length, 1);
 });
+
+// Cold start and login: React Navigation writes the tab navigator's state into the root only on
+// its first navigation event, so the tab screens' keys are in no state the router is given.
+const coldStart = () => router.getInitialState(options);
+
+test('cold start: taps from the first tab open their screens before any tab switch', () => {
+    for (const [name, params] of [['TournamentDetails', { id: 'A' }], ['Notifications'], ['MyMatches']]) {
+        const s = nav(coldStart(), name, params, 'home');
+        assert.equal(top(s).name, name);
+        assert.deepEqual(stack(s).slice(0, 1), ['MainTabs']);
+    }
+});
+
+test('cold start: a second tap from the first tab, once a screen covers it, is still ignored', () => {
+    let s = nav(coldStart(), 'TournamentDetails', { id: 'A' }, 'home');
+    const covered = nav(s, 'TournamentDetails', { id: 'B' }, 'home');
+    assert.equal(covered, s);
+    assert.equal(nav(s, 'Notifications', undefined, 'home'), s);
+    assert.deepEqual(stack(s), ['MainTabs', 'TournamentDetails:A']);
+});
+
+test('deep-link start: the tab state is still a keyless partial, taps from it open', () => {
+    const base = coldStart();
+    const s = { ...base, routes: [{ ...base.routes[0], state: { stale: true, routes: [{ name: 'Home' }] } }] };
+    assert.equal(top(nav(s, 'TournamentDetails', { id: 'A' }, 'home')).name, 'TournamentDetails');
+});
+
+test('back on the first tab after a cold start, its taps open again', () => {
+    let s = nav(coldStart(), 'TournamentDetails', { id: 'A' }, 'home');
+    s = act(s, { ...CommonActions.goBack(), source: fromTop(s) });
+    assert.equal(top(nav(s, 'MyMatches', undefined, 'home')).name, 'MyMatches');
+});
+
+test('cold start: a closed screen still cannot navigate, though its tab bar is back in focus', () => {
+    let s = nav(coldStart(), 'TournamentDetails', { id: 'A' }, 'home');
+    const closed = fromTop(s);
+    s = act(s, { ...CommonActions.goBack(), source: closed });
+    assert.equal(nav(s, 'PlayerProfile', { id: 'x' }, closed), s);
+});

@@ -37,7 +37,7 @@ interface MatchChatPanelProps {
 export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false }: MatchChatPanelProps) {
     const { t } = useTranslation('match');
     const { user } = useAuth();
-    const { refresh: refreshBadges } = useBadges();
+    const { refreshCounts, scheduleMatchesRefresh } = useBadges();
     const queryClient = useQueryClient();
     const [newComment, setNewComment] = useState('');
     const inputRef = useRef<TextInput>(null);
@@ -53,12 +53,22 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             content: raw.content ?? raw.Content, sentAt: raw.sentAt ?? raw.SentAt,
         }),
         onRead: async id => {
+            // Lists that change while the read is in flight (a push refetched them, a message came
+            // in) already hold newer server state than this read's answer: those keep their count.
+            // Only a list as old as the read takes the local zero.
+            const lists = () => queryClient.getQueryCache().findAll({ queryKey: ['home-matches'] });
+            const asOfRead = new Map(lists().map(query => [query.queryHash, query.state.dataUpdatedAt]));
             const response = await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(id), {method:'POST'});
-            if (response.ok) {
-                queryClient.setQueriesData<MatchOverviewDto[]>({queryKey:['home-matches']}, current => current?.map(match =>
+            if (!response.ok) return;
+            for (const query of lists()) {
+                if (asOfRead.get(query.queryHash) !== query.state.dataUpdatedAt) continue;
+                queryClient.setQueryData<MatchOverviewDto[]>(query.queryKey, current => current?.map(match =>
                     (match.id ?? match.matchId)?.toLowerCase() === id.toLowerCase() ? {...match, unreadMessages:0} : match));
-                refreshBadges();
             }
+            refreshCounts();
+            // A message that reached the server after the read is unread there. One refetch per
+            // window confirms that, shared with the badge pushes of the same second.
+            scheduleMatchesRefresh();
         },
     });
     const { messages: comments, loading: isLoading, hasMore, loadingMore: loadingEarlier, loadEarlier } = conversation;
@@ -113,7 +123,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     onScroll={scroll.onScroll}
                     scrollEventThrottle={100}
                     onContentSizeChange={scroll.onContentSizeChange}
-                    ListFooterComponent={<ChatOutbox messages={conversation.pending} onRetry={conversation.retry} />}
+                    ListFooterComponent={<ChatOutbox messages={conversation.pending} onRetry={conversation.retry} onDiscard={conversation.discard} />}
                     ListHeaderComponent={
                         hasMore ? (
                             <Pressable

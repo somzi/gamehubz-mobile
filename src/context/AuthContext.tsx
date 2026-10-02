@@ -8,7 +8,8 @@ import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToL
 import * as SecureStore from 'expo-secure-store';
 import { usePushNotifications, STORAGE_KEY_LAST_SYNCED_TOKEN } from '../hooks/usePushNotifications';
 import { syncLanguageWithServer, STORAGE_KEY_LAST_SYNCED_LANGUAGE } from '../lib/languageSync';
-import { fetchTextWithTimeout } from '../lib/fetchWithTimeout';
+import { fetchTextWithTimeout, transportErrorKey } from '../lib/fetchWithTimeout';
+import { queueAuthStorage } from '../lib/authStorage';
 
 
 interface AuthContextType {
@@ -31,19 +32,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, _setUser] = useState<User | null>(null);
     const setUser = (newUser: User | null | ((prev: User | null) => User | null)) => {
+        const version = sessionVersion.current;
+        const persist = (value: User | null) => {
+            void queueAuthStorage(async () => {
+                if (version !== sessionVersion.current) return;
+                if (value) await SecureStore.setItemAsync('user_meta', JSON.stringify(value));
+                else await SecureStore.deleteItemAsync('user_meta');
+            }).catch(() => {});
+        };
         if (typeof newUser === 'function') {
             _setUser(prev => {
                 const val = (newUser as (prev: User | null) => User | null)(prev);
                 if (val === prev) return prev;
                 console.log(`[AuthContext] setUser (functional) - New User: ${val?.username}, Auth: ${!!val}`);
-                if (val) SecureStore.setItemAsync('user_meta', JSON.stringify(val)).catch(() => { });
-                else SecureStore.deleteItemAsync('user_meta').catch(() => { });
+                persist(val);
                 return val;
             });
         } else {
             console.log(`[AuthContext] setUser (direct) - New User: ${newUser?.username}, Auth: ${!!newUser}`);
-            if (newUser) SecureStore.setItemAsync('user_meta', JSON.stringify(newUser)).catch(() => { });
-            else SecureStore.deleteItemAsync('user_meta').catch(() => { });
+            persist(newUser);
             _setUser(newUser);
         }
     };
@@ -73,6 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // freshly (correct behavior for account-switch / delete-account).
         await AsyncStorage.removeItem('gamehubz-rq-cache').catch(() => {});
     }, [queryClient]);
+
+    const clearStoredSession = useCallback(() => queueAuthStorage(() => Promise.allSettled([
+        SecureStore.deleteItemAsync('access_token'),
+        SecureStore.deleteItemAsync('refresh_token'),
+        SecureStore.deleteItemAsync('user_meta'),
+        SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN),
+        SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE),
+    ])), []);
 
     useEffect(() => {
         const loadStoredAuth = async () => {
@@ -113,9 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setToken(null);
             setRefreshToken(null);
             setAuthToken(null);
-            SecureStore.deleteItemAsync('user_meta').catch(() => { });
-            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN).catch(() => { });
-            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE).catch(() => { });
+            void clearStoredSession();
         });
 
         return () => unsubscribe();
@@ -317,10 +330,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const newAcc = data.accessToken.token;
                 const newRef = data.refreshToken;
 
-                await SecureStore.setItemAsync('access_token', newAcc);
-                if (newRef) {
-                    await SecureStore.setItemAsync('refresh_token', newRef);
-                }
+                const saved = await queueAuthStorage(async () => {
+                    if (version !== sessionVersion.current) return false;
+                    await SecureStore.setItemAsync('access_token', newAcc);
+                    if (newRef) await SecureStore.setItemAsync('refresh_token', newRef);
+                    if (version !== sessionVersion.current) {
+                        // Another login may fail, so it cannot be relied on to overwrite these.
+                        await Promise.allSettled([
+                            SecureStore.deleteItemAsync('access_token'), SecureStore.deleteItemAsync('refresh_token'),
+                        ]);
+                        return false;
+                    }
+                    return true;
+                });
+                if (!saved || version !== sessionVersion.current) return { success: false };
 
                 setToken(newAcc);
                 setAuthToken(newAcc);
@@ -350,9 +373,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         } catch (error: any) {
             console.error('Login error:', error);
-            return { success: false, message: error.message || i18n.t('common:app.networkError') };
+            // No answer at all (offline, or past the deadline): RN's raw "Network request failed" /
+            // "Aborted" used to reach the player untranslated.
+            return { success: false, message: i18n.t(transportErrorKey(error)) };
         } finally {
-            setIsLoading(false);
+            if (version === sessionVersion.current) setIsLoading(false);
         }
     }, []);
 
@@ -401,7 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { success: false, message: msg };
         } catch (error: any) {
             console.error('Register error:', error);
-            return { success: false, message: error?.message };
+            return { success: false, message: i18n.t(transportErrorKey(error)) };
         } finally {
             setIsLoading(false);
         }
@@ -529,6 +554,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = useCallback(async () => {
         sessionVersion.current += 1;
         setAuthToken(null);
+        setUser(null);
+        setToken(null);
+        setRefreshToken(null);
+        const cleanup = clearStoredSession();
         if (refreshToken) {
                 void fetchTextWithTimeout(`${API_BASE_URL}/api/Auth/logout`, {
                     method: 'POST',
@@ -542,19 +571,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Wipe cached data so a subsequent login as a different user doesn't
         // paint the previous account's snapshot from the persisted store.
         await wipeSessionCache();
-        await Promise.allSettled([
-            SecureStore.deleteItemAsync('access_token'),
-            SecureStore.deleteItemAsync('refresh_token'),
-            SecureStore.deleteItemAsync('user_meta'),
-            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN),
-            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE),
-        ]);
-
-        setUser(null);
-        setToken(null);
-        setRefreshToken(null);
-        setAuthToken(null);
-    }, [refreshToken, token, wipeSessionCache]);
+        await cleanup;
+    }, [refreshToken, token, wipeSessionCache, clearStoredSession]);
 
     const deleteAccount = useCallback(async (): Promise<boolean> => {
         setIsLoading(true);
@@ -564,14 +582,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (response.ok) {
-                await wipeSessionCache();
-                await SecureStore.deleteItemAsync('access_token');
-                await SecureStore.deleteItemAsync('refresh_token');
-                await SecureStore.deleteItemAsync('user_meta');
+                sessionVersion.current += 1;
+                setAuthToken(null);
                 setUser(null);
                 setToken(null);
                 setRefreshToken(null);
-                setAuthToken(null);
+                const cleanup = clearStoredSession();
+                await wipeSessionCache();
+                await cleanup;
                 return true;
             }
             return false;
@@ -581,7 +599,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, [wipeSessionCache]);
+    }, [wipeSessionCache, clearStoredSession]);
 
     useEffect(() => {
         setAuthToken(token);

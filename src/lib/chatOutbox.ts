@@ -25,5 +25,12 @@ export function createChatOutbox(deliver: (content: string) => Promise<void>, pu
     return { send, retry: (id: string) => {
         const message = messages.find((m) => m.id === id);
         return message ? send(message.content, id) : Promise.resolve(false);
+    },
+    /** Drop a message that failed and will not be retried (the server keeps refusing it). One still
+     *  on its way stays — it may yet arrive, and removing it would hide a sent message. */
+    discard: (id: string): boolean => {
+        if (inFlight.has(id) || !messages.some((m) => m.id === id && m.state === 'failed')) return false;
+        update(messages.filter((m) => m.id !== id));
+        return true;
     } };
 }

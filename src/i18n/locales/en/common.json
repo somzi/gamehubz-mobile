@@ -100,6 +100,7 @@
     "invalidServerResponse": "Invalid server response",
     "invalidCredentials": "Invalid credentials",
     "networkError": "Network error",
+    "requestTimedOut": "The server didn't respond. Try again.",
     "loadBadgesFailed": "Failed to load badges",
     "loadApprovalsFailed": "Failed to load approvals",
     "pushTokenFailed": "Failed to retrieve push token. Are you on a physical device?",

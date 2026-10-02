@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
 import * as SecureStore from 'expo-secure-store';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { createCoalescer } from '../lib/coalesce';
 import { startSignalRWithRetry } from '../lib/signalR';
 import { useAuth } from './AuthContext';
 import { BadgeCounts, ApprovalsBreakdown, TournamentApprovalCount, HubApprovalCount } from '../types/social';
@@ -32,12 +33,19 @@ const EMPTY_BADGES: BadgeCounts = {
 const EMPTY_APPROVALS: ApprovalsBreakdown = { hubs: [], tournaments: [] };
 
 const BADGES_QUERY_KEY = ['me-badges'] as const;
+// How stale a match list may get while a busy chat keeps changing its unread counts.
+const MATCHES_REFRESH_WINDOW_MS = 1_000;
 const APPROVALS_QUERY_KEY = ['me-approvals'] as const;
 
 interface BadgesContextType {
     badges: BadgeCounts;
-    /** Force an immediate re-fetch (e.g. right after accepting a request or reading a chat). */
+    /** Force an immediate re-fetch (e.g. right after accepting a request). */
     refresh: () => void;
+    /** Re-fetch the counts only — what a chat read changes. The approvals breakdown stays. */
+    refreshCounts: () => void;
+    /** Refetch the viewer's match lists once the current window closes (see lib/coalesce): badge
+     *  pushes and chat reads in the same second share one request. */
+    scheduleMatchesRefresh: () => void;
     /** Total pending approvals on a specific hub (0 if none) — drives the hub-card dot. */
     hubApprovals: (hubId: string) => number;
     /** Full per-hub breakdown (count + joinRequests) — lets the hub split its tab dots. */
@@ -89,6 +97,18 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
         queryClient.invalidateQueries({ queryKey: BADGES_QUERY_KEY });
         queryClient.invalidateQueries({ queryKey: APPROVALS_QUERY_KEY });
     }, [queryClient]);
+
+    const refreshCounts = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: BADGES_QUERY_KEY });
+    }, [queryClient]);
+
+    // One match-list refetch per second at most, for the badge pushes and the chat reads together.
+    const matchesRefresh = useMemo(
+        () => createCoalescer(() => { void queryClient.invalidateQueries({ queryKey: ['home-matches'] }); }, MATCHES_REFRESH_WINDOW_MS),
+        [queryClient],
+    );
+    useEffect(() => () => matchesRefresh.cancel(), [matchesRefresh]);
+    const scheduleMatchesRefresh = matchesRefresh.schedule;
 
     // GUID lookups keyed lowercase so client-side ids match the server's casing.
     const approvals = approvalsData ?? EMPTY_APPROVALS;
@@ -170,7 +190,7 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
                 || previous.matchesWithUnreadChat !== dto.matchesWithUnreadChat
                 || previous.matchesToSchedule !== dto.matchesToSchedule
                 || previous.resultsToConfirm !== dto.resultsToConfirm) {
-                queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+                matchesRefresh.schedule();
             }
             // Only refetch the per-entity approvals breakdown when a count that ACTUALLY drives
             // it changed. A pure DM/match-message push used to invalidate approvals every time,
@@ -231,11 +251,14 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
             connection.off('NotificationsUpdated');
             void initialConnection.stop();
         };
-    }, [isAuthenticated, user?.id, queryClient, refresh]);
+    }, [isAuthenticated, user?.id, queryClient, refresh, matchesRefresh]);
 
     const value = useMemo<BadgesContextType>(
-        () => ({ badges: data ?? EMPTY_BADGES, refresh, hubApprovals, hubApprovalDetail, tournamentApprovals, tournamentsForHub }),
-        [data, refresh, hubApprovals, hubApprovalDetail, tournamentApprovals, tournamentsForHub],
+        () => ({
+            badges: data ?? EMPTY_BADGES, refresh, refreshCounts, scheduleMatchesRefresh,
+            hubApprovals, hubApprovalDetail, tournamentApprovals, tournamentsForHub,
+        }),
+        [data, refresh, refreshCounts, scheduleMatchesRefresh, hubApprovals, hubApprovalDetail, tournamentApprovals, tournamentsForHub],
     );
 
     return <BadgesContext.Provider value={value}>{children}</BadgesContext.Provider>;
@@ -248,6 +271,8 @@ export function useBadges(): BadgesContextType {
         return {
             badges: EMPTY_BADGES,
             refresh: () => { },
+            refreshCounts: () => { },
+            scheduleMatchesRefresh: () => { },
             hubApprovals: () => 0,
             hubApprovalDetail: () => undefined,
             tournamentApprovals: () => undefined,

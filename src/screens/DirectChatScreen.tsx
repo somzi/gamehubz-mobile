@@ -43,7 +43,8 @@ export default function DirectChatScreen() {
     const route = useRoute<Route>();
     const navigation = useNavigation<Nav>();
     const { user } = useAuth();
-    const { refresh: refreshBadges } = useBadges();
+    // A read changes the counts only; the approvals breakdown is not worth a second request.
+    const { refreshCounts } = useBadges();
     const queryClient = useQueryClient();
     const myUserId = user?.id;
 
@@ -95,12 +96,12 @@ export default function DirectChatScreen() {
             // Reconcile both the per-chat list and the aggregate Social badge with
             // the committed server state. Prefix invalidation covers cached searches.
             queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
-            refreshBadges();
+            refreshCounts();
         } catch {
             // The optimistic clear must not become permanent if the write failed.
             queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
         }
-    }, [queryClient, refreshBadges, updateCachedChat]);
+    }, [queryClient, refreshCounts, updateCachedChat]);
 
     // ─── Bootstrap: resolve chat + load messages ────────────────────────
     // Fast path (chat list tap): the header is seeded from navigation params, so
@@ -285,7 +286,7 @@ export default function DirectChatScreen() {
                     onScroll={scroll.onScroll}
                     scrollEventThrottle={100}
                     onContentSizeChange={scroll.onContentSizeChange}
-                    ListFooterComponent={<ChatOutbox messages={conversation.pending} onRetry={conversation.retry} />}
+                    ListFooterComponent={<ChatOutbox messages={conversation.pending} onRetry={conversation.retry} onDiscard={conversation.discard} />}
                     ListHeaderComponent={
                         hasMore ? (
                             <View className="items-center pb-3">

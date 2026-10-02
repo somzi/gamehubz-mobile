@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Skeleton } from '../ui/Skeleton';
@@ -35,6 +35,9 @@ interface NotificationRowProps {
     item: NotificationItem;
     /** Keep it stable (useCallback): rows are memoized and the list is unbounded. */
     onPress: (item: NotificationItem) => void;
+    /** Its destination is still being worked out (a chat looked up first): the time gives way
+     *  to a spinner, in the same spot, and the row takes no second tap. */
+    opening?: boolean;
 }
 
 /**
@@ -42,7 +45,7 @@ interface NotificationRowProps {
  * on the leading edge, a faint wash, a tinted edge, the time in that colour — so what is waiting
  * reads at a glance and still says what kind of thing it is. Read cards go quiet.
  */
-export const NotificationRow = React.memo(function NotificationRow({ item, onPress }: NotificationRowProps) {
+export const NotificationRow = React.memo(function NotificationRow({ item, onPress, opening = false }: NotificationRowProps) {
     const { t } = useTranslation('notifications');
     const meta = useMemo(() => notificationMeta(item.data ?? { type: item.type }), [item.data, item.type]);
     const unread = !item.readOn;
@@ -57,6 +60,8 @@ export const NotificationRow = React.memo(function NotificationRow({ item, onPre
         <CardShell accent={unread ? meta.accent : undefined}>
             <Pressable
                 onPress={() => onPress(item)}
+                disabled={opening}
+                accessibilityState={{ busy: opening }}
                 accessibilityRole="button"
                 accessibilityLabel={accessibilityLabel}
                 accessibilityHint={meta.external ? t('a11y.opensOutside') : undefined}
@@ -106,15 +111,19 @@ export const NotificationRow = React.memo(function NotificationRow({ item, onPre
                             >
                                 {item.title}
                             </Text>
-                            <Text
-                                className="text-[11px] font-bold"
-                                style={{
-                                    color: unread ? meta.accent : COLORS.slate500,
-                                    fontVariant: ['tabular-nums'],
-                                }}
-                            >
-                                {time}
-                            </Text>
+                            {opening ? (
+                                <ActivityIndicator size="small" color={meta.accent} style={{ height: 14, transform: [{ scale: 0.8 }] }} />
+                            ) : (
+                                <Text
+                                    className="text-[11px] font-bold"
+                                    style={{
+                                        color: unread ? meta.accent : COLORS.slate500,
+                                        fontVariant: ['tabular-nums'],
+                                    }}
+                                >
+                                    {time}
+                                </Text>
+                            )}
                         </View>
 
                         <Text

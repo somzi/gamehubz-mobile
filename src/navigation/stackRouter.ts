@@ -41,7 +41,7 @@ const SUBJECT: Record<string, (a: Params, b: Params) => boolean> = {
 // change. Going back to it is not a reason to do either, so it keeps the params it was opened with.
 const KEEPS_PARAMS_ON_RETURN = new Set(['DirectChat']);
 
-type NestedState = { index?: number; routes: { key?: string; state?: NestedState }[] };
+type NestedState = { index?: number; stale?: boolean; routes: { key?: string; name?: string; state?: NestedState }[] };
 
 /**
  * Where the screen that sent an action sits: on the focused path, under another screen, or not in
@@ -60,6 +60,43 @@ function placeOf(state: NestedState | undefined, key: string, onFocusedPath = tr
         if (nested) return nested;
     }
     return null;
+}
+
+// Root screens that host a navigator of their own. React Navigation hands a nested navigator's
+// state to its parent only on that navigator's first navigation event ("undefined or stale until
+// the first navigation event happens", useNavigationBuilder), so after a cold start or a login the
+// tab screens' keys are in no state the router is given until the first tab switch.
+const HOSTS_NAVIGATOR = new Set(['MainTabs']);
+
+// Root screens taken off the stack recently. A callback such a screen scheduled before it closed
+// (a profile opened once a sheet is down) must not navigate on its behalf.
+const REMOVED_LIMIT = 100;
+const removedKeys = new Set<string>();
+
+function rememberRemoved(before: StackState, after: { routes: { key?: string }[] }) {
+    const kept = new Set(after.routes.map((r) => r.key));
+    for (const route of before.routes) {
+        if (kept.has(route.key)) continue;
+        removedKeys.add(route.key);
+        if (removedKeys.size > REMOVED_LIMIT) {
+            const oldest = removedKeys.values().next().value;
+            if (oldest !== undefined) removedKeys.delete(oldest);
+        }
+    }
+}
+
+/**
+ * Whether the screen that sent an action is the one on screen. A key the state does not contain
+ * is either a closed screen (refused) or a tab screen whose navigator has not reported its state
+ * yet — on screen only if the focused root screen is that navigator, with its state still unwritten.
+ */
+function isActiveSource(state: StackState, source: string): boolean {
+    const place = placeOf(state as NestedState, source);
+    if (place) return place === 'focused';
+    if (removedKeys.has(source)) return false;
+    const focused = (state as NestedState).routes[state.index ?? state.routes.length - 1];
+    return !!focused?.name && HOSTS_NAVIGATOR.has(focused.name)
+        && (!focused.state || focused.state.stale !== false);
 }
 
 // A link can arrive before a profile-opened chat has resolved its id. Once either bootstrap
@@ -178,7 +215,7 @@ export function singleCopyStackRouter<Action extends NavigationAction>(
         // This is state-derived: no timer, no global history shared between router instances.
         const name = (navAction.payload as { name?: string } | undefined)?.name;
         if (opensScreen && name && (state.routeNames as string[]).includes(name) && navAction.source
-            && placeOf(state as NestedState, navAction.source) !== 'focused') {
+            && !isActiveSource(state, navAction.source)) {
             logNavigation('ignored navigate from inactive screen', name);
             return state;
         }
@@ -229,8 +266,10 @@ export function singleCopyStackRouter<Action extends NavigationAction>(
 
     return {
         getStateForAction(state, action, options) {
-            const next = resolve(state, action, options);
-            return next?.stale === false && action.type === 'SET_PARAMS' ? reconcileChats(next, action.source) : next;
+            let next = resolve(state, action, options);
+            if (next?.stale === false && action.type === 'SET_PARAMS') next = reconcileChats(next, action.source);
+            if (next && next !== state && next.routes) rememberRemoved(state, next);
+            return next;
         },
     };
 }

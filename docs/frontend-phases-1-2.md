@@ -25,11 +25,22 @@ Implementacija i regresione provere, 2. oktobar 2026. Izmene nisu objavljene.
 
 ## Automatske provere
 
-Rezultat: **45/45 testova prolazi**, TypeScript provera je bez grešaka, a lokalni Expo export uspeva za Android i iOS. `git diff --check` je čist.
+Rezultat posle druge runde review-a: **93/93 testa prolazi**. TypeScript provera je bez grešaka, a lokalni Expo export uspeva za Android i iOS. `git diff --check` je čist.
 
 - `npm run test:frontend`: router, tranzicije, istorija chata, deduplikacija poruka, red slanja, odbacivanje starih odgovora, ponovno povezivanje i timeout.
 - `node node_modules/typescript/bin/tsc --noEmit --incremental false`
 - Lokalni Expo export za Android i iOS proverava pakovanje JavaScript-a i resursa. Nije zamena za native build ili probu na uređaju.
+
+## Dodatni review faza 1 i 2
+
+Ispravljeni slučajevi koji nisu bili pokriveni prvih 45 testova:
+
+- Zahtev prethodne sesije ne sme da se ponovi sa tokenom drugog naloga posle zakasnelog 401 odgovora. Odgovori, čitanje njihovog tela i upload provere vezani su za sesiju koja je pokrenula zahtev. Odloženo čitanje iz SecureStore-a ne vraća token posle odjave.
+- Upisivanje tokena pri osvežavanju, prijavi i odjavi ide kroz zajednički red. Zakasneli upis ne prepisuje novu prijavu. Prijava koju je zamenio drugi pokušaj čisti sopstveni nepotpuni upis; stariji pokušaj ne gasi indikator novijeg pokušaja.
+- Tiho osvežavanje koje zameni običan zahtev završava njegov indikator učitavanja. Neuspešno prvo učitavanje detalja meča ima grešku i dugme za ponavljanje. Osvežavanje već učitanog žreba prikazuje obaveštenje o grešci i čuva sadržaj.
+- Odgovor na čitanje chata koji stigne posle nove poruke usklađuje broj nepročitanih poruka sa serverom, umesto da ostavi pogrešnu lokalnu nulu.
+
+Novi testovi izvršavaju stvarne Axios interceptore, funkcije prijave/osvežavanja i React Query cache uz kontrolisane odgovore. Ne proveravaju native raspored, animacije niti tastaturu. ADB provera nije našla povezan Android uređaj ili emulator; proba na uređaju ostaje otvorena.
 
 ## Proba na Androidu i iOS-u pre objave
 
@@ -44,3 +55,14 @@ Rezultat: **45/45 testova prolazi**, TypeScript provera je bez grešaka, a lokal
 9. Proveriti prijavu/registraciju na vezi koja ne odgovara i odjavu bez mreže.
 
 Native animacije, tastatura i ponašanje u pozadini još zahtevaju probu na uređaju. Red neuspelih poruka nije trajno skladište i ne preživljava gašenje aplikacije; trajni nacrti nisu deo ove faze.
+
+## Druga runda review-a
+
+- **Hladan start (kritično):** router je odbacivao tapove sa početnog taba dok korisnik ne promeni tab, jer React Navigation upisuje stanje tab navigatora u root tek na prvu navigaciju unutar tabova. Nepoznat izvor sada prolazi samo kad je fokusiran root ekran tab navigator čije stanje još nije upisano. Zatvoren ekran i dalje ne može da navigira, a zakasneli tap sa pokrivenog ekrana i dalje se odbacuje.
+- **Osvežavanje žreba:** traka pamti koji je resurs pao (turnir, žreb). "Pokušaj ponovo" ponavlja baš njega, a traka nestaje tek kad svi uspeju.
+- **Chat zahtevi:** lokalna nula za nepročitane važi samo za liste koje se nisu menjale tokom čitanja. Provera kod servera ostaje, ali je push i čitanje dele: najviše jedno osvežavanje mečeva u sekundi. Posle čitanja se osvežavaju samo brojači, a čitanje se šalje najviše jednom u sekundi i šalje se i pri napuštanju chata.
+- **Sesija pri prekidu mreže:** sesiju briše samo odbijanje refresh-a od servera (400/401/403), refresh bez tokena ili odgovor bez novih tokena. Prekid mreže, timeout i 5xx je čuvaju.
+- **Poruke i indikatori:** prijava i registracija bez odgovora prikazuju prevedenu poruku. Traka "Connecting…" se pojavljuje tek posle 1,2 s. Neuspela poruka može da se ukloni. Red u inboxu pokazuje spiner dok se otvara DM.
+
+Expo export za Android i iOS uspeva, a `git diff --check` je čist.
+

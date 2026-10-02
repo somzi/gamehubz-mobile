@@ -32,7 +32,15 @@ test('auth timeout also aborts a stalled response body', async () => {
     mock.timers.enable({apis:['setTimeout']});const original=globalThis.fetch;
     try {
         globalThis.fetch=async (_url,{signal})=>({ok:true,status:200,text:()=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('aborted'))))});
-        const result=fetchTextWithTimeout('https://test.invalid',{},10);const failure=assert.rejects(result,/aborted/);
+        const result=fetchTextWithTimeout('https://test.invalid',{},10);const failure=assert.rejects(result,{name:'TimeoutError'});
         await flush();mock.timers.tick(10);await failure;
     } finally {globalThis.fetch=original;mock.timers.reset();}
+});
+
+test('a transport error that is not the deadline passes through unchanged', async () => {
+    const original=globalThis.fetch;
+    try {
+        globalThis.fetch=async ()=>{throw new TypeError('Network request failed');};
+        await assert.rejects(fetchTextWithTimeout('https://test.invalid',{},10),{name:'TypeError'});
+    } finally {globalThis.fetch=original;}
 });

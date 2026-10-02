@@ -12,6 +12,10 @@ import { createChatOutbox, type OutgoingMessage } from '../lib/chatOutbox';
 export type { OutgoingMessage } from '../lib/chatOutbox';
 
 type Message = { id: string; content: string; sentAt: string };
+
+// Messages arriving while the chat is on screen are marked read together, at most once per this
+// long. Each read is a POST plus a badge refetch, and a busy chat sends a message every few seconds.
+const READ_DELAY_MS = 1_000;
 type Options<T> = {
     id?: string; kind: 'match' | 'direct'; active: boolean;
     map: (raw: any) => T;
@@ -116,6 +120,7 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
         if (!id || !active || !foreground) return;
         let alive = true;
         let readTimer: ReturnType<typeof setTimeout> | undefined;
+        let readPending = false;
         void refreshRef.current();
         const connection = new HubConnectionBuilder()
             .withUrl(kind === 'match' ? `${API_BASE_URL}/hubs/chat` : ENDPOINTS.SIGNALR_DM_HUB, {
@@ -134,8 +139,10 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
             if (kind === 'direct' && (raw.chatId ?? raw.ChatId)?.toLowerCase() !== id.toLowerCase()) return;
             const message = latest.current.map(raw);
             setMessages((previous) => mergeMessagesById(previous, [message]));
-            clearTimeout(readTimer);
-            readTimer = setTimeout(read, 300);
+            readPending = true;
+            if (readTimer === undefined) {
+                readTimer = setTimeout(() => { readTimer = undefined; readPending = false; read(); }, READ_DELAY_MS);
+            }
         });
         connection.onreconnecting(() => { if (alive) setConnectionStatus('reconnecting'); });
         connection.onreconnected(() => { void join().catch(() => {
@@ -148,6 +155,8 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
         return () => {
             alive = false;
             clearTimeout(readTimer);
+            // Seen on screen, not yet reported: leaving inside the window still counts as reading it.
+            if (readPending) void Promise.resolve(latest.current.onRead(id)).catch(() => {});
             requests.clear();
             paging.current = false; setLoadingMore(false);
             connection.off('ReceiveMessage');
@@ -169,5 +178,6 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
     }, (next) => { if (latest.current.id === id) setPending(next); }), [id, kind]);
 
     return { messages, loading, loaded, error, hasMore, loadingMore, pageError, loadEarlier, refresh,
-        pending, send: outbox.send, retry: (message: OutgoingMessage) => outbox.retry(message.id), connectionStatus };
+        pending, send: outbox.send, retry: (message: OutgoingMessage) => outbox.retry(message.id),
+        discard: (message: OutgoingMessage) => outbox.discard(message.id), connectionStatus };
 }

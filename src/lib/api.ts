@@ -263,6 +263,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import i18n, { getRequestLanguage } from '../i18n';
 import { updateServerClockFromDateHeader } from './serverClock';
+import { queueAuthStorage } from './authStorage';
 
 // Sent on every request so server-side ErrorLog rows record which app build/platform hit
 // the bug — set once at startup.
@@ -276,6 +277,11 @@ export const setAuthToken = (token: string | null) => {
     if (token !== authToken || token === null) authSessionVersion += 1;
     authToken = token;
     explicitlyLoggedOut = token === null;
+};
+
+type SessionRequest = { authSessionVersion?: number };
+const assertSession = (version: number | undefined) => {
+    if (version !== undefined && version !== authSessionVersion) throw new Error('Session ended');
 };
 
 let logoutListeners: (() => void)[] = [];
@@ -299,6 +305,10 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config) => {
+    const sessionRequest = config as typeof config & SessionRequest;
+    // Preserve the original session on retries; another account must never inherit its action.
+    sessionRequest.authSessionVersion ??= authSessionVersion;
+    assertSession(sessionRequest.authSessionVersion);
     (config as typeof config & { serverClockRequestStartedAt?: number }).serverClockRequestStartedAt = Date.now();
     config.headers['X-App-Version'] = APP_VERSION;
     config.headers['X-Platform'] = APP_PLATFORM;
@@ -311,10 +321,12 @@ apiClient.interceptors.request.use(async (config) => {
         let token = authToken;
         if (!token && !explicitlyLoggedOut) {
             token = await SecureStore.getItemAsync('access_token');
+            assertSession(sessionRequest.authSessionVersion);
             if (token) authToken = token;
         }
         if (token) config.headers.Authorization = `Bearer ${token}`;
     } catch (e) {
+        assertSession(sessionRequest.authSessionVersion);
         if (authToken) config.headers.Authorization = `Bearer ${authToken}`;
     }
     return config;
@@ -333,39 +345,57 @@ let refreshPromise: Promise<string> | null = null;
  * Shared by the axios 401 interceptor and the raw-fetch upload path so uploads
  * get the same refresh-and-retry behaviour as JSON requests.
  */
+/**
+ * The server turned the refresh down, or there is nothing to refresh with: the session is over.
+ * Every other failure — no network, a timeout, a 5xx — says nothing about the session, which stays
+ * for the next request to try again. Opening the app offline used to log the player out.
+ */
+class RefreshRejectedError extends Error {}
+// What AuthController.RefreshToken answers for a refresh token it will not exchange (BadRequest),
+// plus the auth statuses an expired or revoked one can come back with.
+const REFRESH_REJECTED_STATUSES = new Set([400, 401, 403]);
+
 async function doRefresh(): Promise<string> {
     const version = authSessionVersion;
     if (explicitlyLoggedOut) throw new Error('Session ended');
     const refreshToken = await SecureStore.getItemAsync('refresh_token');
     const accessToken = await SecureStore.getItemAsync('access_token');
-    if (!refreshToken || !accessToken) throw new Error('Refresh failed');
+    if (!refreshToken || !accessToken) throw new RefreshRejectedError('Refresh failed');
 
     const requestStartedAt = Date.now();
-    const refreshResponse = await axios.post(`${API_BASE_URL}/api/Auth/refreshtoken`, {
-        AccessToken: accessToken,
-        RefreshToken: refreshToken,
-    }, {
-        // This request deliberately uses the bare axios client so a 401 cannot recurse through the
-        // apiClient interceptor. It still needs its own timeout or every original request awaiting
-        // the shared refresh promise would remain pending forever.
-        timeout: REFRESH_TIMEOUT_MS,
-    });
+    let refreshResponse;
+    try {
+        refreshResponse = await axios.post(`${API_BASE_URL}/api/Auth/refreshtoken`, {
+            AccessToken: accessToken,
+            RefreshToken: refreshToken,
+        }, {
+            // This request deliberately uses the bare axios client so a 401 cannot recurse through the
+            // apiClient interceptor. It still needs its own timeout or every original request awaiting
+            // the shared refresh promise would remain pending forever.
+            timeout: REFRESH_TIMEOUT_MS,
+        });
+    } catch (error: any) {
+        const status = error?.response?.status;
+        if (typeof status === 'number' && REFRESH_REJECTED_STATUSES.has(status)) {
+            throw new RefreshRejectedError('Refresh rejected');
+        }
+        throw error;
+    }
     updateServerClockFromDateHeader(refreshResponse.headers?.date, requestStartedAt);
 
     const data = refreshResponse.data;
     const newAccess = data?.accessToken?.token || data?.accessToken || data?.AccessToken;
     const newRefresh = data?.refreshToken || data?.RefreshToken;
-    if (!newAccess || !newRefresh) throw new Error('Refresh failed');
+    if (!newAccess || !newRefresh) throw new RefreshRejectedError('Refresh failed');
     if (version !== authSessionVersion || explicitlyLoggedOut) throw new Error('Session ended');
 
-    await SecureStore.setItemAsync('access_token', newAccess);
-    await SecureStore.setItemAsync('refresh_token', newRefresh);
-    if (version !== authSessionVersion) {
-        if (explicitlyLoggedOut) await Promise.allSettled([
-            SecureStore.deleteItemAsync('access_token'), SecureStore.deleteItemAsync('refresh_token'),
-        ]);
-        throw new Error('Session ended');
-    }
+    await queueAuthStorage(async () => {
+        assertSession(version);
+        await SecureStore.setItemAsync('access_token', newAccess);
+        await SecureStore.setItemAsync('refresh_token', newRefresh);
+        assertSession(version);
+    });
+    assertSession(version);
     authToken = newAccess;
     return newAccess;
 }
@@ -383,11 +413,18 @@ function refreshAccessToken(): Promise<string> {
             return await doRefresh();
         } catch (error) {
             if (version !== authSessionVersion || explicitlyLoggedOut) throw error;
-            authToken = null;
-            await Promise.all([
-                SecureStore.deleteItemAsync('access_token').catch(() => { }),
-                SecureStore.deleteItemAsync('refresh_token').catch(() => { }),
-            ]);
+            // A failure that is not the server's no keeps the session: the request that needed the
+            // refresh fails on its own, and the next one tries again.
+            if (!(error instanceof RefreshRejectedError)) throw error;
+            await queueAuthStorage(async () => {
+                assertSession(version);
+                authToken = null;
+                await Promise.all([
+                    SecureStore.deleteItemAsync('access_token').catch(() => { }),
+                    SecureStore.deleteItemAsync('refresh_token').catch(() => { }),
+                ]);
+            });
+            assertSession(version);
             triggerLogout();
             throw error;
         } finally {
@@ -408,6 +445,7 @@ const bearerTokenFromHeaders = (headers: any): string | null => {
 };
 
 apiClient.interceptors.response.use((response) => {
+    assertSession((response.config as typeof response.config & SessionRequest).authSessionVersion);
     const requestStartedAt = (response.config as typeof response.config & {
         serverClockRequestStartedAt?: number;
     }).serverClockRequestStartedAt;
@@ -415,6 +453,7 @@ apiClient.interceptors.response.use((response) => {
     return response;
 }, async (error) => {
     const originalRequest = error.config;
+    assertSession((originalRequest as SessionRequest | undefined)?.authSessionVersion);
 
     if (error.response) {
         const requestStartedAt = (originalRequest as typeof originalRequest & {
@@ -433,6 +472,7 @@ apiClient.interceptors.response.use((response) => {
             const newAccess = authToken && requestAccess !== authToken
                 ? authToken
                 : await refreshAccessToken();
+            assertSession((originalRequest as SessionRequest).authSessionVersion);
             originalRequest.headers = originalRequest.headers ?? {};
             originalRequest.headers.Authorization = 'Bearer ' + newAccess;
             return apiClient(originalRequest);
@@ -445,6 +485,7 @@ apiClient.interceptors.response.use((response) => {
 });
 
 export const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
+    const version = authSessionVersion;
     try {
         const isFormData = options.body instanceof FormData;
 
@@ -475,6 +516,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
 
             // Prefer the in-memory token (same reasoning as the axios interceptor).
             let token = authToken || (explicitlyLoggedOut ? null : await SecureStore.getItemAsync('access_token').catch(() => null));
+            assertSession(version);
 
             // Uploads get a longer timeout than regular JSON calls — 90s covers even a
             // heavy set of match-evidence screenshots on a slow LTE link. Anything past
@@ -484,6 +526,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             const uploadTimeout = 90_000;
 
             const doUpload = async (activeToken: string | null) => {
+                assertSession(version);
                 const controller = new AbortController();
                 const timer = setTimeout(() => controller.abort(), uploadTimeout);
                 const requestStartedAt = Date.now();
@@ -494,6 +537,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
                         body: options.body,
                         signal: controller.signal,
                     });
+                    assertSession(version);
                     updateServerClockFromDateHeader(response.headers.get('date'), requestStartedAt);
                     return response;
                 } finally {
@@ -502,6 +546,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             };
 
             let fetchResponse = await doUpload(token);
+            assertSession(version);
 
             // Uploads use raw fetch and so bypass the axios 401→refresh interceptor.
             // Handle the same refresh-and-retry here once, so an expired token mid-upload
@@ -516,7 +561,10 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
                         : await refreshAccessToken();
                     token = newAccess;
                     fetchResponse = await doUpload(newAccess);
-                } catch { /* refreshAccessToken performs the shared logout cleanup */ }
+                } catch {
+                    assertSession(version);
+                    // refreshAccessToken performs the shared logout cleanup.
+                }
             }
 
             // Ako server vrati grešku (npr. 400, 413, 500)
@@ -551,6 +599,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
         }
 
         const response = await apiClient({
+            ...({ authSessionVersion: version } as SessionRequest),
             method: options.method || 'GET',
             url: routeUrl,
             data: options.body,
@@ -562,8 +611,11 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             ok: response.status >= 200 && response.status < 300,
             status: response.status,
             statusText: response.statusText,
-            json: async () => response.data,
-            text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
+            json: async () => { assertSession(version); return response.data; },
+            text: async () => {
+                assertSession(version);
+                return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+            },
         } as unknown as Response;
 
     } catch (error: any) {
