@@ -152,6 +152,9 @@ export default function NotificationsScreen() {
     useFocusEffect(useCallback(() => () => { openRequest.current += 1; setOpeningId(null); }, []));
     const handlePress = useCallback(async (item: NotificationItem) => {
         const request = ++openRequest.current;
+        // Any new tap supersedes a lookup still running, and that lookup no longer clears its own
+        // spinner — so it goes here, whichever way this tap leaves (a link opens no lookup at all).
+        setOpeningId(null);
         // Read first, optimistically — the navigation below never waits on the request.
         if (!item.readOn) markRead(item.id);
 

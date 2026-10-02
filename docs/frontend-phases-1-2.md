@@ -25,7 +25,7 @@ Implementacija i regresione provere, 2. oktobar 2026. Izmene nisu objavljene.
 
 ## Automatske provere
 
-Rezultat posle druge runde review-a: **93/93 testa prolazi**. TypeScript provera je bez grešaka, a lokalni Expo export uspeva za Android i iOS. `git diff --check` je čist.
+Rezultat posle treće runde review-a: **95/95 testova prolazi**. TypeScript provera je bez grešaka, a lokalni Expo export uspeva za Android i iOS. `git diff --check` je čist.
 
 - `npm run test:frontend`: router, tranzicije, istorija chata, deduplikacija poruka, red slanja, odbacivanje starih odgovora, ponovno povezivanje i timeout.
 - `node node_modules/typescript/bin/tsc --noEmit --incremental false`
@@ -66,3 +66,8 @@ Native animacije, tastatura i ponašanje u pozadini još zahtevaju probu na ure�
 
 Expo export za Android i iOS uspeva, a `git diff --check` je čist.
 
+
+## Treća runda review-a
+
+- Čitanje chata proverava noviji keš po brojaču izmena (`dataUpdateCount`), ne po vremenu: dva upisa u istoj milisekundi više ne mogu da obrišu bedž nove poruke.
+- Novi tap u inboxu uvek gasi spiner prethodnog otvaranja, i kad je novi tap notifikacija sa spoljnim linkom.

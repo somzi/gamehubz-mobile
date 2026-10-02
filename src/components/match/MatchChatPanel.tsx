@@ -55,13 +55,14 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         onRead: async id => {
             // Lists that change while the read is in flight (a push refetched them, a message came
             // in) already hold newer server state than this read's answer: those keep their count.
-            // Only a list as old as the read takes the local zero.
+            // Only a list as old as the read takes the local zero. Compared by update count, not
+            // by time: two writes inside one millisecond share a dataUpdatedAt.
             const lists = () => queryClient.getQueryCache().findAll({ queryKey: ['home-matches'] });
-            const asOfRead = new Map(lists().map(query => [query.queryHash, query.state.dataUpdatedAt]));
+            const asOfRead = new Map(lists().map(query => [query.queryHash, query.state.dataUpdateCount]));
             const response = await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(id), {method:'POST'});
             if (!response.ok) return;
             for (const query of lists()) {
-                if (asOfRead.get(query.queryHash) !== query.state.dataUpdatedAt) continue;
+                if (asOfRead.get(query.queryHash) !== query.state.dataUpdateCount) continue;
                 queryClient.setQueryData<MatchOverviewDto[]>(query.queryKey, current => current?.map(match =>
                     (match.id ?? match.matchId)?.toLowerCase() === id.toLowerCase() ? {...match, unreadMessages:0} : match));
             }

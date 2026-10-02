@@ -62,3 +62,23 @@ test('a failed read leaves the badge alone', async () => {
     assert.equal(queryClient.getQueryData(queryKey)[0].unreadMessages, 2);
     queryClient.clear();
 });
+
+test('a new message written in the same millisecond as the read started keeps its badge', async () => {
+    const realNow = Date.now;
+    Date.now = () => 1_700_000_000_000; // every cache write below lands on one dataUpdatedAt
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    const queryKey = ['home-matches', 'user-A'];
+    try {
+        queryClient.setQueryData(queryKey, [{ id: 'match-A', unreadMessages: 0 }]);
+        const read = deferred();
+        const markRead = loadConversationCallback('src/components/match/MatchChatPanel.tsx', 'onRead', {
+            queryClient, refreshCounts() {}, scheduleMatchesRefresh() {}, authenticatedFetch: () => read.promise,
+            ENDPOINTS: { MARK_MATCH_CHAT_READ: id => id },
+        });
+        const pending = markRead('match-A');
+        queryClient.setQueryData(queryKey, [{ id: 'match-A', unreadMessages: 1 }]);
+        assert.equal(queryClient.getQueryState(queryKey).dataUpdatedAt, 1_700_000_000_000);
+        read.resolve({ ok: true }); await pending;
+        assert.equal(queryClient.getQueryData(queryKey)[0].unreadMessages, 1);
+    } finally { Date.now = realNow; queryClient.clear(); }
+});

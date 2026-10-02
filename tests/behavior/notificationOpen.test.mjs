@@ -45,3 +45,25 @@ test('a failed lookup still drops the spinner', async () => {
     await assert.rejects(handlePress({ id: 'n1', readOn: 'x', data: {} }));
     assert.equal(state.opening, null);
 });
+
+test('a link notification tapped while a DM is opening clears that DM row’s spinner', async () => {
+    const lookup = deferred(); const opened = [];
+    const state = { opening: null };
+    const handlePress = loadFetcher('src/screens/NotificationsScreen.tsx', 'handlePress', {
+        useCallback: fn => fn, openRequest: { current: 0 }, markRead() {},
+        externalLinkFromNotification: data => data.url ?? null,
+        Linking: { openURL: async url => { opened.push(url); } },
+        routeFromNotification: () => lookup.promise,
+        navigation: { isFocused: () => true }, Alert: { alert() {} }, t: key => key,
+        setOpeningId: value => { state.opening = value; }, console: { warn() {} },
+    });
+    const dm = handlePress({ id: 'n1', readOn: 'x', data: { type: 'direct_message', chatId: 'c1' } });
+    await flush();
+    assert.equal(state.opening, 'n1');
+    await handlePress({ id: 'n2', readOn: 'x', data: { type: 'link', url: 'https://example.test' } });
+    assert.equal(state.opening, null);
+    assert.deepEqual(opened, ['https://example.test']);
+    // The superseded DM lookup finishing later does not bring a spinner back.
+    lookup.resolve({ name: 'DirectChat', params: { chatId: 'c1' } }); await dm;
+    assert.equal(state.opening, null);
+});
