@@ -3,7 +3,8 @@ const { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } = require
 const path = require('node:path');
 const { parseArgs } = require('node:util');
 
-const USAGE = 'npm run update:ota -- --channel production --message "Quick fix" [--dry-run]';
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const USAGE = `${npmCommand} run update:ota -- --channel production --message "Quick fix" [--dry-run]`;
 
 function publishOta({
     root = path.resolve(__dirname, '..'),
@@ -12,18 +13,28 @@ function publishOta({
     run = spawnSync,
     log = console.log,
 } = {}) {
-    const { values } = parseArgs({
-        args,
-        options: {
-            channel: { type: 'string' },
-            message: { type: 'string', short: 'm' },
-            environment: { type: 'string' },
-            platform: { type: 'string', default: 'all', short: 'p' },
-            'non-interactive': { type: 'boolean' },
-            'dry-run': { type: 'boolean' },
-            help: { type: 'boolean', short: 'h' },
-        },
-    });
+    let values;
+    try {
+        ({ values } = parseArgs({
+            args,
+            options: {
+                channel: { type: 'string' },
+                message: { type: 'string', short: 'm' },
+                environment: { type: 'string' },
+                platform: { type: 'string', default: 'all', short: 'p' },
+                'non-interactive': { type: 'boolean' },
+                'dry-run': { type: 'boolean' },
+                help: { type: 'boolean', short: 'h' },
+            },
+        }));
+    } catch (error) {
+        // Do not recover options from npm_config_*: npm.ps1 can swallow --dry-run too.
+        // Reject the invocation instead of accidentally turning a preview into a publish.
+        const hint = process.platform === 'win32'
+            ? '\nPowerShell npm.ps1 may swallow -- and OTA options. Use npm.cmd instead of npm.'
+            : '';
+        throw new Error(`${error.message}${hint}\nUsage: ${USAGE}`);
+    }
     if (values.help) {
         log(USAGE);
         return 0;

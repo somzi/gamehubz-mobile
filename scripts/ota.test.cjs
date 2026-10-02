@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const { existsSync, mkdtempSync, readFileSync, writeFileSync, copyFileSync, unlinkSync, rmdirSync } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,7 +21,7 @@ function fixture(t) {
     copyFileSync(path.join(projectRoot, 'app.config.js'), path.join(root, 'app.config.js'));
     t.after(() => {
         // Only remove the known fixture files; do not recursively delete a computed path.
-        for (const name of ['app.json', 'ota-revisions.json', 'app.config.js', '.ota-publish.lock']) {
+        for (const name of ['app.json', 'ota-revisions.json', 'app.config.js', '.ota-publish.lock', 'package.json', 'probe.cjs']) {
             const file = path.join(root, name);
             if (existsSync(file)) unlinkSync(file);
         }
@@ -67,6 +68,44 @@ test('dry-run neither reserves a number nor invokes EAS', (t) => {
     const before = readFileSync(f.revisionsPath, 'utf8');
     assert.equal(publishOta({ ...f.options, args: [...args, '--dry-run'], run() { assert.fail('Must not publish'); } }), 0);
     assert.equal(readFileSync(f.revisionsPath, 'utf8'), before);
+    assert.equal(existsSync(path.join(f.root, '.ota-publish.lock')), false);
+});
+
+test('flags swallowed by npm fail with actionable usage without consuming a revision', (t) => {
+    const f = fixture(t);
+    assert.throws(() => publishOta({
+        ...f.options,
+        args: ['production'],
+        env: { ...f.options.env, npm_config_channel: 'true', npm_config_message: 'Quick fix', npm_config_dry_run: 'true' },
+        run() { assert.fail('Must not publish'); },
+    }), (error) => {
+        assert.match(error.message, /Usage:/);
+        if (process.platform === 'win32') assert.match(error.message, /Use npm\.cmd instead of npm/);
+        return true;
+    });
+    assert.equal(f.counters()[baseConfig.version], 0);
+    assert.equal(existsSync(path.join(f.root, '.ota-publish.lock')), false);
+});
+
+test('PowerShell npm.cmd preserves channel, a multiword message and dry-run end to end', {
+    skip: process.platform !== 'win32',
+}, (t) => {
+    const f = fixture(t);
+    writeFileSync(path.join(f.root, 'package.json'), JSON.stringify({ private: true, scripts: { 'update:ota': 'node probe.cjs' } }));
+    writeFileSync(path.join(f.root, 'probe.cjs'), `
+        const assert = require('node:assert/strict');
+        const { publishOta } = require(${JSON.stringify(require.resolve('./publish-ota.cjs'))});
+        assert.deepEqual(process.argv.slice(2), ['--channel', 'production', '--message', 'Added revision and add schedule outside app', '--dry-run']);
+        process.exitCode = publishOta({ root: __dirname, run() { throw new Error('Must not invoke EAS'); } });
+    `);
+    const result = spawnSync('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-Command',
+        'npm.cmd run update:ota -- --channel production --message "Added revision and add schedule outside app" --dry-run; exit $LASTEXITCODE',
+    ], { cwd: f.root, encoding: 'utf8', timeout: 30_000, windowsHide: true });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.ok(result.stdout.includes(`Would publish ${baseConfig.version}-r1`));
+    assert.equal(f.counters()[baseConfig.version], 0);
     assert.equal(existsSync(path.join(f.root, '.ota-publish.lock')), false);
 });
 
