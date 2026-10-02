@@ -24,6 +24,10 @@ export interface AdminAvailability {
     matchId?: string;
     confirmedTime?: string | null;
     matchDeadline?: string | null;
+    /** Who marked the match agreed outside the app. Then confirmedTime is only when they did. */
+    agreedOutsideAppByUserId?: string | null;
+    /** Null for a deleted account even when the id is set. */
+    agreedOutsideAppByName?: string | null;
     home: AdminAvailabilitySide;
     away: AdminAvailabilitySide;
     /** Hours both sides offered. Empty while one is silent AND when the two simply never met. */
@@ -34,7 +38,7 @@ export interface AdminAvailability {
 const answered = (side: AdminAvailabilitySide) =>
     side?.hasSubmitted ?? (side?.slots?.length ?? 0) > 0;
 
-type Verdict = 'scheduled' | 'noOverlap' | 'waitingOne' | 'waitingBoth';
+type Verdict = 'scheduled' | 'agreedOutside' | 'noOverlap' | 'waitingOne' | 'waitingBoth';
 
 /**
  * Groups a side's hours under their day, so twelve slots read as two lines instead of twelve
@@ -157,6 +161,7 @@ function SideRow({
 
 const VERDICT_META: Record<Verdict, { icon: keyof typeof Ionicons.glyphMap; color: string; tint: string }> = {
     scheduled: { icon: 'checkmark-circle', color: COLORS.primary, tint: 'bg-primary/[0.08]' },
+    agreedOutside: { icon: 'chatbubbles-outline', color: COLORS.info, tint: 'bg-info/[0.08]' },
     noOverlap: { icon: 'git-compare-outline', color: COLORS.warning, tint: 'bg-warning/[0.08]' },
     waitingOne: { icon: 'alert-circle', color: COLORS.destructive, tint: 'bg-destructive/[0.07]' },
     waitingBoth: { icon: 'time-outline', color: COLORS.slate400, tint: 'bg-white/[0.03]' },
@@ -186,8 +191,10 @@ export function AdminAvailabilityPanel({
     const awayAnswered = answered(availability.away);
     const overlap = availability.overlappingSlots ?? [];
 
+    // A time someone marked as agreed outside the app is not one the two lists met on — the
+    // organizer has to be able to tell, and to see who pressed it.
     const verdict: Verdict = availability.confirmedTime
-        ? 'scheduled'
+        ? (availability.agreedOutsideAppByUserId ? 'agreedOutside' : 'scheduled')
         : homeAnswered && awayAnswered
             ? 'noOverlap'
             : homeAnswered || awayAnswered
@@ -201,20 +208,27 @@ export function AdminAvailabilityPanel({
     const verdictText =
         verdict === 'scheduled'
             ? t('adminAvailability.scheduledFor', { time: formatDateTimeShort(availability.confirmedTime) })
-            : verdict === 'noOverlap'
-                ? t('adminAvailability.noOverlap')
-                : verdict === 'waitingOne'
-                    ? t('adminAvailability.waitingOne', { name: silentName || t('adminAvailability.opponent') })
-                    : t('adminAvailability.waitingBoth');
+            : verdict === 'agreedOutside'
+                ? (availability.agreedOutsideAppByName
+                    ? t('adminAvailability.agreedOutsideAppBy', { name: availability.agreedOutsideAppByName })
+                    : t('adminAvailability.agreedOutsideApp'))
+                : verdict === 'noOverlap'
+                    ? t('adminAvailability.noOverlap')
+                    : verdict === 'waitingOne'
+                        ? t('adminAvailability.waitingOne', { name: silentName || t('adminAvailability.opponent') })
+                        : t('adminAvailability.waitingBoth');
 
+    // The time on an outside-app agreement is when it was marked, not a kick-off — said in the hint.
     const verdictHint =
-        verdict === 'noOverlap'
-            ? t('adminAvailability.noOverlapHint')
-            : verdict === 'waitingOne'
-                ? t('adminAvailability.waitingOneHint')
-                : verdict === 'waitingBoth'
-                    ? t('adminAvailability.waitingBothHint')
-                    : null;
+        verdict === 'agreedOutside'
+            ? t('adminAvailability.agreedOutsideAppHint', { time: formatDateTimeShort(availability.confirmedTime) })
+            : verdict === 'noOverlap'
+                ? t('adminAvailability.noOverlapHint')
+                : verdict === 'waitingOne'
+                    ? t('adminAvailability.waitingOneHint')
+                    : verdict === 'waitingBoth'
+                        ? t('adminAvailability.waitingBothHint')
+                        : null;
 
     return (
         <View className="bg-card rounded-[20px] border border-white/10 overflow-hidden">
@@ -266,7 +280,7 @@ export function AdminAvailabilityPanel({
 
             {/* Undo. Only ever on a match that actually has a time — there is nothing to cancel
                 otherwise — and only for callers that pass the handler, which is the organizer view. */}
-            {onClearSchedule && verdict === 'scheduled' && (
+            {onClearSchedule && (verdict === 'scheduled' || verdict === 'agreedOutside') && (
                 <View className="px-4 pt-3 pb-4 border-t border-white/[0.06]">
                     <PressableScale
                         onPress={onClearSchedule}
