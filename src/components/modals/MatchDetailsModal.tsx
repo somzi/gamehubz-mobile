@@ -3,6 +3,7 @@ import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator,
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import type { AvailabilityDraft } from '../match/HourlyAvailabilityPicker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
 import { MatchTimingStrip } from '../match/MatchTimingStrip';
 import { hapticError, hapticSuccess } from '../../lib/haptics';
@@ -14,6 +15,7 @@ import { EvidencePreviewModal } from '../match/EvidencePreviewModal';
 import { PendingEvidenceStrip } from '../match/PendingEvidenceStrip';
 import { MatchChatPanel } from '../match/MatchChatPanel';
 import { useMatchChatMute } from '../../hooks/useMatchChatMute';
+import type { StreamDraft } from '../match/MatchStreamPanel';
 import { MatchStreamPanel } from '../match/MatchStreamPanel';
 import { MatchInsightsPanel, type MatchInsightPlayer } from '../match/MatchInsightsPanel';
 import { AdminHelpSection } from '../match/AdminHelpSection';
@@ -44,6 +46,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { cn, parseUtcDate, formatDateTimeShort } from '../../lib/utils';
 import { MatchStage } from '../../types/tournament';
+import type { SeriesScoreDraft } from '../match/SeriesScoreEntry';
+import { ChatWorkspace } from '../../lib/chatWorkspace';
+import { appendMatchTabs, matchPresentation } from '../../lib/matchPresentation';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
 import { SeriesBreakdown } from '../match/SeriesBreakdown';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
@@ -174,6 +179,7 @@ interface MatchDetailsModalProps {
      * modal was left on when it reopens after a player's profile.
      */
     defaultTab?: MatchModalTab;
+    onTabChange?: (tab: MatchModalTab) => void;
     /**
      * Takes a player tap over (open that profile) so the host can bring this modal back, on the
      * same tab, when the viewer returns. Without it the modal closes and pushes the profile
@@ -217,6 +223,7 @@ export function MatchDetailsModal({
     nextMatchLoserBracketId,
     tournamentStatus,
     defaultTab = 'match',
+    onTabChange,
     onOpenProfile,
     onDismiss,
     holdUntilReady = false,
@@ -335,6 +342,10 @@ export function MatchDetailsModal({
     const [isApproving, setIsApproving] = useState(false);
     const [isRejecting, setIsRejecting] = useState(false);
     const [isEditingProposal, setIsEditingProposal] = useState(false);
+    const seriesDraft = React.useMemo(() => ({ current: null as SeriesScoreDraft | null }), [matchId, isEditMode, isEditingProposal]);
+    const chatWorkspace = React.useMemo(() => new ChatWorkspace(), [matchId]);
+    const streamDraft = React.useMemo(() => ({ current: null as StreamDraft | null }), [matchId]);
+    const availabilityDraft = React.useMemo(() => ({ current: null as AvailabilityDraft | null }), [matchId]);
 
     // Delete-result (revert) state — reopens a completed match as Scheduled.
     const [isDeletingResult, setIsDeletingResult] = useState(false);
@@ -402,7 +413,8 @@ export function MatchDetailsModal({
         // screen until (and unless) the new one's details came back with its own.
         setLocalDeadline(deadline);
         setConfirmedTimeIso(undefined);
-    }, [matchId, deadline]);
+    }, [matchId]);
+    useEffect(() => { setLocalDeadline(deadline); }, [deadline]);
 
     // Another match in the same modal: drop the previous one's details instead of showing them under
     // the new match's header until its own arrive. Not keyed on anything else — a reopen of the same
@@ -426,6 +438,8 @@ export function MatchDetailsModal({
         if (visible) setActiveTab(defaultTab);
     }, [matchId, visible, defaultTab]);
 
+    useEffect(() => { if (visible) onTabChange?.(activeTab); }, [visible, activeTab, onTabChange]);
+
     // A verification never outlives the modal it was started from: reopening the same match must not
     // bring the sheet straight back up (the per-match reset above only runs when the match changes).
     useEffect(() => {
@@ -436,7 +450,7 @@ export function MatchDetailsModal({
         if (visible && matchId) {
             // Back from a player's profile opened from this match: what is on screen is what the
             // viewer just left, so it refreshes underneath (silently) instead of behind a loader.
-            const returning = profileTripMatchIdRef.current === matchId;
+            const returning = !!matchDetailsRef.current;
             profileTripMatchIdRef.current = null;
             // fetchMatchDetails hits /details/full which returns details + streams + the caller's
             // availability in a single round-trip. It handles setting all three; the legacy
@@ -1384,14 +1398,18 @@ export function MatchDetailsModal({
         && !adminAvailability.confirmedTime
         && sideAnswered(adminAvailability.home) !== sideAnswered(adminAvailability.away);
 
-    // Five tabs can share the row for an organizer. FORM is deliberately short, while the whole
-    // bar steps down once Schedule and Stream join it so translated labels remain intact.
-    const tabCount = 1 + (showInsightsTab ? 1 : 0) + (showChatTab ? 1 : 0) + (showStreamTab ? 1 : 0) + (showScheduleTab ? 1 : 0);
-    const tabLabelClass = tabCount >= 5
-        ? 'text-[8px] font-black uppercase tracking-normal'
-        : tabCount >= 4
-        ? 'text-[10px] font-black uppercase tracking-wider'
-        : 'text-xs font-black uppercase tracking-widest';
+    const availableTabs: MatchModalTab[] = ['match'];
+    if (showInsightsTab) availableTabs.push('insights');
+    if (showChatTab) availableTabs.push('chat');
+    if (showStreamTab) availableTabs.push('stream');
+    if (showScheduleTab) availableTabs.push('schedule');
+    const [tabOrder, setTabOrder] = useState<MatchModalTab[]>(['match']);
+    const orderedTabs = appendMatchTabs(tabOrder, availableTabs);
+    if (orderedTabs !== tabOrder) setTabOrder(orderedTabs);
+    const tabLabels: Record<MatchModalTab, string> = {
+        match: t('tournament:details.match'), insights: t('insights.tab'), chat: t('match:chat.chat'),
+        stream: t('common:stream'), schedule: t('match:adminAvailability.tab'),
+    };
 
     const insightHome: MatchInsightPlayer = {
         id: effectiveHome?.userId || '',
@@ -1735,6 +1753,7 @@ export function MatchDetailsModal({
                             format={seriesFormat}
                             allowTiebreak={!!matchDetails.allowsTieBreak}
                             initialGames={entrySeedGames}
+                            draftRef={seriesDraft}
                             onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                             onChange={(games, outcome, complete) => {
                                 setSeriesGames(games);
@@ -2314,10 +2333,26 @@ export function MatchDetailsModal({
         );
     };
 
-    // Held until the load for THIS match has finished — the details on hand may be another match's —
-    // and the tournament is in. A failed load ends the hold too: the error belongs on screen.
-    const holding = (!!matchId && (detailsSettledFor !== matchId || (isLoadingDetails && !matchDetails)))
-        || (holdUntilReady && !contextReady);
+    // Reset before committing a frame for another match, while keeping the native Modal instance.
+    // An effect alone runs after paint and can expose the previous game's actions under new names.
+    const [stateMatchId, setStateMatchId] = useState(matchId);
+    if (stateMatchId !== matchId) {
+        setStateMatchId(matchId);
+        setMatchDetails(null); setDetailsSettledFor(null); setIsLoadingDetails(true);
+        setHomeScore(''); setAwayScore(''); setSelectedImages([]); setError(null);
+        setIsEditMode(false); setIsEditingProposal(false); setCheckInOverride(null);
+        setSeriesGames([]); setSeriesOutcome(null); setIsSeriesComplete(false);
+        setShowResolveHelpPrompt(false); setShowVerifySheet(false);
+        setStreams([]); setAdminAvailability(null);
+        setMySlots(myAvailability); setOpponentSlots(opponentAvailability);
+        setConfirmedTime(scheduledTime); setConfirmedTimeIso(undefined); setLocalDeadline(deadline);
+        setCurrentStatus(status); setActiveTab(defaultTab); setTabOrder(['match']);
+    }
+    const seeded = !!home?.username || !!away?.username;
+    const { holding, preview } = matchPresentation({
+        seeded, hasDetails: !!matchDetails, settled: detailsSettledFor === matchId,
+        loading: isLoadingDetails, contextReady: !holdUntilReady || contextReady,
+    });
 
     if (!presence.rendered) return null;
 
@@ -2385,7 +2420,7 @@ export function MatchDetailsModal({
                     <View className="flex-1 items-center justify-center" accessibilityRole="progressbar">
                         <ActivityIndicator size="large" color="#10B981" />
                     </View>
-                ) : error && !matchDetails ? (
+                ) : error && !matchDetails && !seeded ? (
                     <View className="flex-1 items-center justify-center px-6">
                         <Text className="text-red-400 text-center">{error}</Text>
                         <Button className="mt-6" onPress={() => fetchMatchDetails()} loading={isLoadingDetails}>
@@ -2394,117 +2429,46 @@ export function MatchDetailsModal({
                     </View>
                 ) : (
                 <>
-                {/* Match / Form / Chat / Schedule / Stream tabs. Match is always present; the
-                    optional matchup tab appears as soon as both players are resolved. */}
-                {(showInsightsTab || showChatTab || showStreamTab || showScheduleTab) && (
-                    <View className="flex-row mx-6 mt-3 mb-2 rounded-2xl p-1 bg-card border border-white/[0.04]">
-                        <Pressable
-                            onPress={() => setActiveTab('match')}
-                            className={cn(
-                                "flex-1 py-2.5 items-center rounded-xl",
-                                activeTab === 'match' ? "bg-primary/15" : "bg-transparent"
-                            )}
-                        >
-                            <Text numberOfLines={1} className={cn(
-                                tabLabelClass, "w-full text-center",
-                                activeTab === 'match' ? "text-primary" : "text-slate-500"
-                            )}>{t('tournament:details.match')}</Text>
-                        </Pressable>
-                        {showInsightsTab && (
-                        <Pressable
-                            onPress={() => setActiveTab('insights')}
-                            className={cn(
-                                "flex-1 py-2.5 items-center rounded-xl",
-                                activeTab === 'insights' ? "bg-indigo-500/15" : "bg-transparent"
-                            )}
-                        >
-                            <View className="flex-row items-center gap-1.5">
-                                <Ionicons
-                                    name="pulse"
-                                    size={12}
-                                    color={activeTab === 'insights' ? '#818CF8' : '#64748B'}
-                                />
-                                <Text numberOfLines={1} className={cn(
-                                    tabLabelClass,
-                                    activeTab === 'insights' ? "text-indigo-400" : "text-slate-500"
-                                )}>{t('insights.tab')}</Text>
-                            </View>
-                        </Pressable>
-                        )}
-                        {showChatTab && (
-                        <Pressable
-                            onPress={() => setActiveTab('chat')}
-                            className={cn(
-                                "flex-1 py-2.5 items-center rounded-xl",
-                                activeTab === 'chat' ? "bg-primary/15" : "bg-transparent"
-                            )}
-                        >
-                            <View className="flex-row items-center gap-1.5">
-                                <Ionicons
-                                    name="chatbubbles-outline"
-                                    size={12}
-                                    color={activeTab === 'chat' ? '#10B981' : '#64748B'}
-                                />
-                                <Text numberOfLines={1} className={cn(
-                                    tabLabelClass,
-                                    activeTab === 'chat' ? "text-primary" : "text-slate-500"
-                                )}>{t('match:chat.chat')}</Text>
-                                {adminHelpRequested && (
-                                    <View className="w-1.5 h-1.5 rounded-full bg-warning" />
-                                )}
-                            </View>
-                        </Pressable>
-                        )}
-                        {showScheduleTab && (
-                        <Pressable
-                            onPress={() => setActiveTab('schedule')}
-                            className={cn(
-                                "flex-1 py-2.5 items-center rounded-xl",
-                                activeTab === 'schedule' ? "bg-primary/15" : "bg-transparent"
-                            )}
-                        >
-                            <View className="flex-row items-center gap-1.5">
-                                <Text numberOfLines={1} className={cn(
-                                    tabLabelClass,
-                                    activeTab === 'schedule' ? "text-primary" : "text-slate-500"
-                                )}>{t('match:adminAvailability.tab')}</Text>
-                                {scheduleNeedsAttention && (
-                                    <View className="w-1.5 h-1.5 rounded-full bg-warning" />
-                                )}
-                            </View>
-                        </Pressable>
-                        )}
-                        {showStreamTab && (
-                        <Pressable
-                            onPress={() => setActiveTab('stream')}
-                            className={cn(
-                                "flex-1 py-2.5 items-center rounded-xl",
-                                activeTab === 'stream' ? "bg-primary/15" : "bg-transparent"
-                            )}
-                        >
-                            <View className="flex-row items-center gap-1.5">
-                                <Text numberOfLines={1} className={cn(
-                                    tabLabelClass,
-                                    activeTab === 'stream' ? "text-primary" : "text-slate-500"
-                                )}>{t('common:stream')}</Text>
-                                {hasLiveStream && (
-                                    <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
-                                        <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                                        <Text className="text-[8px] font-black text-red-400 uppercase">{t('details.liveBadge')}</Text>
-                                    </View>
-                                )}
-                            </View>
-                        </Pressable>
-                        )}
-                    </View>
-                )}
+                <View className="mx-6 mt-3 mb-2 rounded-2xl bg-card border border-white/[0.04]">
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
+                        {orderedTabs.map(tab => {
+                            const enabled = availableTabs.includes(tab) && (!preview || tab === 'match');
+                            return <Pressable key={tab} accessibilityRole="tab"
+                                accessibilityState={{ selected: activeTab === tab, disabled: !enabled }}
+                                disabled={!enabled} onPress={() => setActiveTab(tab)}
+                                style={{ width: 112, opacity: enabled ? 1 : 0.4 }}
+                                className={cn('py-2.5 px-1 items-center justify-center rounded-xl', activeTab === tab ? 'bg-primary/15' : 'bg-transparent')}>
+                                <View className="flex-row items-center gap-1">
+                                    {(tab === 'chat' || tab === 'insights') && <Ionicons name={tab === 'chat' ? 'chatbubbles-outline' : 'pulse'} size={12} color={activeTab === tab ? '#10B981' : '#64748B'} />}
+                                    <Text numberOfLines={1} className={cn('text-[10px] font-black uppercase', activeTab === tab ? 'text-primary' : 'text-slate-500')}>
+                                        {tabLabels[tab]}
+                                    </Text>
+                                    {((tab === 'chat' && adminHelpRequested) || (tab === 'schedule' && scheduleNeedsAttention)) && <View className="w-1.5 h-1.5 rounded-full bg-warning" />}
+                                    {tab === 'stream' && hasLiveStream && <Text className="text-[8px] text-red-400 font-bold">{t('details.liveBadge')}</Text>}
+                                </View>
+                            </Pressable>;
+                        })}
+                    </ScrollView>
+                </View>
 
-                {isLoadingDetails && !matchDetails && (
-                    <View className="py-2 items-center">
-                        <ActivityIndicator size="small" color="#10B981" />
+                {preview ? (
+                    <View className="flex-1 px-6 pt-5">
+                        <View className="flex-row items-center justify-between gap-4 rounded-3xl bg-white/5 p-5">
+                            {[home, away].map((player, index) => <Pressable key={index} className="flex-1 items-center gap-3"
+                                disabled={!player?.userId} onPress={() => player?.userId && navigateToProfile(player.userId)}>
+                                <PlayerAvatar name={player?.username || t(index === 0 ? 'details.homeSide' : 'details.awaySide')} size="lg" />
+                                <Text className="text-white font-bold text-center">{player?.username || t(index === 0 ? 'details.homeSide' : 'details.awaySide')}</Text>
+                            </Pressable>)}
+                        </View>
+                        {!!scheduledTime && <Text className="text-slate-400 text-center mt-4">{scheduledTime}</Text>}
+                        {!!deadline && deadline !== 'TBD' && <Text className="text-slate-400 text-center mt-2">{t('timing.deadline')}: {formatDateTimeShort(deadline)}</Text>}
+                        {error ? <View className="items-center mt-6">
+                            <Text className="text-red-400 text-center">{error}</Text>
+                            <Button className="mt-4" onPress={() => fetchMatchDetails()} loading={isLoadingDetails}>{t('common:retry')}</Button>
+                        </View> : <View className="items-center py-8" accessibilityRole="progressbar"><ActivityIndicator size="small" color="#10B981" /></View>}
                     </View>
-                )}
-
+                ) : (
+                <>
                 {activeTab === 'insights' && showInsightsTab ? (
                     <View className="flex-1 px-6 pt-2">
                         <MatchInsightsPanel
@@ -2543,6 +2507,7 @@ export function MatchDetailsModal({
                             isCompleted={effectiveStatus === 'completed'}
                             currentUserId={user?.id}
                             initialStreams={streams}
+                            draftRef={streamDraft}
                             onStreamsChange={setStreams}
                         />
                     </View>
@@ -2570,6 +2535,8 @@ export function MatchDetailsModal({
                                         opponentName={opponentName}
                                         opponentAvailability={opponentSlots}
                                         initialSlots={mySlots}
+                                        draftRef={availabilityDraft}
+                                        active={visible}
                                         onSubmit={async (slots: string[], dateTimeSlots: string[]) => {
                                             try {
                                                 setIsSubmitting(true);
@@ -2639,12 +2606,15 @@ export function MatchDetailsModal({
                         <MatchChatPanel
                             key={matchId}
                             matchId={matchId}
+                            workspace={chatWorkspace}
                             active={visible && activeTab === 'chat' && showChatTab}
                             participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
                             avatarsByUserId={chatAvatars}
                             readOnly={isChatReadOnly}
                         />
                     </View>
+                </>
+                )}
                 </>
                 )}
             </View>

@@ -1,8 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { OutgoingMessage } from '../../hooks/useChatConversation';
 import { createDelayedNotice } from '../../lib/delayedNotice';
+import type { ChatWorkspace } from '../../lib/chatWorkspace';
+
+export function ChatSavedDrafts({ workspace }: { workspace: ChatWorkspace }) {
+    const { t } = useTranslation('common');
+    const { drafts } = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot);
+    return <>{drafts.map(draft => <View key={draft.id} className="mx-4 my-1 rounded-xl bg-white/5 p-3">
+        <Text className="text-xs text-slate-400">{t('chatSavedDraft')}</Text>
+        <Text className="text-white" numberOfLines={2}>{draft.content}</Text>
+        <View className="flex-row gap-6 mt-2">
+            <Pressable accessibilityRole="button" onPress={() => workspace.restoreDraft(draft.id)}><Text className="text-primary">{t('chatRestoreDraft')}</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => workspace.discardDraft(draft.id)}><Text className="text-slate-400">{t('remove')}</Text></Pressable>
+        </View>
+    </View>)}</>;
+}
 
 // Long enough that an ordinary connect or a blip of a reconnect never shows (see delayedNotice).
 const CONNECTION_NOTICE_DELAY_MS = 1_200;

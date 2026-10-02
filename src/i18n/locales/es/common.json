@@ -1,4 +1,6 @@
 {
+  "chatSavedDraft": "Borrador guardado",
+  "chatRestoreDraft": "Restaurar borrador",
   "cancel": "Cancelar",
   "save": "Guardar",
   "delete": "Eliminar",

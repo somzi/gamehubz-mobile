@@ -1,4 +1,6 @@
 {
+  "chatSavedDraft": "Збережена чернетка",
+  "chatRestoreDraft": "Відновити чернетку",
   "add": "Додати",
   "app": {
     "activitiesCount_one": "{{count}} активність",

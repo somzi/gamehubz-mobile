@@ -10,6 +10,7 @@ import { usePushNotifications, STORAGE_KEY_LAST_SYNCED_TOKEN } from '../hooks/us
 import { syncLanguageWithServer, STORAGE_KEY_LAST_SYNCED_LANGUAGE } from '../lib/languageSync';
 import { fetchTextWithTimeout, transportErrorKey } from '../lib/fetchWithTimeout';
 import { queueAuthStorage } from '../lib/authStorage';
+import { clearChatWorkspaces } from '../lib/chatWorkspace';
 
 
 interface AuthContextType {
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // BadgesContext), so clearing these two is enough to guarantee a fresh
     // login as a DIFFERENT user never paints the previous user's snapshot.
     const wipeSessionCache = useCallback(async () => {
+        clearChatWorkspaces();
         try { queryClient.clear(); } catch { /* best-effort */ }
         // Persister keeps a single blob under this key; blowing it away means
         // the next cold start has no snapshot to restore and re-hits the API

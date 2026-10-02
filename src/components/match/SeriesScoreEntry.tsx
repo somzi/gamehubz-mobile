@@ -18,13 +18,17 @@ import {
     seriesBlockLabel,
 } from '../../lib/series';
 
-interface GameRow {
+export interface GameRow {
     left: string;
     right: string;
     seriesNumber: number;
 }
 
+export type SeriesScoreDraft = GameRow[];
+
 interface SeriesScoreEntryProps {
+    /** Raw cells (including half-filled rows), owned by a modal that can hide its native subtree. */
+    draftRef?: { current: SeriesScoreDraft | null };
     /** Left column player — the parent decides whose side that is (usually the logged-in player). */
     leftName: string;
     /** In-game nickname, shown on its own gamepad line under the username. */
@@ -148,13 +152,15 @@ export function SeriesScoreEntry({
     format,
     allowTiebreak,
     initialGames,
+    draftRef,
     onChange,
     onFocusInput,
     editable = true,
 }: SeriesScoreEntryProps) {
     const { t } = useTranslation('match');
     // The raw `format` prop is fine here: the initializer runs once, so identity churn can't reach it.
-    const [rows, setRows] = useState<GameRow[]>(() => buildRows(initialGames, format));
+    const [rows, setRows] = useState<GameRow[]>(() => draftRef?.current ?? buildRows(initialGames, format));
+    if (draftRef) draftRef.current = rows;
 
     // Callers build the format object inline, so a fresh identity arrives on every parent render.
     // Rebuilding it from its primitive fields keeps everything memoised below stable: without this

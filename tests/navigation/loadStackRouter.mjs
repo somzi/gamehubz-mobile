@@ -27,12 +27,17 @@ function transpile(relativePath, rewrite) {
 
 export async function loadStackRouter() {
     const dir = mkdtempSync(join(tmpdir(), 'gamehubz-nav-'));
+    writeFileSync(join(dir, 'chatOutbox.mjs'), transpile('src/lib/chatOutbox.ts', []));
+    writeFileSync(join(dir, 'chatWorkspace.mjs'), transpile('src/lib/chatWorkspace.ts', [['./chatOutbox', './chatOutbox.mjs']]));
+    writeFileSync(join(dir, 'modalReturn.mjs'), transpile('src/lib/modalReturn.ts', []));
     writeFileSync(join(dir, 'navigationLog.mjs'), transpile('src/lib/navigationLog.ts', []));
     writeFileSync(
         join(dir, 'stackRouter.mjs'),
         transpile('src/navigation/stackRouter.ts', [
             ['@react-navigation/native', routersUrl],
             ['../lib/navigationLog', './navigationLog.mjs'],
+            ['../lib/chatWorkspace', './chatWorkspace.mjs'],
+            ['../lib/modalReturn', './modalReturn.mjs'],
         ]),
     );
     const [routerModule, routers, log] = await Promise.all([
@@ -40,7 +45,7 @@ export async function loadStackRouter() {
         import(routersUrl),
         import(pathToFileURL(join(dir, 'navigationLog.mjs')).href),
     ]);
-    return { ...routerModule, ...routers, log };
+    return { ...routerModule, ...routers, log, ...(await import(pathToFileURL(join(dir, 'chatWorkspace.mjs')).href)), ...(await import(pathToFileURL(join(dir, 'modalReturn.mjs')).href)) };
 }
 
 export async function loadStackTransitions() {

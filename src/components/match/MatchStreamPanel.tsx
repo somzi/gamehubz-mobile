@@ -15,7 +15,10 @@ import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectInput } from '../ui/SelectInput';
 
+export type StreamDraft = { startOpen: boolean; platform?: SocialType; handle: string; vodInput: string };
+
 interface MatchStreamPanelProps {
+    draftRef?: { current: StreamDraft | null };
     matchId: string;
     isParticipant: boolean;
     isCompleted: boolean;
@@ -33,6 +36,7 @@ export function MatchStreamPanel({
     isCompleted,
     currentUserId,
     initialStreams,
+    draftRef,
     onStreamsChange,
 }: MatchStreamPanelProps) {
     const { t } = useTranslation('match');
@@ -48,12 +52,13 @@ export function MatchStreamPanel({
     const [error, setError] = useState<string | null>(null);
 
     // start form
-    const [startOpen, setStartOpen] = useState(false);
-    const [platform, setPlatform] = useState<SocialType | undefined>(undefined);
-    const [handle, setHandle] = useState('');
+    const [startOpen, setStartOpen] = useState(draftRef?.current?.startOpen ?? false);
+    const [platform, setPlatform] = useState<SocialType | undefined>(draftRef?.current?.platform);
+    const [handle, setHandle] = useState(draftRef?.current?.handle ?? '');
 
     // manual VOD fallback
-    const [vodInput, setVodInput] = useState('');
+    const [vodInput, setVodInput] = useState(draftRef?.current?.vodInput ?? '');
+    if (draftRef) draftRef.current = { startOpen, platform, handle, vodInput };
 
     const applyStreams = (list: MatchStream[]) => {
         setStreams(list);

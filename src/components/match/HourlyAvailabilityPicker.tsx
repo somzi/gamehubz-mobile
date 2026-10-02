@@ -8,7 +8,11 @@ import { cn, parseUtcDate } from '../../lib/utils';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import i18n, { dateLocale } from '../../i18n';
 
+export type AvailabilityDraft = { slots: string[] };
+
 interface HourlyAvailabilityPickerProps {
+    active?: boolean;
+    draftRef?: { current: AvailabilityDraft | null };
     matchId: string;
     deadline: string; // ISO String
     opponentName: string;
@@ -79,6 +83,8 @@ export function HourlyAvailabilityPicker({
     opponentAvatarUrl,
     opponentAvailability = [],
     initialSlots = [],
+    draftRef,
+    active = true,
     onSubmit,
     onMarkScheduled,
     onOpponentPress,
@@ -109,11 +115,13 @@ export function HourlyAvailabilityPicker({
     // Committed selection (what was sent to the server)
     const [selectedSlots, setSelectedSlots] = useState<Set<string>>(initialKeys);
     // Working selection used only inside the picker modal
-    const [draftSlots, setDraftSlots] = useState<Set<string>>(initialKeys);
+    const [draftSlots, setDraftSlots] = useState<Set<string>>(() => draftRef?.current ? new Set(draftRef.current.slots) : initialKeys);
     const [pickerVisible, setPickerVisible] = useState(false);
     /** Set when the server rejected the submit — the selection has been rolled back. */
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [selectedDateIndex, setSelectedDateIndex] = useState(0);
+
+    useEffect(() => { if (!active) setPickerVisible(false); }, [active]);
 
     const hasSubmitted = selectedSlots.size > 0;
 
@@ -132,7 +140,7 @@ export function HourlyAvailabilityPicker({
 
     useEffect(() => {
         setSelectedSlots(initialKeys);
-        setDraftSlots(initialKeys);
+        setDraftSlots(draftRef?.current ? new Set(draftRef.current.slots) : initialKeys);
     }, [initialKeys]);
 
     const processedOpponentKeys = useMemo(() => {
@@ -188,7 +196,7 @@ export function HourlyAvailabilityPicker({
     );
 
     const openPicker = () => {
-        setDraftSlots(new Set(selectedSlots));
+        setDraftSlots(new Set(draftRef?.current?.slots ?? selectedSlots));
         setSelectedDateIndex(0);
         setPickerVisible(true);
     };
@@ -207,6 +215,7 @@ export function HourlyAvailabilityPicker({
             } else {
                 next.add(slotId);
             }
+            if (draftRef) draftRef.current = { slots: [...next] };
             return next;
         });
     };
@@ -227,6 +236,7 @@ export function HourlyAvailabilityPicker({
 
         try {
             await onSubmit(Array.from(committed), dateTimeSlots);
+            if (draftRef) draftRef.current = null;
         } catch (error: any) {
             console.error('[HourlyAvailabilityPicker] Submit failed:', error);
             setSelectedSlots(previous);

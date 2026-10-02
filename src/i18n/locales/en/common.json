@@ -1,4 +1,6 @@
 {
+  "chatSavedDraft": "Saved draft",
+  "chatRestoreDraft": "Restore draft",
   "cancel": "Cancel",
   "save": "Save",
   "delete": "Delete",

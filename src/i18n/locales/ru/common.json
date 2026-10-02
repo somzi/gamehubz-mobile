@@ -1,4 +1,6 @@
 {
+  "chatSavedDraft": "Сохранённый черновик",
+  "chatRestoreDraft": "Восстановить черновик",
   "add": "Добавить",
   "app": {
     "activitiesCount_one": "{{count}} активность",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
@@ -8,7 +8,7 @@ import { mergeMessagesById } from '../lib/mergeMessages';
 import { startSignalRWithRetry } from '../lib/signalR';
 import { useRequestGate } from './useRequestGate';
 import { loadChatHistory } from '../lib/chatHistory';
-import { createChatOutbox, type OutgoingMessage } from '../lib/chatOutbox';
+import { ChatWorkspace } from '../lib/chatWorkspace';
 export type { OutgoingMessage } from '../lib/chatOutbox';
 
 type Message = { id: string; content: string; sentAt: string };
@@ -21,6 +21,7 @@ type Options<T> = {
     map: (raw: any) => T;
     onRead: (id: string) => void | Promise<void>;
     onSent?: (message: T) => void;
+    workspace?: ChatWorkspace;
 };
 
 /** Both chat surfaces use the same paging, connection lifecycle and explicit send retry. */
@@ -44,7 +45,9 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
     const [loadingMore, setLoadingMore] = useState(false);
     const paging = useRef(false);
     const [pageError, setPageError] = useState(false);
-    const [pending, setPending] = useState<OutgoingMessage[]>([]);
+    const localWorkspace = useMemo(() => new ChatWorkspace(), [id, kind]);
+    const workspace = options.workspace ?? localWorkspace;
+    const work = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot);
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'reconnecting'>('connecting');
     const [foreground, setForeground] = useState(AppState.currentState === 'active');
     const history = (take = 30, before?: string) => kind === 'match'
@@ -60,10 +63,17 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
 
     useEffect(() => {
         setMessages([]); messagesRef.current = [];
-        setPending([]);
         loadedRef.current = false; historyAnchor.current = undefined; setLoaded(false); setLoading(true);
         setHasMore(false); setError(null); setPageError(false); paging.current = false;
     }, [id, kind]);
+
+    const sentSeen = useRef({ workspace, id, ids: new Set<string>() });
+    useEffect(() => {
+        if (sentSeen.current.workspace !== workspace || sentSeen.current.id !== id) sentSeen.current = { workspace, id, ids: new Set() };
+        const unseen = work.sent.filter(message => !sentSeen.current.ids.has(message.id));
+        for (const message of unseen) sentSeen.current.ids.add(message.id);
+        if (unseen.length) setMessages(previous => mergeMessagesById(previous, unseen as T[]));
+    }, [work.sent, id, workspace]);
 
     const refresh = async () => {
         if (!id || !visible()) return;
@@ -164,7 +174,9 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
         };
     }, [id, kind, active, foreground, requests]));
 
-    const outbox = useMemo(() => createChatOutbox(async (content) => {
+    useFocusEffect(useCallback(() => {
+        if (!id || !active || !foreground) return;
+        return workspace.bindSender(async (content) => {
             if (!id || !visible()) throw new Error('Chat inactive');
             const response = await authenticatedFetch(kind === 'match' ? ENDPOINTS.POST_MATCH_COMMENT(id) : ENDPOINTS.SEND_DIRECT_MESSAGE(id), {
                 method: 'POST', body: JSON.stringify({ content }),
@@ -173,11 +185,12 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
             const raw = await response.json();
             if (latest.current.id !== id) return;
             const message = latest.current.map(raw);
-            setMessages((previous) => mergeMessagesById(previous, [message]));
+            workspace.recordSent(message);
             latest.current.onSent?.(message);
-    }, (next) => { if (latest.current.id === id) setPending(next); }), [id, kind]);
+        });
+    }, [id, kind, active, foreground, workspace]));
 
     return { messages, loading, loaded, error, hasMore, loadingMore, pageError, loadEarlier, refresh,
-        pending, send: outbox.send, retry: (message: OutgoingMessage) => outbox.retry(message.id),
-        discard: (message: OutgoingMessage) => outbox.discard(message.id), connectionStatus };
+        pending: work.pending, send: workspace.send, retry: workspace.retry,
+        discard: workspace.discard, connectionStatus };
 }

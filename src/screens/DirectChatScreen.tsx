@@ -1,11 +1,11 @@
 import { useChatConversation } from '../hooks/useChatConversation';
 import { useChatScroll } from '../hooks/useChatScroll';
-import { ChatConnectionStatus, ChatOutbox, ChatNewMessages } from '../components/chat/ChatFeedback';
+import { ChatConnectionStatus, ChatOutbox, ChatNewMessages, ChatSavedDrafts } from '../components/chat/ChatFeedback';
 import { LoadFailedState } from '../components/ui/EmptyState';
 import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
 import { useTranslation } from 'react-i18next';
 import i18n, { dateLocale } from '../i18n';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
     View,
     Text,
@@ -34,6 +34,7 @@ import { SocialAvatar } from '../components/social/SocialAvatar';
 import { CopiedOverlay } from '../components/chat/CopiedOverlay';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { DirectChat, DirectMessage } from '../types/social';
+import { getChatWorkspace, retainChatWorkspace, releaseChatWorkspace } from '../lib/chatWorkspace';
 
 type Route = RouteProp<RootStackParamList, 'DirectChat'>;
 type Nav = StackNavigationProp<RootStackParamList, 'DirectChat'>;
@@ -51,7 +52,13 @@ export default function DirectChatScreen() {
     const { chatId: initialChatId, otherUserId, header } = route.params || {};
 
     const [chat, setChat] = useState<DirectChat | null>(null);
-    const [input, setInput] = useState('');
+    const [workspace] = useState(() => getChatWorkspace(route.key));
+    const work = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot);
+    const input = work.draft, setInput = workspace.setDraft;
+    useEffect(() => {
+        retainChatWorkspace(route.key, workspace);
+        return () => releaseChatWorkspace(route.key, workspace);
+    }, [route.key, workspace]);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -202,7 +209,7 @@ export default function DirectChatScreen() {
     }, [request, loadAttempt]);
 
     const conversation = useChatConversation<DirectMessage>({
-        id: chat?.id, kind: 'direct', active: true,
+        id: chat?.id, kind: 'direct', active: true, workspace,
         map: raw => ({ id: raw.id ?? raw.Id, chatId: raw.chatId ?? raw.ChatId,
             senderId: raw.senderId ?? raw.SenderId, senderUsername: raw.senderUsername ?? raw.SenderUsername,
             senderAvatarUrl: raw.senderAvatarUrl ?? raw.SenderAvatarUrl, content: raw.content ?? raw.Content,
@@ -264,6 +271,7 @@ export default function DirectChatScreen() {
 
             <KeyboardAvoider keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}>
                 <ChatConnectionStatus status={conversation.connectionStatus} />
+                <ChatSavedDrafts workspace={workspace} />
                 {conversation.error && messages.length > 0 && <RefreshFailedBanner onRetry={conversation.refresh} retrying={conversation.loading} />}
                 <FlatList
                     ref={listRef}

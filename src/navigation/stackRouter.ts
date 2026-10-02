@@ -6,6 +6,8 @@ import {
 } from '@react-navigation/native';
 import type { RootStackParamList } from '../types/navigation';
 import { describeRoute, logNavigation } from '../lib/navigationLog';
+import { mergeChatWorkspaces } from '../lib/chatWorkspace';
+import { noteRouteOpen } from '../lib/modalReturn';
 
 type StackState = StackNavigationState<RootStackParamList>;
 type Params = Record<string, any> | undefined;
@@ -100,14 +102,14 @@ function isActiveSource(state: StackState, source: string): boolean {
 }
 
 // A link can arrive before a profile-opened chat has resolved its id. Once either bootstrap
-// learns both identities, keep the original screen (including its draft) and remove its copies.
+// learns both identities, keep the visible screen and transfer the local work of its copies.
 function reconcileChats(state: StackState, source?: string): StackState {
     const resolved = state.routes.find((r) => r.key === source && r.name === 'DirectChat');
     if (!resolved) return state;
     const copies = state.routes.filter((r) => r.name === 'DirectChat' && SUBJECT.DirectChat(r.params, resolved.params));
     if (copies.length < 2) return state;
-    const original = copies[0];
-    const duplicateKeys = new Set(copies.slice(1).map((r) => r.key));
+    const original = copies.find(route => route.key === state.routes[state.index].key) ?? copies[0];
+    const duplicateKeys = new Set(copies.filter(route => route.key !== original.key).map((r) => r.key));
     const params = { ...resolved.params, ...original.params } as Record<string, any>;
     for (const copy of copies) {
         for (const [key, value] of Object.entries(copy.params ?? {})) {
@@ -115,18 +117,11 @@ function reconcileChats(state: StackState, source?: string): StackState {
         }
     }
     const current = state.routes[state.index];
-    let routes = state.routes.filter((r) => !duplicateKeys.has(r.key))
+    const routes = state.routes.filter((r) => !duplicateKeys.has(r.key))
         .map((r) => r.key === original.key ? { ...r, params } : r);
-    // If a duplicate is visible, restore the original at that position without opening an
-    // unrelated screen in between. A hidden resolution must never steal focus.
-    if (duplicateKeys.has(current.key)) {
-        const restored = routes.find((r) => r.key === original.key)!;
-        routes = routes.filter((r) => r.key !== original.key);
-        const index = state.routes.slice(0, state.index).filter((r) => !duplicateKeys.has(r.key) && r.key !== original.key).length;
-        routes.splice(index, 0, restored);
-    }
+    mergeChatWorkspaces(original.key, [...duplicateKeys]);
     logNavigation('merged duplicate chat', describeRoute('DirectChat', params));
-    return { ...state, routes, index: routes.findIndex((r) => r.key === (duplicateKeys.has(current.key) ? original.key : current.key)) };
+    return { ...state, routes, index: routes.findIndex((r) => r.key === current.key) };
 }
 
 /** Whether a route shows the screen and subject a navigate asked for — the router's own test. */
@@ -267,6 +262,11 @@ export function singleCopyStackRouter<Action extends NavigationAction>(
     return {
         getStateForAction(state, action, options) {
             let next = resolve(state, action, options);
+            if (next && ['NAVIGATE', 'PUSH', 'REPLACE'].includes(action.type)) {
+                const destination = (action.payload as { name?: string } | undefined)?.name;
+                const top = next.routes[next.index ?? next.routes.length - 1];
+                if (top?.key && top.name === destination && (!action.source || isActiveSource(state, action.source))) noteRouteOpen(top.key);
+            }
             if (next?.stale === false && action.type === 'SET_PARAMS') next = reconcileChats(next, action.source);
             if (next && next !== state && next.routes) rememberRemoved(state, next);
             return next;

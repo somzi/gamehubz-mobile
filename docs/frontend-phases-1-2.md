@@ -5,7 +5,7 @@ Implementacija i regresione provere, 2. oktobar 2026. Izmene nisu objavljene.
 ## Faza 1
 
 - **R1:** navigacija sa ekrana proverava da li je izvor još u fokusu. Nema globalne blokade od 500 ms; notifikacije i linkovi preko container-a ostaju dozvoljeni.
-- **R2:** DM se prepoznaje po razgovoru ili sagovorniku. Parametri se dopunjavaju čim se sazna identitet; kasno razrešene duple rute spajaju se uz čuvanje prvobitne instance.
+- **R2:** DM se prepoznaje po razgovoru ili sagovorniku. Parametri se dopunjavaju čim se sazna identitet; kasno razrešene duple rute spajaju se uz čuvanje vidljive instance, nacrta i reda slanja iz obe kopije.
 - **28 / 27, deo:** testovi routera i prelaza, ograničen navigacioni log u memoriji. Log se može podeliti dugim pritiskom na verziju u Settings.
 - **16 / 15:** osvežavanje ne uklanja postojeći sadržaj turnira, profila i huba; greška i prazna lista imaju različit prikaz i mogućnost ponavljanja.
 - **3:** prelazi čekaju zatvaranje modala i završetak animacije stack-a. Odloženo ponovno otvaranje otkazuje se pri gubitku fokusa. iOS koristi `onDismiss` uz rezervno čekanje; Android koristi rezervno čekanje jer RN 0.81 ne pruža taj callback na Androidu.
@@ -25,7 +25,7 @@ Implementacija i regresione provere, 2. oktobar 2026. Izmene nisu objavljene.
 
 ## Automatske provere
 
-Rezultat posle treće runde review-a: **95/95 testova prolazi**. TypeScript provera je bez grešaka, a lokalni Expo export uspeva za Android i iOS. `git diff --check` je čist.
+Rezultat nakon dodatnih stavki 7, 6 i 9 iz review-a: **109/109 testova prolazi**. TypeScript provera je bez grešaka, a lokalni Expo export uspeva za Android i iOS. `git diff --check` je čist.
 
 - `npm run test:frontend`: router, tranzicije, istorija chata, deduplikacija poruka, red slanja, odbacivanje starih odgovora, ponovno povezivanje i timeout.
 - `node node_modules/typescript/bin/tsc --noEmit --incremental false`
@@ -71,3 +71,22 @@ Expo export za Android i iOS uspeva, a `git diff --check` je čist.
 
 - Čitanje chata proverava noviji keš po brojaču izmena (`dataUpdateCount`), ne po vremenu: dva upisa u istoj milisekundi više ne mogu da obrišu bedž nove poruke.
 - Novi tap u inboxu uvek gasi spiner prethodnog otvaranja, i kad je novi tap notifikacija sa spoljnim linkom.
+
+## Dodatne dorade iz review-a: 7 → 6 → 9
+
+Ovi brojevi se odnose na Claude-ov poslednji review, ne na prvobitni plan. Faza 3 nije započeta.
+
+- **7 — spajanje DM-ova:** ostaje trenutno vidljiva ruta (ako su obe skrivene, ostaje prvobitna). Nacrti i red slanja žive izvan pojedinačne rute. Tekst vidljivog razgovora ostaje u unosu; drugi, različit tekst prikazuje se kao sačuvan nacrt. Vraćanje nacrta čuva postojeći unos umesto da ga prepiše. Neuspele poruke prenose se zajedno sa porukama koje se još šalju. Zahtev u toku se ne ponavlja; njegov uspeh ili neuspeh stiže u preživeli razgovor. Stanje je samo u memoriji, oslobađa se pri napuštanju razgovora i odjavi.
+- **6 — povratak modala:** blur turnira pamti otvoreni pojedinačni ili timski meč i aktivni tab, pa skloni oba modala. Back vraća samo zapamćeni prikaz nakon stack tranzicije. Eksplicitna navigacija do turnira, uključujući novu notifikaciju, poništava prethodni povratak. Sačuvan je tok timski meč → pojedinačni meč → profil → Back → zatvori pojedinačni → timski meč. Unosi rezultata, nepotpuni redovi serije, izbor termina, tekst stream forme i chat nacrt/red slanja čuvaju se izvan native podstabla koje se zatvara.
+- **9 — početni prikaz meča:** poznati igrači, zaglavlje i termin/rok vide se odmah. Detalji i akcije prikazuju se tek nakon uspešnog učitavanja. Greška prvog učitavanja ima ponavljanje. Meč otvoren samo ID-em zadržava jedan loader dok ne stignu potrebni podaci. Promena meča resetuje stanje pre prvog prikazanog frejma, uz istu native Modal instancu. Povratak na isti učitani meč osvežava podatke tiho i čuva edit režim. Tabovi imaju stalnu širinu u horizontalnom redu; novootkriveni tabovi dodaju se na kraj, bez pomeranja ranijih tabova.
+
+Dodati testovi proveravaju router sa stvarnim prenosom nacrta, slanje koje se završi nakon spajanja, ponavljanje neuspele poruke bez duplog POST-a, stvarni focus callback turnira, novu navigaciju tokom povratka, početni prikaz i stabilan red tabova. U izdvojenoj kopiji potvrđeno je da testovi padaju kad se uklone odgovarajuće zaštite. Automatski testovi ne potvrđuju native animaciju ili vizuelni raspored.
+
+Dodatna proba na oba uređaja:
+
+1. Otvoriti isti DM iz dva izvora tokom razrešavanja identiteta. Proveriti očuvanje vidljivog unosa, vraćanje drugog nacrta i slanje koje se završi posle spajanja.
+2. Otvoriti meč, promeniti tab i uneti tekst/rezultat (uključujući pola reda serije). Otići na profil i vratiti se; ponoviti sa notifikacijom za drugi ekran. Proveriti unose i jedno otvaranje modala posle animacije.
+3. Dok traje povratak, otvoriti novu notifikaciju za drugi meč. Stari modal se ne vraća preko novog. Proveriti ceo timski tok i ručno zatvaranje modala.
+4. Na sporoj mreži otvoriti meč iz žreba, zatim drugi meč. Imena su tačna od prvog prikaza, prethodne akcije/rezultati se ne pojavljuju, a tabovi ostaju na mestu. Proveriti neuspeh i Retry, otvaranje iz notifikacije i tihi povratak na isti meč.
+
+ADB provera za ovu doradu nije našla povezan uređaj/emulator. Proba na uređaju ostaje otvorena. Ovaj paket nije objavljen.

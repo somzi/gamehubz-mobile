@@ -6,7 +6,7 @@ import { RefreshFailedBanner } from '../ui/RefreshFailedBanner';
 import { useQueryClient } from '@tanstack/react-query';
 import type { MatchOverviewDto } from '../../lib/homeMatches';
 import { useTranslation } from 'react-i18next';
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
@@ -15,6 +15,7 @@ import { useBadges } from '../../context/BadgesContext';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
+import { ChatWorkspace } from '../../lib/chatWorkspace';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { dateLocale } from '../../i18n';
 
@@ -28,24 +29,28 @@ interface MatchChatPanelProps {
     avatarsByUserId?: Record<string, string | undefined>;
     /** Completed matches keep the history visible but hide the composer. */
     readOnly?: boolean;
+    workspace?: ChatWorkspace;
 }
 
 /**
  * Self-contained match chat: history via REST, live updates via the /hubs/chat
  * SignalR group, and a send box. Shared by match cards and match details.
  */
-export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false }: MatchChatPanelProps) {
+export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false, workspace: suppliedWorkspace }: MatchChatPanelProps) {
     const { t } = useTranslation('match');
     const { user } = useAuth();
     const { refreshCounts, scheduleMatchesRefresh } = useBadges();
     const queryClient = useQueryClient();
-    const [newComment, setNewComment] = useState('');
+    const localWorkspace = useMemo(() => new ChatWorkspace(), [matchId]);
+    const workspace = suppliedWorkspace ?? localWorkspace;
+    const work = useSyncExternalStore(workspace.subscribe, workspace.getSnapshot);
+    const newComment = work.draft, setNewComment = workspace.setDraft;
     const inputRef = useRef<TextInput>(null);
     const sendingRef = useRef(false);
     const [isSending, setIsSending] = useState(false);
     const normalizedParticipantIds = participantIds.filter(Boolean).map(id => id!.toLowerCase());
     const conversation = useChatConversation<MatchComment>({
-        id: matchId, kind: 'match', active,
+        id: matchId, kind: 'match', active, workspace,
         map: raw => ({
             id: raw.id ?? raw.Id, userId: raw.userId ?? raw.UserId,
             userNickname: raw.userNickname ?? raw.UserNickname ?? t('common:unknown'),

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { loadStackRouter } from './loadStackRouter.mjs';
 import { loadDirectChatTarget } from './loadStackRouter.mjs';
 
-const { singleCopyStackRouter, isRouteFor, StackRouter, CommonActions, StackActions } = await loadStackRouter();
+const { singleCopyStackRouter, isRouteFor, StackRouter, CommonActions, StackActions, getChatWorkspace, getRouteOpenVersion } = await loadStackRouter();
 const { prepareDirectChatTarget } = await loadDirectChatTarget();
 
 const ROUTES = [
@@ -210,14 +210,18 @@ test('metadata failure still allows the destination to show its load error', asy
     assert.deepEqual(params, {chatId:'c1'});
 });
 
-test('late identity resolution merges copies and preserves the original screen', () => {
+test('late identity resolution keeps the visible chat and both drafts', () => {
     let s = nav(start(), 'DirectChat', {otherUserId:'u1'}, 'home');
     const original = fromTop(s);
     s = nav(s, 'PlayerProfile', {id:'x'}, original);
     s = nav(s, 'DirectChat', {chatId:'c1'});
     const duplicate = fromTop(s);
+    getChatWorkspace(original).setDraft('hidden draft');
+    getChatWorkspace(duplicate).setDraft('visible draft');
     s = act(s, {...CommonActions.setParams({header:{otherUserId:'u1',otherUsername:'u'}}),source:duplicate});
-    assert.equal(fromTop(s), original);
+    assert.equal(fromTop(s), duplicate);
+    assert.equal(getChatWorkspace(duplicate).getSnapshot().draft, 'visible draft');
+    assert.equal(getChatWorkspace(duplicate).getSnapshot().drafts[0].content, 'hidden draft');
     assert.equal(top(s).params.chatId, 'c1');
     assert.deepEqual(stack(s), ['MainTabs','PlayerProfile:x','DirectChat:c1']);
 });
@@ -231,6 +235,19 @@ test('hidden chat reconciliation does not change the focused screen', () => {
     s = act(s, {...CommonActions.setParams({chatId:'c1'}),source:original});
     assert.equal(fromTop(s), focused);
     assert.equal(s.routes.filter(r => r.name === 'DirectChat').length, 1);
+});
+
+test('Back preserves a tournament modal return, whereas explicit navigation to that same route replaces it', () => {
+    let s = nav(start(), 'TournamentDetails', {id:'A'}, 'home');
+    const tournament = fromTop(s), version = getRouteOpenVersion(tournament);
+    s = nav(s, 'PlayerProfile', {id:'x'}, tournament);
+    s = act(s, CommonActions.goBack());
+    assert.equal(fromTop(s),tournament);
+    assert.equal(getRouteOpenVersion(tournament),version);
+    s = nav(s,'PlayerProfile',{id:'x'},tournament);
+    s = nav(s,'TournamentDetails',{id:'A',focusMatchId:'B'});
+    assert.equal(fromTop(s),tournament);
+    assert.notEqual(getRouteOpenVersion(tournament),version);
 });
 
 // Cold start and login: React Navigation writes the tab navigator's state into the root only on

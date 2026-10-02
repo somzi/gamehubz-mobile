@@ -87,6 +87,7 @@ import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
 import { NO_REFRESH_FAILURES, retryFailedRefreshes, withRefreshResult, type RefreshFailures } from '../lib/refreshFailures';
 import { LoadFailedState } from '../components/ui/EmptyState';
 import { afterScreenTransition, useModalHandoff } from '../lib/modalHandoff';
+import { createModalReturn, getRouteOpenVersion } from '../lib/modalReturn';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -480,11 +481,10 @@ export default function TournamentDetailsScreen() {
     // The match modal was opened from a push with only the match id: it holds one loading state
     // until the match and this tournament are both in (see MatchDetailsModal holdUntilReady).
     const [matchFromLink, setMatchFromLink] = useState(false);
-    // Set while a player tap inside the match modal has the viewer on that player's profile: the
-    // modal has to be hidden for the pushed screen to show, and coming back reopens it on this tab.
-    const reopenMatchModalOnFocusRef = useRef<MatchModalTab | null>(null);
-    // The same for the team overview: hidden for a player's profile, back on return.
-    const reopenTeamMatchOnFocusRef = useRef(false);
+    // A covered match returns on Back with its tab and inputs; explicit navigation overrides it.
+    type ReturnModal = { kind: 'match'; id: string; tab: MatchModalTab } | { kind: 'team'; id: string };
+    const [modalReturn] = useState(() => createModalReturn<ReturnModal>());
+    const matchActiveTabRef = useRef<MatchModalTab>('match');
     // What happens after a match modal closes (a profile, the other match modal) waits until it is
     // down, so the two never animate over each other — see lib/modalHandoff.
     const matchModalHandoff = useModalHandoff();
@@ -1116,8 +1116,7 @@ export default function TournamentDetailsScreen() {
         // is presented over the loading page if the tournament is not in yet.
         if (focusMatchId) {
             let cancelled = false;
-            reopenMatchModalOnFocusRef.current = null;
-            reopenTeamMatchOnFocusRef.current = false;
+            modalReturn.clear();
             setSelectedMatch({ id: focusMatchId, canRevert: false, isRoundLocked: false });
             setMatchModalDefaultTab(focusMatchTab === 'match' ? 'match' : 'chat');
             setMatchFromLink(true);
@@ -1139,8 +1138,7 @@ export default function TournamentDetailsScreen() {
         // Fallback: a team-match id with no specific sub-match — open the team overview modal.
         if (focusTeamMatchId) {
             let cancelled = false;
-            reopenMatchModalOnFocusRef.current = null;
-            reopenTeamMatchOnFocusRef.current = false;
+            modalReturn.clear();
             setSelectedTeamMatchId(focusTeamMatchId);
             setReturnToTeamMatchId(null);
             const open = () => {
@@ -1158,6 +1156,8 @@ export default function TournamentDetailsScreen() {
             return () => { cancelled = true; cancel(); };
         }
         if (focusTeamId) {
+            modalReturn.clear();
+            setShowReportModal(false); setShowTeamMatchDetail(false);
             // Land on the Teams → open tab so the team is in context behind the prompt.
             setActiveTab('teams');
             setTeamsTab('open');
@@ -1171,6 +1171,8 @@ export default function TournamentDetailsScreen() {
             return;
         }
         if (openAdminHelp) {
+            modalReturn.clear();
+            setShowReportModal(false); setShowTeamMatchDetail(false);
             setShowAdminHelpModal(true);
             fetchAdminHelpRequests();
             navigation.setParams({ openAdminHelp: undefined });
@@ -2038,48 +2040,56 @@ export default function TournamentDetailsScreen() {
     // hands them back to the team overview it came from. The hand-off still happens, once the
     // reopened modal is genuinely dismissed.
     const handleOpenProfileFromMatch = (userId: string, fromTab: MatchModalTab) => {
-        reopenMatchModalOnFocusRef.current = fromTab;
+        modalReturn.remember({ kind: 'match', id: selectedMatch.id, tab: fromTab }, getRouteOpenVersion(route.key));
         setShowReportModal(false);
         // Only if the viewer is still here: back pressed while the modal was going down cancels it.
         matchModalHandoff.after(() => {
-            if (navigation.isFocused()) navigation.navigate('PlayerProfile', { id: userId });
-            else reopenMatchModalOnFocusRef.current = null;
+            if (navigation.isFocused() && modalReturn.peek(getRouteOpenVersion(route.key))) navigation.navigate('PlayerProfile', { id: userId });
         });
     };
 
     // Same trip from the team overview. It stays mounted while hidden (selectedTeamMatchId is kept),
     // which is also what lets iOS report when it is down.
     const handleOpenProfileFromTeamMatch = (userId: string) => {
-        reopenTeamMatchOnFocusRef.current = true;
+        if (!selectedTeamMatchId) return;
+        modalReturn.remember({ kind: 'team', id: selectedTeamMatchId }, getRouteOpenVersion(route.key));
         setShowTeamMatchDetail(false);
         teamModalHandoff.after(() => {
-            if (navigation.isFocused()) navigation.navigate('PlayerProfile', { id: userId });
-            else reopenTeamMatchOnFocusRef.current = false;
+            if (navigation.isFocused() && modalReturn.peek(getRouteOpenVersion(route.key))) navigation.navigate('PlayerProfile', { id: userId });
         });
     };
 
-    // Back from the profile: the modal returns once the profile has finished sliding away.
-    useFocusEffect(
-        useCallback(() => {
-            const cancel = (reopenMatchModalOnFocusRef.current || reopenTeamMatchOnFocusRef.current) ? afterScreenTransition(() => {
-                const tab = reopenMatchModalOnFocusRef.current;
-                if (tab) {
-                    reopenMatchModalOnFocusRef.current = null;
-                    setMatchModalDefaultTab(tab);
-                    setShowReportModal(true);
-                }
-                if (reopenTeamMatchOnFocusRef.current) {
-                    reopenTeamMatchOnFocusRef.current = false;
-                    setShowTeamMatchDetail(true);
-                }
-            }) : undefined;
-            return () => {
-                cancel?.();
-                setShowReportModal(false);
+    // Read the current modal on blur, including a notification that covered the tournament.
+    const modalViewRef = useRef({ showReportModal, showTeamMatchDetail, selectedMatch, selectedTeamMatchId });
+    modalViewRef.current = { showReportModal, showTeamMatchDetail, selectedMatch, selectedTeamMatchId };
+    const handleModalFocus = useCallback(() => {
+        const version = getRouteOpenVersion(route.key);
+        const cancel = modalReturn.peek(version) ? afterScreenTransition(() => {
+            if (!navigation.isFocused()) return;
+            const pending = modalReturn.take(getRouteOpenVersion(route.key));
+            const view = modalViewRef.current;
+            if (pending?.kind === 'match' && pending.id === view.selectedMatch?.id) {
+                setMatchModalDefaultTab(pending.tab);
                 setShowTeamMatchDetail(false);
-            };
-        }, [])
-    );
+                setShowReportModal(true);
+            } else if (pending?.kind === 'team' && pending.id === view.selectedTeamMatchId) {
+                setShowReportModal(false);
+                setShowTeamMatchDetail(true);
+            }
+        }) : undefined;
+        return () => {
+            cancel?.();
+            const view = modalViewRef.current;
+            if (view.showReportModal && view.selectedMatch?.id) {
+                modalReturn.remember({ kind: 'match', id: view.selectedMatch.id, tab: matchActiveTabRef.current }, getRouteOpenVersion(route.key));
+            } else if (view.showTeamMatchDetail && view.selectedTeamMatchId) {
+                modalReturn.remember({ kind: 'team', id: view.selectedTeamMatchId }, getRouteOpenVersion(route.key));
+            }
+            setShowReportModal(false);
+            setShowTeamMatchDetail(false);
+        };
+    }, [route.key, modalReturn, navigation]);
+    useFocusEffect(handleModalFocus);
 
     useEffect(() => {
         if (activeTab === 'bracket') {
@@ -2704,6 +2714,7 @@ export default function TournamentDetailsScreen() {
             holdUntilReady={matchFromLink}
             contextReady={!!tournament || !!error}
             onClose={() => {
+                modalReturn.clear();
                 setShowReportModal(false);
                 setMatchFromLink(false);
                 // If this game was opened from a team match, drop back onto the team overview.
@@ -2756,6 +2767,7 @@ export default function TournamentDetailsScreen() {
             requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
             tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
             defaultTab={matchModalDefaultTab}
+            onTabChange={tab => { matchActiveTabRef.current = tab; }}
             onOpenProfile={handleOpenProfileFromMatch}
             onMatchUpdate={(freshStructure?: any) => {
                 // Backend now returns the refreshed bracket structure inline on
@@ -2791,7 +2803,7 @@ export default function TournamentDetailsScreen() {
     const teamMatchModal = selectedTeamMatchId ? (
         <TeamMatchDetailModal
             visible={showTeamMatchDetail}
-            onClose={() => { setShowTeamMatchDetail(false); setSelectedTeamMatchId(null); }}
+            onClose={() => { modalReturn.clear(); setShowTeamMatchDetail(false); setSelectedTeamMatchId(null); }}
             onDismiss={teamModalHandoff.onDismiss}
             onOpenProfile={handleOpenProfileFromTeamMatch}
             matchId={selectedTeamMatchId}
