@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
@@ -48,7 +48,8 @@ export default function ProfileScreen() {
     const [hasMoreMatches, setHasMoreMatches] = useState(true);
     const [isLoadingMoreMatches, setIsLoadingMoreMatches] = useState(false);
 
-    const [isLoadingData, setIsLoadingData] = useState(false);
+    // When the stats last loaded — the focus refetch below skips anything fresher than 30s.
+    const statsLoadedAtRef = useRef(0);
     const [error, setError] = useState<string | null>(null);
     const [shareCardVisible, setShareCardVisible] = useState(false);
 
@@ -63,27 +64,23 @@ export default function ProfileScreen() {
         [navigation],
     );
 
+    // Stats only. The tournament / match lists keep their pages: resetting the cursors here while the
+    // rows stayed on screen made the next "load more" fetch page 0 again and append it a second time.
     const fetchDetailedData = useCallback(async () => {
         if (!user?.id) return;
-        setIsLoadingData(true);
         setError(null);
-        setTournamentsPage(0);
-        setHasMoreTournaments(true);
-        setMatchesPage(0);
-        setHasMoreMatches(true);
         try {
             const statsRes = await authenticatedFetch(ENDPOINTS.GET_PLAYER_STATS(user.id));
 
             if (statsRes.ok) {
                 const statsData = await statsRes.json();
                 setPlayerMatches(normalizePlayerMatches(statsData.result || statsData));
+                statsLoadedAtRef.current = Date.now();
             }
 
         } catch (error: any) {
             console.error('Error fetching profile detailed data:', error);
             setError(t('refreshStatsFailed'));
-        } finally {
-            setIsLoadingData(false);
         }
     }, [user?.id]);
 
@@ -156,12 +153,14 @@ export default function ProfileScreen() {
     // would drop the user's scroll position and re-fetch page 0 every time they hop
     // between bottom tabs. Explicit pull-to-refresh (if added) should call fetchDetailedData
     // + reset separately.
+    // Same 30s rule as the other tabs (useRefetchOnFocusIfStale): hopping between tabs used to
+    // refetch the user and the stats on every single visit.
     useFocusEffect(
         useCallback(() => {
-            if (user?.id) {
-                refreshUser();
-                fetchDetailedData();
-            }
+            if (!user?.id) return;
+            if (Date.now() - statsLoadedAtRef.current < 30_000) return;
+            refreshUser();
+            fetchDetailedData();
         }, [user?.id, refreshUser, fetchDetailedData])
     );
 

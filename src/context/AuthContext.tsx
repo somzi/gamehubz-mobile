@@ -33,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (typeof newUser === 'function') {
             _setUser(prev => {
                 const val = (newUser as (prev: User | null) => User | null)(prev);
+                if (val === prev) return prev;
                 console.log(`[AuthContext] setUser (functional) - New User: ${val?.username}, Auth: ${!!val}`);
                 if (val) SecureStore.setItemAsync('user_meta', JSON.stringify(val)).catch(() => { });
                 else SecureStore.deleteItemAsync('user_meta').catch(() => { });
@@ -269,7 +270,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (response.ok) {
                 const userInfo = await response.json();
                 const apiInfo = userInfo.result || userInfo;
-                setUser(normalizeUser(apiInfo));
+                const next = normalizeUser(apiInfo);
+                // Runs on every Profile focus and nearly always answers with what we already hold. A
+                // new object anyway re-rendered every useAuth consumer and rewrote the keystore.
+                setUser(prev => (prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
             }
         } catch (error) {
             console.error('Refresh user error:', error);

@@ -128,11 +128,19 @@ export default function HubsScreen() {
         { enabled: !!user?.id },
     );
 
-    const onRefresh = useCallback(() => {
-        // Invalidate every ['hubs', ...] entry so both joined and discovery caches
-        // refetch cleanly. Cheap on device because only the currently-mounted key
-        // has active observers and will actually fire.
-        queryClient.invalidateQueries({ queryKey: ['hubs'] });
+    // The spinner follows the pull only. Bound to isRefetching it also flipped on the focus refetch,
+    // and on iOS a flip while this tab is hidden leaves a blank band above the list.
+    const [isPulling, setIsPulling] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsPulling(true);
+        try {
+            // Invalidate every ['hubs', ...] entry so both joined and discovery caches
+            // refetch cleanly. Cheap on device because only the currently-mounted key
+            // has active observers and will actually fire.
+            await queryClient.invalidateQueries({ queryKey: ['hubs'] });
+        } finally {
+            setIsPulling(false);
+        }
     }, [queryClient]);
 
     const loadMoreHubs = useCallback(() => {
@@ -316,9 +324,7 @@ export default function HubsScreen() {
                     renderItem={renderHubItem}
                     contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
                     refreshControl={
-                        // isRefetching (not isFetching) so a background paginate doesn't
-                        // spin the pull-to-refresh indicator — that would flicker on scroll.
-                        <RefreshControl refreshing={hubsQuery.isRefetching} onRefresh={onRefresh} tintColor="#818CF8" />
+                        <RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor="#818CF8" />
                     }
                     onEndReached={loadMoreHubs}
                     onEndReachedThreshold={0.5}

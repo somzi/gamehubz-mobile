@@ -116,8 +116,16 @@ export default function TournamentsScreen() {
         { enabled: !!user?.id },
     );
 
-    const onRefresh = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+    // The spinner follows the pull only. Bound to isRefetching it also flipped on the focus refetch,
+    // and on iOS a flip while this tab is hidden leaves a blank band above the list.
+    const [isPulling, setIsPulling] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsPulling(true);
+        try {
+            await queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+        } finally {
+            setIsPulling(false);
+        }
     }, [queryClient]);
 
     const loadMore = useCallback(() => {
@@ -262,9 +270,7 @@ export default function TournamentsScreen() {
                     renderItem={renderTournament}
                     contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
                     refreshControl={
-                        // isRefetching (not isFetching) so a background paginate doesn't
-                        // spin the pull-to-refresh indicator on scroll.
-                        <RefreshControl refreshing={tournamentsQuery.isRefetching} onRefresh={onRefresh} tintColor="#818CF8" />
+                        <RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor="#818CF8" />
                     }
                     onEndReached={loadMore}
                     onEndReachedThreshold={0.5}

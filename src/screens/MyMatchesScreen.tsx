@@ -1,107 +1,51 @@
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { MatchScheduleCard } from '../components/match/MatchScheduleCard';
+import { MatchCardSkeleton } from '../components/match/MatchCardSkeleton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
-import { authenticatedFetch, ENDPOINTS } from '../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { useHomeMatches, type MatchOverviewDto } from '../lib/homeMatches';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 import { parseUtcDate } from '../lib/utils';
 import { dateLocale } from '../i18n';
 
-interface MatchOverviewDto {
-    id: string;
-    tournamentId: string;
-    tournamentName: string;
-    hubName: string;
-    scheduledTime: string | null;
-    roundDeadline?: string | null;
-    opponentName: string;
-    opponentAvatarUrl?: string;
-    status: number;
-    isRoundLocked?: boolean;
-    unreadMessages?: number;
-    /** Games this match is played over — 1 (or absent) is a plain single game. */
-    bestOf?: number;
-    /**
-     * Ready check, shaped for the card and built ONCE in the normalizer. The card is memoized on
-     * its props, so a fresh object literal in the JSX would re-render every card on every parent
-     * render — this way the identity is as stable as the match row it came from.
-     */
-    checkIn?: {
-        enabled: boolean;
-        graceMinutes: number | null;
-        isHome: boolean | null;
-        homeCheckedInOn: string | null;
-        awayCheckedInOn: string | null;
-        checkInOpensAt: string | null;
-        checkInDeadline: string | null;
-    };
-}
+const EMPTY_MATCHES: MatchOverviewDto[] = [];
 
 export default function MyMatchesScreen() {
     const { t } = useTranslation('match');
-    const navigation = useNavigation();
     const { user } = useAuth();
-    const [matches, setMatches] = useState<MatchOverviewDto[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'scheduled'>('all');
 
-    // useCallback so the identity is stable: it is handed to every MatchScheduleCard as
-    // onMatchUpdate, and the card is memoized — a fresh function here would invalidate every
-    // row on every render and undo the memo entirely.
-    const fetchMatches = useCallback(async () => {
-        if (!user?.id) return;
-        setLoading(true);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_USER_HOME_MATCHES(user.id));
-            if (response.ok) {
-                const data: any[] = await response.json();
-                const normalizedData: MatchOverviewDto[] = data.map(m => ({
-                    id: m.id || m.Id,
-                    tournamentId: m.tournamentId || m.TournamentId,
-                    tournamentName: m.tournamentName || m.TournamentName,
-                    hubName: m.hubName || m.HubName,
-                    scheduledTime: m.scheduledTime || m.ScheduledTime || null,
-                    // Read by the card's deadline strip below — dropping it here is what made
-                    // every match read "no round deadline" regardless of what the API returned.
-                    roundDeadline: m.roundDeadline ?? m.RoundDeadline ?? null,
-                    opponentName: m.opponentName || m.OpponentName,
-                    opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
-                    status: m.status !== undefined ? m.status : m.Status,
-                    isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
-                    unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
-                    bestOf: m.bestOf ?? m.BestOf ?? 1,
-                    // Ready check — the card face renders the countdown and the button from this.
-                    checkIn: {
-                        enabled: m.requireMatchCheckIn ?? m.RequireMatchCheckIn ?? false,
-                        graceMinutes: m.checkInGraceMinutes ?? m.CheckInGraceMinutes ?? null,
-                        isHome: m.isHome ?? m.IsHome ?? null,
-                        homeCheckedInOn: m.homeCheckedInOn ?? m.HomeCheckedInOn ?? null,
-                        awayCheckedInOn: m.awayCheckedInOn ?? m.AwayCheckedInOn ?? null,
-                        checkInOpensAt: m.checkInOpensAt ?? m.CheckInOpensAt ?? null,
-                        checkInDeadline: m.checkInDeadline ?? m.CheckInDeadline ?? null,
-                    },
-                }));
-                // Optionally filter them out completely if the user expects them gone from here too.
-                // The user explicitly requested filtering in "Home panel", but keeping them here with locks is better UI.
-                setMatches(normalizedData);
-            }
-        } catch (error) {
-            console.error('Error fetching matches:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [user?.id]);
+    // The list Home shows, from the same query: "See all" opens on the cards Home already holds
+    // and refetches underneath once they are older than 30s.
+    const matchesQuery = useHomeMatches(user?.id);
+    const matches = matchesQuery.data ?? EMPTY_MATCHES;
 
-    useEffect(() => {
-        fetchMatches();
-    }, [fetchMatches]);
+    // Stable: it is handed to every MatchScheduleCard as onMatchUpdate, and the card is memoized —
+    // a fresh function here would invalidate every row on every render and undo the memo entirely.
+    // Invalidating the shared key refreshes Home's cards as well.
+    const refreshMatches = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+    }, [queryClient]);
+
+    // The spinner follows the pull only — a background refetch (a card's own update) must not
+    // drop the list down by the control's height on iOS.
+    const [isPulling, setIsPulling] = useState(false);
+    const onRefresh = useCallback(async () => {
+        setIsPulling(true);
+        try {
+            await queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+        } finally {
+            setIsPulling(false);
+        }
+    }, [queryClient]);
 
     const filteredMatches = matches.filter(m => {
         if (activeTab === 'all') return true;
@@ -143,16 +87,22 @@ export default function MyMatchesScreen() {
                 // press: every chat message needed two taps on Send. 'handled' lets the tap reach
                 // its target, exactly like the friends DM list.
                 keyboardShouldPersistTaps="handled"
-                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchMatches} tintColor={COLORS.primary} />}
+                refreshControl={<RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor={COLORS.primary} />}
                 contentContainerStyle={{ paddingBottom: 40 }}
             >
                 <View className="gap-3">
-                    {filteredMatches.length > 0 ? (
+                    {matchesQuery.isPending ? (
+                        <>
+                            <MatchCardSkeleton />
+                            <MatchCardSkeleton />
+                            <MatchCardSkeleton />
+                        </>
+                    ) : filteredMatches.length > 0 ? (
                         filteredMatches.map((match) => (
                             <MatchScheduleCard
-                                key={match.id}
-                                matchId={match.id}
-                                tournamentId={match.tournamentId}
+                                key={match.id || match.matchId}
+                                matchId={match.id || match.matchId || ''}
+                                tournamentId={match.tournamentId || ''}
                                 tournamentName={match.tournamentName}
                                 roundName={match.hubName}
                                 opponentName={match.opponentName}
@@ -163,7 +113,7 @@ export default function MyMatchesScreen() {
                                 scheduledTime={match.scheduledTime ? parseUtcDate(match.scheduledTime).toLocaleString(dateLocale()) : undefined}
                                 scheduledTimeIso={match.scheduledTime}
                                 deadline={match.roundDeadline ?? undefined}
-                                onMatchUpdate={fetchMatches}
+                                onMatchUpdate={refreshMatches}
                                 isRoundLocked={match.isRoundLocked}
                                 unreadMessages={match.unreadMessages}
                                 bestOf={match.bestOf}

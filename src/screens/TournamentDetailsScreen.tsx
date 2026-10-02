@@ -81,6 +81,7 @@ import { JoinByCodeModal } from '../components/modals/JoinByCodeModal';
 import { formatJoinCode } from '../lib/share';
 import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
 import { isPlatformAdminToken } from '../lib/platformRole';
+import { Skeleton } from '../components/ui/Skeleton';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -195,6 +196,71 @@ const pickDefaultStageIndex = (stages: any[]): number => {
     return lastWithContent;
 };
 
+/**
+ * What a tournament looked like the last time it was open in this app session: the overview, the
+ * roster and the teams. Opening it again paints this at once instead of a loading screen, and the
+ * focus fetch swaps the fresh data in underneath. Memory only — after a cold start a copy from
+ * yesterday could show a tournament that has moved on, so the first open waits for the server.
+ */
+type TournamentSnapshot = {
+    tournament?: any;
+    participants?: any[];
+    teams?: TeamDto[];
+    userTeam?: TeamDto | null;
+};
+const SNAPSHOT_LIMIT = 20;
+const snapshots = new Map<string, TournamentSnapshot>();
+// Per viewer: the overview carries their registration and their right to manage it.
+const snapshotKey = (userId: string | undefined, tournamentId: string | undefined) =>
+    `${userId ?? ''}:${tournamentId ?? ''}`.toLowerCase();
+
+function rememberSnapshot(userId: string | undefined, tournamentId: string | undefined, patch: TournamentSnapshot) {
+    if (!userId || !tournamentId) return;
+    const key = snapshotKey(userId, tournamentId);
+    const next = { ...snapshots.get(key), ...patch };
+    // Re-inserted so the Map's order is least recently used first.
+    snapshots.delete(key);
+    snapshots.set(key, next);
+    if (snapshots.size > SNAPSHOT_LIMIT) {
+        const oldest = snapshots.keys().next().value;
+        if (oldest !== undefined) snapshots.delete(oldest);
+    }
+}
+
+// First open of a tournament: the page's shape, so the content lands in place instead of
+// replacing a loading screen.
+function TournamentDetailsSkeleton() {
+    return (
+        <View>
+            <View
+                className="mx-4 mt-3"
+                style={{
+                    borderRadius: 26,
+                    padding: 18,
+                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.06)',
+                }}
+            >
+                <View className="flex-row" style={{ gap: 6 }}>
+                    <Skeleton width={86} height={24} radius={12} />
+                    <Skeleton width={64} height={24} radius={12} />
+                </View>
+                <Skeleton width="78%" height={26} radius={8} style={{ marginTop: 14 }} />
+                <Skeleton width="42%" height={13} radius={6} style={{ marginTop: 12 }} />
+                <Skeleton width="34%" height={13} radius={6} style={{ marginTop: 9 }} />
+            </View>
+            <View className="px-5 mt-4 mb-4">
+                <Skeleton height={46} radius={16} />
+            </View>
+            <View className="px-4" style={{ gap: 10 }}>
+                <Skeleton height={88} radius={20} />
+                <Skeleton height={150} radius={20} />
+            </View>
+        </View>
+    );
+}
+
 export default function TournamentDetailsScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const { t } = useTranslation('tournament');
@@ -202,6 +268,9 @@ export default function TournamentDetailsScreen() {
     const { t: tTeam } = useTranslation('team');
     const route = useRoute<TournamentDetailsRouteProp>();
     const { id } = route.params;
+    const { user, token } = useAuth();
+    // Opened earlier in this session: paint from the snapshot, refresh underneath.
+    const [snapshot] = useState(() => snapshots.get(snapshotKey(user?.id, id)));
     // A private tournament's join code, when the player arrived holding one — through the
     // organiser's invite link (`?code=`) or the join-with-code sheet. It rides along with the
     // registration; without it a private tournament asks for the code before signing anyone up.
@@ -238,10 +307,14 @@ export default function TournamentDetailsScreen() {
     // Filters whichever Players sub-tab is open. Both lists arrive whole, so it stays local.
     const [playerSearch, setPlayerSearch] = useState('');
     const [openTeams, setOpenTeams] = useState<TeamDto[]>([]);
-    const [isLoadingOpenTeams, setIsLoadingOpenTeams] = useState(false);
-    const [tournament, setTournament] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    // The *Loaded flags say a list has been fetched once. Only before that does a list show its
+    // spinner; a later refresh keeps the rows on screen while it runs.
+    const [openTeamsLoaded, setOpenTeamsLoaded] = useState(false);
+    const [tournament, setTournament] = useState<any>(snapshot?.tournament ?? null);
+    const [isLoading, setIsLoading] = useState(!snapshot?.tournament);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    // Open / close registration in flight: spins its own button, the page stays.
+    const [isTogglingRegistration, setIsTogglingRegistration] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [stages, setStages] = useState<any[]>([]);
     // Tournament-wide series settings from the structure payload. Drives the "Default (BoN)" chip in
@@ -256,16 +329,18 @@ export default function TournamentDetailsScreen() {
     const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
     const [loadingBracket, setLoadingBracket] = useState(false);
     const [bracketError, setBracketError] = useState<string | null>(null);
+    // Until the first structure response the bracket tab has nothing to say yet, not "no bracket".
+    const [bracketLoaded, setBracketLoaded] = useState(false);
     const [isThirdPlaceExpanded, setIsThirdPlaceExpanded] = useState(false);
 
-    const { user, token } = useAuth();
     // Swapping knockout seeds is platform-admin only: tournament staff live with the automatic draw.
     const isPlatformAdmin = useMemo(() => isPlatformAdminToken(token), [token]);
     const [isRegistering, setIsRegistering] = useState(false);
-    const [participants, setParticipants] = useState<any[]>([]);
-    const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
+    const [participants, setParticipants] = useState<any[]>(snapshot?.participants ?? []);
+    const [participantsLoaded, setParticipantsLoaded] = useState(!!snapshot?.participants);
     const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
     const [isLoadingPending, setIsLoadingPending] = useState(false);
+    const [pendingLoaded, setPendingLoaded] = useState(false);
 
     // The confirmed row keeps the seed it was served with: that number is the entrant's position
     // in the list the backend ordered, not a row counter, so filtering must not renumber it.
@@ -316,7 +391,11 @@ export default function TournamentDetailsScreen() {
     const [showStartConfirm, setShowStartConfirm] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
     const [selectedMatch, setSelectedMatch] = useState<any>(null);
-    const [isUserRegistered, setIsUserRegistered] = useState(false);
+    // Seeded the way fetchTournamentDetails sets it, so a snapshot paint shows the right button.
+    const [isUserRegistered, setIsUserRegistered] = useState(() => {
+        const status = snapshot?.tournament?.status;
+        return (status === 0 || status === 1) && !!snapshot?.tournament?.hasUserRegistered;
+    });
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [statusModalConfig, setStatusModalConfig] = useState<{
         type: 'success' | 'error' | 'info';
@@ -385,9 +464,10 @@ export default function TournamentDetailsScreen() {
 
     // Team tournament states
     const [showTeamRegistration, setShowTeamRegistration] = useState(false);
-    const [tournamentTeams, setTournamentTeams] = useState<TeamDto[]>([]);
-    const [isLoadingTeams, setIsLoadingTeams] = useState(false);
-    const [userTeam, setUserTeam] = useState<TeamDto | null>(null);
+    const [tournamentTeams, setTournamentTeams] = useState<TeamDto[]>(snapshot?.teams ?? []);
+    // Doubles as "do we know the viewer's team yet": the register button waits for it.
+    const [teamsLoaded, setTeamsLoaded] = useState(!!snapshot?.teams);
+    const [userTeam, setUserTeam] = useState<TeamDto | null>(snapshot?.userTeam ?? null);
     const [showTeamMatchDetail, setShowTeamMatchDetail] = useState(false);
     const [selectedTeamMatchId, setSelectedTeamMatchId] = useState<string | null>(null);
     // When a single game is opened from the team overview, remember the parent team match so
@@ -434,7 +514,9 @@ export default function TournamentDetailsScreen() {
                 message: t('details.registeredSuccess')
             });
             setShowStatusModal(true);
-            fetchTournamentDetails(); // Refresh details
+            fetchTournamentDetails(true); // Refresh details
+            // The roster decides "joined" vs "pending approval" under the cover.
+            fetchParticipants();
         } catch (err: any) {
             setStatusModalConfig({
                 type: 'error',
@@ -677,6 +759,7 @@ export default function TournamentDetailsScreen() {
             };
 
             setTournament(normalizedTournament);
+            rememberSnapshot(user?.id, id, { tournament: normalizedTournament });
 
             // Fold the registration flag from the v3 overview so the Join / Registered button
             // renders correctly without a follow-up call. Only relevant while registration is
@@ -751,6 +834,7 @@ export default function TournamentDetailsScreen() {
             if (!silent) setBracketError(t('details.bracketLoadFailed'));
         } finally {
             if (!silent) setLoadingBracket(false);
+            setBracketLoaded(true);
         }
     };
 
@@ -1107,7 +1191,7 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
             fetchBracket(); // Refresh the bracket view
-            fetchTournamentDetails(); // Refresh details to update status if needed
+            fetchTournamentDetails(true); // Refresh details to update status if needed
         } catch (err: any) {
             console.error('Create bracket error:', err);
             // The picker stays open on failure so a rejected plan can be corrected in place.
@@ -1140,7 +1224,7 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
             fetchBracket();
-            fetchTournamentDetails();
+            fetchTournamentDetails(true);
         } catch (err: any) {
             setStatusModalConfig({ type: 'error', title: tCommon('error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
@@ -1165,7 +1249,7 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
             fetchBracket();
-            fetchTournamentDetails();
+            fetchTournamentDetails(true);
         } catch (err: any) {
             setStatusModalConfig({ type: 'error', title: tCommon('error'), message: getErrorMessage(err) });
             setShowStatusModal(true);
@@ -1248,7 +1332,7 @@ export default function TournamentDetailsScreen() {
 
     const handleCloseRegistration = async () => {
         if (!id) return;
-        setIsLoading(true); // Reuse main loading or add specific one
+        setIsTogglingRegistration(true);
         try {
             const url = ENDPOINTS.CLOSE_REGISTRATION(id);
             const response = await authenticatedFetch(url, {
@@ -1266,7 +1350,7 @@ export default function TournamentDetailsScreen() {
                 message: t('details.registrationClosed')
             });
             setShowStatusModal(true);
-            fetchTournamentDetails(); // Refresh details
+            fetchTournamentDetails(true); // Refresh details
         } catch (err: any) {
             console.error('Close registration error:', err);
             setStatusModalConfig({
@@ -1276,13 +1360,13 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
         } finally {
-            setIsLoading(false);
+            setIsTogglingRegistration(false);
         }
     };
 
     const handleOpenRegistration = async () => {
         if (!id) return;
-        setIsLoading(true); // Reuse main loading or add specific one
+        setIsTogglingRegistration(true);
         try {
             const url = ENDPOINTS.OPEN_REGISTRATION(id);
             const response = await authenticatedFetch(url, {
@@ -1300,7 +1384,7 @@ export default function TournamentDetailsScreen() {
                 message: t('details.registrationOpened')
             });
             setShowStatusModal(true);
-            fetchTournamentDetails(); // Refresh details
+            fetchTournamentDetails(true); // Refresh details
         } catch (err: any) {
             console.error('Open registration error:', err);
             setStatusModalConfig({
@@ -1310,7 +1394,7 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
         } finally {
-            setIsLoading(false);
+            setIsTogglingRegistration(false);
         }
     };
 
@@ -1327,12 +1411,12 @@ export default function TournamentDetailsScreen() {
             console.error('Pending registrations fetch error:', err);
         } finally {
             setIsLoadingPending(false);
+            setPendingLoaded(true);
         }
     };
 
     const fetchParticipants = async () => {
         if (!id) return;
-        setIsLoadingParticipants(true);
         try {
             const url = ENDPOINTS.GET_TOURNAMENT_PARTICIPANTS(id);
             const response = await authenticatedFetch(url);
@@ -1352,10 +1436,11 @@ export default function TournamentDetailsScreen() {
                 })
                 : list;
             setParticipants(deduped);
+            if (Array.isArray(deduped)) rememberSnapshot(user?.id, id, { participants: deduped });
         } catch (err) {
             console.error('Participants fetch error:', err);
         } finally {
-            setIsLoadingParticipants(false);
+            setParticipantsLoaded(true);
         }
     };
 
@@ -1383,7 +1468,7 @@ export default function TournamentDetailsScreen() {
             setShowStatusModal(true);
             fetchPendingRegistrations();
             fetchParticipants(); // Refresh participants list
-            fetchTournamentDetails();
+            fetchTournamentDetails(true);
         } catch (err: any) {
             console.error('[Approve] Error:', err);
             setStatusModalConfig({
@@ -1420,7 +1505,7 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
             fetchParticipants(); // Refresh list
-            fetchTournamentDetails(); // Update participant count
+            fetchTournamentDetails(true); // Update participant count
         } catch (err: any) {
             console.error('[RemoveParticipant] Error:', err);
             setStatusModalConfig({
@@ -1523,7 +1608,7 @@ export default function TournamentDetailsScreen() {
             setShowStatusModal(true);
             fetchPendingRegistrations();
             fetchParticipants();
-            fetchTournamentDetails();
+            fetchTournamentDetails(true);
         } catch (err: any) {
             console.error('[ApproveAll] Error:', err);
             setStatusModalConfig({
@@ -1583,7 +1668,6 @@ export default function TournamentDetailsScreen() {
         if (!id || !selectedRoundForDeadline) return;
 
         setShowDeadlineModal(false);
-        setIsLoading(true);
 
         try {
             const payload = {
@@ -1656,17 +1740,16 @@ export default function TournamentDetailsScreen() {
             });
             setShowStatusModal(true);
         } finally {
-            setIsLoading(false);
             setSelectedRoundForDeadline(null);
         }
     };
 
     const fetchTournamentTeams = async (tournamentId: string) => {
-        setIsLoadingTeams(true);
         try {
             // Populate confirmed list
             const finalTeams = await getTournamentTeams(tournamentId);
             setTournamentTeams(finalTeams);
+            rememberSnapshot(user?.id, tournamentId, { teams: finalTeams });
 
             // Find user's team from all teams (including pending) like before
             if (user?.id) {
@@ -1676,6 +1759,7 @@ export default function TournamentDetailsScreen() {
                         teamRow.members && teamRow.members.some(m => (m.userId || m.UserId)?.toLowerCase() === user.id.toLowerCase())
                     );
                     setUserTeam(myTeam || null);
+                    rememberSnapshot(user.id, tournamentId, { userTeam: myTeam || null });
                 } catch (checkErr) {
                     console.error('Error verifying user team status:', checkErr);
                 }
@@ -1683,7 +1767,7 @@ export default function TournamentDetailsScreen() {
         } catch (err) {
             console.error('Error fetching tournament teams:', err);
         } finally {
-            setIsLoadingTeams(false);
+            setTeamsLoaded(true);
         }
     };
 
@@ -1727,7 +1811,7 @@ export default function TournamentDetailsScreen() {
                             // The optimistic filter above already removed the row; the authoritative
                             // reload comes from fetchTournamentDetails, which refetches the teams for
                             // a team tournament itself. Calling both raced two identical requests.
-                            fetchTournamentDetails();
+                            fetchTournamentDetails(true);
                         } catch (err: any) {
                             setStatusModalConfig({
                                 type: 'error',
@@ -1858,14 +1942,13 @@ export default function TournamentDetailsScreen() {
 
     const fetchOpenTeams = async () => {
         if (!id) return;
-        setIsLoadingOpenTeams(true);
         try {
             const data = await getTeamsToJoin(id);
             setOpenTeams(data);
         } catch (err) {
             console.error('Fetch open teams error:', err);
         } finally {
-            setIsLoadingOpenTeams(false);
+            setOpenTeamsLoaded(true);
         }
     };
 
@@ -2155,6 +2238,26 @@ export default function TournamentDetailsScreen() {
     }, [stages, selectedStageIndex, tournament]);
 
     const renderStages = () => {
+        // Not fetched yet, or the fetch failed: neither means there is no bracket, and the empty
+        // state below offered an organiser "Create bracket" over one that already exists.
+        if (stages.length === 0 && (!bracketLoaded || loadingBracket)) {
+            return (
+                <View className="py-20 items-center justify-center">
+                    <ActivityIndicator size="small" color="#10B981" />
+                </View>
+            );
+        }
+        if (stages.length === 0 && bracketError) {
+            return (
+                <View className="py-20 items-center justify-center px-6">
+                    <Ionicons name="cloud-offline-outline" size={44} color="#71717A" />
+                    <Text className="text-muted-foreground mt-4 text-center">{bracketError}</Text>
+                    <Button className="mt-6" onPress={() => fetchBracket()} loading={loadingBracket}>
+                        {t('common:retry')}
+                    </Button>
+                </View>
+            );
+        }
         if (stages.length === 0) {
             const isCreator = canManage;
             const isRegClosed = tournament?.status === 2;
@@ -2434,9 +2537,8 @@ export default function TournamentDetailsScreen() {
         return (
             <SafeAreaView className="flex-1 bg-background">
                 <PageHeader title={t('details.headerTournament')} showBack />
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#10B981" />
-                    <Text className="text-muted-foreground mt-4">{t('details.loadingTournament')}</Text>
+                <View accessibilityLabel={t('details.loadingTournament')} accessibilityRole="progressbar">
+                    <TournamentDetailsSkeleton />
                 </View>
             </SafeAreaView>
         );
@@ -2449,7 +2551,7 @@ export default function TournamentDetailsScreen() {
                 <View className="flex-1 items-center justify-center px-6">
                     <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
                     <Text className="text-destructive mt-4 text-center font-medium">{error || t('details.tournamentNotFound')}</Text>
-                    <Button onPress={fetchTournamentDetails} className="mt-6">{t('common:retry')}</Button>
+                    <Button onPress={() => fetchTournamentDetails()} className="mt-6">{t('common:retry')}</Button>
                 </View>
             </SafeAreaView>
         );
@@ -2544,7 +2646,7 @@ export default function TournamentDetailsScreen() {
                         // Surface a "restricted" note (instead of a join button) when the user
                         // would otherwise be able to join but isn't eligible by region/country.
                         const wouldJoin = !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull
-                            && (!tournament.isTeamTournament ? true : (!userTeam && !isLoadingTeams));
+                            && (!tournament.isTeamTournament ? true : (!userTeam && teamsLoaded));
 
                         if (wouldJoin && !isEligible) {
                             buttons.push(
@@ -2555,7 +2657,9 @@ export default function TournamentDetailsScreen() {
                                     </Text>
                                 </View>
                             );
-                        } else if (!isParticipant && isUserRegistered && isOpenOrUpcoming && !tournament.isTeamTournament) {
+                        } else if (participantsLoaded && !isParticipant && isUserRegistered && isOpenOrUpcoming && !tournament.isTeamTournament) {
+                            // HasUserRegistered is also true for a confirmed player, so this waits for the
+                            // roster: before it lands, every confirmed player saw "pending" flash.
                             buttons.push(
                                 <View key="pending-approval" className="w-full bg-[#1A1607] border border-amber-500/20 rounded-2xl p-4 flex-row items-center gap-3">
                                     <View className="w-9 h-9 rounded-xl bg-amber-500/10 items-center justify-center">
@@ -2572,8 +2676,8 @@ export default function TournamentDetailsScreen() {
                                 </View>
                             );
                         } else if (tournament.isTeamTournament) {
-                            // Show nothing while teams are still loading (prevents flash of register button)
-                            if (isLoadingTeams) {
+                            // Show nothing until the viewer's team is known (prevents flash of register button)
+                            if (!teamsLoaded) {
                                 // render nothing — button appears smoothly once data resolves
                             } else if (!userTeam && !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull && isEligible) {
                                 buttons.push(
@@ -2847,7 +2951,7 @@ export default function TournamentDetailsScreen() {
                                         <Button
                                             className="w-full bg-destructive"
                                             onPress={handleCloseRegistration}
-                                            loading={isLoading}
+                                            loading={isTogglingRegistration}
                                         >
                                             {t('details.closeRegistration')}
                                         </Button>
@@ -2861,14 +2965,14 @@ export default function TournamentDetailsScreen() {
                                         <Button
                                             className="w-full bg-primary"
                                             onPress={handleOpenRegistration}
-                                            loading={isLoading}
+                                            loading={isTogglingRegistration}
                                         >
                                             {tournament?.status === 2 ? t('details.openRegistration') : t('details.openRegistrationNow')}
                                         </Button>
                                     )}
 
                                 {/* My Team — an action, so it comes before the facts */}
-                                {tournament.isTeamTournament && !isLoadingTeams && userTeam && (
+                                {tournament.isTeamTournament && userTeam && (
                                     <Pressable
                                         onPress={() => navigation.navigate('TeamDashboard', { teamId: userTeam.teamId, tournamentId: id, teamSize: tournament?.teamSize, tournamentStatus: tournament?.status })}
                                         accessibilityRole="button"
@@ -2981,7 +3085,7 @@ export default function TournamentDetailsScreen() {
 
                             {/* Confirmed Teams — one panel, a row per team; tapping a row opens its roster */}
                             {teamsTab === 'confirmed' && (
-                                isLoadingTeams ? (
+                                !teamsLoaded ? (
                                     <ActivityIndicator size="small" color="#00E5A0" />
                                 ) : tournamentTeams.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
@@ -3052,7 +3156,7 @@ export default function TournamentDetailsScreen() {
 
                             {/* Open Teams */}
                             {teamsTab === 'open' && tournament?.status < 3 && (
-                                isLoadingOpenTeams ? (
+                                !openTeamsLoaded ? (
                                     <ActivityIndicator size="small" color="#3B82F6" />
                                 ) : openTeams.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center mt-2">
@@ -3137,7 +3241,7 @@ export default function TournamentDetailsScreen() {
                                             </View>
                                         )}
 
-                                        {isLoadingPending ? (
+                                        {!pendingLoaded ? (
                                             <ActivityIndicator size="small" color="#F59E0B" />
                                         ) : teamRequests.length === 0 ? (
                                             <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
@@ -3257,7 +3361,7 @@ export default function TournamentDetailsScreen() {
 
                             {/* Confirmed Players */}
                             {playersTab === 'confirmed' && (
-                                isLoadingParticipants ? (
+                                !participantsLoaded ? (
                                     <ActivityIndicator size="small" color="#3B82F6" />
                                 ) : participants.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
@@ -3320,7 +3424,7 @@ export default function TournamentDetailsScreen() {
                                             </Button>
                                         </View>
                                     )}
-                                    {isLoadingPending ? (
+                                    {!pendingLoaded ? (
                                         <ActivityIndicator size="small" color="#F59E0B" />
                                     ) : pendingRegistrations.length === 0 ? (
                                         <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">

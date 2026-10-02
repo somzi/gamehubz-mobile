@@ -10,6 +10,7 @@ import MyMatchesScreen from '../screens/MyMatchesScreen';
 import DirectChatScreen from '../screens/DirectChatScreen';
 import TeamRedirectScreen from '../screens/TeamRedirectScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import { singleCopyStackRouter } from './stackRouter';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -44,6 +45,8 @@ export function RootNavigator() {
 
     return (
         <Stack.Navigator
+            // One copy of each screen: a navigate to a screen already in the stack goes back to it.
+            UNSTABLE_router={singleCopyStackRouter}
             screenOptions={{
                 headerShown: false, // We use our own PageHeader
                 // A pushed screen leaves the one below it mounted: open a match modal from

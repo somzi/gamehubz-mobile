@@ -19,8 +19,10 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { NotificationBell } from '../components/ui/NotificationBell';
 import { RaisedCard } from '../components/ui/RaisedCard';
 import { Skeleton } from '../components/ui/Skeleton';
+import { MatchCardSkeleton } from '../components/match/MatchCardSkeleton';
 import { COLORS } from '../lib/theme';
 import { DashboardActivityDto } from '../types/dashboard';
+import { useHomeMatches, type MatchOverviewDto } from '../lib/homeMatches';
 import { HighlightsModal } from '../components/modals/HighlightsModal';
 import { parseUtcDate, formatLocalDateTime } from '../lib/utils';
 import { dateLocale } from '../i18n';
@@ -31,39 +33,6 @@ type HomeScreenNavigationProp = CompositeNavigationProp<
     BottomTabNavigationProp<MainTabParamList, 'Home'>,
     StackNavigationProp<RootStackParamList>
 >;
-
-interface MatchOverviewDto {
-    id?: string;
-    matchId?: string;
-    tournamentId?: string;
-    tournamentName: string;
-    hubName: string;
-    scheduledTime: string | null;
-    roundDeadline?: string | null;
-    opponentName: string;
-    opponentAvatarUrl?: string;
-    opponentNickname?: string;
-    userNickname?: string;
-    status: number;
-    isRoundLocked?: boolean;
-    unreadMessages?: number;
-    /** Games this match is played over — 1 (or absent) is a plain single game. */
-    bestOf?: number;
-    /**
-     * Ready check, shaped for the card and built ONCE in the normalizer. The card is memoized on
-     * its props, so a fresh object literal in the JSX would re-render every card on every parent
-     * render — this way the identity is as stable as the match row it came from.
-     */
-    checkIn?: {
-        enabled: boolean;
-        graceMinutes: number | null;
-        isHome: boolean | null;
-        homeCheckedInOn: string | null;
-        awayCheckedInOn: string | null;
-        checkInOpensAt: string | null;
-        checkInDeadline: string | null;
-    };
-}
 
 const SECTION_GAP = 28;
 
@@ -116,49 +85,7 @@ export default function HomeScreen() {
         setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const homeMatchesQuery = useQuery<MatchOverviewDto[]>({
-        queryKey: ['home-matches', user?.id],
-        queryFn: async () => {
-            const response = await authenticatedFetch(ENDPOINTS.GET_USER_HOME_MATCHES(user!.id));
-            if (!response.ok) throw new Error(`GET_USER_HOME_MATCHES failed: ${response.status}`);
-            const data: any[] = await response.json();
-            return data.map((m) => ({
-                id: m.id || m.Id,
-                matchId: m.matchId || m.MatchId,
-                tournamentId: m.tournamentId || m.TournamentId,
-                tournamentName: m.tournamentName || m.TournamentName,
-                hubName: m.hubName || m.HubName,
-                scheduledTime: m.scheduledTime || m.ScheduledTime || null,
-                // Both of these are read by the cards below (deadline strip, Bo label) and were
-                // being dropped here, so every card rendered "no round deadline" no matter what
-                // the round actually had — the API has been sending it all along.
-                roundDeadline: m.roundDeadline ?? m.RoundDeadline ?? null,
-                bestOf: m.bestOf ?? m.BestOf ?? 1,
-                // Ready check — the card face renders the countdown and the button from this.
-                checkIn: {
-                    enabled: m.requireMatchCheckIn ?? m.RequireMatchCheckIn ?? false,
-                    graceMinutes: m.checkInGraceMinutes ?? m.CheckInGraceMinutes ?? null,
-                    isHome: m.isHome ?? m.IsHome ?? null,
-                    homeCheckedInOn: m.homeCheckedInOn ?? m.HomeCheckedInOn ?? null,
-                    awayCheckedInOn: m.awayCheckedInOn ?? m.AwayCheckedInOn ?? null,
-                    checkInOpensAt: m.checkInOpensAt ?? m.CheckInOpensAt ?? null,
-                    checkInDeadline: m.checkInDeadline ?? m.CheckInDeadline ?? null,
-                },
-                opponentName: m.opponentName || m.OpponentName,
-                opponentAvatarUrl: m.opponentAvatarUrl || m.OpponentAvatarUrl,
-                opponentNickname: m.opponentNickname || m.OpponentNickname,
-                userNickname: m.userNickname || m.UserNickname,
-                status: m.status !== undefined ? m.status : m.Status,
-                isRoundLocked: m.isRoundLocked !== undefined ? m.isRoundLocked : m.IsRoundLocked,
-                unreadMessages: m.unreadMessages !== undefined ? m.unreadMessages : m.UnreadMessages,
-            }));
-        },
-        enabled: !!user?.id,
-        staleTime: 30_000,
-        // Respect staleTime — 'always' would ignore it and re-hit the API on
-        // every remount, defeating the tab-swap-is-instant win we just bought.
-        refetchOnMount: true,
-    });
+    const homeMatchesQuery = useHomeMatches(user?.id);
 
     const hubActivitiesQuery = useQuery<DashboardActivityDto[]>({
         queryKey: ['hub-activities'],
@@ -576,28 +503,6 @@ function SectionHeader({
 
 // Placeholders in the shape of the cards, so a cold start shows cards arriving instead of
 // flashing "No active matches" / "No highlights yet" before the first response lands.
-function MatchCardSkeleton() {
-    return (
-        <RaisedCard>
-            <View style={{ paddingLeft: 16, paddingRight: 14, paddingVertical: 12 }}>
-                <View className="flex-row items-center gap-3">
-                    <Skeleton width="36%" height={10} radius={5} />
-                    <View className="flex-1" />
-                    <Skeleton width="28%" height={10} radius={5} />
-                </View>
-                <View className="flex-row items-center gap-3" style={{ marginTop: 11 }}>
-                    <Skeleton width={45} height={45} radius={23} />
-                    <View className="flex-1" style={{ gap: 8 }}>
-                        <Skeleton width="64%" height={14} radius={7} />
-                        <Skeleton width="42%" height={10} radius={5} />
-                    </View>
-                    <Skeleton width={68} height={44} radius={12} />
-                </View>
-            </View>
-        </RaisedCard>
-    );
-}
-
 function FeedCardSkeleton() {
     return (
         <RaisedCard>
