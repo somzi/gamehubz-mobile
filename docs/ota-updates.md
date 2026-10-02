@@ -3,11 +3,15 @@
 Za JS/asset quick fix ostavi `expo.version` u `app.json` na verziji instaliranog
 build-a (trenutno `3.1.0`). `runtimeVersion.policy` ostaje `appVersion`.
 
-Objavljuj kroz novu komandu:
+U Windows PowerShell-u objavljuj kroz `npm.cmd`:
 
-```sh
-npm run update:ota -- --channel production --message "Ispravka prikaza rezultata"
+```powershell
+npm.cmd run update:ota -- --channel production --message "Ispravka prikaza rezultata"
 ```
+
+`npm` u nekim PowerShell/npm verzijama pokrece `npm.ps1`, koji proguta `--`
+separator i opcije. Ako vidis `Unexpected argument 'production'`, koristi
+`npm.cmd` kao iznad. Na macOS/Linux koristi `npm` umesto `npm.cmd`.
 
 Komanda rezervise sledeci broj iz `ota-revisions.json`, izvozi sveze bundle-ove
 i pokrece EAS Update. Prva objava je `3.1.0-r1`, sledeca `3.1.0-r2`, itd.
@@ -16,8 +20,8 @@ Android i iOS iz iste objave dobijaju istu reviziju.
 
 Za pregled sledece oznake bez izmene fajlova ili objave:
 
-```sh
-npm run update:ota -- --channel production --message "Provera" --dry-run
+```powershell
+npm.cmd run update:ota -- --channel production --message "Provera" --dry-run
 ```
 
 - Podrzani kanali: `production`, `preview`, `development`. EAS environment po
@@ -59,7 +63,7 @@ sacuvani za eventualne ispravke starijih verzija.
 `X-App-Version` i provera minimalne podrzane verzije koriste osnovnu verziju
 bez `-rN` sufiksa. Native izmene i dalje zahtevaju novi kompatibilan build.
 
-Provere: `npm run test:ota` i `npx tsc --noEmit`.
+Provere u PowerShell-u: `npm.cmd run test:ota` i `npx.cmd tsc --noEmit`.
 
 Expo reference: [runtime verzije](https://docs.expo.dev/eas-update/runtime-versions/)
 i [Expo config iz aktivnog manifesta](https://docs.expo.dev/versions/v54.0.0/sdk/constants/#expoconfig).
