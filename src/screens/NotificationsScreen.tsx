@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '../components/layout/PageHeader';
@@ -145,7 +145,10 @@ export default function NotificationsScreen() {
         [data, todayLabel, yesterdayLabel],
     );
 
-    const handlePress = useCallback((item: NotificationItem) => {
+    const openRequest = React.useRef(0);
+    useFocusEffect(useCallback(() => () => { openRequest.current += 1; }, []));
+    const handlePress = useCallback(async (item: NotificationItem) => {
+        const request = ++openRequest.current;
         // Read first, optimistically — the navigation below never waits on the request.
         if (!item.readOn) markRead(item.id);
 
@@ -157,7 +160,9 @@ export default function NotificationsScreen() {
 
         // The same router a push tap uses. A notification that outlived its target (a deleted
         // tournament, a hub the user left) lands on that screen's own not-found state.
-        const destination = routeFromNotification(navigation, item.data);
+        const destination = await routeFromNotification(navigation, item.data,
+            () => request === openRequest.current && navigation.isFocused());
+        if (request !== openRequest.current || !navigation.isFocused()) return;
         if (!destination) {
             // No payload, or nothing this build knows how to open. The tap has already marked the row
             // read; saying so beats a row that silently ignores the finger.

@@ -10,7 +10,8 @@ import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useHomeMatches, type MatchOverviewDto } from '../lib/homeMatches';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailedState } from '../components/ui/EmptyState';
+import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
 import { COLORS } from '../lib/theme';
 import { parseUtcDate } from '../lib/utils';
 import { dateLocale } from '../i18n';
@@ -91,12 +92,17 @@ export default function MyMatchesScreen() {
                 contentContainerStyle={{ paddingBottom: 40 }}
             >
                 <View className="gap-3">
+                    {matchesQuery.isError && matches.length > 0 && (
+                        <RefreshFailedBanner onRetry={refreshMatches} retrying={matchesQuery.isFetching} />
+                    )}
                     {matchesQuery.isPending ? (
                         <>
                             <MatchCardSkeleton />
                             <MatchCardSkeleton />
                             <MatchCardSkeleton />
                         </>
+                    ) : matchesQuery.isError && matches.length === 0 ? (
+                        <LoadFailedState onRetry={refreshMatches} retrying={matchesQuery.isFetching} />
                     ) : filteredMatches.length > 0 ? (
                         filteredMatches.map((match) => (
                             <MatchScheduleCard

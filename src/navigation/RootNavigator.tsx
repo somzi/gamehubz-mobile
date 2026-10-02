@@ -11,6 +11,7 @@ import DirectChatScreen from '../screens/DirectChatScreen';
 import TeamRedirectScreen from '../screens/TeamRedirectScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import { singleCopyStackRouter } from './stackRouter';
+import { noteStackTransitionEnd, noteStackTransitionStart, resetStackTransitions } from './stackTransitions';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -33,8 +34,18 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import { HelpCenterScreen, AboutUsScreen, ContactUsScreen } from '../screens/SupportScreens';
 import { View, ActivityIndicator } from 'react-native';
 
+const STACK_TRANSITION_LISTENERS = {
+    transitionStart: noteStackTransitionStart,
+    transitionEnd: noteStackTransitionEnd,
+};
+
 export function RootNavigator() {
     const { isAuthenticated, isLoading, user } = useAuth();
+
+    React.useEffect(() => {
+        resetStackTransitions();
+        return resetStackTransitions;
+    }, [isAuthenticated]);
 
     React.useEffect(() => {
         console.log("[RootNavigator] Mounted");
@@ -47,6 +58,8 @@ export function RootNavigator() {
         <Stack.Navigator
             // One copy of each screen: a navigate to a screen already in the stack goes back to it.
             UNSTABLE_router={singleCopyStackRouter}
+            // Feeds afterStackTransition: a modal reopened on return waits for the pop to finish.
+            screenListeners={STACK_TRANSITION_LISTENERS}
             screenOptions={{
                 headerShown: false, // We use our own PageHeader
                 // A pushed screen leaves the one below it mounted: open a match modal from

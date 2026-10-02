@@ -23,6 +23,8 @@ import { ForceUpdateGate } from './src/components/ForceUpdateGate';
 // Shared with the notification inbox, so a row opens exactly the screen its push tap would.
 import { externalLinkFromNotification, routeFromNotification } from './src/lib/notificationRouting';
 import { RootStackParamList } from './src/types/navigation';
+import { isRouteFor } from './src/navigation/stackRouter';
+import { describeRoute, logNavigation } from './src/lib/navigationLog';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Linking } from 'react-native';
@@ -190,7 +192,7 @@ function NotificationRouter({
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const attempt = () => {
+    const attempt = async () => {
       if (cancelled) return;
 
       const nav = navigationRef.current;
@@ -199,7 +201,8 @@ function NotificationRouter({
       // `routeNames` only lists MainTabs once the logged-in screen set is mounted — until
       // then every deep-link target is an unknown route and the action would be discarded.
       if (rootState?.routeNames?.includes('MainTabs')) {
-        const target = routeFromNotification(nav!, data);
+        const target = await routeFromNotification(nav!, data, () => !cancelled);
+        if (cancelled) return;
 
         // Nothing routable in the payload — treat it as handled so we stop retrying. Worth a
         // warn: on Android expo-notifications can synthesise a response out of raw launch
@@ -212,9 +215,11 @@ function NotificationRouter({
         }
 
         // navigate() commits synchronously, so the new top-level route is readable right
-        // away. Anything else means the action was swallowed mid screen-set swap.
+        // away. Anything else means the action was swallowed mid screen-set swap. The subject is
+        // compared too: tournament A on screen does not mean the push for tournament B landed.
         const state = nav!.getRootState();
-        if (state?.routes?.[state.index]?.name === target) {
+        if (isRouteFor(state?.routes?.[state.index], target.name, target.params)) {
+          logNavigation('push tap opened', describeRoute(target.name, target.params as Record<string, any>));
           handledRef.current = reqId;
           return;
         }
@@ -222,6 +227,7 @@ function NotificationRouter({
 
       if (Date.now() - startedAt > DEEP_LINK_RETRY_TIMEOUT) {
         console.warn('[NotificationRouter] could not route notification', reqId, data);
+        logNavigation('push tap not opened', reqId);
         return;
       }
 
@@ -237,6 +243,20 @@ function NotificationRouter({
   }, [lastResponse, isAuthenticated, navReady, navigationRef, markRead]);
 
   return null;
+}
+
+// The screen in focus after every navigation, nested down to the tab: "MainTabs / Home",
+// "TournamentDetails:3fa85f64". Feeds the navigation log (see navigationLog.ts).
+type LoggedState = { index?: number; routes: { name: string; params?: object; state?: LoggedState }[] };
+function logFocusedRoute(state: LoggedState | undefined) {
+  const path: string[] = [];
+  let level = state;
+  while (level?.routes?.length) {
+    const route = level.routes[level.index ?? level.routes.length - 1];
+    path.push(describeRoute(route.name, route.params as Record<string, any>));
+    level = route.state;
+  }
+  if (path.length) logNavigation('focus', path.join(' / '));
 }
 
 // Applies OTA updates when restarting the app is free — see useOtaUpdates for the reasoning.
@@ -283,6 +303,7 @@ export default function App() {
                       ref={navigationRef}
                       linking={linking}
                       onReady={() => setNavReady(true)}
+                      onStateChange={logFocusedRoute}
                     >
                       <RootNavigator />
                     </NavigationContainer>

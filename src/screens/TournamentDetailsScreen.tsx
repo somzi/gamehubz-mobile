@@ -1,3 +1,4 @@
+import { useRequestGate } from '../hooks/useRequestGate';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Pressable, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -82,6 +83,9 @@ import { formatJoinCode } from '../lib/share';
 import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
 import { isPlatformAdminToken } from '../lib/platformRole';
 import { Skeleton } from '../components/ui/Skeleton';
+import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
+import { LoadFailedState } from '../components/ui/EmptyState';
+import { afterScreenTransition, useModalHandoff } from '../lib/modalHandoff';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -268,6 +272,7 @@ export default function TournamentDetailsScreen() {
     const { t: tTeam } = useTranslation('team');
     const route = useRoute<TournamentDetailsRouteProp>();
     const { id } = route.params;
+    const requests = useRequestGate(id);
     const { user, token } = useAuth();
     // Opened earlier in this session: paint from the snapshot, refresh underneath.
     const [snapshot] = useState(() => snapshots.get(snapshotKey(user?.id, id)));
@@ -310,9 +315,21 @@ export default function TournamentDetailsScreen() {
     // The *Loaded flags say a list has been fetched once. Only before that does a list show its
     // spinner; a later refresh keeps the rows on screen while it runs.
     const [openTeamsLoaded, setOpenTeamsLoaded] = useState(false);
+    // The last load of a list failed. With no rows to show, that list says so (and retries)
+    // instead of reading "nobody registered yet".
+    const [openTeamsError, setOpenTeamsError] = useState(false);
     const [tournament, setTournament] = useState<any>(snapshot?.tournament ?? null);
     const [isLoading, setIsLoading] = useState(!snapshot?.tournament);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    // A background refresh failed while the page was showing: it stays, with a banner on top.
+    const [refreshFailed, setRefreshFailed] = useState(false);
+    // The banner's own retry spinner: driving the pull-to-refresh flag instead would drop the page
+    // by the control's height on iOS without a pull.
+    const [isRetryingRefresh, setIsRetryingRefresh] = useState(false);
+    // The fetchers outlive the render that made them (the focus effect keeps the first one), so they
+    // read "is something on screen" from here rather than from a stale closure.
+    const tournamentRef = useRef(tournament);
+    tournamentRef.current = tournament;
     // Open / close registration in flight: spins its own button, the page stays.
     const [isTogglingRegistration, setIsTogglingRegistration] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -338,9 +355,11 @@ export default function TournamentDetailsScreen() {
     const [isRegistering, setIsRegistering] = useState(false);
     const [participants, setParticipants] = useState<any[]>(snapshot?.participants ?? []);
     const [participantsLoaded, setParticipantsLoaded] = useState(!!snapshot?.participants);
+    const [participantsError, setParticipantsError] = useState(false);
     const [pendingRegistrations, setPendingRegistrations] = useState<any[]>([]);
     const [isLoadingPending, setIsLoadingPending] = useState(false);
     const [pendingLoaded, setPendingLoaded] = useState(false);
+    const [pendingError, setPendingError] = useState(false);
 
     // The confirmed row keeps the seed it was served with: that number is the entrant's position
     // in the list the backend ordered, not a row counter, so filtering must not renumber it.
@@ -454,9 +473,19 @@ export default function TournamentDetailsScreen() {
     // enters via the help-requests inbox, set to the tab it was left on when it reopens after a
     // player's profile, and reset to 'match' for every other entry.
     const [matchModalDefaultTab, setMatchModalDefaultTab] = useState<MatchModalTab>('match');
+    // The match modal was opened from a push with only the match id: it holds one loading state
+    // until the match and this tournament are both in (see MatchDetailsModal holdUntilReady).
+    const [matchFromLink, setMatchFromLink] = useState(false);
     // Set while a player tap inside the match modal has the viewer on that player's profile: the
     // modal has to be hidden for the pushed screen to show, and coming back reopens it on this tab.
     const reopenMatchModalOnFocusRef = useRef<MatchModalTab | null>(null);
+    // The same for the team overview: hidden for a player's profile, back on return.
+    const reopenTeamMatchOnFocusRef = useRef(false);
+    // What happens after a match modal closes (a profile, the other match modal) waits until it is
+    // down, so the two never animate over each other — see lib/modalHandoff.
+    const matchModalHandoff = useModalHandoff();
+    const teamModalHandoff = useModalHandoff();
+    const joinPromptHandoff = useModalHandoff();
 
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
@@ -467,6 +496,7 @@ export default function TournamentDetailsScreen() {
     const [tournamentTeams, setTournamentTeams] = useState<TeamDto[]>(snapshot?.teams ?? []);
     // Doubles as "do we know the viewer's team yet": the register button waits for it.
     const [teamsLoaded, setTeamsLoaded] = useState(!!snapshot?.teams);
+    const [teamsError, setTeamsError] = useState(false);
     const [userTeam, setUserTeam] = useState<TeamDto | null>(snapshot?.userTeam ?? null);
     const [showTeamMatchDetail, setShowTeamMatchDetail] = useState(false);
     const [selectedTeamMatchId, setSelectedTeamMatchId] = useState<string | null>(null);
@@ -688,6 +718,7 @@ export default function TournamentDetailsScreen() {
     };
 
     const fetchTournamentDetails = async (silent = false) => {
+        const isCurrent = requests.begin('fetchTournamentDetails');
         if (!id) return;
         if (!silent) setIsLoading(true);
         setError(null);
@@ -695,6 +726,7 @@ export default function TournamentDetailsScreen() {
             // v3 = v2 + HasUserRegistered (folds the CHECK_REGISTRATION round-trip inline).
             const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V3(id);
             const response = await authenticatedFetch(url);
+            if (!isCurrent()) return;
             if (!response.ok) {
                 // A 404 here is the normal end of a tournament's life, not a failure: this screen is
                 // where push notifications, share links and the notification inbox all land, and any
@@ -705,6 +737,7 @@ export default function TournamentDetailsScreen() {
                     : t('details.fetchTournamentFailed', { status: response.status }));
             }
             const data = await response.json();
+            if (!isCurrent()) return;
             const rawData = data.result || data;
 
             // Normalize tournament data to use camelCase consistently
@@ -759,6 +792,7 @@ export default function TournamentDetailsScreen() {
             };
 
             setTournament(normalizedTournament);
+            setRefreshFailed(false);
             rememberSnapshot(user?.id, id, { tournament: normalizedTournament });
 
             // Fold the registration flag from the v3 overview so the Join / Registered button
@@ -774,9 +808,14 @@ export default function TournamentDetailsScreen() {
                 await fetchTournamentTeams(id);
             }
         } catch (err: any) {
+            if (!isCurrent()) return;
             console.error('Tournament fetch error:', err);
-            setError(getErrorMessage(err));
+            // Only a load with nothing on screen becomes the error page. A refresh that fails over
+            // a loaded tournament (focus, pull, after an action) used to replace it with that page.
+            if (silent && tournamentRef.current) setRefreshFailed(true);
+            else setError(getErrorMessage(err));
         } finally {
+            if (!isCurrent()) return;
             setIsLoading(false);
         }
     };
@@ -785,6 +824,7 @@ export default function TournamentDetailsScreen() {
     // used by the focus refetch and pull-to-refresh, where blanking to a spinner (or to an error
     // screen over a transient blip) would be worse than briefly showing slightly stale cards.
     const fetchBracket = async (silent = false) => {
+        const isCurrent = requests.begin('fetchBracket');
         if (!id) return;
         if (!silent) {
             setLoadingBracket(true);
@@ -794,10 +834,12 @@ export default function TournamentDetailsScreen() {
             const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE_V3(id);
             console.log('Fetching bracket from:', url);
             const response = await authenticatedFetch(url);
+            if (!isCurrent()) return;
             if (!response.ok) {
                 throw new Error(t('details.fetchBracketFailed', { status: response.status }));
             }
             const data = await response.json();
+            if (!isCurrent()) return;
             const nextStages = data.stages || [];
             setStages(nextStages);
             setTournamentBestOf(normalizeBestOf(data.bestOf ?? data.BestOf));
@@ -830,21 +872,26 @@ export default function TournamentDetailsScreen() {
             // bracket UI can render the right submit / approve flow per match without an extra fetch.
             setBracketRequireResultApproval(data.requireResultApproval ?? data.RequireResultApproval ?? false);
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Bracket fetch error:', err);
             if (!silent) setBracketError(t('details.bracketLoadFailed'));
         } finally {
+            if (!isCurrent()) return;
             if (!silent) setLoadingBracket(false);
             setBracketLoaded(true);
         }
     };
 
     const fetchAdminHelpRequests = async () => {
+        const isCurrent = requests.begin('fetchAdminHelpRequests');
         if (!id) return;
         setIsLoadingAdminHelp(true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_ADMIN_HELP_REQUESTS(id));
+            if (!isCurrent()) return;
             if (!response.ok) return;
             const data = await response.json();
+            if (!isCurrent()) return;
             const normalized: AdminHelpRequestItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
                 matchId: it.matchId || it.MatchId,
                 teamMatchId: it.teamMatchId ?? it.TeamMatchId ?? null,
@@ -866,19 +913,24 @@ export default function TournamentDetailsScreen() {
             }));
             setAdminHelpRequests(normalized);
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Admin help requests fetch error:', err);
         } finally {
+            if (!isCurrent()) return;
             setIsLoadingAdminHelp(false);
         }
     };
 
     const fetchPendingApprovals = async () => {
+        const isCurrent = requests.begin('fetchPendingApprovals');
         if (!id || !canManage || !requiresApproval) return;
         setIsLoadingApprovals(true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_PENDING_APPROVALS(id));
+            if (!isCurrent()) return;
             if (!response.ok) return;
             const data = await response.json();
+            if (!isCurrent()) return;
             const normalized: PendingApprovalItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
                 matchId: it.matchId || it.MatchId,
                 roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
@@ -905,8 +957,10 @@ export default function TournamentDetailsScreen() {
             // reconnect attempts) — leaving a stale count that this fetch proves wrong.
             refreshBadges();
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Pending approvals fetch error:', err);
         } finally {
+            if (!isCurrent()) return;
             setIsLoadingApprovals(false);
         }
     };
@@ -1019,7 +1073,7 @@ export default function TournamentDetailsScreen() {
 
         setReturnToTeamMatchId(selectedTeamMatchId);
         setShowTeamMatchDetail(false);
-        setSelectedMatch({
+        const game = {
             id: sub.matchId,
             status: numericStatus,
             roundName: t('details.teamMatch'),
@@ -1031,33 +1085,69 @@ export default function TournamentDetailsScreen() {
                 : null,
             canRevert: isDone && isPlayerOfSub && !approvalRequired,
             isRoundLocked: false,
+        };
+        // The game's page comes up once the team overview is down.
+        teamModalHandoff.after(() => {
+            if (!navigation.isFocused()) return;
+            setSelectedMatch(game);
+            setMatchModalDefaultTab(tab);
+            setShowReportModal(true);
         });
-        setMatchModalDefaultTab(tab);
-        setShowReportModal(true);
     };
 
     // Deep links. Push notifications land here with openAdminHelp / focusMatchId;
     // a shared /team/{id} link lands here with focusTeamId. We act once, then clear
     // the params so the action doesn't replay on the next render/focus.
     const { openAdminHelp, focusMatchId, focusTeamMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval } = route.params;
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
         // Match deep links (incl. team-tournament sub-matches): open the solo match modal on
         // the requested tab. The push carries the sub-match id in focusMatchId; the modal
         // resolves the pairing & score out of the parent team-match DTO, so chat/stream/result
         // all work here — unlike the team modal, which has neither chat nor a help-resolve action.
+        // The modal comes up once this screen has finished sliding in (not over the push), and it
+        // is presented over the loading page if the tournament is not in yet.
         if (focusMatchId) {
+            let cancelled = false;
+            reopenMatchModalOnFocusRef.current = null;
+            reopenTeamMatchOnFocusRef.current = false;
             setSelectedMatch({ id: focusMatchId, canRevert: false, isRoundLocked: false });
             setMatchModalDefaultTab(focusMatchTab === 'match' ? 'match' : 'chat');
-            setShowReportModal(true);
-            navigation.setParams({ focusMatchId: undefined, focusTeamMatchId: undefined, focusMatchTab: undefined });
-            return;
+            setMatchFromLink(true);
+            setReturnToTeamMatchId(null);
+            const open = () => {
+                if (cancelled || !navigation.isFocused()) return;
+                setShowReportModal(true);
+                navigation.setParams({ focusMatchId: undefined, focusTeamMatchId: undefined, focusMatchTab: undefined });
+            };
+            const cancel = afterScreenTransition(() => {
+                if (cancelled || !navigation.isFocused()) return;
+                if (showTeamMatchDetail) {
+                    setShowTeamMatchDetail(false);
+                    teamModalHandoff.after(open);
+                } else open();
+            });
+            return () => { cancelled = true; cancel(); };
         }
         // Fallback: a team-match id with no specific sub-match — open the team overview modal.
         if (focusTeamMatchId) {
+            let cancelled = false;
+            reopenMatchModalOnFocusRef.current = null;
+            reopenTeamMatchOnFocusRef.current = false;
             setSelectedTeamMatchId(focusTeamMatchId);
-            setShowTeamMatchDetail(true);
-            navigation.setParams({ focusTeamMatchId: undefined, focusMatchTab: undefined });
-            return;
+            setReturnToTeamMatchId(null);
+            const open = () => {
+                if (cancelled || !navigation.isFocused()) return;
+                setShowTeamMatchDetail(true);
+                navigation.setParams({ focusTeamMatchId: undefined, focusMatchTab: undefined });
+            };
+            const cancel = afterScreenTransition(() => {
+                if (cancelled || !navigation.isFocused()) return;
+                if (showReportModal) {
+                    setShowReportModal(false);
+                    matchModalHandoff.after(open);
+                } else open();
+            });
+            return () => { cancelled = true; cancel(); };
         }
         if (focusTeamId) {
             // Land on the Teams → open tab so the team is in context behind the prompt.
@@ -1078,7 +1168,7 @@ export default function TournamentDetailsScreen() {
             navigation.setParams({ openAdminHelp: undefined });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [openAdminHelp, focusMatchId, focusTeamMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval]);
+    }, [openAdminHelp, focusMatchId, focusTeamMatchId, focusMatchTab, focusTeamId, focusTeamName, focusTeamRequiresApproval]));
 
     // Confirm → reuse the existing join/request flow, then close the prompt.
     const handleJoinPromptConfirm = async () => {
@@ -1089,7 +1179,9 @@ export default function TournamentDetailsScreen() {
             // animated out — iOS drops a Modal presented while another one is still dismissing,
             // which would leave the player with nothing on screen after tapping Join.
             setJoinPrompt(null);
-            setTimeout(() => setPendingPrivateTeamJoin({ teamId, requiresApproval }), 400);
+            joinPromptHandoff.after(() => {
+                if (navigation.isFocused()) setPendingPrivateTeamJoin({ teamId, requiresApproval });
+            });
             return;
         }
         await handleJoinTeam(teamId, requiresApproval);
@@ -1107,22 +1199,28 @@ export default function TournamentDetailsScreen() {
     };
 
     const fetchDrawOptions = async () => {
+        const isCurrent = requests.begin('fetchDrawOptions');
         if (!id) return;
         setIsLoadingDrawOptions(true);
         setDrawOptionsError(null);
         try {
             const response = await authenticatedFetch(ENDPOINTS.BRACKET_DRAW_OPTIONS(id));
+            if (!isCurrent()) return;
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No response body');
+            if (!isCurrent()) return;
                 throw new Error(text);
             }
             const data = await response.json();
+            if (!isCurrent()) return;
             setDrawOptions(data?.result || data);
         } catch (err: any) {
+            if (!isCurrent()) return;
             console.error('Draw options fetch error:', err);
             setDrawOptions(null);
             setDrawOptionsError(getErrorMessage(err));
         } finally {
+            if (!isCurrent()) return;
             setIsLoadingDrawOptions(false);
         }
     };
@@ -1399,29 +1497,39 @@ export default function TournamentDetailsScreen() {
     };
 
     const fetchPendingRegistrations = async () => {
+        const isCurrent = requests.begin('fetchPendingRegistrations');
         if (!id) return;
         setIsLoadingPending(true);
         try {
             const url = ENDPOINTS.GET_PENDING_REGISTRATIONS(id);
             const response = await authenticatedFetch(url);
+            if (!isCurrent()) return;
             if (!response.ok) throw new Error(t('details.fetchPendingFailed'));
             const data = await response.json();
+            if (!isCurrent()) return;
             setPendingRegistrations(data.result || data || []);
+            setPendingError(false);
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Pending registrations fetch error:', err);
+            setPendingError(true);
         } finally {
+            if (!isCurrent()) return;
             setIsLoadingPending(false);
             setPendingLoaded(true);
         }
     };
 
     const fetchParticipants = async () => {
+        const isCurrent = requests.begin('fetchParticipants');
         if (!id) return;
         try {
             const url = ENDPOINTS.GET_TOURNAMENT_PARTICIPANTS(id);
             const response = await authenticatedFetch(url);
+            if (!isCurrent()) return;
             if (!response.ok) throw new Error(t('details.fetchParticipantsFailed'));
             const data = await response.json();
+            if (!isCurrent()) return;
             const list = data.result || data || [];
             // Guard against duplicate participant rows for the same user (legacy data). The list
             // is keyed by user id, so duplicates would crash rendering with duplicate React keys.
@@ -1436,10 +1544,14 @@ export default function TournamentDetailsScreen() {
                 })
                 : list;
             setParticipants(deduped);
+            setParticipantsError(false);
             if (Array.isArray(deduped)) rememberSnapshot(user?.id, id, { participants: deduped });
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Participants fetch error:', err);
+            setParticipantsError(true);
         } finally {
+            if (!isCurrent()) return;
             setParticipantsLoaded(true);
         }
     };
@@ -1745,28 +1857,36 @@ export default function TournamentDetailsScreen() {
     };
 
     const fetchTournamentTeams = async (tournamentId: string) => {
+        const isCurrent = requests.begin('fetchTournamentTeams');
         try {
             // Populate confirmed list
             const finalTeams = await getTournamentTeams(tournamentId);
+            if (!isCurrent()) return;
             setTournamentTeams(finalTeams);
+            setTeamsError(false);
             rememberSnapshot(user?.id, tournamentId, { teams: finalTeams });
 
             // Find user's team from all teams (including pending) like before
             if (user?.id) {
                 try {
                     const allTeams = await getPendingTournamentTeams(tournamentId);
+            if (!isCurrent()) return;
                     const myTeam = allTeams.find(teamRow =>
                         teamRow.members && teamRow.members.some(m => (m.userId || m.UserId)?.toLowerCase() === user.id.toLowerCase())
                     );
                     setUserTeam(myTeam || null);
                     rememberSnapshot(user.id, tournamentId, { userTeam: myTeam || null });
                 } catch (checkErr) {
+            if (!isCurrent()) return;
                     console.error('Error verifying user team status:', checkErr);
                 }
             }
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Error fetching tournament teams:', err);
+            setTeamsError(true);
         } finally {
+            if (!isCurrent()) return;
             setTeamsLoaded(true);
         }
     };
@@ -1912,16 +2032,44 @@ export default function TournamentDetailsScreen() {
     const handleOpenProfileFromMatch = (userId: string, fromTab: MatchModalTab) => {
         reopenMatchModalOnFocusRef.current = fromTab;
         setShowReportModal(false);
-        navigation.navigate('PlayerProfile', { id: userId });
+        // Only if the viewer is still here: back pressed while the modal was going down cancels it.
+        matchModalHandoff.after(() => {
+            if (navigation.isFocused()) navigation.navigate('PlayerProfile', { id: userId });
+            else reopenMatchModalOnFocusRef.current = null;
+        });
     };
 
+    // Same trip from the team overview. It stays mounted while hidden (selectedTeamMatchId is kept),
+    // which is also what lets iOS report when it is down.
+    const handleOpenProfileFromTeamMatch = (userId: string) => {
+        reopenTeamMatchOnFocusRef.current = true;
+        setShowTeamMatchDetail(false);
+        teamModalHandoff.after(() => {
+            if (navigation.isFocused()) navigation.navigate('PlayerProfile', { id: userId });
+            else reopenTeamMatchOnFocusRef.current = false;
+        });
+    };
+
+    // Back from the profile: the modal returns once the profile has finished sliding away.
     useFocusEffect(
         useCallback(() => {
-            const tab = reopenMatchModalOnFocusRef.current;
-            if (!tab) return;
-            reopenMatchModalOnFocusRef.current = null;
-            setMatchModalDefaultTab(tab);
-            setShowReportModal(true);
+            const cancel = (reopenMatchModalOnFocusRef.current || reopenTeamMatchOnFocusRef.current) ? afterScreenTransition(() => {
+                const tab = reopenMatchModalOnFocusRef.current;
+                if (tab) {
+                    reopenMatchModalOnFocusRef.current = null;
+                    setMatchModalDefaultTab(tab);
+                    setShowReportModal(true);
+                }
+                if (reopenTeamMatchOnFocusRef.current) {
+                    reopenTeamMatchOnFocusRef.current = false;
+                    setShowTeamMatchDetail(true);
+                }
+            }) : undefined;
+            return () => {
+                cancel?.();
+                setShowReportModal(false);
+                setShowTeamMatchDetail(false);
+            };
         }, [])
     );
 
@@ -1941,13 +2089,19 @@ export default function TournamentDetailsScreen() {
     }, [id, activeTab, teamsTab, playersTab]);
 
     const fetchOpenTeams = async () => {
+        const isCurrent = requests.begin('fetchOpenTeams');
         if (!id) return;
         try {
             const data = await getTeamsToJoin(id);
+            if (!isCurrent()) return;
             setOpenTeams(data);
+            setOpenTeamsError(false);
         } catch (err) {
+            if (!isCurrent()) return;
             console.error('Fetch open teams error:', err);
+            setOpenTeamsError(true);
         } finally {
+            if (!isCurrent()) return;
             setOpenTeamsLoaded(true);
         }
     };
@@ -2533,6 +2687,118 @@ export default function TournamentDetailsScreen() {
         );
     };
 
+    // One element for every state of the page below. It sits at the same place in all three, so
+    // a match opened from a push is presented over the loading page and stays the same modal when
+    // the tournament lands — instead of the page loading first and the modal sliding up after it.
+    const matchDetailsModal = (
+        <MatchDetailsModal
+            visible={showReportModal}
+            holdUntilReady={matchFromLink}
+            contextReady={!!tournament || !!error}
+            onClose={() => {
+                setShowReportModal(false);
+                setMatchFromLink(false);
+                // If this game was opened from a team match, drop back onto the team overview.
+                // Defer + guard with isFocused: the solo modal also calls onClose right before
+                // navigating to a player's profile, and we must not re-raise the team modal on
+                // top of that pushed screen — only restore it on a genuine dismiss.
+                if (returnToTeamMatchId) {
+                    const back = returnToTeamMatchId;
+                    setReturnToTeamMatchId(null);
+                    matchModalHandoff.after(() => {
+                        if (navigation.isFocused()) {
+                            setSelectedTeamMatchId(back);
+                            setShowTeamMatchDetail(true);
+                        }
+                    });
+                }
+            }}
+            onDismiss={matchModalHandoff.onDismiss}
+            matchId={selectedMatch?.id}
+            tournamentId={id}
+            tournamentName={tournament?.name}
+            roundName={selectedMatch?.roundName || t('details.matchDetails')}
+            opponentName={selectedMatch?.away?.username}
+            // formatDateTimeShort parses as UTC (backend timestamps carry no Z suffix, so raw
+            // parsing reads the UTC clock as local and shows a shifted kick-off time) and
+            // stacks the clock under the date for the narrow Match Time tile.
+            scheduledTime={selectedMatch?.startTime ? formatDateTimeShort(selectedMatch.startTime, '\n') : undefined}
+            // Bracket matches already carry their round deadline, so the modal can show it
+            // immediately instead of waiting for the details round-trip to fill it in.
+            deadline={selectedMatch?.roundDeadline ?? selectedMatch?.RoundDeadline ?? undefined}
+            status={
+                // NoShow (5) maps to 'completed' too: it's a terminal, admin-set outcome, so the
+                // modal shows the result view (with its no-show framing) and its Edit / Delete
+                // actions instead of an empty "report your score" form.
+                selectedMatch?.status === 3 || selectedMatch?.status === 4 || selectedMatch?.status === 5 ? 'completed' :
+                    selectedMatch?.status === 2 ? 'ready_phase' :
+                        selectedMatch?.status === 1 ? 'scheduled' :
+                            selectedMatch?.status === 0 ? 'pending_availability' : 'ready_phase'
+            }
+            home={selectedMatch?.home}
+            away={selectedMatch?.away}
+            evidences={selectedMatch?.evidences}
+            hubOwnerId={hubOwnerId}
+            canManage={canManage}
+            isRoundLocked={selectedMatch?.isRoundLocked}
+            canRevert={selectedMatch?.canRevert}
+            stage={selectedMatch?.stage ?? selectedMatch?.Stage}
+            nextMatchId={selectedMatch?.nextMatchId ?? selectedMatch?.NextMatchId}
+            nextMatchLoserBracketId={selectedMatch?.nextMatchLoserBracketId ?? selectedMatch?.NextMatchLoserBracketId}
+            requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
+            tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
+            defaultTab={matchModalDefaultTab}
+            onOpenProfile={handleOpenProfileFromMatch}
+            onMatchUpdate={(freshStructure?: any) => {
+                // Backend now returns the refreshed bracket structure inline on
+                // matchResult / approve / reject, so we can update local state directly
+                // without a follow-up GET_TOURNAMENT_STRUCTURE round-trip. Falls back to
+                // fetchBracket() for actions that don't (yet) piggy-back the structure.
+                if (freshStructure) {
+                    setStages(freshStructure.stages || []);
+                    if (freshStructure.hubOwnerId || freshStructure.HubOwnerId) {
+                        setHubOwnerId(freshStructure.hubOwnerId || freshStructure.HubOwnerId);
+                    }
+                    setBracketCanManage(freshStructure.canManage ?? freshStructure.CanManage ?? false);
+                    setBracketRequireResultApproval(freshStructure.requireResultApproval ?? freshStructure.RequireResultApproval ?? false);
+                } else {
+                    fetchBracket();
+                }
+                // Pill counts (approvals / admin help) come from the BadgesContext cascade.
+                // The SignalR push covers participants, but an organizer approving someone
+                // else's result isn't pushed on every path — invalidate eagerly so the
+                // bracket-tab pill drops the moment the action lands instead of after the
+                // next background refetch. The lists themselves stay on-demand (pill tap).
+                refreshBadges();
+                // The HELP REQUESTS pill renders from this locally fetched list (not the
+                // cascade), and resolving from the match modal doesn't re-enter the bracket
+                // tab — refetch it here or the resolved request keeps its pill count.
+                if (canManage) fetchAdminHelpRequests();
+            }}
+        />
+    );
+
+    // Mounted for as long as a team match is selected, so it can be hidden for a game's page or a
+    // profile and come back as it was — and, like the match modal, presented over the loading page.
+    const teamMatchModal = selectedTeamMatchId ? (
+        <TeamMatchDetailModal
+            visible={showTeamMatchDetail}
+            onClose={() => { setShowTeamMatchDetail(false); setSelectedTeamMatchId(null); }}
+            onDismiss={teamModalHandoff.onDismiss}
+            onOpenProfile={handleOpenProfileFromTeamMatch}
+            matchId={selectedTeamMatchId}
+            tournamentId={id}
+            hubOwnerId={hubOwnerId}
+            canManage={canManage}
+            currentUserId={user?.id}
+            onOpenSubMatch={handleOpenSubMatchFromTeam}
+            onMatchUpdate={() => {
+                fetchBracket();
+                if (tournament?.isTeamTournament) fetchTournamentTeams(id);
+            }}
+        />
+    ) : null;
+
     if (isLoading) {
         return (
             <SafeAreaView className="flex-1 bg-background">
@@ -2540,6 +2806,8 @@ export default function TournamentDetailsScreen() {
                 <View accessibilityLabel={t('details.loadingTournament')} accessibilityRole="progressbar">
                     <TournamentDetailsSkeleton />
                 </View>
+                {matchDetailsModal}
+                {teamMatchModal}
             </SafeAreaView>
         );
     }
@@ -2553,6 +2821,8 @@ export default function TournamentDetailsScreen() {
                     <Text className="text-destructive mt-4 text-center font-medium">{error || t('details.tournamentNotFound')}</Text>
                     <Button onPress={() => fetchTournamentDetails()} className="mt-6">{t('common:retry')}</Button>
                 </View>
+                {matchDetailsModal}
+                {teamMatchModal}
             </SafeAreaView>
         );
     }
@@ -2609,6 +2879,21 @@ export default function TournamentDetailsScreen() {
                 }
             >
                 <View className="animate-slide-up">
+                    {refreshFailed && (
+                        <RefreshFailedBanner
+                            className="mx-4 mt-3"
+                            retrying={isRetryingRefresh}
+                            onRetry={async () => {
+                                setIsRetryingRefresh(true);
+                                try {
+                                    await fetchTournamentDetails(true);
+                                } finally {
+                                    setIsRetryingRefresh(false);
+                                }
+                            }}
+                        />
+                    )}
+
                     {/* Hero: the tournament's cover, in its share card's violet and gold. Status and
                         access pills, the name, how many are in and the hub hosting it; the sign-up
                         actions sit under the cover. */}
@@ -3087,6 +3372,8 @@ export default function TournamentDetailsScreen() {
                             {teamsTab === 'confirmed' && (
                                 !teamsLoaded ? (
                                     <ActivityIndicator size="small" color="#00E5A0" />
+                                ) : teamsError && tournamentTeams.length === 0 ? (
+                                    <LoadFailedState onRetry={() => fetchTournamentTeams(id)} />
                                 ) : tournamentTeams.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
@@ -3158,6 +3445,8 @@ export default function TournamentDetailsScreen() {
                             {teamsTab === 'open' && tournament?.status < 3 && (
                                 !openTeamsLoaded ? (
                                     <ActivityIndicator size="small" color="#3B82F6" />
+                                ) : openTeamsError && openTeams.length === 0 ? (
+                                    <LoadFailedState className="mt-2" onRetry={fetchOpenTeams} />
                                 ) : openTeams.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center mt-2">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
@@ -3243,6 +3532,8 @@ export default function TournamentDetailsScreen() {
 
                                         {!pendingLoaded ? (
                                             <ActivityIndicator size="small" color="#F59E0B" />
+                                        ) : pendingError && teamRequests.length === 0 ? (
+                                            <LoadFailedState onRetry={fetchPendingRegistrations} />
                                         ) : teamRequests.length === 0 ? (
                                             <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                                 <Ionicons name="checkmark-circle-outline" size={48} color="#F59E0B" />
@@ -3363,6 +3654,8 @@ export default function TournamentDetailsScreen() {
                             {playersTab === 'confirmed' && (
                                 !participantsLoaded ? (
                                     <ActivityIndicator size="small" color="#3B82F6" />
+                                ) : participantsError && participants.length === 0 ? (
+                                    <LoadFailedState onRetry={fetchParticipants} />
                                 ) : participants.length === 0 ? (
                                     <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                         <Ionicons name="people-outline" size={48} color="#71717A" />
@@ -3426,6 +3719,8 @@ export default function TournamentDetailsScreen() {
                                     )}
                                     {!pendingLoaded ? (
                                         <ActivityIndicator size="small" color="#F59E0B" />
+                                    ) : pendingError && pendingRegistrations.length === 0 ? (
+                                        <LoadFailedState onRetry={fetchPendingRegistrations} />
                                     ) : pendingRegistrations.length === 0 ? (
                                         <View className="bg-card/50 p-8 rounded-3xl border border-white/5 items-center justify-center">
                                             <Ionicons name="checkmark-circle-outline" size={48} color="#10B981" />
@@ -3520,87 +3815,8 @@ export default function TournamentDetailsScreen() {
                 </View>
             </ScrollView>
 
-            <MatchDetailsModal
-                visible={showReportModal}
-                onClose={() => {
-                    setShowReportModal(false);
-                    // If this game was opened from a team match, drop back onto the team overview.
-                    // Defer + guard with isFocused: the solo modal also calls onClose right before
-                    // navigating to a player's profile, and we must not re-raise the team modal on
-                    // top of that pushed screen — only restore it on a genuine dismiss.
-                    if (returnToTeamMatchId) {
-                        const back = returnToTeamMatchId;
-                        setReturnToTeamMatchId(null);
-                        setTimeout(() => {
-                            if (navigation.isFocused()) {
-                                setSelectedTeamMatchId(back);
-                                setShowTeamMatchDetail(true);
-                            }
-                        }, 320);
-                    }
-                }}
-                matchId={selectedMatch?.id}
-                tournamentId={id}
-                tournamentName={tournament?.name}
-                roundName={selectedMatch?.roundName || t('details.matchDetails')}
-                opponentName={selectedMatch?.away?.username}
-                // formatDateTimeShort parses as UTC (backend timestamps carry no Z suffix, so raw
-                // parsing reads the UTC clock as local and shows a shifted kick-off time) and
-                // stacks the clock under the date for the narrow Match Time tile.
-                scheduledTime={selectedMatch?.startTime ? formatDateTimeShort(selectedMatch.startTime, '\n') : undefined}
-                // Bracket matches already carry their round deadline, so the modal can show it
-                // immediately instead of waiting for the details round-trip to fill it in.
-                deadline={selectedMatch?.roundDeadline ?? selectedMatch?.RoundDeadline ?? undefined}
-                status={
-                    // NoShow (5) maps to 'completed' too: it's a terminal, admin-set outcome, so the
-                    // modal shows the result view (with its no-show framing) and its Edit / Delete
-                    // actions instead of an empty "report your score" form.
-                    selectedMatch?.status === 3 || selectedMatch?.status === 4 || selectedMatch?.status === 5 ? 'completed' :
-                        selectedMatch?.status === 2 ? 'ready_phase' :
-                            selectedMatch?.status === 1 ? 'scheduled' :
-                                selectedMatch?.status === 0 ? 'pending_availability' : 'ready_phase'
-                }
-                home={selectedMatch?.home}
-                away={selectedMatch?.away}
-                evidences={selectedMatch?.evidences}
-                hubOwnerId={hubOwnerId}
-                canManage={canManage}
-                isRoundLocked={selectedMatch?.isRoundLocked}
-                canRevert={selectedMatch?.canRevert}
-                stage={selectedMatch?.stage ?? selectedMatch?.Stage}
-                nextMatchId={selectedMatch?.nextMatchId ?? selectedMatch?.NextMatchId}
-                nextMatchLoserBracketId={selectedMatch?.nextMatchLoserBracketId ?? selectedMatch?.NextMatchLoserBracketId}
-                requireResultApproval={bracketRequireResultApproval || (tournament as any)?.requireResultApproval || (tournament as any)?.RequireResultApproval || false}
-                tournamentStatus={tournament?.status !== undefined ? Number(tournament.status) : undefined}
-                defaultTab={matchModalDefaultTab}
-                onOpenProfile={handleOpenProfileFromMatch}
-                onMatchUpdate={(freshStructure?: any) => {
-                    // Backend now returns the refreshed bracket structure inline on
-                    // matchResult / approve / reject, so we can update local state directly
-                    // without a follow-up GET_TOURNAMENT_STRUCTURE round-trip. Falls back to
-                    // fetchBracket() for actions that don't (yet) piggy-back the structure.
-                    if (freshStructure) {
-                        setStages(freshStructure.stages || []);
-                        if (freshStructure.hubOwnerId || freshStructure.HubOwnerId) {
-                            setHubOwnerId(freshStructure.hubOwnerId || freshStructure.HubOwnerId);
-                        }
-                        setBracketCanManage(freshStructure.canManage ?? freshStructure.CanManage ?? false);
-                        setBracketRequireResultApproval(freshStructure.requireResultApproval ?? freshStructure.RequireResultApproval ?? false);
-                    } else {
-                        fetchBracket();
-                    }
-                    // Pill counts (approvals / admin help) come from the BadgesContext cascade.
-                    // The SignalR push covers participants, but an organizer approving someone
-                    // else's result isn't pushed on every path — invalidate eagerly so the
-                    // bracket-tab pill drops the moment the action lands instead of after the
-                    // next background refetch. The lists themselves stay on-demand (pill tap).
-                    refreshBadges();
-                    // The HELP REQUESTS pill renders from this locally fetched list (not the
-                    // cascade), and resolving from the match modal doesn't re-enter the bracket
-                    // tab — refetch it here or the resolved request keeps its pill count.
-                    if (canManage) fetchAdminHelpRequests();
-                }}
-            />
+            {matchDetailsModal}
+            {teamMatchModal}
 
             <AdminHelpRequestsModal
                 visible={showAdminHelpModal}
@@ -3640,6 +3856,7 @@ export default function TournamentDetailsScreen() {
             {/* Shared team link → confirm before joining / requesting. */}
             <ConfirmationModal
                 visible={!!joinPrompt}
+                onDismiss={joinPromptHandoff.onDismiss}
                 onClose={() => setJoinPrompt(null)}
                 onConfirm={handleJoinPromptConfirm}
                 isDestructive={false}
@@ -3727,23 +3944,6 @@ export default function TournamentDetailsScreen() {
                 title={t('details.eligibleCountries')}
             />
 
-            {/* Team Match Detail Modal */}
-            {showTeamMatchDetail && (
-                <TeamMatchDetailModal
-                    visible={showTeamMatchDetail}
-                    onClose={() => { setShowTeamMatchDetail(false); setSelectedTeamMatchId(null); }}
-                    matchId={selectedTeamMatchId}
-                    tournamentId={tournament?.id}
-                    hubOwnerId={hubOwnerId}
-                    canManage={canManage}
-                    currentUserId={user?.id}
-                    onOpenSubMatch={handleOpenSubMatchFromTeam}
-                    onMatchUpdate={() => {
-                        fetchBracket();
-                        if (tournament?.isTeamTournament) fetchTournamentTeams(id);
-                    }}
-                />
-            )}
 
             <ConfirmationModal
                 visible={showStartConfirm}

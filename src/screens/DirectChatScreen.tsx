@@ -1,3 +1,8 @@
+import { useChatConversation } from '../hooks/useChatConversation';
+import { useChatScroll } from '../hooks/useChatScroll';
+import { ChatConnectionStatus, ChatOutbox, ChatNewMessages } from '../components/chat/ChatFeedback';
+import { LoadFailedState } from '../components/ui/EmptyState';
+import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
 import { useTranslation } from 'react-i18next';
 import i18n, { dateLocale } from '../i18n';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,29 +23,20 @@ import { KeyboardAvoider } from '../components/ui/KeyboardAvoider';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useQueryClient } from '@tanstack/react-query';
-import * as SecureStore from 'expo-secure-store';
 import { RootStackParamList } from '../types/navigation';
-import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../lib/api';
+import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { parseUtcDate, cn } from '../lib/utils';
 import { COLORS } from '../lib/theme';
-import { mergeMessagesById } from '../lib/mergeMessages';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
-import { useTrailingDebounce } from '../hooks/useTrailingDebounce';
 import { SocialAvatar } from '../components/social/SocialAvatar';
 import { CopiedOverlay } from '../components/chat/CopiedOverlay';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { DirectChat, DirectMessage } from '../types/social';
-import { startSignalRWithRetry } from '../lib/signalR';
 
 type Route = RouteProp<RootStackParamList, 'DirectChat'>;
-type Nav = StackNavigationProp<RootStackParamList>;
-
-// Initial page size — a single screenful loads fast; older messages page in on demand
-// via the "Load earlier" header (uses the `before` cursor on the messages endpoint).
-const PAGE_SIZE = 30;
+type Nav = StackNavigationProp<RootStackParamList, 'DirectChat'>;
 
 export default function DirectChatScreen() {
     const { t } = useTranslation('match');
@@ -54,27 +50,22 @@ export default function DirectChatScreen() {
     const { chatId: initialChatId, otherUserId, header } = route.params || {};
 
     const [chat, setChat] = useState<DirectChat | null>(null);
-    const [messages, setMessages] = useState<DirectMessage[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [sendError, setSendError] = useState<string | null>(null);
-    const [hasMore, setHasMore] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
-    // The header renders from the nav seed before the first page lands; until then the list
-    // is empty but the chat is not, so the "say hi" state must wait for this.
-    const [messagesLoaded, setMessagesLoaded] = useState(false);
+    const [loadAttempt, setLoadAttempt] = useState(0);
 
-    const listRef = useRef<FlatList<DirectMessage>>(null);
-    const connectionRef = useRef<HubConnection | null>(null);
     const inputRef = useRef<TextInput>(null);
     // The real in-flight guard — see send(). The `sending` state is one render behind, which is
     // exactly the window a fast double-tap lands in.
     const sendingRef = useRef(false);
-    // Guards the one-time scroll-to-bottom on first load so paging in older
-    // messages (which grows the list at the top) doesn't yank the view down.
-    const didInitialScrollRef = useRef(false);
+    // What this screen was opened for, pinned at the first render. The bootstrap writes what it
+    // resolves (the chat id, the other player) back into the params, so the router can recognise
+    // this conversation however the next navigate names it — and that write must not restart the
+    // bootstrap. A different chat is a different screen (the router pushes it), so nothing else
+    // changes these params.
+    const [request] = useState(() => ({ chatId: initialChatId, otherUserId, header }));
 
     // The chat list lives underneath this stack screen and stays mounted. Keep every
     // cached search result in sync immediately so going back cannot reveal the old
@@ -111,31 +102,19 @@ export default function DirectChatScreen() {
         }
     }, [queryClient, refreshBadges, updateCachedChat]);
 
-    // Trailing-debounced mark-read: coalesces bursts of incoming messages into a
-    // single POST, and flushes on unmount so leaving the chat within the 600ms
-    // window still fires the read (naive clearTimeout was silently dropping it).
-    const { debounced: markReadDebounced } = useTrailingDebounce((chatId: string) => {
-        void markChatRead(chatId);
-    });
-
     // ─── Bootstrap: resolve chat + load messages ────────────────────────
     // Fast path (chat list tap): the header is seeded from navigation params, so
     // the screen renders instantly and we go straight to GET /messages — no list
     // fetch, and the SignalR effect (keyed on chat.id) connects in parallel.
     // Fallback (deep link / push notification): only a chatId is known, so we pull
-    // just that one chat (GET /api/DirectChat/{id}) alongside the messages.
+    // just that one chat (GET /api/DirectChat/{id}) before starting the conversation.
     useEffect(() => {
+        const { chatId: initialChatId, otherUserId, header } = request;
         let cancelled = false;
-        didInitialScrollRef.current = false;
 
         // Clear per-chat state immediately on switch so the previous chat's
         // messages and draft don't flash while the new chat loads.
-        setMessages([]);
-        setInput('');
-        setSendError(null);
         setError(null);
-        setHasMore(false);
-        setMessagesLoaded(false);
 
         if (header && initialChatId) {
             // Render now from the seed; messages stream in underneath.
@@ -174,237 +153,77 @@ export default function DirectChatScreen() {
                     if (cancelled) return;
                     chatId = resolved.id;
                     setChat(resolved);
+                    // At once, not after the messages: a push for this chat (it names it by chat id
+                    // alone) arriving while they load would otherwise open it a second time.
+                    navigation.setParams({ chatId: resolved.id });
                 }
 
                 if (!chatId) throw new Error(t('chat.missingParams'));
 
                 // Deep link / notification with only a chatId and no header seed — fetch just
-                // this one chat for the header, in parallel with the messages below.
+                // this one chat for the header before loading its conversation.
                 const needsMeta = !header && !otherUserId;
                 const metaPromise: Promise<DirectChat | null> = needsMeta
                     ? authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_BY_ID(chatId))
                         .then((r) => (r.ok ? r.json() : null))
+                        .then((meta: DirectChat | null) => {
+                            // Opened from a push (chat id only): the other player goes into the
+                            // params as soon as they are known, so a profile's Message finds this chat.
+                            if (meta && !cancelled) {
+                                navigation.setParams({
+                                    header: {
+                                        otherUserId: meta.otherUserId,
+                                        otherUsername: meta.otherUsername,
+                                        otherNickname: meta.otherNickname ?? null,
+                                        otherAvatarUrl: meta.otherAvatarUrl ?? null,
+                                    },
+                                });
+                            }
+                            return meta;
+                        })
                         .catch(() => null)
                     : Promise.resolve(null);
 
-                const [msgsRes, meta] = await Promise.all([
-                    authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(chatId, PAGE_SIZE)),
-                    metaPromise,
-                ]);
+                const meta = await metaPromise;
                 if (cancelled) return;
-
                 if (meta) setChat(meta);
                 else if (needsMeta) throw new Error(t('chat.notAvailable'));
-
-                if (msgsRes.ok) {
-                    const msgs: DirectMessage[] = await msgsRes.json();
-                    if (!cancelled) {
-                        setMessages(msgs);
-                        setHasMore(msgs.length >= PAGE_SIZE);
-                        // Let the initial batch lay out, then stop auto-scrolling so
-                        // "Load earlier" prepends don't jump the view to the bottom.
-                        setTimeout(() => { didInitialScrollRef.current = true; }, 400);
-                    }
-                }
-
-                void markChatRead(chatId);
             } catch (e: any) {
                 if (!cancelled) setError(getErrorMessage(e));
             } finally {
                 if (!cancelled) {
                     setLoading(false);
-                    setMessagesLoaded(true);
                 }
             }
         })();
 
         return () => { cancelled = true; };
-    }, [initialChatId, otherUserId]);
+    }, [request, loadAttempt]);
 
-    // ─── Pagination: pull the previous page of older messages ────────────
-    const loadEarlier = useCallback(async () => {
-        const chatId = chat?.id;
-        if (!chatId || loadingMore || !hasMore || messages.length === 0) return;
-        setLoadingMore(true);
-        try {
-            const oldest = messages[0];
-            const res = await authenticatedFetch(
-                ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(chatId, PAGE_SIZE, oldest.sentAt)
-            );
-            if (res.ok) {
-                const older: DirectMessage[] = await res.json();
-                setMessages((prev) => mergeMessagesById(prev, older));
-                setHasMore(older.length >= PAGE_SIZE);
-            }
-        } catch { /* best-effort */ }
-        finally { setLoadingMore(false); }
-    }, [chat?.id, loadingMore, hasMore, messages]);
-
-    // ─── SignalR connection ──────────────────────────────────────────────
-    useEffect(() => {
-        const currentChatId = chat?.id;
-        if (!currentChatId) return;
-
-        // Scope flag — flips false on cleanup. Used to discard late SignalR
-        // events and to skip JoinChatGroup if the user already switched away
-        // before connection.start() resolved.
-        let isActive = true;
-
-        const connection = new HubConnectionBuilder()
-            // DirectChatHub now requires authentication — pass the JWT as the access_token query param.
-            .withUrl(ENDPOINTS.SIGNALR_DM_HUB, {
-                accessTokenFactory: async () =>
-                    (await SecureStore.getItemAsync('access_token').catch(() => null)) ?? '',
-            })
-            .withAutomaticReconnect()
-            .configureLogging(LogLevel.Warning)
-            .build();
-
-        connection.on('ReceiveMessage', (incoming: any) => {
-            if (!isActive) return;
-            const m: DirectMessage = {
-                id: incoming.id || incoming.Id,
-                chatId: incoming.chatId || incoming.ChatId,
-                senderId: incoming.senderId || incoming.SenderId,
-                senderUsername: incoming.senderUsername || incoming.SenderUsername,
-                senderAvatarUrl: incoming.senderAvatarUrl || incoming.SenderAvatarUrl,
-                content: incoming.content || incoming.Content,
-                sentAt: incoming.sentAt || incoming.SentAt,
-                isRead: incoming.isRead ?? incoming.IsRead ?? false,
-            };
-            // Defensive: ignore messages routed for a different chat
-            if (m.chatId && m.chatId !== currentChatId) return;
-
-            setMessages((prev) => {
-                if (prev.some((p) => p.id === m.id)) return prev;
-                return [...prev, m];
-            });
-
-            if (m.senderId !== myUserId) {
-                // Coalesce a burst of incoming messages into one /read call (the endpoint
-                // marks everything up to the read timestamp, so intermediate calls are wasted).
-                markReadDebounced(currentChatId);
-            }
-
-            setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-        });
-
-        // SignalR group membership is per-connection and is NOT restored when
-        // withAutomaticReconnect() re-establishes a dropped socket (common on
-        // mobile: network switch, brief backgrounding, idle timeout). Without
-        // re-joining, the screen stays "connected" but silently stops receiving
-        // messages until the user leaves and re-enters. Re-join on every reconnect.
-        connection.onreconnected(() => {
-            if (!isActive) return;
-            connection.invoke('JoinChatGroup', currentChatId).catch(() => { });
-            // Backfill anything sent during the disconnect gap. Reconnect windows can be
-            // long on mobile (backgrounding, network switch, tunnel exit) so a small page
-            // size would leave a permanent hole in the middle of the conversation — the
-            // "Load earlier" cursor only pulls messages OLDER than the current oldest, so
-            // it can never fill a gap between our existing tail and the freshly-arrived
-            // newest 30. Using 100 covers the vast majority of real disconnect windows;
-            // if the gap is even bigger the user still has to close/reopen the chat, but
-            // that's an edge case the previous implementation already accepted.
-            const RECONNECT_BACKFILL = 100;
-            // mergeMessagesById dedupes by id and re-sorts by sentAt so newest-first
-            // backend output doesn't leave the tail out of order after concat.
-            authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(currentChatId, RECONNECT_BACKFILL))
-                .then((r) => (r.ok ? r.json() : null))
-                .then((msgs: DirectMessage[] | null) => {
-                    if (!isActive || !msgs) return;
-                    setMessages((prev) => mergeMessagesById(prev, msgs));
-                })
-                .catch(() => { });
-        });
-
-        const initialConnection = startSignalRWithRetry(connection, {
-            onConnected: () => {
-                if (!isActive) return;
-                return connection.invoke('JoinChatGroup', currentChatId);
-            },
-            onError: (e) => console.warn('[DM] SignalR connect failed', e),
-        });
-
-        connectionRef.current = connection;
-
-        return () => {
-            isActive = false;
-            connection.off('ReceiveMessage');
-            void (async () => {
-                try {
-                    if (connection.state === 'Connected') {
-                        await connection.invoke('LeaveChatGroup', currentChatId);
-                    }
-                } catch { /* ignore */ }
-                await initialConnection.stop();
-            })();
-            connectionRef.current = null;
-        };
-    }, [chat?.id, myUserId]);
-
-    const showSendError = useCallback((msg: string) => {
-        setSendError(msg);
-        Alert.alert(t('chat.messageNotSent'), msg);
-    }, []);
-
-    const send = useCallback(async () => {
-        if (!chat?.id) return;
+    const conversation = useChatConversation<DirectMessage>({
+        id: chat?.id, kind: 'direct', active: true,
+        map: raw => ({ id: raw.id ?? raw.Id, chatId: raw.chatId ?? raw.ChatId,
+            senderId: raw.senderId ?? raw.SenderId, senderUsername: raw.senderUsername ?? raw.SenderUsername,
+            senderAvatarUrl: raw.senderAvatarUrl ?? raw.SenderAvatarUrl, content: raw.content ?? raw.Content,
+            sentAt: raw.sentAt ?? raw.SentAt, isRead: raw.isRead ?? raw.IsRead ?? false }),
+        onRead: markChatRead,
+        onSent: echo => {
+            updateCachedChat(echo.chatId, item => ({ ...item, lastMessage: echo.content,
+                lastMessageAt: echo.sentAt, lastMessageSenderId: echo.senderId, unreadCount: 0 }));
+            queryClient.invalidateQueries({queryKey:['direct-chats']});
+        },
+    });
+    const { messages, hasMore, loadingMore, loadEarlier, loaded: messagesLoaded } = conversation;
+    const scroll = useChatScroll(messages, loadingMore);
+    const { listRef } = scroll;
+    const send = async () => {
         const content = input.trim();
-        // Ref, not the `sending` state: state is captured in this closure and only refreshes on
-        // re-render, so two taps inside one frame both read false and the same message goes twice.
         if (!content || sendingRef.current) return;
-
-        sendingRef.current = true;
-        // Keep the keyboard up across sends (Discord-style): re-assert focus before the
-        // async round-trip — a no-op when already focused, and it re-opens the keyboard
-        // if a near-miss tap on the message list just dismissed it.
-        inputRef.current?.focus();
-
-        // Cleared NOW rather than on the server's answer: text left in the box for the length of
-        // the round-trip reads as "send did nothing". Put back below when the send really fails.
-        setInput('');
-
-        try {
-            setSending(true);
-            setSendError(null);
-            const res = await authenticatedFetch(ENDPOINTS.SEND_DIRECT_MESSAGE(chat.id), {
-                method: 'POST',
-                body: JSON.stringify({ content }),
-            });
-            if (res.ok) {
-                // We'll also receive via SignalR; the dedup in ReceiveMessage handler covers double-add.
-                const echo: DirectMessage = await res.json();
-                setMessages((prev) => {
-                    if (prev.some((p) => p.id === echo.id)) return prev;
-                    return [...prev, echo];
-                });
-                updateCachedChat(chat.id, (item) => ({
-                    ...item,
-                    lastMessage: echo.content,
-                    lastMessageAt: echo.sentAt,
-                    lastMessageSenderId: echo.senderId,
-                    unreadCount: 0,
-                }));
-                // The optimistic row above makes Back instantaneous; the refetch
-                // also picks up any concurrent message that won the latest slot.
-                queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
-                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-            } else {
-                const body = await res.text().catch(() => '');
-                console.log('[DM] send failed:', res.status, body);
-                // Only into an empty box — anything typed since outranks the failed message.
-                setInput((current) => (current.length === 0 ? content : current));
-                showSendError(getErrorMessage(body) || t('chat.couldNotSend'));
-            }
-        } catch (e) {
-            console.log('[DM] send threw:', e);
-            setInput((current) => (current.length === 0 ? content : current));
-            showSendError(getErrorMessage(e));
-        } finally {
-            sendingRef.current = false;
-            setSending(false);
-        }
-    }, [chat?.id, input, queryClient, showSendError, updateCachedChat]);
+        sendingRef.current = true; setSending(true);
+        inputRef.current?.focus(); setInput(''); scroll.jumpToLatest();
+        try { await conversation.send(content); }
+        finally { sendingRef.current = false; setSending(false); }
+    };
 
     if (loading) {
         return (
@@ -426,6 +245,9 @@ export default function DirectChatScreen() {
                     <Text className="text-red-400 mt-4 text-center font-bold">
                         {error || t('chat.notAvailable')}
                     </Text>
+                    <Pressable onPress={() => setLoadAttempt((attempt) => attempt + 1)} accessibilityRole="button" className="mt-5 px-5 py-3 rounded-xl bg-primary/15">
+                        <Text className="text-primary font-bold">{t('common:retry')}</Text>
+                    </Pressable>
                 </View>
             </SafeAreaView>
         );
@@ -440,6 +262,8 @@ export default function DirectChatScreen() {
             />
 
             <KeyboardAvoider keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 0}>
+                <ChatConnectionStatus status={conversation.connectionStatus} />
+                {conversation.error && messages.length > 0 && <RefreshFailedBanner onRetry={conversation.refresh} retrying={conversation.loading} />}
                 <FlatList
                     ref={listRef}
                     data={messages}
@@ -458,11 +282,10 @@ export default function DirectChatScreen() {
                     // Keep the reading position stable when "Load earlier" prepends older
                     // messages (RN 0.81 supports this on both platforms).
                     maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-                    onContentSizeChange={() => {
-                        if (!didInitialScrollRef.current) {
-                            listRef.current?.scrollToEnd({ animated: false });
-                        }
-                    }}
+                    onScroll={scroll.onScroll}
+                    scrollEventThrottle={100}
+                    onContentSizeChange={scroll.onContentSizeChange}
+                    ListFooterComponent={<ChatOutbox messages={conversation.pending} onRetry={conversation.retry} />}
                     ListHeaderComponent={
                         hasMore ? (
                             <View className="items-center pb-3">
@@ -478,7 +301,7 @@ export default function DirectChatScreen() {
                                     >
                                         <Ionicons name="arrow-up" size={13} color={COLORS.slate400} />
                                         <Text className="text-slate-300 text-xs font-bold" numberOfLines={1}>
-                                            {t('chat.loadEarlier')}
+                                            {conversation.pageError ? t('common:retry') : t('chat.loadEarlier')}
                                         </Text>
                                     </Pressable>
                                 )}
@@ -503,7 +326,7 @@ export default function DirectChatScreen() {
                         );
                     }}
                     ListEmptyComponent={
-                        messagesLoaded ? (
+                        conversation.error ? <LoadFailedState onRetry={conversation.refresh} retrying={conversation.loading} /> : messagesLoaded ? (
                             <View className="items-center mt-24 px-6">
                                 <View style={styles.emptyGlow}>
                                     <LinearGradient colors={RING_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.emptyRing}>
@@ -535,21 +358,10 @@ export default function DirectChatScreen() {
                     }
                 />
 
+                <ChatNewMessages visible={scroll.hasNewMessages} onPress={scroll.jumpToLatest} />
                 <View
                     className="border-t border-white/[0.04] bg-background-deep px-3 pt-3 pb-2"
                 >
-                    {sendError && (
-                        <View className="flex-row items-center bg-red-500/10 border border-red-500/25 rounded-2xl px-3 py-2 mb-2">
-                            <Ionicons name="alert-circle" size={16} color="#F87171" />
-                            <Text className="text-red-300 text-xs font-bold flex-1 ml-2" numberOfLines={2}>
-                                {sendError}
-                            </Text>
-                            <Pressable onPress={() => setSendError(null)} hitSlop={8} className="ml-2">
-                                <Ionicons name="close" size={14} color="#F87171" />
-                            </Pressable>
-                        </View>
-                    )}
-                    {/* One rounded field with the send button nested in its right end. */}
                     <View
                         className="flex-row items-end gap-2 rounded-[28px] pl-3 pr-1.5 py-1.5"
                         style={styles.composerField}

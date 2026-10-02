@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { MenuItem } from '../ui/MenuItem';
 import { PressableScale } from '../ui/PressableScale';
 import { COLORS } from '../../lib/theme';
+import { useModalHandoff } from '../../lib/modalHandoff';
 
 export interface ActionSheetAction {
     label: string;
@@ -43,9 +44,11 @@ export function ActionSheetModal({
     const insets = useSafeAreaInsets();
     const { t } = useTranslation('common');
 
+    // The picked action (often another modal) starts once this sheet is down — see lib/modalHandoff.
+    const handoff = useModalHandoff();
     const run = (action: () => void) => {
         onClose();
-        setTimeout(action, 350);
+        handoff.after(action);
     };
 
     const regular = actions.filter(a => !a.destructive);
@@ -57,6 +60,7 @@ export function ActionSheetModal({
             transparent
             animationType="slide"
             onRequestClose={onClose}
+            onDismiss={handoff.onDismiss}
         >
             <View className="flex-1 justify-end">
                 <Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />

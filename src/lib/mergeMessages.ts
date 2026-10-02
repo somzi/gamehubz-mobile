@@ -19,7 +19,11 @@ export function mergeMessagesById<T extends { id: string; sentAt: string }>(
 ): T[] {
     if (incoming.length === 0) return prev;
     const known = new Set(prev.map((p) => p.id));
-    const added = incoming.filter((m) => !known.has(m.id));
+    const added = incoming.filter((m) => {
+        if (!m.id || known.has(m.id)) return false;
+        known.add(m.id);
+        return true;
+    });
     if (added.length === 0) return prev;
     const merged = [...prev, ...added];
     merged.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());

@@ -10,6 +10,8 @@
   "confirm": "Confirmar",
   "submit": "Enviar",
   "retry": "Tentar novamente",
+  "refreshFailed": "Não foi possível atualizar",
+  "loadFailed": "Não foi possível carregar",
   "search": "Buscar",
   "loading": "Carregando...",
   "error": "Erro",
@@ -174,5 +176,10 @@
     "title": "Atualização necessária",
     "body": "Esta versão do GameHubz não é mais compatível. Atualize para a versão mais recente para continuar jogando.",
     "button": "Atualizar agora"
-  }
+  },
+  "chatConnecting": "Conectando…",
+  "chatReconnecting": "Reconectando…",
+  "chatSending": "Enviando…",
+  "chatSendFailed": "Não enviada",
+  "chatNewMessages": "Novas mensagens"
 }

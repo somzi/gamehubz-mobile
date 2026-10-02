@@ -1,23 +1,22 @@
+import { useChatConversation } from '../../hooks/useChatConversation';
+import { useChatScroll } from '../../hooks/useChatScroll';
+import { ChatConnectionStatus, ChatOutbox, ChatNewMessages } from '../chat/ChatFeedback';
+import { LoadFailedState } from '../ui/EmptyState';
+import { RefreshFailedBanner } from '../ui/RefreshFailedBanner';
+import { useQueryClient } from '@tanstack/react-query';
+import type { MatchOverviewDto } from '../../lib/homeMatches';
 import { useTranslation } from 'react-i18next';
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform, Alert } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
-import * as SecureStore from 'expo-secure-store';
-import { authenticatedFetch, ENDPOINTS, API_BASE_URL, getErrorMessage } from '../../lib/api';
+import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
-import { useTrailingDebounce } from '../../hooks/useTrailingDebounce';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { MatchChatBubble } from '../chat/MatchChatBubble';
 import { MatchComment } from '../../types/auth';
-import { mergeMessagesById } from '../../lib/mergeMessages';
 import { cn, parseUtcDate } from '../../lib/utils';
 import { dateLocale } from '../../i18n';
-import { startSignalRWithRetry } from '../../lib/signalR';
-
-// Initial page size — load a screenful fast; older messages page in on demand.
-const PAGE_SIZE = 30;
 
 interface MatchChatPanelProps {
     matchId: string;
@@ -33,243 +32,45 @@ interface MatchChatPanelProps {
 
 /**
  * Self-contained match chat: history via REST, live updates via the /hubs/chat
- * SignalR group, and a send box. Mirrors the chat tab in MatchScheduleCard so
- * admins opening a match from the bracket get the same conversation.
+ * SignalR group, and a send box. Shared by match cards and match details.
  */
 export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false }: MatchChatPanelProps) {
     const { t } = useTranslation('match');
     const { user } = useAuth();
     const { refresh: refreshBadges } = useBadges();
-    const [comments, setComments] = useState<MatchComment[]>([]);
+    const queryClient = useQueryClient();
     const [newComment, setNewComment] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [sendError, setSendError] = useState<string | null>(null);
-    const [hasMore, setHasMore] = useState(false);
-    const [loadingEarlier, setLoadingEarlier] = useState(false);
-    const listRef = useRef<FlatList<MatchComment>>(null);
-    const connectionRef = useRef<HubConnection | null>(null);
     const inputRef = useRef<TextInput>(null);
-    // The real in-flight guard. `isSending` state cannot do this job: it is captured in the
-    // handler's closure and only refreshes on re-render, so two taps inside one frame both read
-    // false, both pass, and the same message is posted twice. A ref updates synchronously.
     const sendingRef = useRef(false);
-    // Guards the one-time scroll-to-bottom so paging in older messages doesn't yank to the end.
-    const didInitialScrollRef = useRef(false);
-
-    const normalizedParticipantIds = participantIds
-        .filter(Boolean)
-        .map(id => (id as string).toLowerCase());
-
-    // `size` lets the reconnect-backfill path pull more than the initial page size —
-    // long disconnect gaps (>30 messages) would leave an unfillable hole in the
-    // middle of the conversation with just PAGE_SIZE (the "Load earlier" cursor
-    // only walks BACKWARD from the current oldest, never fills gaps).
-    const fetchComments = async (silent = false, size: number = PAGE_SIZE) => {
-        if (!matchId) return;
-        if (!silent) setIsLoading(true);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId, size));
+    const [isSending, setIsSending] = useState(false);
+    const normalizedParticipantIds = participantIds.filter(Boolean).map(id => id!.toLowerCase());
+    const conversation = useChatConversation<MatchComment>({
+        id: matchId, kind: 'match', active,
+        map: raw => ({
+            id: raw.id ?? raw.Id, userId: raw.userId ?? raw.UserId,
+            userNickname: raw.userNickname ?? raw.UserNickname ?? t('common:unknown'),
+            userAvatarUrl: raw.userAvatarUrl ?? raw.UserAvatarUrl,
+            content: raw.content ?? raw.Content, sentAt: raw.sentAt ?? raw.SentAt,
+        }),
+        onRead: async id => {
+            const response = await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(id), {method:'POST'});
             if (response.ok) {
-                const data = await response.json();
-                const list: MatchComment[] = Array.isArray(data) ? data : [];
-                if (silent) {
-                    // Reconnect backfill: merge with what we already have (which may include
-                    // older messages the user paged in) so we don't silently drop history.
-                    // Replacing wholesale — as this used to do — wiped every "Load earlier"
-                    // batch every time SignalR reconnected.
-                    setComments((prev) => mergeMessagesById(prev, list));
-                } else {
-                    setComments(list);
-                    setHasMore(list.length >= PAGE_SIZE);
-                    // Let the initial batch lay out, then stop auto-scrolling so
-                    // "Load earlier" prepends don't jump the view to the bottom.
-                    setTimeout(() => { didInitialScrollRef.current = true; }, 400);
-                }
+                queryClient.setQueriesData<MatchOverviewDto[]>({queryKey:['home-matches']}, current => current?.map(match =>
+                    (match.id ?? match.matchId)?.toLowerCase() === id.toLowerCase() ? {...match, unreadMessages:0} : match));
+                refreshBadges();
             }
-        } catch (error) {
-            console.error('[MatchChatPanel] Error fetching comments:', error);
-        } finally {
-            if (!silent) setIsLoading(false);
-        }
-    };
-
-    // Pull the previous page of older messages (oldest currently shown = the cursor).
-    const loadEarlier = async () => {
-        if (!matchId || loadingEarlier || !hasMore || comments.length === 0) return;
-        setLoadingEarlier(true);
-        try {
-            const oldest = comments[0];
-            const response = await authenticatedFetch(
-                ENDPOINTS.GET_MATCH_COMMENTS(matchId, PAGE_SIZE, oldest.sentAt)
-            );
-            if (response.ok) {
-                const data = await response.json();
-                const older: MatchComment[] = Array.isArray(data) ? data : [];
-                setComments(prev => {
-                    const known = new Set(prev.map(c => c.id));
-                    const fresh = older.filter(c => !known.has(c.id));
-                    return fresh.length ? [...fresh, ...prev] : prev;
-                });
-                setHasMore(older.length >= PAGE_SIZE);
-            }
-        } catch (error) {
-            console.error('[MatchChatPanel] Error loading earlier comments:', error);
-        } finally {
-            setLoadingEarlier(false);
-        }
-    };
-
-    // Trailing-debounced mark-read: coalesces bursts of incoming opponent messages
-    // into a single POST, and flushes on unmount so leaving the panel within the
-    // 600ms window still fires the read (naive clearTimeout was silently dropping it).
-    const { debounced: markReadInternal } = useTrailingDebounce(async (id: string) => {
-        try {
-            await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(id), { method: 'POST' });
-            refreshBadges();
-        } catch { /* best-effort */ }
+        },
     });
-
-    const markRead = () => {
-        if (!matchId) return;
-        markReadInternal(matchId);
-    };
-
-    useEffect(() => {
-        if (!active || !matchId) return;
-        didInitialScrollRef.current = false;
-        setComments([]);
-        setHasMore(false);
-        fetchComments();
-        markRead();
-    }, [matchId, active]);
-
-    // SignalR live updates — same scope-flag pattern as MatchScheduleCard.
-    useEffect(() => {
-        if (!matchId || !active) return;
-
-        let isActive = true;
-
-        const connection = new HubConnectionBuilder()
-            // MatchChatHub now requires authentication — pass the JWT as the access_token query param
-            // (WebSockets can't set Authorization headers).
-            .withUrl(`${API_BASE_URL}/hubs/chat`, {
-                accessTokenFactory: async () =>
-                    (await SecureStore.getItemAsync('access_token').catch(() => null)) ?? '',
-            })
-            .withAutomaticReconnect()
-            .configureLogging(LogLevel.Information)
-            .build();
-
-        connection.on('ReceiveMessage', (newMessage: any) => {
-            if (!isActive) return;
-            const mapped: MatchComment = {
-                id: newMessage.id || newMessage.Id,
-                userId: newMessage.userId || newMessage.UserId,
-                userNickname: newMessage.userNickname || newMessage.UserNickname || t('common:unknown'),
-                userAvatarUrl: newMessage.userAvatarUrl || newMessage.UserAvatarUrl,
-                content: newMessage.content || newMessage.Content,
-                sentAt: newMessage.sentAt || newMessage.SentAt,
-            };
-            setComments(prev => {
-                if (prev.some(c => c.id === mapped.id)) return prev;
-                return [...prev, mapped];
-            });
-            // We're actively viewing the chat — keep it marked read so the badge
-            // doesn't re-appear for a message the user is looking at right now.
-            if ((mapped.userId || '').toLowerCase() !== user?.id?.toLowerCase()) {
-                markRead();
-            }
-            setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-        });
-
-        // Group membership is per-connection and is lost when
-        // withAutomaticReconnect() re-establishes a dropped socket (common on
-        // mobile). Re-join on reconnect — otherwise the panel stays "connected"
-        // but silently stops receiving messages. Also pull a fresh snapshot to
-        // backfill anything sent during the disconnect gap (dedup handles overlap).
-        connection.onreconnected(() => {
-            if (!isActive) return;
-            connection.invoke('JoinMatchGroup', matchId).catch(() => { });
-            // Pull a larger batch to cover long disconnect windows — see fetchComments
-            // note above; 100 mirrors the DirectChatScreen reconnect backfill.
-            fetchComments(true, 100);
-        });
-
-        const initialConnection = startSignalRWithRetry(connection, {
-            onConnected: () => {
-                if (!isActive) return;
-                return connection.invoke('JoinMatchGroup', matchId);
-            },
-            onError: (err) => console.error('[MatchChatPanel] SignalR error:', err),
-        });
-
-        connectionRef.current = connection;
-
-        return () => {
-            isActive = false;
-            connection.off('ReceiveMessage');
-            void initialConnection.stop();
-            connectionRef.current = null;
-        };
-    }, [matchId, active]);
-
+    const { messages: comments, loading: isLoading, hasMore, loadingMore: loadingEarlier, loadEarlier } = conversation;
+    const scroll = useChatScroll(comments, loadingEarlier);
+    const { listRef } = scroll;
     const handleSend = async () => {
         const content = newComment.trim();
-        // Ref first, and synchronously — see sendingRef. The `disabled` prop is no guard either:
-        // it only takes effect on the next render, which is exactly the window a fast double-tap
-        // lands in.
-        if (!content || !matchId || sendingRef.current) return;
-
-        sendingRef.current = true;
-        // Keep the keyboard up across sends (Discord-style): re-assert focus before the
-        // async round-trip — a no-op when already focused, and it re-opens the keyboard
-        // if a near-miss tap on the message list just dismissed it.
-        inputRef.current?.focus();
-        setIsSending(true);
-
-        // Cleared NOW, not when the server answers. Waiting for the round-trip leaves the sent
-        // text sitting in the box for as long as the network takes — which reads as "send did
-        // nothing", and is what makes someone press it again. Put back below if the send fails,
-        // so a message is never silently lost either.
-        setNewComment('');
-
-        const restoreFailedComment = () => {
-            // Preserve both drafts in chronological order when the user has already started
-            // the next message during the request. Restoring only into an empty composer made
-            // the failed message disappear in exactly that case.
-            setNewComment((current) => current.length === 0 ? content : `${content}\n${current}`);
-        };
-
-        const showSendError = (message: string) => {
-            setSendError(message);
-            Alert.alert(t('chat.messageNotSent'), message);
-        };
-
-        try {
-            setSendError(null);
-            const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
-                method: 'POST',
-                body: JSON.stringify({ content }),
-            });
-            if (response.ok) {
-                if (!connectionRef.current) {
-                    await fetchComments(true);
-                }
-                setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
-            } else {
-                const body = await response.text().catch(() => '');
-                restoreFailedComment();
-                showSendError(getErrorMessage(body) || t('chat.couldNotSend'));
-            }
-        } catch (error) {
-            console.error('[MatchChatPanel] Error sending comment:', error);
-            restoreFailedComment();
-            showSendError(getErrorMessage(error) || t('chat.couldNotSend'));
-        } finally {
-            sendingRef.current = false;
-            setIsSending(false);
-        }
+        if (!content || sendingRef.current) return;
+        sendingRef.current = true; setIsSending(true);
+        inputRef.current?.focus(); setNewComment(''); scroll.jumpToLatest();
+        try { await conversation.send(content); }
+        finally { sendingRef.current = false; setIsSending(false); }
     };
 
     // Exact local time (device timezone) instead of "x ago". Date is prefixed only for
@@ -283,10 +84,14 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
 
     return (
         <View className="flex-1 px-5">
-            {isLoading ? (
+            <ChatConnectionStatus status={conversation.connectionStatus} />
+            {conversation.error && comments.length > 0 && <RefreshFailedBanner onRetry={conversation.refresh} retrying={isLoading} />}
+            {isLoading && comments.length === 0 ? (
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="small" color="#10B981" />
                 </View>
+            ) : conversation.error && comments.length === 0 ? (
+                <LoadFailedState onRetry={conversation.refresh} retrying={isLoading} />
             ) : (
                 // Same list wiring as the friends DM (DirectChatScreen), which sends on the first
                 // tap with the keyboard up: a FlatList with keyboardShouldPersistTaps="handled",
@@ -305,11 +110,10 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                     showsVerticalScrollIndicator={false}
                     // Keep the reading position stable when "Load earlier" prepends older messages.
                     maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-                    onContentSizeChange={() => {
-                        if (!didInitialScrollRef.current) {
-                            listRef.current?.scrollToEnd({ animated: false });
-                        }
-                    }}
+                    onScroll={scroll.onScroll}
+                    scrollEventThrottle={100}
+                    onContentSizeChange={scroll.onContentSizeChange}
+                    ListFooterComponent={<ChatOutbox messages={conversation.pending} onRetry={conversation.retry} />}
                     ListHeaderComponent={
                         hasMore ? (
                             <Pressable
@@ -321,7 +125,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                                     <ActivityIndicator size="small" color="#10B981" />
                                 ) : (
                                     <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                                        {t('chatPanel.loadEarlier')}
+                                        {conversation.pageError ? t('common:retry') : t('chatPanel.loadEarlier')}
                                     </Text>
                                 )}
                             </Pressable>
@@ -395,6 +199,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 />
             )}
 
+            <ChatNewMessages visible={scroll.hasNewMessages} onPress={scroll.jumpToLatest} />
             {/* Composer — hidden for completed matches (chat stays visible, read-only) */}
             {readOnly ? (
                 <View className="py-3 border-t border-white/5 items-center">
@@ -407,26 +212,6 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
                 </View>
             ) : (
             <View className="py-3 border-t border-white/5">
-                {sendError && (
-                    <View
-                        accessibilityRole="alert"
-                        className="flex-row items-center bg-red-500/10 border border-red-500/25 rounded-2xl px-3 py-2 mb-2"
-                    >
-                        <Ionicons name="alert-circle" size={16} color="#F87171" />
-                        <Text className="text-red-300 text-xs font-bold flex-1 ml-2" numberOfLines={2}>
-                            {sendError}
-                        </Text>
-                        <Pressable
-                            onPress={() => setSendError(null)}
-                            hitSlop={8}
-                            accessibilityRole="button"
-                            accessibilityLabel={t('common:close')}
-                            className="ml-2"
-                        >
-                            <Ionicons name="close" size={14} color="#F87171" />
-                        </Pressable>
-                    </View>
-                )}
                 <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
                     <TextInput
                         ref={inputRef}

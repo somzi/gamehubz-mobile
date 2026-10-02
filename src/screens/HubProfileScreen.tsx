@@ -25,6 +25,8 @@ import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { HeroCard, CoverPill, EmblemImage, COMPACT_EMBLEM_IMAGE } from '../components/ui/HeroCard';
 import { Panel, PanelTitle, StatCell, StatDivider, ExpandableText } from '../components/ui/Panel';
+import { RefreshFailedBanner } from '../components/ui/RefreshFailedBanner';
+import { LoadFailedState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 import i18n, { dateLocale } from '../i18n';
 
@@ -78,7 +80,15 @@ export default function HubProfileScreen() {
     const [memberPage, setMemberPage] = useState(0);
     const [hasMoreMembers, setHasMoreMembers] = useState(true);
     const [isMembersLoading, setIsMembersLoading] = useState(false);
+    // A first page that failed to load, per list: shown as a load failure, not as "no tournaments" /
+    // "no members yet".
+    const [tournamentsError, setTournamentsError] = useState(false);
+    const [membersError, setMembersError] = useState(false);
+    // Which tournaments request is the current one: switching Live → Past while Live is still in
+    // flight must not let Live's late answer (or its failure) land under Past.
+    const tournamentsSeq = useRef(0);
     const memberSearchSeq = useRef(0);
+    const pagesInFlight = useRef(new Set<string>());
 
     // Stable so the memoized TournamentCard doesn't invalidate on every parent
     // re-render (member search typing, badge tick, follow state change). The
@@ -137,17 +147,22 @@ export default function HubProfileScreen() {
     );
 
     useEffect(() => {
-        // Only fetch if we are on the tournaments tab
+        const seq = ++tournamentsSeq.current;
         if (hubTab === 'tournaments') {
             setTournaments([]);
             setPage(0);
             setHasMore(true);
-            fetchTournaments(0, tournamentFilter);
+            setTournamentsError(false);
+            fetchTournaments(0, tournamentFilter, seq);
         }
-    }, [tournamentFilter, hubTab]);
+        return () => { tournamentsSeq.current += 1; };
+    }, [id, tournamentFilter, hubTab]);
 
-    const fetchTournaments = async (currentPage: number, tab: string) => {
+    const fetchTournaments = async (currentPage: number, tab: string, seq = tournamentsSeq.current) => {
         if (!hasMore && currentPage > 0) return;
+        const requestKey = `tournaments:${seq}:${currentPage}`;
+        if (pagesInFlight.current.has(requestKey)) return;
+        pagesInFlight.current.add(requestKey);
 
         try {
             setIsListLoading(true);
@@ -159,48 +174,65 @@ export default function HubProfileScreen() {
 
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_TOURNAMENTS(id, status, currentPage));
 
-            if (response.ok) {
-                const data = await response.json();
-                const newTournaments = data.tournaments || [];
-                const totalCount = data.count || 0;
-
-                if (currentPage === 0) {
-                    setTournaments(newTournaments);
-                } else {
-                    setTournaments(prev => [...prev, ...newTournaments]);
-                }
-
-                setHasMore(newTournaments.length === 10); // Assuming pageSize is 10
+            if (seq !== tournamentsSeq.current) return;
+            if (!response.ok) {
+                setTournamentsError(true);
+                return;
             }
+
+            const data = await response.json();
+            if (seq !== tournamentsSeq.current) return;
+            const newTournaments = data.tournaments || [];
+            setTournamentsError(false);
+            setPage(currentPage);
+
+            if (currentPage === 0) {
+                setTournaments(newTournaments);
+            } else {
+                setTournaments(prev => [...prev, ...newTournaments]);
+            }
+
+            setHasMore(newTournaments.length === 10); // Assuming pageSize is 10
         } catch (err) {
             console.error('Error fetching tournaments:', err);
+            if (seq === tournamentsSeq.current) setTournamentsError(true);
         } finally {
-            setIsListLoading(false);
+            pagesInFlight.current.delete(requestKey);
+            if (seq === tournamentsSeq.current) setIsListLoading(false);
         }
     };
 
     const loadMoreTournaments = () => {
         if (!isListLoading && hasMore) {
-            const nextPage = page + 1;
-            setPage(nextPage);
+            const nextPage = tournaments.length ? page + 1 : 0;
             fetchTournaments(nextPage, tournamentFilter);
         }
     };
 
     const fetchMembers = useCallback(async (pageNumber: number, search: string, seq: number) => {
+        const requestKey = `members:${seq}:${pageNumber}`;
+        if (pagesInFlight.current.has(requestKey)) return;
+        pagesInFlight.current.add(requestKey);
         try {
-            if (pageNumber === 0) setIsMembersLoading(true);
+            setIsMembersLoading(true);
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_MEMBERS_PAGED(id, pageNumber, search));
-            if (!response.ok) return;
+            if (!response.ok) {
+                if (seq === memberSearchSeq.current) setMembersError(true);
+                return;
+            }
             const data = await response.json();
             const list: any[] = Array.isArray(data) ? data : (data.result || []);
             // ignore stale results from older searches
             if (seq !== memberSearchSeq.current) return;
+            setMembersError(false);
+            setMemberPage(pageNumber);
             setMembers(prev => (pageNumber === 0 ? list : [...prev, ...list]));
             setHasMoreMembers(list.length === 10);
         } catch (err) {
             console.error('Error fetching members:', err);
+            if (seq === memberSearchSeq.current) setMembersError(true);
         } finally {
+            pagesInFlight.current.delete(requestKey);
             if (seq === memberSearchSeq.current) setIsMembersLoading(false);
         }
     }, [id]);
@@ -211,21 +243,23 @@ export default function HubProfileScreen() {
     // — no more empty-flash between letters. The seq guard still handles overlapping
     // in-flight requests.
     useEffect(() => {
-        if (hubTab !== 'members') return;
         const seq = ++memberSearchSeq.current;
+        if (hubTab !== 'members') return;
+        // Block pagination of the old search while the new query is debouncing.
+        setIsMembersLoading(true);
         const handle = setTimeout(() => {
             setMembers([]);
             setMemberPage(0);
             setHasMoreMembers(true);
+            setMembersError(false);
             fetchMembers(0, memberSearch.trim(), seq);
         }, memberSearch ? 300 : 0);
-        return () => clearTimeout(handle);
+        return () => { clearTimeout(handle); memberSearchSeq.current += 1; };
     }, [hubTab, memberSearch, fetchMembers]);
 
     const loadMoreMembers = () => {
         if (isMembersLoading || !hasMoreMembers) return;
-        const nextPage = memberPage + 1;
-        setMemberPage(nextPage);
+        const nextPage = members.length ? memberPage + 1 : 0;
         fetchMembers(nextPage, memberSearch.trim(), memberSearchSeq.current);
     };
 
@@ -389,7 +423,17 @@ export default function HubProfileScreen() {
         },
     ];
 
+    const retryTournaments = () => {
+        setTournamentsError(false);
+        setHasMore(true);
+        setPage(0);
+        fetchTournaments(0, tournamentFilter, ++tournamentsSeq.current);
+    };
+
     const renderTournamentList = () => {
+        if (tournaments.length === 0 && !isListLoading && tournamentsError) {
+            return <LoadFailedState onRetry={retryTournaments} className="mt-2" />;
+        }
         if (tournaments.length === 0 && !isListLoading) {
             return (
                 <View className="bg-card rounded-[24px] p-10 border border-white/5 items-center">
@@ -435,6 +479,7 @@ export default function HubProfileScreen() {
                         <ActivityIndicator size="small" color="#10B981" />
                     </View>
                 )}
+                {tournamentsError && tournaments.length > 0 && <LoadFailedState onRetry={loadMoreTournaments} retrying={isListLoading} />}
             </View>
         );
     };
@@ -460,7 +505,9 @@ export default function HubProfileScreen() {
         );
     }
 
-    if (error || !hubData) {
+    // Only with nothing to show: a refresh that fails over a loaded hub keeps it on screen, with the
+    // banner above the hero.
+    if (!hubData) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-row items-center justify-between px-6 py-2">
@@ -535,6 +582,10 @@ export default function HubProfileScreen() {
                 }}
                 scrollEventThrottle={16}
             >
+                {hubQuery.isError && (
+                    <RefreshFailedBanner className="mx-5 mt-3" onRetry={refetchHub} retrying={hubQuery.isFetching} />
+                )}
+
                 {/* ─── Hub hero: the in-app version of the hub's share card ─── */}
                 {(() => {
                     const socials = mapSocialsToLinks(hubData.hubSocials);
@@ -848,8 +899,20 @@ export default function HubProfileScreen() {
                                             <ActivityIndicator size="small" color={COLORS.info} />
                                         </View>
                                     )}
+                                    {membersError && members.length > 0 && <LoadFailedState onRetry={loadMoreMembers} retrying={isMembersLoading} />}
 
-                                    {!isMembersLoading && members.length === 0 && (
+                                    {!isMembersLoading && members.length === 0 && membersError && (
+                                        <LoadFailedState
+                                            variant="plain"
+                                            className="py-10"
+                                            onRetry={() => {
+                                                setMembersError(false);
+                                                fetchMembers(0, memberSearch.trim(), ++memberSearchSeq.current);
+                                            }}
+                                        />
+                                    )}
+
+                                    {!isMembersLoading && members.length === 0 && !membersError && (
                                         <View className="py-10 items-center px-6">
                                             <View className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-3">
                                                 <Ionicons name={memberSearch ? 'search-outline' : 'people-outline'} size={22} color={COLORS.slate500} />

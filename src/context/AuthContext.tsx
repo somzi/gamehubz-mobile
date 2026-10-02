@@ -8,6 +8,7 @@ import { API_BASE_URL, ENDPOINTS, setAuthToken, authenticatedFetch, subscribeToL
 import * as SecureStore from 'expo-secure-store';
 import { usePushNotifications, STORAGE_KEY_LAST_SYNCED_TOKEN } from '../hooks/usePushNotifications';
 import { syncLanguageWithServer, STORAGE_KEY_LAST_SYNCED_LANGUAGE } from '../lib/languageSync';
+import { fetchTextWithTimeout } from '../lib/fetchWithTimeout';
 
 
 interface AuthContextType {
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isAppReady, setIsAppReady] = useState(false);
+    const sessionVersion = useRef(0);
 
     // Push notifications
     const { checkAndSync, requestAndSync } = usePushNotifications();
@@ -100,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadStoredAuth();
 
         const unsubscribe = subscribeToLogout(() => {
+            sessionVersion.current += 1;
             // Force-logout path (401 → refresh failed). Wipe cached data here too so
             // an expired session can't paint the previous account's snapshot after
             // the user re-logs in. wipeSessionCache reads no state, only clears the
@@ -265,10 +268,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshUser = useCallback(async () => {
         if (!user?.id) return;
+        const version = sessionVersion.current;
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_USER_INFO(user.id));
             if (response.ok) {
                 const userInfo = await response.json();
+                if (version !== sessionVersion.current) return;
                 const apiInfo = userInfo.result || userInfo;
                 const next = normalizeUser(apiInfo);
                 // Runs on every Profile focus and nearly always answers with what we already hold. A
@@ -281,9 +286,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user?.id]);
 
     const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+        const version = ++sessionVersion.current;
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/Auth/login`, {
+            const response = await fetchTextWithTimeout(`${API_BASE_URL}/api/Auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -297,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             const text = await response.text();
+            if (version !== sessionVersion.current) return { success: false };
             let data: any;
 
             try {
@@ -352,7 +359,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const register = useCallback(async (formData: any): Promise<{ success: boolean; message?: string }> => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/Auth/registerUser`, {
+            const response = await fetchTextWithTimeout(`${API_BASE_URL}/api/Auth/registerUser`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -520,28 +527,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const logout = useCallback(async () => {
+        sessionVersion.current += 1;
+        setAuthToken(null);
         if (refreshToken) {
-            try {
-                await fetch(`${API_BASE_URL}/api/Auth/logout`, {
+                void fetchTextWithTimeout(`${API_BASE_URL}/api/Auth/logout`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': token ? `Bearer ${token}` : ''
                     },
                     body: JSON.stringify(refreshToken),
-                });
-            } catch (error) {
-                console.error('[AuthContext] Logout API error:', error);
-            }
+                }).catch((error) => console.warn('[AuthContext] Logout API error:', error));
         }
         // Wipe cached data so a subsequent login as a different user doesn't
         // paint the previous account's snapshot from the persisted store.
         await wipeSessionCache();
-        await SecureStore.deleteItemAsync('access_token');
-        await SecureStore.deleteItemAsync('refresh_token');
-        await SecureStore.deleteItemAsync('user_meta');
-        await SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN);
-        await SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE);
+        await Promise.allSettled([
+            SecureStore.deleteItemAsync('access_token'),
+            SecureStore.deleteItemAsync('refresh_token'),
+            SecureStore.deleteItemAsync('user_meta'),
+            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_TOKEN),
+            SecureStore.deleteItemAsync(STORAGE_KEY_LAST_SYNCED_LANGUAGE),
+        ]);
 
         setUser(null);
         setToken(null);

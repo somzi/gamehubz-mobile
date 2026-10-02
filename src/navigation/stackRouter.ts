@@ -5,6 +5,7 @@ import {
     type StackNavigationState,
 } from '@react-navigation/native';
 import type { RootStackParamList } from '../types/navigation';
+import { describeRoute, logNavigation } from '../lib/navigationLog';
 
 type StackState = StackNavigationState<RootStackParamList>;
 type Params = Record<string, any> | undefined;
@@ -40,10 +41,63 @@ const SUBJECT: Record<string, (a: Params, b: Params) => boolean> = {
 // change. Going back to it is not a reason to do either, so it keeps the params it was opened with.
 const KEEPS_PARAMS_ON_RETURN = new Set(['DirectChat']);
 
-// About one push transition. A second screen opened while the first is still sliding in is a
-// double tap: the second tap lands on the new screen's content, or on another row of the list.
-const PUSH_COOLDOWN_MS = 500;
-let lastPush: { key: string; at: number } | null = null;
+type NestedState = { index?: number; routes: { key?: string; state?: NestedState }[] };
+
+/**
+ * Where the screen that sent an action sits: on the focused path, under another screen, or not in
+ * the tree at all (a container-ref navigate from a push or a link carries no source). A screen
+ * that is covered can only be talking because of a tap that landed before the new screen took over
+ * the touch: the second tap of a double tap, or a second row tapped during the transition.
+ */
+function placeOf(state: NestedState | undefined, key: string, onFocusedPath = true): 'focused' | 'covered' | null {
+    if (!state?.routes) return null;
+    const focusedIndex = state.index ?? state.routes.length - 1;
+    for (let i = 0; i < state.routes.length; i++) {
+        const route = state.routes[i];
+        const focused = onFocusedPath && i === focusedIndex;
+        if (route.key === key) return focused ? 'focused' : 'covered';
+        const nested = placeOf(route.state, key, focused);
+        if (nested) return nested;
+    }
+    return null;
+}
+
+// A link can arrive before a profile-opened chat has resolved its id. Once either bootstrap
+// learns both identities, keep the original screen (including its draft) and remove its copies.
+function reconcileChats(state: StackState, source?: string): StackState {
+    const resolved = state.routes.find((r) => r.key === source && r.name === 'DirectChat');
+    if (!resolved) return state;
+    const copies = state.routes.filter((r) => r.name === 'DirectChat' && SUBJECT.DirectChat(r.params, resolved.params));
+    if (copies.length < 2) return state;
+    const original = copies[0];
+    const duplicateKeys = new Set(copies.slice(1).map((r) => r.key));
+    const params = { ...resolved.params, ...original.params } as Record<string, any>;
+    for (const copy of copies) {
+        for (const [key, value] of Object.entries(copy.params ?? {})) {
+            if (params[key] == null) params[key] = value;
+        }
+    }
+    const current = state.routes[state.index];
+    let routes = state.routes.filter((r) => !duplicateKeys.has(r.key))
+        .map((r) => r.key === original.key ? { ...r, params } : r);
+    // If a duplicate is visible, restore the original at that position without opening an
+    // unrelated screen in between. A hidden resolution must never steal focus.
+    if (duplicateKeys.has(current.key)) {
+        const restored = routes.find((r) => r.key === original.key)!;
+        routes = routes.filter((r) => r.key !== original.key);
+        const index = state.routes.slice(0, state.index).filter((r) => !duplicateKeys.has(r.key) && r.key !== original.key).length;
+        routes.splice(index, 0, restored);
+    }
+    logNavigation('merged duplicate chat', describeRoute('DirectChat', params));
+    return { ...state, routes, index: routes.findIndex((r) => r.key === (duplicateKeys.has(current.key) ? original.key : current.key)) };
+}
+
+/** Whether a route shows the screen and subject a navigate asked for — the router's own test. */
+export function isRouteFor(route: { name: string; params?: object } | undefined, name: string, params?: object): boolean {
+    if (!route || route.name !== name) return false;
+    const same = SUBJECT[name];
+    return !same || same(route.params as Params, params as Params);
+}
 
 function findExisting(state: StackState, name: string, params: Params): number {
     const same = SUBJECT[name];
@@ -108,56 +162,75 @@ function goToExisting(state: StackState, index: number, params: Params): StackSt
  * opened the conversation again on top of itself. Here a navigate to a screen that is already in the
  * stack, for the same tournament/player/hub/chat, goes to that screen instead. The same screen for a
  * different subject (another player's profile from a push) is pushed over the current one rather
- * than swapping its params, so back returns to the first one.
+ * than swapping its params, so back returns to the first one. A tap that reaches a screen after it
+ * was covered (a double tap) opens nothing; navigations from a push or a link are never held back.
  */
 export function singleCopyStackRouter<Action extends NavigationAction>(
     original: Router<StackState, Action>,
 ): Partial<Router<StackState, Action>> {
-    return {
-        getStateForAction(state, action, options) {
-            const navAction = action as unknown as NavigationAction;
-            const opensScreen = navAction.type === 'NAVIGATE' || navAction.type === 'PUSH';
-            let next: ReturnType<typeof original.getStateForAction> | undefined;
+    const resolve: Router<StackState, Action>['getStateForAction'] = (state, action, options) => {
+        const navAction = action as unknown as NavigationAction;
+        const opensScreen = navAction.type === 'NAVIGATE' || navAction.type === 'PUSH';
+        let next: ReturnType<typeof original.getStateForAction> | undefined;
 
-            if (navAction.type === 'NAVIGATE' && navAction.payload) {
-                const { name, params } = navAction.payload as { name: string; params?: Params };
-                if ((state.routeNames as string[]).includes(name)) {
-                    const existing = findExisting(state, name, params);
-                    if (existing !== -1) {
-                        next = goToExisting(state, existing, params);
-                    } else if (state.routes[state.index]?.name === name) {
-                        next = original.getStateForAction(
-                            state,
-                            StackActions.push(name, params) as unknown as Action,
-                            options,
-                        );
-                    }
-                }
-            } else if (navAction.type === 'REPLACE' && navAction.payload && state.index > 0) {
-                // A redirect screen (a team share link) replacing itself with a tournament that is
-                // already open underneath: drop the redirect and go to that one, not a second copy.
-                const { name, params } = navAction.payload as { name: string; params?: Params };
-                const replaced = state.routes[state.index];
-                if (!navAction.source || navAction.source === replaced.key) {
-                    const below: StackState = { ...state, index: state.index - 1, routes: state.routes.slice(0, state.index) };
-                    const existing = findExisting(below, name, params);
-                    if (existing !== -1) next = goToExisting(below, existing, params);
+        // Container actions (push notifications / links) have no source. A screen action must
+        // still belong to the focused path, even when its destination already exists below us.
+        // This is state-derived: no timer, no global history shared between router instances.
+        const name = (navAction.payload as { name?: string } | undefined)?.name;
+        if (opensScreen && name && (state.routeNames as string[]).includes(name) && navAction.source
+            && placeOf(state as NestedState, navAction.source) !== 'focused') {
+            logNavigation('ignored navigate from inactive screen', name);
+            return state;
+        }
+
+        if (navAction.type === 'NAVIGATE' && navAction.payload) {
+            const { name, params } = navAction.payload as { name: string; params?: Params };
+            if ((state.routeNames as string[]).includes(name)) {
+                const existing = findExisting(state, name, params);
+                if (existing !== -1) {
+                    next = goToExisting(state, existing, params);
+                } else if (state.routes[state.index]?.name === name) {
+                    next = original.getStateForAction(
+                        state,
+                        StackActions.push(name, params) as unknown as Action,
+                        options,
+                    );
                 }
             }
+        } else if (navAction.type === 'REPLACE' && navAction.payload && state.index > 0) {
+            // A redirect screen (a team share link) replacing itself with a tournament that is
+            // already open underneath: drop the redirect and go to that one, not a second copy.
+            const { name, params } = navAction.payload as { name: string; params?: Params };
+            const replaced = state.routes[state.index];
+            if (!navAction.source || navAction.source === replaced.key) {
+                const below: StackState = { ...state, index: state.index - 1, routes: state.routes.slice(0, state.index) };
+                const existing = findExisting(below, name, params);
+                if (existing !== -1) next = goToExisting(below, existing, params);
+            }
+        }
 
-            if (next === undefined) next = original.getStateForAction(state, action, options);
-            if (!opensScreen || !next || next === state) return next;
+        if (next === undefined) next = original.getStateForAction(state, action, options);
+        if (!opensScreen || !next || next === state) return next;
 
-            // Only a move forward counts: a new screen on top while the current one stays below it.
-            const current = state.routes[state.index];
-            const top = next.routes[next.index ?? next.routes.length - 1];
-            const forward = !!top?.key && top.key !== current?.key && next.routes.some((r) => r.key === current?.key);
-            if (!forward) return next;
+        const current = state.routes[state.index];
+        const top = next.routes[next.index ?? next.routes.length - 1];
+        const label = top ? describeRoute(top.name, top.params as Params) : '?';
 
-            const now = Date.now();
-            if (lastPush && now - lastPush.at < PUSH_COOLDOWN_MS && current?.key === lastPush.key) return state;
-            lastPush = { key: top.key!, at: now };
+        // Only a move forward can be a stray tap: a new screen on top while the current one stays.
+        const forward = !!top?.key && top.key !== current?.key && next.routes.some((r) => r.key === current?.key);
+        if (!forward) {
+            logNavigation(top?.key === current?.key ? 'updated' : 'back to', label);
             return next;
+        }
+
+        logNavigation(state.routes.some((r) => r.key === top!.key) ? 'brought forward' : 'opened', label);
+        return next;
+    };
+
+    return {
+        getStateForAction(state, action, options) {
+            const next = resolve(state, action, options);
+            return next?.stale === false && action.type === 'SET_PARAMS' ? reconcileChats(next, action.source) : next;
         },
     };
 }

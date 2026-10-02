@@ -10,6 +10,8 @@
   "confirm": "Potvrdi",
   "submit": "Pošalji",
   "retry": "Pokušaj ponovo",
+  "refreshFailed": "Osvežavanje nije uspelo",
+  "loadFailed": "Učitavanje nije uspelo",
   "search": "Pretraži",
   "loading": "Učitavanje...",
   "error": "Greška",
@@ -175,5 +177,10 @@
     "title": "Potrebno ažuriranje",
     "body": "Ova verzija GameHubz aplikacije više nije podržana. Ažuriraj na najnoviju verziju i nastavi da igraš.",
     "button": "Ažuriraj sada"
-  }
+  },
+  "chatConnecting": "Povezivanje…",
+  "chatReconnecting": "Ponovno povezivanje…",
+  "chatSending": "Slanje…",
+  "chatSendFailed": "Nije poslato",
+  "chatNewMessages": "Nove poruke"
 }

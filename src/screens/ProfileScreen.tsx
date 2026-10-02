@@ -1,5 +1,6 @@
+import { useRequestGate } from '../hooks/useRequestGate';
 import { useTranslation } from 'react-i18next';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MatchHistoryCard } from '../components/cards/MatchHistoryCard';
@@ -19,7 +20,7 @@ import { getSocialUrl, withDiscordProfileLink } from '../lib/social';
 import { SharePlayerCardModal } from '../components/modals/SharePlayerCardModal';
 import { TournamentCard } from '../components/cards/TournamentCard';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailedState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 
 
@@ -42,11 +43,14 @@ export default function ProfileScreen() {
     const [tournamentsPage, setTournamentsPage] = useState(0);
     const [hasMoreTournaments, setHasMoreTournaments] = useState(true);
     const [isLoadingMoreTournaments, setIsLoadingMoreTournaments] = useState(false);
+    // The first page of a list failed: shown as a load failure with a retry, not as "no tournaments".
+    const [tournamentsError, setTournamentsError] = useState(false);
 
     const [userMatches, setUserMatches] = useState<any[]>([]);
     const [matchesPage, setMatchesPage] = useState(0);
     const [hasMoreMatches, setHasMoreMatches] = useState(true);
     const [isLoadingMoreMatches, setIsLoadingMoreMatches] = useState(false);
+    const [matchesError, setMatchesError] = useState(false);
 
     // When the stats last loaded — the focus refetch below skips anything fresher than 30s.
     const statsLoadedAtRef = useRef(0);
@@ -84,15 +88,24 @@ export default function ProfileScreen() {
         }
     }, [user?.id]);
 
+    const listRequests = useRequestGate(user?.id);
+    const pageRequests = useMemo(() => new Set<string>(), [listRequests]);
     const loadMoreTournaments = async () => {
         if (!user?.id || isLoadingMoreTournaments || !hasMoreTournaments) return;
 
+        const requestKey = 'tournaments:' + user?.id;
+        if (pageRequests.has(requestKey)) return;
+        pageRequests.add(requestKey);
+        const current = listRequests.begin('tournaments');
+        setTournamentsError(false);
         setIsLoadingMoreTournaments(true);
 
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_TOURNAMENTS(user.id, tournamentsPage));
+            if (!current()) return;
             if (response.ok) {
                 const data = await response.json();
+                if (!current()) return;
                 const items = data.items || data.Items || data.result || data;
                 const itemsArray = Array.isArray(items) ? items : [];
 
@@ -103,40 +116,52 @@ export default function ProfileScreen() {
                 });
                 setTournamentsPage(prev => prev + 1);
                 setHasMoreTournaments(itemsArray.length === 10);
+                setTournamentsError(false);
             } else {
-                setHasMoreTournaments(false);
+                setTournamentsError(true);
             }
         } catch (error) {
             console.error('Error fetching more tournaments:', error);
-            setHasMoreTournaments(false);
+            // A failed first page keeps hasMore, so the retry (and the next visit to the tab) loads it.
+            if (current()) setTournamentsError(true);
         } finally {
-            setIsLoadingMoreTournaments(false);
+            pageRequests.delete(requestKey);
+            if (current()) setIsLoadingMoreTournaments(false);
         }
     };
 
     const loadMoreMatches = async () => {
         if (!user?.id || isLoadingMoreMatches || !hasMoreMatches) return;
 
+        const requestKey = 'matches:' + user?.id;
+        if (pageRequests.has(requestKey)) return;
+        pageRequests.add(requestKey);
+        const current = listRequests.begin('matches');
+        setMatchesError(false);
         setIsLoadingMoreMatches(true);
 
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_PROFILE_MATCHES(user.id, matchesPage));
+            if (!current()) return;
             if (response.ok) {
                 const data = await response.json();
+                if (!current()) return;
                 const items = data.items || data.Items || data.result || data;
                 const itemsArray = Array.isArray(items) ? items : [];
 
                 setUserMatches(prev => [...prev, ...itemsArray]);
                 setMatchesPage(prev => prev + 1);
                 setHasMoreMatches(itemsArray.length === 10);
+                setMatchesError(false);
             } else {
-                setHasMoreMatches(false);
+                setMatchesError(true);
             }
         } catch (error) {
             console.error('Error fetching more matches:', error);
-            setHasMoreMatches(false);
+            if (current()) setMatchesError(true);
         } finally {
-            setIsLoadingMoreMatches(false);
+            pageRequests.delete(requestKey);
+            if (current()) setIsLoadingMoreMatches(false);
         }
     };
 
@@ -296,12 +321,20 @@ export default function ProfileScreen() {
                                                 isPrivate={!!(row.isPrivate ?? row.IsPrivate)}
                                             />
                                         ))}
+                                        {tournamentsError && <LoadFailedState onRetry={loadMoreTournaments} retrying={isLoadingMoreTournaments} />}
                                         {hasMoreTournaments && isLoadingMoreTournaments && (
                                             <View className="mt-4 py-4 items-center justify-center">
                                                 <ActivityIndicator size="small" color="#10B981" />
                                             </View>
                                         )}
                                     </>
+                                ) : tournamentsError ? (
+                                    <LoadFailedState onRetry={() => { setTournamentsError(false); loadMoreTournaments(); }} />
+                                ) : hasMoreTournaments || isLoadingMoreTournaments ? (
+                                    // The first page is still on its way — not "no tournaments" yet.
+                                    <View className="py-10 items-center justify-center">
+                                        <ActivityIndicator size="small" color="#10B981" />
+                                    </View>
                                 ) : (
                                     <EmptyState icon="trophy-outline" color={COLORS.warning} title={t('noTournamentsFound')} />
                                 )}
@@ -333,12 +366,19 @@ export default function ProfileScreen() {
                                                 date={formatDateSafe(match.scheduledTime || match.ScheduledTime, tCommon('app.notAvailableShort'))}
                                             />
                                         ))}
+                                        {matchesError && <LoadFailedState onRetry={loadMoreMatches} retrying={isLoadingMoreMatches} />}
                                         {hasMoreMatches && isLoadingMoreMatches && (
                                             <View className="mt-4 py-4 items-center justify-center">
                                                 <ActivityIndicator size="small" color="#10B981" />
                                             </View>
                                         )}
                                     </>
+                                ) : matchesError ? (
+                                    <LoadFailedState onRetry={() => { setMatchesError(false); loadMoreMatches(); }} />
+                                ) : hasMoreMatches || isLoadingMoreMatches ? (
+                                    <View className="py-10 items-center justify-center">
+                                        <ActivityIndicator size="small" color="#10B981" />
+                                    </View>
                                 ) : (
                                     <EmptyState icon="game-controller-outline" color={COLORS.primary} title={t('noMatchHistory')} />
                                 )}

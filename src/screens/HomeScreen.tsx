@@ -15,7 +15,7 @@ import { MatchScheduleCard } from '../components/match/MatchScheduleCard';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, LoadFailedState } from '../components/ui/EmptyState';
 import { NotificationBell } from '../components/ui/NotificationBell';
 import { RaisedCard } from '../components/ui/RaisedCard';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -317,6 +317,12 @@ export default function HomeScreen() {
                                 <MatchCardSkeleton />
                                 <MatchCardSkeleton />
                             </View>
+                        ) : homeMatchesQuery.isError && allMatches.length === 0 ? (
+                            <LoadFailedState
+                                onRetry={invalidateMatches}
+                                retrying={homeMatchesQuery.isFetching}
+                                className={EMPTY_SECTION_CLASS}
+                            />
                         ) : sortedActiveMatches.length > 0 ? (
                             <View className="gap-2.5">
                                 {sortedActiveMatches.slice(0, 3).map((match) => (
@@ -381,6 +387,12 @@ export default function HomeScreen() {
                                 <FeedCardSkeleton />
                                 <FeedCardSkeleton />
                             </View>
+                        ) : hubActivitiesQuery.isError && hubActivities.length === 0 ? (
+                            <LoadFailedState
+                                onRetry={() => queryClient.invalidateQueries({ queryKey: ['hub-activities'] })}
+                                retrying={hubActivitiesQuery.isFetching}
+                                className={EMPTY_SECTION_CLASS}
+                            />
                         ) : hubActivities.length > 0 ? (
                             <View className="gap-2.5">
                                 {hubActivities.slice(0, 3).map((item, index) => (

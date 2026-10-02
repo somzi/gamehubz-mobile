@@ -57,6 +57,8 @@ import {
     seriesGamesFrom,
 } from '../../lib/series';
 import { dateLocale } from '../../i18n';
+import { useModalHandoff, useModalPresence } from '../../lib/modalHandoff';
+import { useRequestGate } from '../../hooks/useRequestGate';
 
 export type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -178,6 +180,14 @@ interface MatchDetailsModalProps {
      * itself, and coming back lands on the bare screen.
      */
     onOpenProfile?: (userId: string, fromTab: MatchModalTab) => void;
+    /** iOS: the modal has finished animating out — what a host's hand-off (a profile, the team
+     *  overview) waits for. See lib/modalHandoff. */
+    onDismiss?: () => void;
+    /** Opened with nothing but the match id (a push): show one loading state until the match and
+     *  the tournament around it are in, rather than tabs and forms drawn from guesses and redrawn. */
+    holdUntilReady?: boolean;
+    /** The host's tournament (permissions, status) is loaded. Read only while holding. */
+    contextReady?: boolean;
 }
 
 export function MatchDetailsModal({
@@ -208,11 +218,16 @@ export function MatchDetailsModal({
     tournamentStatus,
     defaultTab = 'match',
     onOpenProfile,
+    onDismiss,
+    holdUntilReady = false,
+    contextReady = true,
 }: MatchDetailsModalProps) {
     const { user } = useAuth();
     const { t } = useTranslation('match');
     const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+    // Hidden, the window stays until it has animated out on iOS, so onDismiss can report it.
+    const presence = useModalPresence(visible, onDismiss);
     const insets = useSafeAreaInsets();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -263,6 +278,11 @@ export function MatchDetailsModal({
     const mainScrollY = useRef(0);
 
     const [isLoadingDetails, setIsLoadingDetails] = useState(true);
+    // The modal is reused across matches, so the details on hand may be the previous one's. This
+    // is the match whose load last finished (with or without data) — what the push hold waits for.
+    const [detailsSettledFor, setDetailsSettledFor] = useState<string | null>(null);
+    // Read inside fetchMatchDetails after its await: an answer for a match no longer shown is dropped.
+    const requests = useRequestGate(matchId);
 
     // Backend MatchStatus.NoShow (5): a fixture an admin closed as a double walkover. Terminal
     // like Completed — and reversible — so it shares the completed rendering path, with its own
@@ -382,6 +402,18 @@ export function MatchDetailsModal({
         setConfirmedTimeIso(undefined);
     }, [matchId, deadline]);
 
+    // Another match in the same modal: drop the previous one's details instead of showing them under
+    // the new match's header until its own arrive. Not keyed on anything else — a reopen of the same
+    // match (back from a profile) keeps what is on screen.
+    useEffect(() => {
+        setMatchDetails(null);
+        setDetailsSettledFor(null);
+        setStreams([]);
+        setAdminAvailability(null);
+        setMySlots(myAvailability);
+        setOpponentSlots(opponentAvailability);
+    }, [matchId]);
+
     // Apply the host-requested starting tab whenever the modal opens or the match
     // changes — covers reopens on the same matchId (e.g. admin closes from chat,
     // reopens via the help-requests inbox and expects chat again).
@@ -489,6 +521,8 @@ export function MatchDetailsModal({
      */
     const fetchMatchDetails = async (silent = false) => {
         if (!matchId) return;
+        const requestedId = matchId;
+        const isCurrent = requests.begin('details');
         if (!silent) {
             setIsLoadingDetails(true);
             setError(null);
@@ -496,8 +530,11 @@ export function MatchDetailsModal({
         try {
             // Combo endpoint: details + streams + availability in one round-trip.
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS_FULL(matchId));
+            // Match A's late answer must not land on match B (closed A, opened B from a push).
+            if (!isCurrent()) return;
             if (response.ok) {
                 const envelope = await response.json();
+                if (!isCurrent()) return;
                 // /details/full response shape: { details, streams, availability? }. Older /details
                 // returned the details DTO at the top level, so fall back to that when either the
                 // envelope shape is missing or a proxy/older server is in the mix.
@@ -581,22 +618,27 @@ export function MatchDetailsModal({
             }
         } catch (err) {
             console.error('Error fetching match details:', err);
-            if (!silent) setError(t('details.loadResultsError'));
+            if (!silent && isCurrent()) setError(t('details.loadResultsError'));
         } finally {
-            if (!silent) {
-                setIsLoadingDetails(false);
-                setIsEditMode(false);
+            if (isCurrent()) {
+                setDetailsSettledFor(requestedId);
+                if (!silent) {
+                    setIsLoadingDetails(false);
+                    setIsEditMode(false);
+                }
             }
         }
     };
 
     const fetchAvailability = async () => {
         if (!user?.id || !matchId) return;
+        const isCurrent = requests.begin('availability');
         setIsLoadingAvailability(true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_AVAILABILITY(matchId, user.id));
             if (response.ok) {
                 const data = await response.json();
+                if (!isCurrent()) return;
                 if (data.mySlots) setMySlots(data.mySlots);
                 if (data.opponentSlots) setOpponentSlots(data.opponentSlots);
                 if (data.matchDeadline) {
@@ -612,7 +654,7 @@ export function MatchDetailsModal({
         } catch (error) {
             console.error('Error fetching availability:', error);
         } finally {
-            setIsLoadingAvailability(false);
+            if (isCurrent()) setIsLoadingAvailability(false);
         }
     };
 
@@ -740,11 +782,12 @@ export function MatchDetailsModal({
         onClose();
     };
 
-    // Hide the nested confirm first and close the match modal a beat later — dismissing a parent
-    // Modal while its child is still presented glitches on iOS (same reason ActionSheetModal defers).
+    // Hide the nested confirm first and close the match modal once it is gone — dismissing a parent
+    // Modal while its child is still presented glitches on iOS.
+    const promptHandoff = useModalHandoff();
     const closeAfterPrompt = () => {
         setShowResolveHelpPrompt(false);
-        setTimeout(onClose, 250);
+        promptHandoff.after(onClose);
     };
 
     const confirmResolveHelp = async () => {
@@ -2164,6 +2207,7 @@ export function MatchDetailsModal({
                         )}
                     </Pressable>
                 </View>
+
                 </>
                 )}
 
@@ -2263,13 +2307,18 @@ export function MatchDetailsModal({
         );
     };
 
-    if (!visible) return null;
+    // Held until the load for THIS match has finished — the details on hand may be another match's —
+    // and the tournament is in. A failed load ends the hold too: the error belongs on screen.
+    const holding = (!!matchId && detailsSettledFor !== matchId) || (holdUntilReady && !contextReady);
+
+    if (!presence.rendered) return null;
 
     return (
         <Modal
             animationType="slide"
             transparent={false}
             visible={visible}
+            onDismiss={presence.onDismiss}
             onRequestClose={() => {
                 // The Verify Result sheet is an overlay inside this window, not a Modal of its own, so
                 // Android's back key arrives here — it closes the sheet, not the match under it.
@@ -2324,6 +2373,12 @@ export function MatchDetailsModal({
                     )}
                 </View>
 
+                {holding ? (
+                    <View className="flex-1 items-center justify-center" accessibilityRole="progressbar">
+                        <ActivityIndicator size="large" color="#10B981" />
+                    </View>
+                ) : (
+                <>
                 {/* Match / Form / Chat / Schedule / Stream tabs. Match is always present; the
                     optional matchup tab appears as soon as both players are resolved. */}
                 {(showInsightsTab || showChatTab || showStreamTab || showScheduleTab) && (
@@ -2476,23 +2531,7 @@ export function MatchDetailsModal({
                             onStreamsChange={setStreams}
                         />
                     </View>
-                ) : activeTab === 'chat' && showChatTab ? (
-                    // Both platforms lift the composer by the measured keyboard inset.
-                    // KeyboardAvoidingView cannot do this here: it pads from its own
-                    // parent-relative frame, so nested under the modal's top padding +
-                    // header + tab bar it under-padded by that whole offset on iOS and
-                    // left the composer sitting behind the keyboard — which is why
-                    // sending a message meant dismissing the keyboard first.
-                    <View style={{ flex: 1, paddingBottom: chatKeyboardInset }}>
-                        <MatchChatPanel
-                            matchId={matchId}
-                            active={visible && activeTab === 'chat'}
-                            participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
-                            avatarsByUserId={chatAvatars}
-                            readOnly={isChatReadOnly}
-                        />
-                    </View>
-                ) : (
+                ) : activeTab === 'chat' && showChatTab ? null : (
                 <ScrollView
                     keyboardShouldPersistTaps="handled"
                     ref={mainScrollViewRef}
@@ -2581,11 +2620,24 @@ export function MatchDetailsModal({
                     )}
                 </ScrollView>
                 )}
+                <View style={{ flex: 1, paddingBottom: chatKeyboardInset, display: activeTab === 'chat' && showChatTab ? 'flex' : 'none' }}>
+                        <MatchChatPanel
+                            key={matchId}
+                            matchId={matchId}
+                            active={visible && activeTab === 'chat' && showChatTab}
+                            participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
+                            avatarsByUserId={chatAvatars}
+                            readOnly={isChatReadOnly}
+                        />
+                    </View>
+                </>
+                )}
             </View>
 
             {/* Admin just settled a match with an open help request — offer to close it in one go. */}
             <ConfirmationModal
                 visible={showResolveHelpPrompt}
+                onDismiss={promptHandoff.onDismiss}
                 onClose={closeAfterPrompt}
                 onConfirm={confirmResolveHelp}
                 title={t('details.closeHelpTitle')}

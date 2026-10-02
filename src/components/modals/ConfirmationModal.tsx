@@ -25,6 +25,9 @@ export interface ConfirmationModalProps {
      *  the whole sheet-plus-confirmation flow stays in a single window, so that cannot happen.
      *  The caller owns the hardware back key - route it to onClose while this is up. */
     overlay?: boolean;
+    /** iOS: called once the modal has animated out — where a hand-off to the next modal or screen
+     *  waits (see lib/modalHandoff). */
+    onDismiss?: () => void;
 }
 
 export function ConfirmationModal({
@@ -39,6 +42,7 @@ export function ConfirmationModal({
     isLoading = false,
     stacked = false,
     overlay = false,
+    onDismiss,
 }: ConfirmationModalProps) {
     // Resolved in the body rather than as default parameters: a default is evaluated
     // before hooks run, so it would capture whatever language was active at import.
@@ -131,6 +135,7 @@ export function ConfirmationModal({
             transparent
             animationType="fade"
             onRequestClose={onClose}
+            onDismiss={onDismiss}
         >
             {body}
         </Modal>

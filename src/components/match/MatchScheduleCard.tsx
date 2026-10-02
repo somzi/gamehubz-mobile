@@ -1,6 +1,7 @@
+import { useRequestGate } from '../../hooks/useRequestGate';
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Modal, ScrollView, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -18,16 +19,14 @@ import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { PressableScale } from '../ui/PressableScale';
 import { RaisedCard } from '../ui/RaisedCard';
 import { COLORS } from '../../lib/theme';
-import { cn, formatLocalDateTime, parseUtcDate } from '../../lib/utils';
-import { authenticatedFetch, ENDPOINTS, API_BASE_URL } from '../../lib/api';
+import { cn, parseUtcDate } from '../../lib/utils';
+import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useBadges } from '../../context/BadgesContext';
 import { useKeyboardInset } from '../../hooks/useKeyboardInset';
-import { HubConnectionBuilder, HubConnection, LogLevel } from '@microsoft/signalr';
-import * as SecureStore from 'expo-secure-store';
 import * as ImagePicker from 'expo-image-picker';
 import { PendingEvidenceStrip } from './PendingEvidenceStrip';
-import { startSignalRWithRetry } from '../../lib/signalR';
+import { MatchChatPanel } from './MatchChatPanel';
 import { EvidenceThumb } from './EvidenceThumb';
 import { EvidencePreviewModal } from './EvidencePreviewModal';
 import { ResultVerificationCard } from './ResultVerificationCard';
@@ -43,11 +42,8 @@ import {
     isImageWithinLimit,
     MAX_VIDEO_DURATION_SECONDS,
 } from '../../lib/evidence';
-import { MatchComment } from '../../types/auth';
 import { RootStackParamList } from '../../types/navigation';
 import { MAX_FILE_SIZE, formatFileSize } from '../../lib/image';
-import { MatchChatBubble } from '../chat/MatchChatBubble';
-import { mergeMessagesById } from '../../lib/mergeMessages';
 import { AdminHelpSection } from './AdminHelpSection';
 import { MatchStreamPanel } from './MatchStreamPanel';
 import { MatchInsightsPanel, type MatchInsightPlayer } from './MatchInsightsPanel';
@@ -64,6 +60,7 @@ import {
 import { MatchStream, MatchStreamStatus } from '../../types/stream';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
 import { dateLocale } from '../../i18n';
+import { afterScreenTransition, useModalHandoff } from '../../lib/modalHandoff';
 
 type MatchStatus = 'pending_availability' | 'scheduled' | 'ready_phase' | 'completed';
 
@@ -157,12 +154,12 @@ function MatchScheduleCardBase({
     const { user } = useAuth();
     const { refresh: refreshBadges } = useBadges();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+    const requests = useRequestGate(matchId);
     const insets = useSafeAreaInsets();
 
-    // Local copy so the card badge clears the moment the user opens the chat,
-    // without waiting for the parent list to refetch.
-    const [chatRead, setChatRead] = useState(false);
-    const showUnreadBadge = unreadMessages > 0 && !chatRead && initialStatus !== 'completed';
+    // The shared chat updates the cached unread count after the read succeeds.
+    // New badge pushes refetch it, so later unread messages appear again.
+    const showUnreadBadge = unreadMessages > 0 && initialStatus !== 'completed';
 
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -175,6 +172,11 @@ function MatchScheduleCardBase({
     const [currentStatus, setCurrentStatus] = useState<MatchStatus>(initialStatus);
     const [matchTime, setMatchTime] = useState(initialScheduledTime);
     const [matchTimeIso, setMatchTimeIso] = useState<string | undefined>(scheduledTimeIso ?? undefined);
+    useEffect(() => { setCurrentStatus(initialStatus); }, [initialStatus]);
+    useEffect(() => {
+        setMatchTime(initialScheduledTime);
+        setMatchTimeIso(scheduledTimeIso ?? undefined);
+    }, [initialScheduledTime, scheduledTimeIso]);
     const [localDeadline, setLocalDeadline] = useState<string>(deadline);
     /** "We already agreed outside the app" is a one-way skip of the whole availability step —
      *  it schedules the match for BOTH sides — so it goes through a confirmation first. */
@@ -297,20 +299,9 @@ function MatchScheduleCardBase({
     const [compressionProgress, setCompressionProgress] = useState(0);
 
     // Comments state
-    const [comments, setComments] = useState<MatchComment[]>([]);
-    const [newComment, setNewComment] = useState('');
-    const [isLoadingComments, setIsLoadingComments] = useState(false);
-    const [isSendingComment, setIsSendingComment] = useState(false);
-    const commentsListRef = useRef<FlatList<MatchComment>>(null);
     const mainScrollViewRef = useRef<ScrollView>(null);
     // Live scroll offset, kept in a ref so tracking it costs no re-renders.
     const mainScrollY = useRef(0);
-    const connectionRef = useRef<HubConnection | null>(null);
-    const commentInputRef = useRef<TextInput>(null);
-    // The real in-flight guard — see the note in handleSendComment. State is one render behind,
-    // which is precisely the window a fast double-tap lands in.
-    const sendingCommentRef = useRef(false);
-
     // Collapsible sections state. Evidence starts closed: it's the tallest block on the screen,
     // empty most of the time, and open it pushed "Need Help?" below the fold.
     const [isEvidenceExpanded, setIsEvidenceExpanded] = useState(false);
@@ -381,19 +372,28 @@ function MatchScheduleCardBase({
     const reopenOnFocusRef = useRef(false);
     const [seriesDraftToRestore, setSeriesDraftToRestore] = useState<SeriesGame[] | null>(null);
 
+    // The profile slides in once the sheet is down, and the sheet comes back once the profile has
+    // slid away — one movement at a time (see lib/modalHandoff).
+    const sheetHandoff = useModalHandoff();
     const openPlayerProfile = (userId?: string | null, seriesDraft?: SeriesGame[]) => {
         if (!userId) return;
         reopenOnFocusRef.current = true;
         setSeriesDraftToRestore(seriesDraft?.length ? seriesDraft : null);
         setModalVisible(false);
-        navigation.navigate('PlayerProfile', { id: userId });
+        // Only if the viewer is still on this list: leaving it while the sheet went down cancels it.
+        sheetHandoff.after(() => {
+            if (navigation.isFocused()) navigation.navigate('PlayerProfile', { id: userId });
+            else reopenOnFocusRef.current = false;
+        });
     };
 
     useFocusEffect(
         React.useCallback(() => {
-            if (!reopenOnFocusRef.current) return;
-            reopenOnFocusRef.current = false;
-            setModalVisible(true);
+            const cancel = reopenOnFocusRef.current ? afterScreenTransition(() => {
+                reopenOnFocusRef.current = false;
+                setModalVisible(true);
+            }) : undefined;
+            return () => { cancel?.(); setModalVisible(false); };
         }, [])
     );
 
@@ -404,12 +404,15 @@ function MatchScheduleCardBase({
     }, [deadline]);
 
     const fetchAvailability = async () => {
+        const isCurrent = requests.begin('fetchAvailability');
         if (!user?.id || !matchId) return;
         setIsLoadingAvailability(true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_AVAILABILITY(matchId, user.id));
+            if (!isCurrent()) return;
             if (response.ok) {
                 const data = await response.json();
+            if (!isCurrent()) return;
                 if (data.mySlots) setMySlots(data.mySlots);
                 if (data.opponentSlots) setOpponentSlots(data.opponentSlots);
                 if (data.matchDeadline) {
@@ -425,111 +428,33 @@ function MatchScheduleCardBase({
                 }
             }
         } catch (error) {
+            if (!isCurrent()) return;
             console.error('Error fetching availability:', error);
         } finally {
+            if (!isCurrent()) return;
             setIsLoadingAvailability(false);
         }
     };
 
-    const fetchComments = async (silent = false) => {
-        if (!matchId) return;
-        if (!silent) setIsLoadingComments(true);
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId));
-            if (response.ok) {
-                const data = await response.json();
-                setComments(Array.isArray(data) ? data : []);
-            }
-        } catch (error) {
-            console.error('Error fetching comments:', error);
-        } finally {
-            if (!silent) setIsLoadingComments(false);
-        }
-    };
-
     const fetchStreams = async () => {
+        const isCurrent = requests.begin('fetchStreams');
         if (!matchId) return;
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_STREAMS(matchId));
+            if (!isCurrent()) return;
             if (response.ok) {
                 const data = await response.json();
+            if (!isCurrent()) return;
                 setStreams(Array.isArray(data) ? data : []);
             }
         } catch (error) {
+            if (!isCurrent()) return;
             console.error('Error fetching streams:', error);
         }
     };
 
-    // Mark the match chat read for the current user, clear the card badge, and
-    // refresh the global counts.
-    const markChatRead = async () => {
-        if (!matchId) return;
-        setChatRead(true);
-        try {
-            await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(matchId), { method: 'POST' });
-            refreshBadges();
-        } catch { /* best-effort */ }
-    };
-
-    // Clear unread as soon as the user opens the Chat tab.
-    useEffect(() => {
-        if (modalVisible && activeModalTab === 'chat') {
-            markChatRead();
-        }
-    }, [modalVisible, activeModalTab, matchId]);
-
-    const handleSendComment = async () => {
-        const content = newComment.trim();
-        // The guard has to be a REF, not the isSendingComment state: the button fires on
-        // touch-down, and state is captured in this closure and only refreshes on re-render — so
-        // two taps inside one frame both read false, both pass, and the message posts twice. The
-        // `disabled` prop has the same one-render lag and guards nothing here.
-        if (!content || !matchId || sendingCommentRef.current) return;
-
-        sendingCommentRef.current = true;
-        // Keep the keyboard up across sends (Discord-style): re-assert focus before the
-        // async round-trip — a no-op when already focused, and it re-opens the keyboard
-        // if a near-miss tap on the message list just dismissed it.
-        commentInputRef.current?.focus();
-        setIsSendingComment(true);
-
-        // Cleared NOW rather than when the server answers: the old text sitting in the box for
-        // the length of the round-trip is what reads as "send did nothing" and gets it pressed
-        // again. Restored below if the send actually fails.
-        setNewComment('');
-
-        try {
-            const response = await authenticatedFetch(ENDPOINTS.POST_MATCH_COMMENT(matchId), {
-                method: 'POST',
-                body: JSON.stringify({ content }),
-            });
-
-            if (response.ok) {
-                // If SignalR is not connected or fails, we might want a manual refresh
-                // but we should do it silently to avoid UI jumps
-                if (!connectionRef.current) {
-                    await fetchComments(true);
-                }
-                // Scroll to bottom after new comment
-                setTimeout(() => {
-                    commentsListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-            } else {
-                // Only into an empty box — anything typed since outranks the failed message.
-                setNewComment((current) => (current.length === 0 ? content : current));
-            }
-        } catch (error) {
-            console.error('Error sending comment:', error);
-            setNewComment((current) => (current.length === 0 ? content : current));
-        } finally {
-            sendingCommentRef.current = false;
-            setIsSendingComment(false);
-        }
-    };
-
-    const formatCommentTime = (dateString: string) => formatLocalDateTime(dateString);
-
     const fetchDbHomeUserId = async (): Promise<string | null> => {
+        const isCurrent = requests.begin('fetchDbHomeUserId');
         if (!matchId) {
             // Nothing to wait for, and the gate below must not strand the form behind a spinner:
             // callers build this id defensively (`match.id || match.matchId || ''`).
@@ -538,8 +463,10 @@ function MatchScheduleCardBase({
         }
         try {
             const response = await authenticatedFetch(ENDPOINTS.GET_MATCH_DETAILS(matchId));
+            if (!isCurrent()) return null;
             if (response.ok) {
                 const data = await response.json();
+            if (!isCurrent()) return null;
 
                 // For a team sub-match, GET_MATCH_DETAILS returns the whole team-match DTO,
                 // which has no top-level homeUserId/awayUserId — the home/away roles (and the
@@ -650,8 +577,10 @@ function MatchScheduleCardBase({
                 return homeUserId;
             }
         } catch (error) {
+            if (!isCurrent()) return null;
             console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
         } finally {
+            if (!isCurrent()) return null;
             // Settled either way: a failed fetch must not leave the form hidden behind a spinner.
             setDetailsLoaded(true);
         }
@@ -709,7 +638,7 @@ function MatchScheduleCardBase({
         }
     };
 
-    // Fetch availability and comments when modal opens
+    // Match details load on opening; chat loads only on its own tab.
     useEffect(() => {
         if (!modalVisible) {
             // A trip to a player's profile is not a real close: the sheet comes straight back on
@@ -724,12 +653,6 @@ function MatchScheduleCardBase({
 
         if (currentStatus === 'pending_availability') {
             fetchAvailability();
-        }
-
-        // Only load comments if they haven't been loaded for this match yet
-        // or if we explicitly want to refresh on open
-        if (currentStatus === 'scheduled' || currentStatus === 'ready_phase' || currentStatus === 'pending_availability') {
-            fetchComments();
         }
 
         // Fetch DB home/away roles so we can correctly map scores on submit AND so the chat
@@ -754,81 +677,6 @@ function MatchScheduleCardBase({
         const id = setInterval(() => { fetchDbHomeUserId(); }, 20000);
         return () => clearInterval(id);
     }, [modalVisible, matchId, checkInEnabled, checkInState.checkInDeadline, checkInState.homeCheckedInOn, checkInState.awayCheckedInOn]);
-
-    // SignalR Connection
-    useEffect(() => {
-        if (!matchId || !modalVisible) return;
-
-        // Scope flag — same pattern as DirectChatScreen. Prevents stale
-        // ReceiveMessage callbacks from writing to the next match's state
-        // and skips JoinMatchGroup if the modal closed before start() resolved.
-        let isActive = true;
-
-        const connection = new HubConnectionBuilder()
-            // MatchChatHub now requires authentication — pass the JWT as the access_token query param.
-            .withUrl(`${API_BASE_URL}/hubs/chat`, {
-                accessTokenFactory: async () =>
-                    (await SecureStore.getItemAsync('access_token').catch(() => null)) ?? '',
-            })
-            .withAutomaticReconnect()
-            .configureLogging(LogLevel.Information)
-            .build();
-
-        connection.on("ReceiveMessage", (newMessage: any) => {
-            if (!isActive) return;
-            const mappedMessage: MatchComment = {
-                id: newMessage.id || newMessage.Id,
-                userId: newMessage.userId || newMessage.UserId,
-                userNickname: newMessage.userNickname || newMessage.UserNickname || tCommon('unknown'),
-                userAvatarUrl: newMessage.userAvatarUrl || newMessage.UserAvatarUrl,
-                content: newMessage.content || newMessage.Content,
-                sentAt: newMessage.sentAt || newMessage.SentAt,
-            };
-
-            setComments((prevComments) => {
-                if (prevComments.some(c => c.id === mappedMessage.id)) return prevComments;
-                return [...prevComments, mappedMessage];
-            });
-
-            setTimeout(() => {
-                commentsListRef.current?.scrollToEnd({ animated: true });
-            }, 100);
-        });
-
-        // Group membership is per-connection: withAutomaticReconnect() re-establishes the
-        // socket after a drop (common on mobile: network switch, backgrounding) but SignalR
-        // does NOT re-join our old groups. Without this handler the card looks connected
-        // but silently stops receiving new messages until the user closes and reopens it.
-        // Backfill the gap with a merged, dedup'd history pull.
-        connection.onreconnected(() => {
-            if (!isActive) return;
-            connection.invoke('JoinMatchGroup', matchId).catch(() => { });
-            authenticatedFetch(ENDPOINTS.GET_MATCH_COMMENTS(matchId))
-                .then((r) => (r.ok ? r.json() : null))
-                .then((msgs: MatchComment[] | null) => {
-                    if (!isActive || !Array.isArray(msgs)) return;
-                    setComments((prev) => mergeMessagesById(prev, msgs));
-                })
-                .catch(() => { });
-        });
-
-        const initialConnection = startSignalRWithRetry(connection, {
-            onConnected: () => {
-                if (!isActive) return;
-                return connection.invoke("JoinMatchGroup", matchId);
-            },
-            onError: (err) => console.error('SignalR Connection Error:', err),
-        });
-
-        connectionRef.current = connection;
-
-        return () => {
-            isActive = false;
-            connection.off("ReceiveMessage");
-            void initialConnection.stop();
-            connectionRef.current = null;
-        };
-    }, [matchId, modalVisible]);
 
     const handleAvailabilitySubmit = async (slots: string[], dateTimeSlots: string[]) => {
         try {
@@ -1420,11 +1268,7 @@ function MatchScheduleCardBase({
 
         const scrollToBottom = () => {
             setTimeout(() => {
-                if (activeModalTab === 'chat') {
-                    commentsListRef.current?.scrollToEnd({ animated: true });
-                } else {
-                    mainScrollViewRef.current?.scrollToEnd({ animated: true });
-                }
+                mainScrollViewRef.current?.scrollToEnd({ animated: true });
             }, 150);
         };
 
@@ -1433,6 +1277,7 @@ function MatchScheduleCardBase({
                 animationType="slide"
                 transparent={false}
                 visible={modalVisible}
+                onDismiss={sheetHandoff.onDismiss}
                 onRequestClose={() => {
                     // The evidence preview, the Verify Result sheet and the confirmation are overlays
                     // inside this window, not Modals of their own, so Android's back key arrives
@@ -1575,17 +1420,6 @@ function MatchScheduleCardBase({
                                             "shrink",
                                             activeModalTab === 'chat' ? "text-emerald-300" : "text-slate-500"
                                         )}>{t('match:chat.chat')}</Text>
-                                        {comments.length > 0 && (
-                                            <View className={cn(
-                                                "min-w-[20px] h-5 items-center justify-center rounded-full px-1.5",
-                                                activeModalTab === 'chat' ? "bg-emerald-400/30" : "bg-white/[0.06]"
-                                            )}>
-                                                <Text className={cn(
-                                                    "text-[10px] font-black",
-                                                    activeModalTab === 'chat' ? "text-emerald-200" : "text-slate-500"
-                                                )}>{comments.length}</Text>
-                                            </View>
-                                        )}
                                     </View>
                                 </ModalTabButton>
                                 {/* Streaming only matters once the match is scheduled (live POVs) or
@@ -2251,165 +2085,18 @@ function MatchScheduleCardBase({
                                         initialStreams={streams}
                                         onStreamsChange={setStreams}
                                     />
-                                ) : (
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center gap-2 mb-4">
-                                            <Ionicons name="chatbubbles-outline" size={isPremium ? 20 : 18} color="#10B981" />
-                                            <Text className={cn("font-black uppercase tracking-tight", isPremium ? "text-lg text-white" : "text-sm text-foreground")}>{t('card.matchChat')}</Text>
-                                            <Text className={cn("font-bold", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>({comments.length})</Text>
-                                        </View>
-
-                                        {isLoadingComments ? (
-                                            <View className="h-48 items-center justify-center">
-                                                <ActivityIndicator size="small" color="#10B981" />
-                                            </View>
-                                        ) : (
-                                            // Same list wiring as the friends DM (DirectChatScreen), which sends on
-                                            // the first tap with the keyboard up: a FlatList with
-                                            // keyboardShouldPersistTaps="handled", drag-to-dismiss, composer below.
-                                            <FlatList
-                                                ref={commentsListRef}
-                                                data={comments}
-                                                keyExtractor={(c) => c.id}
-                                                className="mb-2 flex-1"
-                                                showsVerticalScrollIndicator={false}
-                                                keyboardShouldPersistTaps="handled"
-                                                // iOS: drag down onto the keyboard to dismiss (Discord-style).
-                                                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-                                                initialNumToRender={15}
-                                                maxToRenderPerBatch={15}
-                                                windowSize={11}
-                                                contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
-                                                onContentSizeChange={() => commentsListRef.current?.scrollToEnd({ animated: false })}
-                                                ListEmptyComponent={
-                                                    <View className={cn("h-32 border border-dashed rounded-2xl items-center justify-center mb-4", isPremium ? "border-white/10 bg-white/[0.02]" : "border-border/20 bg-muted/5")}>
-                                                        <Ionicons name="chatbubble-outline" size={isPremium ? 28 : 24} color={isPremium ? "#475569" : "#71717A"} />
-                                                        <Text numberOfLines={1} className={cn("font-bold uppercase tracking-widest mt-1 w-full text-center", isPremium ? "text-xs text-slate-500" : "text-[10px] text-muted-foreground")}>{t('card.noMessagesYet')}</Text>
-                                                    </View>
-                                                }
-                                                renderItem={({ item: comment }) => {
-                                                    const senderId = (comment.userId || '').toLowerCase();
-                                                    const isMyComment = !!user?.id && senderId === user.id.toLowerCase();
-                                                    // Match participants (home/away) come from the loaded match details.
-                                                    // Any sender outside that set is an admin / hub owner chiming in.
-                                                    const matchParticipantIds = [dbHomeUserId, dbAwayUserId]
-                                                        .filter(Boolean)
-                                                        .map(id => (id as string).toLowerCase());
-                                                    const isAdminMessage = !isMyComment && matchParticipantIds.length > 0 && !matchParticipantIds.includes(senderId);
-                                                    const isOpponentMessage = !isMyComment && !isAdminMessage;
-                                                    // Use the sender's own avatar; only fall back to the opponent avatar for the
-                                                    // actual opponent — never borrow it for an admin (that was the bug).
-                                                    const avatarSrc = isMyComment
-                                                        ? user?.avatarUrl
-                                                        : (comment.userAvatarUrl || (isOpponentMessage ? opponentAvatarUrl : undefined));
-                                                    return (
-                                                        <View className={cn(
-                                                            "mb-4 flex-row items-end gap-2 max-w-[85%]",
-                                                            isMyComment ? "self-end" : "self-start"
-                                                        )}>
-                                                            {!isMyComment && (
-                                                                <PlayerAvatar
-                                                                    src={avatarSrc}
-                                                                    name={comment.userNickname}
-                                                                    size="sm"
-                                                                    className="w-7 h-7 shrink-0"
-                                                                />
-                                                            )}
-
-                                                            <View className={cn(isMyComment ? "items-end" : "items-start", "flex-1")}>
-                                                                <View className="flex-row items-center gap-2 mb-1 px-1">
-                                                                    {!isMyComment && (
-                                                                        <Text className={cn("font-black text-[10px] uppercase tracking-tighter", isPremium ? "text-primary" : "text-primary/70")}>
-                                                                            {comment.userNickname}
-                                                                        </Text>
-                                                                    )}
-                                                                    {isAdminMessage && (
-                                                                        <View className="bg-warning/15 px-1.5 py-0.5 rounded-full border border-warning/25">
-                                                                            <Text className="text-[8px] font-black text-warning uppercase tracking-widest">{t('card.admin')}</Text>
-                                                                        </View>
-                                                                    )}
-                                                                    <Text className="text-[9px] font-bold text-slate-500">
-                                                                        {formatCommentTime(comment.sentAt)}
-                                                                    </Text>
-                                                                </View>
-                                                                <MatchChatBubble
-                                                                    content={comment.content}
-                                                                    isMyComment={isMyComment}
-                                                                />
-                                                            </View>
-
-                                                            {isMyComment && (
-                                                                <PlayerAvatar
-                                                                    src={user?.avatarUrl}
-                                                                    name={user?.username || t('card.you')}
-                                                                    size="sm"
-                                                                    className="w-7 h-7 shrink-0"
-                                                                />
-                                                            )}
-                                                        </View>
-                                                    );
-                                                }}
-                                            />
-                                        )}
-                                    </View>
-                                )}
+                                ) : null}
+                                <View style={{ flex: 1, display: activeModalTab === 'chat' ? 'flex' : 'none' }}>
+                                    <MatchChatPanel
+                                        key={matchId}
+                                        matchId={matchId}
+                                        active={modalVisible && activeModalTab === 'chat'}
+                                        participantIds={[dbHomeUserId, dbAwayUserId]}
+                                        avatarsByUserId={{ [opponentUserId?.toLowerCase() ?? '']: opponentAvatarUrl ?? undefined }}
+                                        readOnly={currentStatus === 'completed'}
+                                    />
+                                </View>
                             </View>
-
-                            {/* Completed matches keep the chat visible but read-only. */}
-                            {activeModalTab === 'chat' && currentStatus === 'completed' && (
-                                <View className="p-2 border-t border-white/5 pt-4 items-center">
-                                    <View className="flex-row items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.03] border border-white/10">
-                                        <Ionicons name="lock-closed-outline" size={13} color="#64748B" />
-                                        <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                                            {t('card.chatReadOnly')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-                            {activeModalTab === 'chat' && currentStatus !== 'completed' && (
-                                <View className="p-2 border-t border-white/5 pt-4">
-                                    <View className="flex-row items-end gap-3 bg-white/5 p-2 rounded-[24px] border border-white/10">
-                                        <TextInput
-                                            ref={commentInputRef}
-                                            className={cn(
-                                                "flex-1 px-4 py-3 text-white font-medium",
-                                            )}
-                                            placeholder={t('card.typeAMessage')}
-                                            placeholderTextColor="#64748B"
-                                            value={newComment}
-                                            onChangeText={setNewComment}
-                                            multiline
-                                            maxLength={500}
-                                            style={{ minHeight: 48, maxHeight: 120 }}
-                                        />
-                                        <Pressable
-                                            onPress={handleSendComment}
-                                            disabled={!newComment.trim() || isSendingComment}
-                                            // Taps that land a few px above the button hit the message list,
-                                            // which dismisses the keyboard and swallows the tap — extend the
-                                            // touch target so near-misses still send.
-                                            hitSlop={{ top: 14, bottom: 10, left: 6, right: 10 }}
-                                            // Background MUST live in className — a function style on Pressable is
-                                            // not applied reliably here. bg-emerald-500 (bright green) when there's
-                                            // text, bg-white/5 (dark) when empty. Mirrors the friends DM send button.
-                                            className={`w-12 h-12 rounded-full items-center justify-center ${
-                                                newComment.trim() && !isSendingComment ? 'bg-emerald-500' : 'bg-white/5'
-                                            }`}
-                                            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-                                        >
-                                            {isSendingComment ? (
-                                                <ActivityIndicator size="small" color="#fff" />
-                                            ) : (
-                                                <Ionicons
-                                                    name="send"
-                                                    size={20}
-                                                    color={newComment.trim() ? '#fff' : '#475569'}
-                                                />
-                                            )}
-                                        </Pressable>
-                                    </View>
-                                </View>
-                            )}
                         </View>
                     </View>
                 </View>

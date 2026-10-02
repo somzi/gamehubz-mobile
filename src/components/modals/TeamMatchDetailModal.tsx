@@ -1,3 +1,5 @@
+import { RefreshFailedBanner } from '../ui/RefreshFailedBanner';
+import { useRequestGate } from '../../hooks/useRequestGate';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
@@ -10,6 +12,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useModalPresence } from '../../lib/modalHandoff';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
@@ -48,6 +51,11 @@ interface TeamMatchDetailModalProps {
      * the parent reshapes the sub-match and opens the solo surface; `tab` picks the entry tab.
      */
     onOpenSubMatch?: (sub: SubMatchDto, tab: 'match' | 'chat') => void;
+    /** Takes a player tap over, so the host can hide this modal for the profile and bring it back
+     *  on return. Without it the modal closes and pushes the profile itself. */
+    onOpenProfile?: (userId: string) => void;
+    /** iOS: the modal has finished animating out (see lib/modalHandoff). */
+    onDismiss?: () => void;
 }
 
 // One source of truth for the redesigned palette — emerald primary, amber pending/tie-break,
@@ -276,8 +284,20 @@ export function TeamMatchDetailModal({
     currentUserId,
     onMatchUpdate,
     onOpenSubMatch,
+    onOpenProfile,
+    onDismiss,
 }: TeamMatchDetailModalProps) {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+    const requests = useRequestGate(matchId);
+    const presence = useModalPresence(visible, onDismiss);
+    const openProfile = (userId: string) => {
+        if (onOpenProfile) {
+            onOpenProfile(userId);
+            return;
+        }
+        onClose();
+        navigation.navigate('PlayerProfile', { id: userId });
+    };
     const insets = useSafeAreaInsets();
     const { t } = useTranslation('team');
     const { t: tCommon } = useTranslation('common');
@@ -314,11 +334,13 @@ export function TeamMatchDetailModal({
     };
 
     const fetchData = useCallback(async () => {
+        const isCurrent = requests.begin('fetchData');
         if (!matchId) return;
         setIsLoading(true);
         setError(null);
         try {
             const raw = await getMatchDetails(matchId);
+            if (!isCurrent()) return;
 
             const home = raw.homeTeam || raw.HomeTeam;
             const away = raw.awayTeam || raw.AwayTeam;
@@ -449,16 +471,16 @@ export function TeamMatchDetailModal({
             } as TeamMatchDetailsDto;
 
             setData(normalized);
-            if (normalized.tieBreak?.isRequired) {
-                setTieBreakStatus(normalized.tieBreak);
-            }
+            setTieBreakStatus(normalized.tieBreak?.isRequired ? normalized.tieBreak : null);
         } catch (err: unknown) {
+            if (!isCurrent()) return;
             const message = getErrorMessage(err);
             setError(message);
         } finally {
+            if (!isCurrent()) return;
             setIsLoading(false);
         }
-    }, [matchId]);
+    }, [matchId, requests]);
 
     // Clear per-match state when switching to a different team match.
     // Modal stays mounted between opens, so without this the previous match's
@@ -486,9 +508,14 @@ export function TeamMatchDetailModal({
             return;
         }
 
+        let active = true;
+        let inFlight = false;
         const poll = async () => {
+            if (inFlight) return;
+            inFlight = true;
             try {
                 const status = await getTieBreakStatus(data.teamMatchId);
+                if (!active) return;
                 setTieBreakStatus(status);
                 // If both reps are set, refresh full data to get the tie-break sub-match
                 if (status.homeRepresentative && status.awayRepresentative) {
@@ -497,11 +524,14 @@ export function TeamMatchDetailModal({
                 }
             } catch {
                 // Silently fail polling
+            } finally {
+                inFlight = false;
             }
         };
 
         pollRef.current = setInterval(poll, 5000);
         return () => {
+            active = false;
             if (pollRef.current) clearInterval(pollRef.current);
         };
     }, [visible, data?.teamMatchId, data?.status, fetchData]);
@@ -665,13 +695,14 @@ export function TeamMatchDetailModal({
     const homeIsHeroWinner = winnerSide === 'home';
     const awayIsHeroWinner = winnerSide === 'away';
 
-    if (!visible) return null;
+    if (!presence.rendered) return null;
 
     return (
         <Modal
             visible={visible}
             animationType="slide"
             onRequestClose={onClose}
+            onDismiss={presence.onDismiss}
         >
             <View
                 style={{
@@ -725,14 +756,15 @@ export function TeamMatchDetailModal({
                     <View style={{ width: 40 }} />
                 </View>
 
-                {isLoading ? (
+                {error && data && <RefreshFailedBanner onRetry={fetchData} retrying={isLoading} />}
+                {isLoading && !data ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                         <ActivityIndicator size="large" color={C.emerald} />
                         <Text style={{ marginTop: 16, color: C.textDim, fontWeight: '800', letterSpacing: 2, fontSize: 10, textTransform: 'uppercase' }}>
                             {t('matchModal.loading')}
                         </Text>
                     </View>
-                ) : error || !data ? (
+                ) : !data ? (
                     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
                         <Ionicons name="alert-circle-outline" size={48} color={C.red} />
                         <Text style={{ marginTop: 16, color: C.red, textAlign: 'center', fontWeight: '600' }}>
@@ -1096,8 +1128,7 @@ export function TeamMatchDetailModal({
                                                 <Pressable
                                                     onPress={() => {
                                                         if (sm.homePlayer?.userId) {
-                                                            onClose();
-                                                            navigation.navigate('PlayerProfile', { id: sm.homePlayer.userId });
+                                                            openProfile(sm.homePlayer.userId);
                                                         }
                                                     }}
                                                 >
@@ -1143,8 +1174,7 @@ export function TeamMatchDetailModal({
                                                 <Pressable
                                                     onPress={() => {
                                                         if (sm.awayPlayer?.userId) {
-                                                            onClose();
-                                                            navigation.navigate('PlayerProfile', { id: sm.awayPlayer.userId });
+                                                            openProfile(sm.awayPlayer.userId);
                                                         }
                                                     }}
                                                 >

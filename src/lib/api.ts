@@ -270,7 +270,13 @@ const APP_VERSION = Constants.expoConfig?.version ?? 'unknown';
 const APP_PLATFORM = Platform.OS;
 
 let authToken: string | null = null;
-export const setAuthToken = (token: string | null) => { authToken = token; };
+let authSessionVersion = 0;
+let explicitlyLoggedOut = false;
+export const setAuthToken = (token: string | null) => {
+    if (token !== authToken || token === null) authSessionVersion += 1;
+    authToken = token;
+    explicitlyLoggedOut = token === null;
+};
 
 let logoutListeners: (() => void)[] = [];
 export const subscribeToLogout = (listener: () => void) => {
@@ -303,7 +309,7 @@ apiClient.interceptors.request.use(async (config) => {
         // that read is several ms of crypto/disk per call on Android. SecureStore is only
         // consulted as a cold-start fallback before AuthContext has populated authToken.
         let token = authToken;
-        if (!token) {
+        if (!token && !explicitlyLoggedOut) {
             token = await SecureStore.getItemAsync('access_token');
             if (token) authToken = token;
         }
@@ -328,6 +334,8 @@ let refreshPromise: Promise<string> | null = null;
  * get the same refresh-and-retry behaviour as JSON requests.
  */
 async function doRefresh(): Promise<string> {
+    const version = authSessionVersion;
+    if (explicitlyLoggedOut) throw new Error('Session ended');
     const refreshToken = await SecureStore.getItemAsync('refresh_token');
     const accessToken = await SecureStore.getItemAsync('access_token');
     if (!refreshToken || !accessToken) throw new Error('Refresh failed');
@@ -348,9 +356,16 @@ async function doRefresh(): Promise<string> {
     const newAccess = data?.accessToken?.token || data?.accessToken || data?.AccessToken;
     const newRefresh = data?.refreshToken || data?.RefreshToken;
     if (!newAccess || !newRefresh) throw new Error('Refresh failed');
+    if (version !== authSessionVersion || explicitlyLoggedOut) throw new Error('Session ended');
 
     await SecureStore.setItemAsync('access_token', newAccess);
     await SecureStore.setItemAsync('refresh_token', newRefresh);
+    if (version !== authSessionVersion) {
+        if (explicitlyLoggedOut) await Promise.allSettled([
+            SecureStore.deleteItemAsync('access_token'), SecureStore.deleteItemAsync('refresh_token'),
+        ]);
+        throw new Error('Session ended');
+    }
     authToken = newAccess;
     return newAccess;
 }
@@ -361,11 +376,13 @@ async function doRefresh(): Promise<string> {
  */
 function refreshAccessToken(): Promise<string> {
     if (refreshPromise) return refreshPromise;
+    const version = authSessionVersion;
 
     refreshPromise = (async () => {
         try {
             return await doRefresh();
         } catch (error) {
+            if (version !== authSessionVersion || explicitlyLoggedOut) throw error;
             authToken = null;
             await Promise.all([
                 SecureStore.deleteItemAsync('access_token').catch(() => { }),
@@ -457,7 +474,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             };
 
             // Prefer the in-memory token (same reasoning as the axios interceptor).
-            let token = authToken || (await SecureStore.getItemAsync('access_token').catch(() => null));
+            let token = authToken || (explicitlyLoggedOut ? null : await SecureStore.getItemAsync('access_token').catch(() => null));
 
             // Uploads get a longer timeout than regular JSON calls — 90s covers even a
             // heavy set of match-evidence screenshots on a slow LTE link. Anything past

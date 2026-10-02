@@ -20,6 +20,7 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../../lib/api';
 import { HubRole } from '../../types/hub';
 import { COLORS } from '../../lib/theme';
+import { useModalHandoff } from '../../lib/modalHandoff';
 
 export interface SwapEligibility {
     tournamentId: string;
@@ -92,6 +93,8 @@ export function SwapParticipantModal({
     const { t: tCommon } = useTranslation('common');
     const { t: tHub } = useTranslation('hub');
     const insets = useSafeAreaInsets();
+    // The screen's success sheet comes up once this one is down — see lib/modalHandoff.
+    const handoff = useModalHandoff();
 
     const [eligibility, setEligibility] = useState<SwapEligibility | null>(null);
     const [eligibilityError, setEligibilityError] = useState<string | null>(null);
@@ -263,7 +266,7 @@ export function SwapParticipantModal({
             Keyboard.dismiss();
             setConfirming(false);
             onClose();
-            setTimeout(() => onSwapped(name), 350);
+            handoff.after(() => onSwapped(name));
         } catch (err: any) {
             setSubmitError(getErrorMessage(err));
             setConfirming(false);
@@ -290,6 +293,7 @@ export function SwapParticipantModal({
             visible={visible && ready}
             transparent
             animationType="slide"
+            onDismiss={handoff.onDismiss}
             // The confirmation no longer has a window of its own, so back has to be routed by hand.
             onRequestClose={() => {
                 if (submitting) return;

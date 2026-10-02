@@ -10,6 +10,8 @@
   "confirm": "Potwierdź",
   "submit": "Wyślij",
   "retry": "Spróbuj ponownie",
+  "refreshFailed": "Nie udało się odświeżyć",
+  "loadFailed": "Nie udało się wczytać",
   "search": "Szukaj",
   "loading": "Ładowanie...",
   "error": "Błąd",
@@ -176,5 +178,10 @@
     "title": "Wymagana aktualizacja",
     "body": "Ta wersja GameHubz nie jest już obsługiwana. Zaktualizuj aplikację do najnowszej wersji, aby dalej grać.",
     "button": "Zaktualizuj teraz"
-  }
+  },
+  "chatConnecting": "Łączenie…",
+  "chatReconnecting": "Ponowne łączenie…",
+  "chatSending": "Wysyłanie…",
+  "chatSendFailed": "Nie wysłano",
+  "chatNewMessages": "Nowe wiadomości"
 }

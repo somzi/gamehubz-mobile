@@ -4,6 +4,7 @@ import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { PressableScale } from '../ui/PressableScale';
+import { useModalHandoff } from '../../lib/modalHandoff';
 
 /** What the organiser picked. PDF is the printable report; CSV is the flat data table
  *  meant for a spreadsheet or for a site that ingests the tournament automatically. */
@@ -99,9 +100,11 @@ export function ExportBracketModal({
     const { t } = useTranslation('tournament');
     const insets = useSafeAreaInsets();
 
+    // The export (and the share sheet it opens) starts once this sheet is down — see lib/modalHandoff.
+    const handoff = useModalHandoff();
     const choose = (choice: ExportChoice) => {
         onClose();
-        setTimeout(() => onSelect(choice), 350);
+        handoff.after(() => onSelect(choice));
     };
 
     return (
@@ -110,6 +113,7 @@ export function ExportBracketModal({
             transparent
             animationType="slide"
             onRequestClose={onClose}
+            onDismiss={handoff.onDismiss}
         >
             <View className="flex-1 justify-end">
                 <Pressable className="absolute inset-0 bg-black/60" onPress={onClose} />

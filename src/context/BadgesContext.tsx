@@ -166,6 +166,12 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
             if (!active || !dto) return;
             const previous = queryClient.getQueryData<BadgeCounts>(BADGES_QUERY_KEY);
             queryClient.setQueryData(BADGES_QUERY_KEY, dto);
+            if (!previous || previous.unreadMatchMessages !== dto.unreadMatchMessages
+                || previous.matchesWithUnreadChat !== dto.matchesWithUnreadChat
+                || previous.matchesToSchedule !== dto.matchesToSchedule
+                || previous.resultsToConfirm !== dto.resultsToConfirm) {
+                queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+            }
             // Only refetch the per-entity approvals breakdown when a count that ACTUALLY drives
             // it changed. A pure DM/match-message push used to invalidate approvals every time,
             // costing an extra GET that returned identical data. Compare the fields that feed

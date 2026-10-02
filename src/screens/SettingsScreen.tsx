@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, Alert } from 'react-native';
+import { View, Text, ScrollView, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +16,7 @@ import { SettingsHero, SettingsHeroLine, SettingsGroup, SETTINGS_EMBLEM_IMAGE, S
 import { EmblemImage } from '../components/ui/HeroCard';
 import { useLanguage } from '../i18n/useLanguage';
 import { usePushPermission } from '../hooks/usePushPermission';
+import { formatNavigationLog } from '../lib/navigationLog';
 
 type SettingsNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -195,7 +196,13 @@ export default function SettingsScreen() {
                 </View>
 
                 <View className="py-8 items-center">
-                    <Text className="text-slate-600 text-xs font-semibold" style={{ fontVariant: ['tabular-nums'] }}>
+                    {/* Long-press shares the navigation log — the way to hand over "it opened the wrong
+                        screen" from a release build, where the console is silenced. */}
+                    <Text
+                        className="text-slate-600 text-xs font-semibold"
+                        style={{ fontVariant: ['tabular-nums'] }}
+                        onLongPress={() => { Share.share({ message: formatNavigationLog() || '-' }).catch(() => {}); }}
+                    >
                         {t('version', { version: Constants.expoConfig?.version || '1.0.0' })}
                     </Text>
                 </View>

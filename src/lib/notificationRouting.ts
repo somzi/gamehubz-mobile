@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from './theme';
+import { authenticatedFetch, ENDPOINTS } from './api';
+import { prepareDirectChatTarget } from '../navigation/directChatTarget';
 
 /**
  * Anything that can dispatch a navigate: the container ref (a push tapped in the OS tray) or a
@@ -8,6 +10,7 @@ import { COLORS } from './theme';
  */
 export interface NotificationNavigator {
     navigate(...args: any[]): void;
+    getState?(): { routes: readonly { name: string; params?: object }[] };
 }
 
 // Announcement pushes carry an http(s) url instead of an in-app screen: the tap belongs to
@@ -29,22 +32,36 @@ export function externalLinkFromNotification(rawData: unknown): string | null {
     return /^https?:\/\//i.test(url) ? url : null;
 }
 
+/** The top-level stack screen a notification was sent to, and the params it was opened with. */
+export interface NotificationTarget {
+    name: string;
+    params?: object;
+}
+
 // Dispatches the deep link for a notification payload and returns the top-level stack
 // route it navigated to (`null` when the payload carries nothing routable). The caller
-// uses that name to confirm the navigation actually took — see NotificationRouter.
-export function routeFromNotification(
+// uses it to confirm the navigation actually took — the screen AND its subject, since the
+// tournament already on screen is not the tournament the push is about. See NotificationRouter.
+export async function routeFromNotification(
     nav: NotificationNavigator,
     rawData: unknown,
-): string | null {
+    isCurrent: () => boolean = () => true,
+): Promise<NotificationTarget | null> {
     if (!rawData || typeof rawData !== 'object') return null;
     const data = rawData as Record<string, any>;
 
-    const go = (name: string, params?: object): string => {
+    const go = async (name: string, params?: object): Promise<NotificationTarget> => {
+        if (name === 'DirectChat') {
+            params = await prepareDirectChatTarget((params as { chatId: string }).chatId, nav.getState?.().routes ?? [], async (id) => {
+                const response = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_BY_ID(id));
+                return response.ok ? response.json() : null;
+            });
+        }
         // The union of every screen's params is too wide for navigate()'s overloads to narrow
         // behind this indirection; each call site below still mirrors the shape
         // RootStackParamList declares for the screen it targets.
-        (nav as { navigate: (screen: string, params?: object) => void }).navigate(name, params);
-        return name;
+        if (isCurrent()) (nav as { navigate: (screen: string, params?: object) => void }).navigate(name, params);
+        return { name, params };
     };
 
     const type = typeof data.type === 'string' ? data.type.toLowerCase() : undefined;

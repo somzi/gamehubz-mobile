@@ -13,8 +13,8 @@ export interface InitialConnectionRetryHandle {
 }
 
 /**
- * Starts a SignalR connection and retries only the initial connection. SignalR's
- * withAutomaticReconnect remains responsible for drops after the first successful start.
+ * Retries the initial connection and restarts after automatic reconnect gives up.
+ * A group-join failure also restarts: a connected socket without its group is not usable.
  */
 export function startSignalRWithRetry(
     connection: HubConnection,
@@ -63,9 +63,9 @@ export function startSignalRWithRetry(
             try {
                 await options.onConnected?.();
             } catch (error) {
-                // The socket is connected; a group-join failure must not call start() again on an
-                // already-connected HubConnection. Existing reconnect handlers will rejoin later.
                 options.onError?.(error);
+                await connection.stop().catch(() => {});
+                scheduleRetry();
             }
         })();
 
@@ -77,6 +77,7 @@ export function startSignalRWithRetry(
         }
     };
 
+    connection.onclose(() => { if (!cancelled) scheduleRetry(); });
     void attemptStart();
 
     return {

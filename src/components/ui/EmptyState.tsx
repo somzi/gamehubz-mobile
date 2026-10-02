@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { COLORS } from '../../lib/theme';
 
@@ -51,5 +52,46 @@ export function EmptyState({
             ) : null}
             {action ? <View className="mt-4">{action}</View> : null}
         </View>
+    );
+}
+
+interface LoadFailedStateProps {
+    onRetry: () => void;
+    retrying?: boolean;
+    variant?: 'card' | 'plain';
+    className?: string;
+}
+
+/**
+ * A list whose load failed, in the empty state's place: it says the list could not be loaded —
+ * an empty one reads as "there is nothing here" — and offers the retry where the rows would be.
+ */
+export function LoadFailedState({ onRetry, retrying, variant, className }: LoadFailedStateProps) {
+    const { t } = useTranslation('common');
+    return (
+        <EmptyState
+            icon="cloud-offline-outline"
+            color={COLORS.warning}
+            title={t('loadFailed')}
+            variant={variant}
+            className={className}
+            action={
+                <Pressable
+                    onPress={onRetry}
+                    disabled={retrying}
+                    accessibilityRole="button"
+                    className="min-w-[120px] h-10 px-5 rounded-xl items-center justify-center active:opacity-70"
+                    style={{ backgroundColor: 'rgba(245,158,11,0.12)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' }}
+                >
+                    {retrying ? (
+                        <ActivityIndicator size="small" color={COLORS.warning} />
+                    ) : (
+                        <Text className="text-xs font-black tracking-wide" style={{ color: COLORS.warning }}>
+                            {t('retry')}
+                        </Text>
+                    )}
+                </Pressable>
+            }
+        />
     );
 }
