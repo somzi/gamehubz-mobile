@@ -185,6 +185,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // registered phone + a screen recording) before their report is accepted.
     const [requireResultVerification, setRequireResultVerification] = useState(false);
 
+    // "Agreed outside the app" — on by default; off means a match time can only come from the
+    // availability calendar.
+    const [allowScheduleOutsideApp, setAllowScheduleOutsideApp] = useState(true);
+
     // Series format: how many games a single match is played over, how those games decide the
     // match, and what settles a level knockout series. 1 = one game, the pre-series default.
     const [bestOf, setBestOf] = useState(1);
@@ -600,6 +604,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 // Null with the check on = the server's own default window.
                 CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
                 RequireResultVerification: requireResultVerification,
+                AllowScheduleOutsideApp: allowScheduleOutsideApp,
                 IsExclusive: isExclusive,
                 IsPrivate: isPrivate,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
@@ -746,6 +751,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     const matchSettingsSummary = [
         bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
         requireResultApproval ? t('form.summaryResultApproval') : null,
+        allowScheduleOutsideApp ? null : t('form.summaryCalendarOnly'),
         requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
         requireResultVerification ? t('form.summaryResultVerification') : null,
         canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
@@ -1122,6 +1128,20 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         />
                                         <Text className={FIELD_HINT}>
                                             {t('form.requireApprovalHint')}
+                                        </Text>
+                                    </View>
+
+                                    {/* "Agreed outside the app" — on by default. Off, every kick-off has
+                                        to come from the two availability lists meeting in the calendar. */}
+                                    <View>
+                                        <Text className={FIELD_LABEL}>{t('form.allowOutsideApp')}</Text>
+                                        <SegmentedToggle
+                                            options={yesNoOptions}
+                                            value={allowScheduleOutsideApp ? 'yes' : 'no'}
+                                            onChange={(v) => setAllowScheduleOutsideApp(v === 'yes')}
+                                        />
+                                        <Text className={FIELD_HINT}>
+                                            {t('form.allowOutsideAppHint')}
                                         </Text>
                                     </View>
 

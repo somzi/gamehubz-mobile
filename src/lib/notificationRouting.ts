@@ -149,6 +149,10 @@ export function routeFromNotification(
         case 'opponentready':
         // The organizer cleared an agreed kick-off — back to the match, where a new time is picked.
         case 'schedulecleared':
+        // The other side marked the match as agreed outside the app — straight to the match, where the
+        // result is reported. The availability-matched push carries no tournamentId and still falls
+        // through to My Matches.
+        case 'matchscheduled':
             if (tournamentId && matchId) {
                 return go('TournamentDetails', {
                     id: tournamentId,
