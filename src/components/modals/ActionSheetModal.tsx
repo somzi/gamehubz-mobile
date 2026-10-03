@@ -14,6 +14,8 @@ export interface ActionSheetAction {
     /** Leading glyph rendered instead of `icon` — e.g. a flag in the language picker. */
     emoji?: string;
     destructive?: boolean;
+    /** Tint for the icon chip of a regular action (see MenuItem `color`); neutral when unset. */
+    color?: string;
     /** Marks the active choice with a trailing check, for sheets used as a picker. */
     selected?: boolean;
     onPress: () => void;
@@ -95,6 +97,7 @@ export function ActionSheetModal({
                                     icon={action.icon}
                                     emoji={action.emoji}
                                     label={action.label}
+                                    color={action.color}
                                     onPress={() => run(action.onPress)}
                                     showChevron={false}
                                     isLast={i === regular.length - 1}

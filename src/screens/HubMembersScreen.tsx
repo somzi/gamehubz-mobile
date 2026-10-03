@@ -1,12 +1,16 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, ActivityIndicator, Alert, TextInput } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, Text, FlatList, Pressable, ActivityIndicator, Alert, TextInput, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../types/navigation';
 import { HubRole } from '../types/hub';
 import { PageHeader } from '../components/layout/PageHeader';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
+import { Panel } from '../components/ui/Panel';
+import { Skeleton } from '../components/ui/Skeleton';
+import { LoadFailedState } from '../components/ui/EmptyState';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../lib/api';
 import { formatDateSafe, sameId } from '../lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +22,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { invalidateHubData } from '../lib/queryPolicy';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
+type IconName = keyof typeof Ionicons.glyphMap;
+type Tab = 'members' | 'requests' | 'blacklisted';
 
 interface JoinRequest {
     requestId: string;
@@ -31,7 +37,6 @@ interface JoinRequest {
 interface MemberRow {
     userId: string;
     username: string;
-    nickname?: string;
     avatarUrl?: string;
     hubRole: HubRole;
 }
@@ -41,81 +46,196 @@ interface BannedRow {
     username: string;
     avatarUrl?: string;
     bannedAt?: string;
+    bannedByName?: string;
 }
 
-// Labels carry i18n keys, not text: this map is module scope and would otherwise
-// freeze whatever language was active at import time.
-const ROLE_META: Record<HubRole, { labelKey: string; container: string; text: string; icon: keyof typeof Ionicons.glyphMap }> = {
-    [HubRole.HubOwner]: {
-        labelKey: 'role.owner',
-        container: 'bg-amber-500/15 border border-amber-500/30',
-        text: 'text-amber-400',
-        icon: 'shield-checkmark',
-    },
-    [HubRole.HubAdmin]: {
-        labelKey: 'role.admin',
-        container: 'bg-indigo-500/15 border border-indigo-500/30',
-        text: 'text-indigo-300',
-        icon: 'star',
-    },
-    [HubRole.HubExclusive]: {
-        labelKey: 'role.exclusive',
-        container: 'bg-fuchsia-500/15 border border-fuchsia-500/30',
-        text: 'text-fuchsia-300',
-        icon: 'sparkles',
-    },
-    [HubRole.HubMember]: {
-        labelKey: 'role.member',
-        container: 'bg-white/[0.05] border border-white/10',
-        text: 'text-slate-400',
-        icon: 'person',
-    },
+// One colour per role, shared by the avatar ring, the pill, the section and the sheet's actions.
+// Labels carry i18n keys, not text: this map is module scope and would otherwise freeze whatever
+// language was active at import time.
+const ROLE_META: Record<HubRole, { labelKey: string; color: string; icon: IconName }> = {
+    [HubRole.HubOwner]: { labelKey: 'role.owner', color: '#FBBF24', icon: 'shield-checkmark' },
+    [HubRole.HubAdmin]: { labelKey: 'role.admin', color: '#A5B4FC', icon: 'star' },
+    [HubRole.HubExclusive]: { labelKey: 'role.exclusive', color: '#E879F9', icon: 'sparkles' },
+    [HubRole.HubMember]: { labelKey: 'role.member', color: '#94A3B8', icon: 'person' },
 };
+
+const roleMeta = (role: HubRole) => ROLE_META[role] ?? ROLE_META[HubRole.HubMember];
+
+// Most privileged first — the roster's order, and the role kept when the backend lists a user twice.
+const ROLE_RANK: Record<number, number> = {
+    [HubRole.HubOwner]: 0,
+    [HubRole.HubAdmin]: 1,
+    [HubRole.HubExclusive]: 2,
+    [HubRole.HubMember]: 3,
+};
+
+// Panel edges: a list's colour sits in its frame, not behind the rows.
+const EDGE = {
+    members: 'rgba(255,255,255,0.06)',
+    requests: 'rgba(245,158,11,0.22)',
+    banned: 'rgba(239,68,68,0.2)',
+};
+
+const TAB_ACCENT: Record<Tab, [string, string]> = {
+    members: [COLORS.primary, COLORS.primaryBright],
+    requests: [COLORS.warning, '#FBBF24'],
+    blacklisted: [COLORS.destructive, '#F87171'],
+};
+
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
+// The hairline between rows starts where the name does: row padding 16 + ringed avatar 46 + gap 12.
+const DIVIDER_INSET = 74;
+
+type ListItem =
+    | { kind: 'header'; key: string; icon: IconName; color: string; label: string; count: number; first: boolean }
+    | { kind: 'member'; key: string; member: MemberRow; first: boolean; last: boolean }
+    | { kind: 'request'; key: string; request: JoinRequest; first: boolean; last: boolean }
+    | { kind: 'ban'; key: string; ban: BannedRow; first: boolean; last: boolean };
 
 // Module scope, so the "unknown" fallback is passed in rather than resolved here.
 function normalizeMember(raw: any, unknownLabel: string): MemberRow | null {
     const userId = raw.UserId || raw.userId || raw.id || raw.Id;
     if (!userId) return null;
     const username = raw.Username || raw.username || raw.Name || raw.name || unknownLabel;
-    const nickname = raw.Nickname || raw.nickname || raw.nickName || '';
     const avatarUrl = raw.AvatarUrl || raw.avatarUrl || undefined;
     const role = raw.HubRole ?? raw.hubRole ?? HubRole.HubMember;
-    return { userId, username, nickname, avatarUrl, hubRole: role as HubRole };
+    return { userId, username, avatarUrl, hubRole: role as HubRole };
 }
 
-function RoleBadge({ role }: { role: HubRole }) {
-    const { t } = useTranslation('hub');
-    const meta = ROLE_META[role] ?? ROLE_META[HubRole.HubMember];
+/**
+ * One row's slice of a panel. The rows of a section are separate list items (a hub can run to
+ * hundreds of members, so the list stays virtualised); together they draw one Panel: the first
+ * carries the top edge, radius and shine, the last the bottom edge, and each one after the first
+ * a hairline that starts at the name.
+ */
+function PanelSegment({ first, last, edge, children }: { first: boolean; last: boolean; edge: string; children: React.ReactNode }) {
     return (
-        <View className={`flex-row items-center px-2 py-1 rounded-full ${meta.container}`} style={{ gap: 4 }}>
-            <Ionicons name={meta.icon} size={11} color={
-                role === HubRole.HubOwner ? '#FBBF24'
-                    : role === HubRole.HubAdmin ? '#A5B4FC'
-                        : role === HubRole.HubExclusive ? '#E879F9'
-                            : '#94A3B8'
-            } />
-            <Text className={`text-[10px] font-black uppercase tracking-wide ${meta.text}`}>
-                {t(meta.labelKey)}
+        <View style={[styles.segment, { borderColor: edge }, first && styles.segmentFirst, last && styles.segmentLast]}>
+            {first ? (
+                <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255,255,255,0.05)', 'rgba(255,255,255,0)']}
+                    style={styles.shine}
+                />
+            ) : (
+                <View pointerEvents="none" style={styles.divider} />
+            )}
+            {children}
+        </View>
+    );
+}
+
+function SectionHeader({ icon, color, label, count, first }: { icon: IconName; color: string; label: string; count: number; first: boolean }) {
+    return (
+        <View className={`flex-row items-center px-1 mb-2 ${first ? '' : 'mt-6'}`} style={{ gap: 7 }}>
+            <Ionicons name={icon} size={12} color={color} />
+            <Text className="shrink text-slate-400 text-[11px] font-black uppercase tracking-[1.6px]" numberOfLines={1}>
+                {label}
+            </Text>
+            <Text className="text-slate-600 text-[11px] font-bold" style={TABULAR}>
+                {count}
             </Text>
         </View>
     );
 }
 
+/** Avatar in a thin ring of the row's colour, with an optional status coin on its corner. */
+function RingAvatar({
+    name,
+    src,
+    ring,
+    badge,
+    dimmed,
+}: {
+    name: string;
+    src?: string;
+    ring: string;
+    badge?: { icon: IconName; bg: string; color: string };
+    dimmed?: boolean;
+}) {
+    return (
+        <View>
+            <View style={{ borderRadius: 999, padding: 1.5, borderWidth: 1.5, borderColor: ring }}>
+                <View style={dimmed ? { opacity: 0.55 } : undefined}>
+                    <PlayerAvatar name={name} src={src} size="md" className="border-0" />
+                </View>
+            </View>
+            {badge && (
+                <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                    <Ionicons name={badge.icon} size={8} color={badge.color} />
+                </View>
+            )}
+        </View>
+    );
+}
+
+function Pill({ label, color }: { label: string; color: string }) {
+    return (
+        <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: color + '26', borderWidth: 1, borderColor: color + '4D' }}>
+            <Text className="text-[9px] font-black uppercase tracking-wider" style={{ color }} numberOfLines={1}>
+                {label}
+            </Text>
+        </View>
+    );
+}
+
+/** The whole panel while a list has nothing to show: a tinted tile and one line. */
+function PanelMessage({ icon, color, text, edge }: { icon: IconName; color: string; text: string; edge: string }) {
+    return (
+        <Panel style={{ borderColor: edge, paddingVertical: 36, paddingHorizontal: 24, alignItems: 'center' }}>
+            <View
+                className="w-12 h-12 rounded-2xl items-center justify-center mb-3"
+                style={{ backgroundColor: color + '1A', borderWidth: 1, borderColor: color + '33' }}
+            >
+                <Ionicons name={icon} size={22} color={color} />
+            </View>
+            <Text className="text-sm font-semibold text-slate-400 text-center">{text}</Text>
+        </Panel>
+    );
+}
+
+function SkeletonPanel({ edge }: { edge: string }) {
+    return (
+        <Panel style={{ borderColor: edge }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+                <View key={i} className="flex-row items-center pl-4 pr-3 py-2.5">
+                    {i > 0 && <View pointerEvents="none" style={styles.divider} />}
+                    <Skeleton width={46} height={46} radius={23} />
+                    <View className="flex-1 ml-3" style={{ gap: 6 }}>
+                        <Skeleton width={i % 2 ? '42%' : '56%'} height={12} radius={6} />
+                        <Skeleton width="28%" height={8} radius={4} />
+                    </View>
+                </View>
+            ))}
+        </Panel>
+    );
+}
+
 export default function HubMembersScreen() {
     const queryClient = useQueryClient();
-    const { t } = useTranslation('hub');
+    const navigation = useNavigation<any>();
+    const { t, i18n } = useTranslation('hub');
     const { t: tCommon } = useTranslation('common');
     const route = useRoute<HubMembersScreenRouteProp>();
     const { hubId } = route.params;
     const { user: currentUser } = useAuth();
 
-    const [activeTab, setActiveTab] = useState<'members' | 'requests' | 'blacklisted'>('members');
+    const [activeTab, setActiveTab] = useState<Tab>('members');
     const [members, setMembers] = useState<MemberRow[]>([]);
     const [requests, setRequests] = useState<JoinRequest[]>([]);
     const [bans, setBans] = useState<BannedRow[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRequestsLoading, setIsRequestsLoading] = useState(false);
-    const [isBansLoading, setIsBansLoading] = useState(false);
+    // `loaded` = the first answer is in (rows or an error); until then the panel shows skeleton rows.
+    // Later focus refreshes run quietly over the rows already on screen.
+    const [membersLoaded, setMembersLoaded] = useState(false);
+    const [requestsLoaded, setRequestsLoaded] = useState(false);
+    const [bansLoaded, setBansLoaded] = useState(false);
+    const [membersError, setMembersError] = useState(false);
+    const [requestsError, setRequestsError] = useState(false);
+    const [bansError, setBansError] = useState(false);
+    const [isRetrying, setIsRetrying] = useState(false);
+    // Only a pull shows the spinner — see refreshcontrol-background-refetch-gap.
+    const [isPulling, setIsPulling] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
     const [isOwner, setIsOwner] = useState(false);
@@ -144,7 +264,6 @@ export default function HubMembersScreen() {
 
     const fetchMembers = useCallback(async () => {
         try {
-            setIsLoading(true);
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_MEMBERS(hubId));
             if (response.ok) {
                 const data = await response.json();
@@ -153,47 +272,47 @@ export default function HubMembersScreen() {
                 // Backend can return the same user twice (e.g. the owner also listed as a plain
                 // member), which crashes the FlatList with duplicate keys (keyExtractor = userId).
                 // Dedupe by userId, keeping the most-privileged role on collision.
-                const rolePriority: Record<number, number> = {
-                    [HubRole.HubOwner]: 0,
-                    [HubRole.HubAdmin]: 1,
-                    [HubRole.HubExclusive]: 2,
-                    [HubRole.HubMember]: 3,
-                };
                 const byUser = new Map<string, MemberRow>();
                 for (const m of normalized) {
                     const key = m.userId.toLowerCase();
                     const existing = byUser.get(key);
-                    if (!existing || (rolePriority[m.hubRole] ?? 99) < (rolePriority[existing.hubRole] ?? 99)) {
+                    if (!existing || (ROLE_RANK[m.hubRole] ?? 99) < (ROLE_RANK[existing.hubRole] ?? 99)) {
                         byUser.set(key, m);
                     }
                 }
                 setMembers(Array.from(byUser.values()));
+                setMembersError(false);
+            } else {
+                setMembersError(true);
             }
         } catch (error) {
             console.error('Error fetching hub members:', error);
+            setMembersError(true);
         } finally {
-            setIsLoading(false);
+            setMembersLoaded(true);
         }
     }, [hubId]);
 
     const fetchRequests = useCallback(async () => {
         try {
-            setIsRequestsLoading(true);
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_JOIN_REQUESTS(hubId));
             if (response.ok) {
                 const data = await response.json();
                 setRequests(data.result || data || []);
+                setRequestsError(false);
+            } else {
+                setRequestsError(true);
             }
         } catch (error) {
             console.error('Error fetching join requests:', error);
+            setRequestsError(true);
         } finally {
-            setIsRequestsLoading(false);
+            setRequestsLoaded(true);
         }
     }, [hubId]);
 
     const fetchBans = useCallback(async () => {
         try {
-            setIsBansLoading(true);
             const response = await authenticatedFetch(ENDPOINTS.GET_HUB_BANS(hubId));
             if (response.ok) {
                 const data = await response.json();
@@ -203,13 +322,18 @@ export default function HubMembersScreen() {
                     username: b.username || b.Username || tCommon('unknown'),
                     avatarUrl: b.avatarUrl || b.AvatarUrl,
                     bannedAt: b.bannedAt || b.BannedAt,
+                    bannedByName: b.bannedByName || b.BannedByName || undefined,
                 })).filter(b => !!b.userId);
                 setBans(normalized);
+                setBansError(false);
+            } else {
+                setBansError(true);
             }
         } catch (error) {
             console.error('Error fetching hub bans:', error);
+            setBansError(true);
         } finally {
-            setIsBansLoading(false);
+            setBansLoaded(true);
         }
     }, [hubId]);
 
@@ -221,6 +345,22 @@ export default function HubMembersScreen() {
             fetchBans();
         }, [fetchHubMeta, fetchMembers, fetchRequests, fetchBans])
     );
+
+    const onRefresh = async () => {
+        setIsPulling(true);
+        await Promise.all([fetchHubMeta(), fetchMembers(), fetchRequests(), fetchBans()]);
+        setIsPulling(false);
+    };
+
+    const retryActiveList = async () => {
+        setIsRetrying(true);
+        await (activeTab === 'members' ? fetchMembers() : activeTab === 'requests' ? fetchRequests() : fetchBans());
+        setIsRetrying(false);
+    };
+
+    const openProfile = (userId?: string) => {
+        if (userId) navigation.navigate('PlayerProfile', { id: userId });
+    };
 
     const changeRole = async (member: MemberRow, newRole: HubRole) => {
         markProcessing(member.userId, true);
@@ -393,47 +533,45 @@ export default function HubMembersScreen() {
     };
 
     // Actions for the in-app sheet (replaces the old native Alert action list).
-    // Icons mirror ROLE_META — the icon shows the TARGET role of the change.
+    // Icon and colour show the TARGET role of the change (ROLE_META).
     const memberSheetActions = (member: MemberRow): ActionSheetAction[] => {
         const actions: ActionSheetAction[] = [];
+        const adminAction: ActionSheetAction = {
+            label: t('members.promoteToAdmin'),
+            icon: 'star-outline',
+            color: ROLE_META[HubRole.HubAdmin].color,
+            onPress: () => changeRole(member, HubRole.HubAdmin),
+        };
+        const memberAction: ActionSheetAction = {
+            label: t('members.demoteToMember'),
+            icon: 'person-outline',
+            color: ROLE_META[HubRole.HubMember].color,
+            onPress: () => changeRole(member, HubRole.HubMember),
+        };
 
         // Only the Owner can grant/revoke elevated roles (admin / exclusive). Same test the row
         // gate uses (canManageMember) — the `isOwner` flag alone lags behind the hub-meta fetch,
         // which left an owner with a sheet offering nothing but "Remove from hub".
         if (viewerIsOwner) {
             if (member.hubRole === HubRole.HubMember) {
-                actions.push({
-                    label: t('members.promoteToAdmin'),
-                    icon: 'star-outline',
-                    onPress: () => changeRole(member, HubRole.HubAdmin),
-                });
+                actions.push(adminAction);
                 actions.push({
                     label: t('members.promoteToExclusive'),
                     icon: 'sparkles-outline',
+                    color: ROLE_META[HubRole.HubExclusive].color,
                     onPress: () => changeRole(member, HubRole.HubExclusive),
                 });
             } else if (member.hubRole === HubRole.HubExclusive) {
-                actions.push({
-                    label: t('members.promoteToAdmin'),
-                    icon: 'star-outline',
-                    onPress: () => changeRole(member, HubRole.HubAdmin),
-                });
-                actions.push({
-                    label: t('members.demoteToMember'),
-                    icon: 'person-outline',
-                    onPress: () => changeRole(member, HubRole.HubMember),
-                });
+                actions.push(adminAction);
+                actions.push(memberAction);
             } else if (member.hubRole === HubRole.HubAdmin) {
                 actions.push({
                     label: t('members.demoteToExclusive'),
                     icon: 'sparkles-outline',
+                    color: ROLE_META[HubRole.HubExclusive].color,
                     onPress: () => changeRole(member, HubRole.HubExclusive),
                 });
-                actions.push({
-                    label: t('members.demoteToMember'),
-                    icon: 'person-outline',
-                    onPress: () => changeRole(member, HubRole.HubMember),
-                });
+                actions.push(memberAction);
             }
 
             // Marked destructive: it is the one action here the owner cannot take back.
@@ -461,10 +599,8 @@ export default function HubMembersScreen() {
         return actions;
     };
 
-    const openMemberActions = (member: MemberRow) => setActionMember(member);
-
     const handleApprove = async (requestId: string, username: string) => {
-        markProcessing(requestId, true);
+        markProcessing(`${requestId}:approve`, true);
         try {
             const response = await authenticatedFetch(ENDPOINTS.APPROVE_HUB_JOIN_REQUEST(requestId), {
                 method: 'POST',
@@ -479,7 +615,7 @@ export default function HubMembersScreen() {
         } catch (error) {
             Alert.alert(tCommon('error'), tCommon('unexpectedError'));
         } finally {
-            markProcessing(requestId, false);
+            markProcessing(`${requestId}:approve`, false);
         }
     };
 
@@ -493,7 +629,7 @@ export default function HubMembersScreen() {
                     text: t('members.reject'),
                     style: 'destructive',
                     onPress: async () => {
-                        markProcessing(requestId, true);
+                        markProcessing(`${requestId}:reject`, true);
                         try {
                             const response = await authenticatedFetch(ENDPOINTS.REJECT_HUB_JOIN_REQUEST(requestId), {
                                 method: 'POST',
@@ -507,27 +643,13 @@ export default function HubMembersScreen() {
                         } catch (error) {
                             Alert.alert(tCommon('error'), tCommon('unexpectedError'));
                         } finally {
-                            markProcessing(requestId, false);
+                            markProcessing(`${requestId}:reject`, false);
                         }
                     },
                 },
             ]
         );
     };
-
-    const filteredMembers = members.filter(m =>
-        m.username.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const filteredRequests = requests.filter(r =>
-        r.username.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const filteredBans = bans.filter(b =>
-        b.username.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const adminCount = members.filter(m => m.hubRole === HubRole.HubAdmin).length;
 
     // The viewer's own role within this hub (drives what actions they may take).
     // sameId, not ===: the members list and the auth user come from different endpoints, so a
@@ -548,263 +670,444 @@ export default function HubMembersScreen() {
         return false;
     };
 
+    const query = searchQuery.trim().toLowerCase();
+
+    // The active tab as one flat list: a header per section, then that section's rows as panel slices.
+    const listData = useMemo<ListItem[]>(() => {
+        const matches = (name: string) => !query || name.toLowerCase().includes(query);
+        const byName = (a: { username: string }, b: { username: string }) =>
+            a.username.localeCompare(b.username, i18n.language, { sensitivity: 'base' });
+        const items: ListItem[] = [];
+
+        const pushSection = <T,>(
+            key: string,
+            header: { icon: IconName; color: string; label: string },
+            rows: T[],
+            toItem: (row: T, first: boolean, last: boolean) => ListItem,
+        ) => {
+            if (rows.length === 0) return;
+            items.push({ kind: 'header', key: `h-${key}`, ...header, count: rows.length, first: items.length === 0 });
+            rows.forEach((row, i) => items.push(toItem(row, i === 0, i === rows.length - 1)));
+        };
+
+        if (activeTab === 'members') {
+            // One roster, ranked: owner, admins, exclusive, members — by name within each rank.
+            const sorted = members
+                .filter(m => matches(m.username))
+                .sort((a, b) => (ROLE_RANK[a.hubRole] ?? 99) - (ROLE_RANK[b.hubRole] ?? 99) || byName(a, b));
+
+            pushSection(
+                'members',
+                { icon: 'people', color: COLORS.slate400, label: t('members.tabMembers') },
+                sorted,
+                (member, first, last) => ({ kind: 'member', key: member.userId, member, first, last }),
+            );
+        } else if (activeTab === 'requests') {
+            pushSection(
+                'requests',
+                { icon: 'person-add', color: '#FBBF24', label: t('members.tabRequests') },
+                requests.filter(r => matches(r.username)),
+                (request, first, last) => ({ kind: 'request', key: request.requestId, request, first, last }),
+            );
+        } else {
+            pushSection(
+                'banned',
+                { icon: 'ban', color: '#F87171', label: t('members.tabBanned') },
+                bans.filter(b => matches(b.username)).sort(byName),
+                (ban, first, last) => ({ kind: 'ban', key: ban.userId, ban, first, last }),
+            );
+        }
+        return items;
+    }, [activeTab, members, requests, bans, query, i18n.language, t]);
+
+    const switchTab = (value: string) => {
+        setActiveTab(value as Tab);
+        setSearchQuery('');
+    };
+
+    // Only Requests carries a count on its tab — it is the one that asks for something. Once the
+    // tab is open, the section header shows the number.
     const tabs: PremiumTabItem[] = [
-        { value: 'members', label: t('members.tabMembers'), icon: 'people-outline', badge: members.length > 0 ? members.length : undefined },
-        { value: 'requests', label: t('members.tabRequests'), icon: 'mail-outline', badge: requests.length > 0 ? requests.length : undefined },
-        { value: 'blacklisted', label: t('members.tabBanned'), icon: 'ban-outline', badge: bans.length > 0 ? bans.length : undefined },
+        { value: 'members', label: t('members.tabMembers'), icon: 'people-outline' },
+        {
+            value: 'requests',
+            label: t('members.tabRequests'),
+            icon: 'person-add-outline',
+            badge: requests.length > 0 && activeTab !== 'requests' ? requests.length : undefined,
+            badgeTone: 'alert',
+        },
+        { value: 'blacklisted', label: t('members.tabBanned'), icon: 'ban-outline' },
     ];
+
+    const tabState = {
+        members: { loaded: membersLoaded, error: membersError, total: members.length, edge: EDGE.members },
+        requests: { loaded: requestsLoaded, error: requestsError, total: requests.length, edge: EDGE.requests },
+        blacklisted: { loaded: bansLoaded, error: bansError, total: bans.length, edge: EDGE.banned },
+    }[activeTab];
 
     const searchPlaceholder =
         activeTab === 'members' ? t('members.searchMembers')
             : activeTab === 'requests' ? t('members.searchRequests')
                 : t('members.searchBanned');
 
+    // Search only when there is something to search through.
+    const showSearch = tabState.total > 0 || searchQuery.length > 0;
+
+    const renderMember = (member: MemberRow, first: boolean, last: boolean) => {
+        const meta = roleMeta(member.hubRole);
+        const isMe = sameId(member.userId, currentUser?.id);
+        const hasRank = member.hubRole !== HubRole.HubMember;
+        const manageable = canManageMember(member);
+        const isProcessing = processingIds.has(member.userId);
+
+        return (
+            <PanelSegment first={first} last={last} edge={EDGE.members}>
+                {isMe && (
+                    <>
+                        <View pointerEvents="none" style={styles.meTint} />
+                        <View pointerEvents="none" style={styles.meLine} />
+                    </>
+                )}
+                <Pressable
+                    onPress={() => openProfile(member.userId)}
+                    accessibilityRole="button"
+                    className="flex-row items-center pl-4 pr-3 py-2.5 active:opacity-70"
+                >
+                    <RingAvatar
+                        name={member.username}
+                        src={member.avatarUrl}
+                        ring={hasRank ? meta.color + '80' : isMe ? 'rgba(16,185,129,0.6)' : 'rgba(255,255,255,0.12)'}
+                    />
+                    <View className="flex-1 flex-row items-center ml-3" style={{ gap: 6 }}>
+                        <Text className="shrink text-[14px] font-black text-white" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                            {member.username}
+                        </Text>
+                        {isMe && <Pill label={tCommon('app.me')} color={COLORS.primaryBright} />}
+                    </View>
+                    {/* Plain members carry no pill — on a roster it would repeat on every row. */}
+                    {hasRank && (
+                        <View className="flex-row items-center px-2 py-1 rounded-full ml-2" style={{ gap: 4, backgroundColor: meta.color + '26', borderWidth: 1, borderColor: meta.color + '4D' }}>
+                            <Ionicons name={meta.icon} size={10} color={meta.color} />
+                            <Text className="text-[10px] font-black uppercase tracking-wide" style={{ color: meta.color }}>
+                                {t(meta.labelKey)}
+                            </Text>
+                        </View>
+                    )}
+                    {manageable ? (
+                        isProcessing ? (
+                            <View className="w-9 h-9 ml-2 items-center justify-center">
+                                <ActivityIndicator size="small" color={COLORS.slate400} />
+                            </View>
+                        ) : (
+                            <Pressable
+                                onPress={() => setActionMember(member)}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('members.chooseAnAction')}
+                                hitSlop={6}
+                                className="w-9 h-9 ml-2 rounded-xl items-center justify-center bg-white/[0.04] border border-white/[0.08] active:opacity-60"
+                            >
+                                <Ionicons name="ellipsis-horizontal" size={17} color={COLORS.slate300} />
+                            </Pressable>
+                        )
+                    ) : (
+                        <Ionicons name="chevron-forward" size={14} color={COLORS.slate600} style={{ marginLeft: 8 }} />
+                    )}
+                </Pressable>
+            </PanelSegment>
+        );
+    };
+
+    const renderRequest = (request: JoinRequest, first: boolean, last: boolean) => {
+        const approving = processingIds.has(`${request.requestId}:approve`);
+        const rejecting = processingIds.has(`${request.requestId}:reject`);
+        const busy = approving || rejecting;
+
+        return (
+            <PanelSegment first={first} last={last} edge={EDGE.requests}>
+                <View className="flex-row items-center pl-4 pr-3 py-2.5">
+                    {/* Avatar + name open the profile, so the request can be vetted before approving. */}
+                    <Pressable
+                        onPress={() => openProfile(request.userId)}
+                        accessibilityRole="button"
+                        className="flex-1 flex-row items-center active:opacity-70"
+                    >
+                        <RingAvatar
+                            name={request.username}
+                            src={request.avatarUrl}
+                            ring="rgba(245,158,11,0.55)"
+                            badge={{ icon: 'hourglass', bg: COLORS.warning, color: '#0F172A' }}
+                        />
+                        <View className="flex-1 ml-3">
+                            <View className="flex-row items-center" style={{ gap: 4 }}>
+                                <Text className="shrink text-[14px] font-black text-white" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                                    {request.username}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={13} color={COLORS.slate500} />
+                            </View>
+                            <Text className="text-[9px] font-bold uppercase tracking-[1.2px] mt-1" style={{ color: '#FCD34D' }} numberOfLines={1}>
+                                {t('members.requestedOn', { date: formatDateSafe(request.requestedAt, '') }).trim()}
+                            </Text>
+                        </View>
+                    </Pressable>
+                    <View className="flex-row items-center ml-2" style={{ gap: 6 }}>
+                        <Pressable
+                            onPress={() => handleReject(request.requestId, request.username)}
+                            disabled={busy}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('members.reject')}
+                            className={`w-9 h-9 rounded-xl items-center justify-center bg-red-500/10 border border-red-500/25 active:opacity-60 ${busy && !rejecting ? 'opacity-40' : ''}`}
+                        >
+                            {rejecting ? (
+                                <ActivityIndicator size="small" color={COLORS.destructive} />
+                            ) : (
+                                <Ionicons name="close" size={17} color="#F87171" />
+                            )}
+                        </Pressable>
+                        <Pressable
+                            onPress={() => handleApprove(request.requestId, request.username)}
+                            disabled={busy}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('members.approve')}
+                            className={`w-9 h-9 rounded-xl items-center justify-center bg-primary active:opacity-80 ${busy && !approving ? 'opacity-40' : ''}`}
+                        >
+                            {approving ? (
+                                <ActivityIndicator size="small" color="#0F172A" />
+                            ) : (
+                                <Ionicons name="checkmark" size={18} color="#0F172A" />
+                            )}
+                        </Pressable>
+                    </View>
+                </View>
+            </PanelSegment>
+        );
+    };
+
+    const renderBan = (ban: BannedRow, first: boolean, last: boolean) => {
+        const isProcessing = processingIds.has(ban.userId);
+        const date = formatDateSafe(ban.bannedAt, '');
+
+        return (
+            <PanelSegment first={first} last={last} edge={EDGE.banned}>
+                <View className="flex-row items-center pl-4 pr-3 py-2.5">
+                    <Pressable
+                        onPress={() => openProfile(ban.userId)}
+                        accessibilityRole="button"
+                        className="flex-1 flex-row items-center active:opacity-70"
+                    >
+                        <RingAvatar
+                            name={ban.username}
+                            src={ban.avatarUrl}
+                            ring="rgba(239,68,68,0.5)"
+                            badge={{ icon: 'ban', bg: COLORS.destructive, color: '#FFFFFF' }}
+                            dimmed
+                        />
+                        <View className="flex-1 ml-3">
+                            <View className="flex-row items-center" style={{ gap: 4 }}>
+                                <Text className="shrink text-[14px] font-black text-slate-200" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                                    {ban.username}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={13} color={COLORS.slate500} />
+                            </View>
+                            <Text className="text-[9px] font-bold uppercase tracking-[1.2px] mt-1" numberOfLines={1}>
+                                <Text style={{ color: '#FCA5A5' }}>
+                                    {date ? t('members.bannedOn', { date }) : t('members.tabBanned')}
+                                </Text>
+                                {ban.bannedByName ? (
+                                    <Text className="text-slate-500">{`  ${t('members.bannedBy', { name: ban.bannedByName })}`}</Text>
+                                ) : null}
+                            </Text>
+                        </View>
+                    </Pressable>
+                    {isProcessing ? (
+                        <View className="h-9 ml-2 items-center justify-center" style={{ minWidth: 84 }}>
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                        </View>
+                    ) : (
+                        <Pressable
+                            onPress={() => unbanMember(ban)}
+                            accessibilityRole="button"
+                            className="h-9 ml-2 px-3 rounded-xl flex-row items-center justify-center active:opacity-60"
+                            style={{ gap: 5, minWidth: 84, backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}
+                        >
+                            <Ionicons name="lock-open" size={13} color={COLORS.primaryBright} />
+                            <Text className="text-[12px] font-bold text-emerald-300" numberOfLines={1}>
+                                {t('members.unban')}
+                            </Text>
+                        </Pressable>
+                    )}
+                </View>
+            </PanelSegment>
+        );
+    };
+
+    const renderItem = ({ item }: { item: ListItem }) => {
+        switch (item.kind) {
+            case 'header':
+                return <SectionHeader icon={item.icon} color={item.color} label={item.label} count={item.count} first={item.first} />;
+            case 'member':
+                return renderMember(item.member, item.first, item.last);
+            case 'request':
+                return renderRequest(item.request, item.first, item.last);
+            case 'ban':
+                return renderBan(item.ban, item.first, item.last);
+        }
+    };
+
+    const emptyComponent = (() => {
+        if (!tabState.loaded) return <SkeletonPanel edge={tabState.edge} />;
+        if (tabState.error && tabState.total === 0) {
+            return (
+                <Panel style={{ borderColor: tabState.edge }}>
+                    <LoadFailedState variant="plain" className="py-10" onRetry={retryActiveList} retrying={isRetrying} />
+                </Panel>
+            );
+        }
+        if (query) {
+            return <PanelMessage icon="search-outline" color={COLORS.slate400} text={t('profile.noMatches')} edge={tabState.edge} />;
+        }
+        if (activeTab === 'requests') {
+            return <PanelMessage icon="checkmark-done" color={COLORS.primary} text={t('members.noPendingRequests')} edge={EDGE.members} />;
+        }
+        if (activeTab === 'blacklisted') {
+            return <PanelMessage icon="shield-checkmark-outline" color={COLORS.slate400} text={t('members.noBannedUsers')} edge={EDGE.members} />;
+        }
+        return <PanelMessage icon="people-outline" color={COLORS.slate400} text={t('members.noMembersFound')} edge={EDGE.members} />;
+    })();
+
+    const actionMeta = actionMember ? roleMeta(actionMember.hubRole) : null;
+
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <PageHeader title={t('members.title')} showBack />
 
-            {/* Tabs */}
-            <View className="px-4 pt-2 pb-1">
+            <View className="px-4 pt-1 pb-3">
                 <PremiumTabs
                     tabs={tabs}
                     activeTab={activeTab}
-                    onTabChange={(v) => setActiveTab(v as 'members' | 'requests' | 'blacklisted')}
+                    onTabChange={switchTab}
+                    accentColor={TAB_ACCENT[activeTab][0]}
+                    accentColorActive={TAB_ACCENT[activeTab][1]}
                 />
             </View>
 
-            {activeTab === 'members' && adminCount > 0 && (
-                <View className="px-4 pt-2">
-                    <Text className="text-[11px] text-slate-500">
-                        {t('members.adminSummary', { count: adminCount, total: members.length })}
-                    </Text>
-                </View>
-            )}
-
-            <View className="px-4 py-2">
-                <View className="flex-row items-center bg-card px-3 rounded-xl border border-white/5">
-                    <Ionicons name="search-outline" size={20} color="#71717A" />
-                    <TextInput
-                        className="flex-1 h-12 text-white ml-2"
-                        placeholder={searchPlaceholder}
-                        placeholderTextColor="#71717A"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                </View>
-            </View>
-
-            {activeTab === 'members' && (
-                isLoading ? (
-                    <View className="flex-1 items-center justify-center">
-                        <ActivityIndicator size="large" color={COLORS.primary} />
+            <FlatList
+                // A fresh list per tab, so each one opens at its top.
+                key={activeTab}
+                data={listData}
+                keyExtractor={(item) => item.key}
+                renderItem={renderItem}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                className="flex-1"
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32, flexGrow: 1 }}
+                removeClippedSubviews
+                refreshControl={<RefreshControl refreshing={isPulling} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+                ListHeaderComponent={showSearch ? (
+                    <View
+                        className="flex-row items-center px-3.5 h-12 rounded-2xl mb-4"
+                        style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderTopColor: 'rgba(255,255,255,0.11)' }}
+                    >
+                        <Ionicons name="search" size={17} color={COLORS.slate500} />
+                        <TextInput
+                            className="flex-1 h-12 text-white ml-2.5 text-[14px]"
+                            placeholder={searchPlaceholder}
+                            placeholderTextColor={COLORS.slate500}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            autoCorrect={false}
+                            autoCapitalize="none"
+                            returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                            <Pressable onPress={() => setSearchQuery('')} hitSlop={10} accessibilityRole="button">
+                                <Ionicons name="close-circle" size={18} color={COLORS.slate500} />
+                            </Pressable>
+                        )}
                     </View>
-                ) : (
-                    <FlatList
-                        keyboardShouldPersistTaps="handled"
-                        data={filteredMembers}
-                        keyExtractor={(item) => item.userId}
-                        className="flex-1 px-4"
-                        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
-                        removeClippedSubviews
-                        renderItem={({ item: member }) => {
-                            const isSelf = sameId(member.userId, currentUser?.id);
-                            const isProcessing = processingIds.has(member.userId);
-                            return (
-                                <View className="flex-row items-center justify-between py-3.5 border-b border-white/5">
-                                    <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                        <PlayerAvatar name={member.username} src={member.avatarUrl} size="md" />
-                                        <View className="flex-1">
-                                            <View className="flex-row items-center" style={{ gap: 8 }}>
-                                                <Text className="text-white font-semibold text-base" numberOfLines={1}>
-                                                    {member.username}
-                                                </Text>
-                                                {isSelf && (
-                                                    <Text className="text-[10px] font-black uppercase text-slate-500">
-                                                        {t('members.you')}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                            <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
-                                                <RoleBadge role={member.hubRole} />
-                                                {member.nickname ? (
-                                                    <Text className="text-slate-500 text-xs" numberOfLines={1}>
-                                                        {member.nickname}
-                                                    </Text>
-                                                ) : null}
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    {canManageMember(member) && (
-                                        isProcessing ? (
-                                            <View className="w-10 h-10 items-center justify-center">
-                                                <ActivityIndicator size="small" color="#818CF8" />
-                                            </View>
-                                        ) : (
-                                            <Pressable
-                                                onPress={() => openMemberActions(member)}
-                                                className="w-10 h-10 rounded-xl items-center justify-center bg-white/[0.03] border border-white/[0.06]"
-                                                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-                                                hitSlop={8}
-                                            >
-                                                <Ionicons name="ellipsis-horizontal" size={18} color="#94A3B8" />
-                                            </Pressable>
-                                        )
-                                    )}
-                                </View>
-                            );
-                        }}
-                        ListEmptyComponent={
-                            <View className="items-center py-20 opacity-30">
-                                <Ionicons name="people-outline" size={64} color="white" />
-                                <Text className="text-white mt-4">{t('members.noMembersFound')}</Text>
-                            </View>
-                        }
-                    />
-                )
-            )}
-
-            {activeTab === 'requests' && (
-                isRequestsLoading ? (
-                    <View className="flex-1 items-center justify-center">
-                        <ActivityIndicator size="large" color="#818CF8" />
-                    </View>
-                ) : (
-                    <FlatList
-                        keyboardShouldPersistTaps="handled"
-                        data={filteredRequests}
-                        keyExtractor={(item) => item.requestId}
-                        className="flex-1 px-4"
-                        contentContainerStyle={{ flexGrow: 1 }}
-                        removeClippedSubviews
-                        renderItem={({ item: request }) => {
-                            const isProcessing = processingIds.has(request.requestId);
-                            return (
-                                <View className="flex-row items-center justify-between py-4 border-b border-white/5">
-                                    <View className="flex-row items-center gap-3 flex-1 mr-2">
-                                        <PlayerAvatar name={request.username} src={request.avatarUrl} size="md" />
-                                        <View className="flex-1">
-                                            <Text className="text-white font-medium text-base" numberOfLines={1}>
-                                                {request.username}
-                                            </Text>
-                                            <Text className="text-slate-500 text-xs">
-                                                Requested {formatDateSafe(request.requestedAt, 'recently')}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View className="flex-row gap-2">
-                                        <Pressable
-                                            onPress={() => handleApprove(request.requestId, request.username)}
-                                            disabled={isProcessing}
-                                            className="bg-emerald-500/15 border border-emerald-500/30 w-10 h-10 rounded-xl items-center justify-center"
-                                            style={({ pressed }) => ({ opacity: (pressed || isProcessing) ? 0.6 : 1 })}
-                                        >
-                                            {isProcessing ? (
-                                                <ActivityIndicator size="small" color="#10B981" />
-                                            ) : (
-                                                <Ionicons name="checkmark" size={20} color="#10B981" />
-                                            )}
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => handleReject(request.requestId, request.username)}
-                                            disabled={isProcessing}
-                                            className="bg-red-500/15 border border-red-500/30 w-10 h-10 rounded-xl items-center justify-center"
-                                            style={({ pressed }) => ({ opacity: (pressed || isProcessing) ? 0.6 : 1 })}
-                                        >
-                                            <Ionicons name="close" size={20} color="#EF4444" />
-                                        </Pressable>
-                                    </View>
-                                </View>
-                            );
-                        }}
-                        ListEmptyComponent={
-                            <View className="items-center py-20">
-                                <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
-                                    <Ionicons name="mail-outline" size={28} color="#334155" />
-                                </View>
-                                <Text className="text-sm font-semibold text-slate-500">{t('members.noPendingRequests')}</Text>
-                                <Text className="text-xs text-slate-600 mt-1">{t('members.noPendingRequestsHint')}</Text>
-                            </View>
-                        }
-                    />
-                )
-            )}
-
-            {activeTab === 'blacklisted' && (
-                isBansLoading ? (
-                    <View className="flex-1 items-center justify-center">
-                        <ActivityIndicator size="large" color="#EF4444" />
-                    </View>
-                ) : (
-                    <FlatList
-                        keyboardShouldPersistTaps="handled"
-                        data={filteredBans}
-                        keyExtractor={(item) => item.userId}
-                        className="flex-1 px-4"
-                        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
-                        removeClippedSubviews
-                        renderItem={({ item: ban }) => {
-                            const isProcessing = processingIds.has(ban.userId);
-                            return (
-                                <View className="flex-row items-center justify-between py-4 border-b border-white/5">
-                                    <View className="flex-row items-center flex-1 mr-2" style={{ gap: 12 }}>
-                                        <PlayerAvatar name={ban.username} src={ban.avatarUrl} size="md" />
-                                        <View className="flex-1">
-                                            <Text className="text-white font-semibold text-sm" numberOfLines={1}>
-                                                {ban.username}
-                                            </Text>
-                                            <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
-                                                <Ionicons name="ban-outline" size={11} color="#EF4444" />
-                                                <Text className="text-[11px] text-red-400">
-                                                    Banned{ban.bannedAt ? ` ${formatDateSafe(ban.bannedAt, '')}` : ''}
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    </View>
-
-                                    {isProcessing ? (
-                                        <View className="w-24 h-10 items-center justify-center">
-                                            <ActivityIndicator size="small" color="#10B981" />
-                                        </View>
-                                    ) : (
-                                        <Pressable
-                                            onPress={() => unbanMember(ban)}
-                                            className="bg-emerald-500/15 border border-emerald-500/30 px-4 h-10 rounded-xl items-center justify-center flex-row"
-                                            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, gap: 6 })}
-                                        >
-                                            <Ionicons name="checkmark-circle-outline" size={15} color="#10B981" />
-                                            <Text className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
-                                                {t('members.unban')}
-                                            </Text>
-                                        </Pressable>
-                                    )}
-                                </View>
-                            );
-                        }}
-                        ListEmptyComponent={
-                            <View className="items-center py-20">
-                                <View className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.06] items-center justify-center mb-4">
-                                    <Ionicons name="ban-outline" size={28} color="#334155" />
-                                </View>
-                                <Text className="text-sm font-semibold text-slate-500">{t('members.noBannedUsers')}</Text>
-                                <Text className="text-xs text-slate-600 mt-1">{t('members.noBannedUsersHint')}</Text>
-                            </View>
-                        }
-                    />
-                )
-            )}
+                ) : null}
+                ListEmptyComponent={emptyComponent}
+            />
 
             <ActionSheetModal
                 visible={!!actionMember}
                 onClose={() => setActionMember(null)}
                 title={actionMember?.username ?? ''}
-                subtitle={t('members.chooseAnAction')}
-                header={actionMember ? (
-                    <PlayerAvatar name={actionMember.username} src={actionMember.avatarUrl} size="md" />
+                subtitle={actionMeta ? t(actionMeta.labelKey) : undefined}
+                header={actionMember && actionMeta ? (
+                    <RingAvatar
+                        name={actionMember.username}
+                        src={actionMember.avatarUrl}
+                        ring={actionMember.hubRole === HubRole.HubMember ? 'rgba(255,255,255,0.12)' : actionMeta.color + '80'}
+                    />
                 ) : undefined}
                 actions={actionMember ? memberSheetActions(actionMember) : []}
             />
         </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    segment: {
+        backgroundColor: COLORS.card,
+        borderLeftWidth: 1,
+        borderRightWidth: 1,
+        overflow: 'hidden',
+    },
+    segmentFirst: {
+        borderTopWidth: 1,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: 4,
+    },
+    segmentLast: {
+        borderBottomWidth: 1,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        paddingBottom: 4,
+    },
+    shine: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 56,
+    },
+    divider: {
+        position: 'absolute',
+        top: 0,
+        left: DIVIDER_INSET,
+        right: 0,
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    meTint: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(16,185,129,0.07)',
+    },
+    meLine: {
+        position: 'absolute',
+        left: 0,
+        top: 10,
+        bottom: 10,
+        width: 3,
+        backgroundColor: COLORS.primary,
+        borderTopRightRadius: 3,
+        borderBottomRightRadius: 3,
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.7,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    badge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 16,
+        height: 16,
+        borderRadius: 999,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.card,
+    },
+});
