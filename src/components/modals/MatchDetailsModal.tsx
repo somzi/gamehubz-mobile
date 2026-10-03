@@ -2385,7 +2385,12 @@ export function MatchDetailsModal({
                         <Ionicons name="close" size={20} color="#94A3B8" />
                     </Pressable>
                     <View className="items-center flex-1 mx-4">
-                        <Text className="text-sm font-black text-white uppercase tracking-[3px] w-full text-center" numberOfLines={1}>
+                        <Text
+                            className="text-sm font-black text-white uppercase tracking-[3px] w-full text-center"
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.7}
+                        >
                             {tournamentName}
                         </Text>
                         <Text className="text-[10px] text-slate-500 font-bold mt-0.5">{roundName}</Text>

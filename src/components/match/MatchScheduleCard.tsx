@@ -1359,16 +1359,21 @@ function MatchScheduleCardBase({
                                         className="text-white font-black tracking-tight"
                                         style={{ fontSize: 20, lineHeight: 24 }}
                                         numberOfLines={2}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.75}
                                     >
                                         {tournamentName}
                                     </Text>
                                     {!!roundName && (
                                         <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
                                             <Ionicons name="planet" size={12} color={COLORS.primaryBright} />
+                                            {/* A long hub name shrinks to fit rather than being cut */}
                                             <Text
                                                 className="shrink text-[10.5px] font-black uppercase tracking-[1.5px]"
                                                 style={{ color: COLORS.primaryBright }}
                                                 numberOfLines={1}
+                                                adjustsFontSizeToFit
+                                                minimumFontScale={0.7}
                                             >
                                                 {roundName}
                                             </Text>
