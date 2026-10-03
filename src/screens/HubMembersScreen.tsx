@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { COLORS } from '../lib/theme';
 import { ActionSheetModal, type ActionSheetAction } from '../components/modals/ActionSheetModal';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateHubData } from '../lib/queryPolicy';
 
 type HubMembersScreenRouteProp = RouteProp<RootStackParamList, 'HubMembers'>;
 
@@ -100,6 +102,7 @@ function RoleBadge({ role }: { role: HubRole }) {
 }
 
 export default function HubMembersScreen() {
+    const queryClient = useQueryClient();
     const { t } = useTranslation('hub');
     const { t: tCommon } = useTranslation('common');
     const route = useRoute<HubMembersScreenRouteProp>();
@@ -230,6 +233,7 @@ export default function HubMembersScreen() {
                 }
             );
             if (response.ok) {
+                await invalidateHubData(queryClient, hubId);
                 setMembers(prev =>
                     prev.map(m => (m.userId === member.userId ? { ...m, hubRole: newRole } : m))
                 );
@@ -268,6 +272,7 @@ export default function HubMembersScreen() {
                             if (response.ok) {
                                 // The viewer is no longer the owner, so re-read both the hub meta
                                 // (drops the owner-only controls) and the member list (new badges).
+                                await invalidateHubData(queryClient, hubId);
                                 await Promise.all([fetchHubMeta(), fetchMembers()]);
                                 Alert.alert(t('members.ownershipTransferred'), t('members.ownershipTransferredMessage', { username: member.username }));
                             } else {
@@ -302,6 +307,7 @@ export default function HubMembersScreen() {
                                 { method: 'DELETE' }
                             );
                             if (response.ok) {
+                                await invalidateHubData(queryClient, hubId);
                                 setMembers(prev => prev.filter(m => m.userId !== member.userId));
                             } else {
                                 const text = await response.text();
@@ -337,6 +343,7 @@ export default function HubMembersScreen() {
                             if (response.ok) {
                                 setMembers(prev => prev.filter(m => m.userId !== member.userId));
                                 fetchBans();
+                                await invalidateHubData(queryClient, hubId);
                             } else {
                                 const text = await response.text();
                                 Alert.alert(tCommon('error'), getErrorMessage(text) || t('members.banFailed'));
@@ -368,6 +375,7 @@ export default function HubMembersScreen() {
                                 { method: 'DELETE' }
                             );
                             if (response.ok) {
+                                await invalidateHubData(queryClient, hubId);
                                 setBans(prev => prev.filter(b => b.userId !== ban.userId));
                             } else {
                                 const text = await response.text();
@@ -462,6 +470,7 @@ export default function HubMembersScreen() {
                 method: 'POST',
             });
             if (response.ok) {
+                await invalidateHubData(queryClient, hubId);
                 setRequests(prev => prev.filter(r => r.requestId !== requestId));
                 fetchMembers();
             } else {
@@ -490,6 +499,7 @@ export default function HubMembersScreen() {
                                 method: 'POST',
                             });
                             if (response.ok) {
+                                await invalidateHubData(queryClient, hubId);
                                 setRequests(prev => prev.filter(r => r.requestId !== requestId));
                             } else {
                                 Alert.alert(tCommon('error'), t('members.rejectFailed'));

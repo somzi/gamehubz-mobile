@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateHubData } from '../lib/queryPolicy';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,6 +62,7 @@ function parseDiscordSettings(json?: string | null): DiscordNotificationSettings
 }
 
 export default function ManageHubDiscordScreen() {
+    const queryClient = useQueryClient();
     const { t } = useTranslation('hub');
     const { t: tCommon } = useTranslation('common');
     const route = useRoute<ManageHubDiscordRouteProp>();
@@ -136,6 +139,7 @@ export default function ManageHubDiscordScreen() {
             });
 
             if (response.ok) {
+                await invalidateHubData(queryClient, hubId);
                 setStatusModalConfig({
                     type: 'success',
                     title: t('discord.settingsSaved'),

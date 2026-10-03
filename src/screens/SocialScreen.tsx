@@ -242,7 +242,7 @@ function FriendsTab({ navigation }: { navigation: NavProp }) {
     const friends = friendsQuery.data ?? EMPTY_FRIENDS;
     const chatByUser = useUnreadByUser(chatsQuery.data ?? EMPTY_CHATS);
 
-    useRefetchOnFocusIfStale(friendsQuery.refetch, friendsQuery.dataUpdatedAt, { enabled: !!user?.id });
+    useRefetchOnFocusIfStale(friendsQuery.refetch, friendsQuery.dataUpdatedAt, { enabled: !!user?.id, queryKey: ['friends', user?.id, debounced] });
     const { isPulling, onRefresh } = usePullToRefresh(
         useCallback(() => Promise.all([friendsQuery.refetch(), chatsQuery.refetch()]), [friendsQuery.refetch, chatsQuery.refetch]),
     );
@@ -392,7 +392,7 @@ function RequestsTab({ navigation }: { navigation: NavProp }) {
     const { incoming, outgoing } = requestsQuery.data ?? EMPTY_REQUESTS;
     const [busy, setBusy] = useState<{ id: string; action: RequestAction } | null>(null);
 
-    useRefetchOnFocusIfStale(requestsQuery.refetch, requestsQuery.dataUpdatedAt, { enabled: !!user?.id });
+    useRefetchOnFocusIfStale(requestsQuery.refetch, requestsQuery.dataUpdatedAt, { enabled: !!user?.id, queryKey: ['friend-requests', user?.id, debounced] });
     useRefetchWhenCountMoves(badges.friendRequests, requestsQuery.refetch);
     const { isPulling, onRefresh } = usePullToRefresh(requestsQuery.refetch);
 
@@ -654,7 +654,7 @@ function ChatsTab({ navigation }: { navigation: NavProp }) {
 
     // Bottom tabs keep this screen mounted; useRefetchOnFocusIfStale bridges the gap, and a
     // message landing while the list is open moves the unread badge, which refetches it.
-    useRefetchOnFocusIfStale(chatsQuery.refetch, chatsQuery.dataUpdatedAt, { enabled: !!user?.id });
+    useRefetchOnFocusIfStale(chatsQuery.refetch, chatsQuery.dataUpdatedAt, { enabled: !!user?.id, queryKey: ['direct-chats', user?.id, debounced] });
     useRefetchWhenCountMoves(badges.unreadDirectMessages, chatsQuery.refetch);
     const { isPulling, onRefresh } = usePullToRefresh(
         useCallback(() => Promise.all([chatsQuery.refetch(), friendsQuery.refetch()]), [chatsQuery.refetch, friendsQuery.refetch]),

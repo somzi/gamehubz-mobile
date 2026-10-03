@@ -127,11 +127,12 @@ export default function HomeScreen() {
     useRefetchOnFocusIfStale(
         homeMatchesQuery.refetch,
         homeMatchesQuery.dataUpdatedAt,
-        { enabled: !!user?.id },
+        { enabled: !!user?.id, queryKey: ['home-matches', user?.id] },
     );
     useRefetchOnFocusIfStale(
         hubActivitiesQuery.refetch,
         hubActivitiesQuery.dataUpdatedAt,
+        { queryKey: ['hub-activities'] },
     );
 
     // The spinner follows the pull only. Bound to isFetching, it also flipped on the background

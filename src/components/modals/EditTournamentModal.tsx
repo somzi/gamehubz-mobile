@@ -26,6 +26,8 @@ import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '..
 import { COLORS } from '../../lib/theme';
 import { dateLocale } from '../../i18n';
 import { PRIVATE_COLORS } from '../ui/PrivateBadge';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateTournamentData } from '../../lib/queryPolicy';
 
 // Values stay at module scope; labels are resolved per render so a language switch applies.
 const YES_NO_OPTIONS = [
@@ -109,6 +111,7 @@ function resolveRegionKey(region: unknown): string {
 }
 
 export function EditTournamentModal({ visible, onClose, tournament, onSaveSuccess }: EditTournamentModalProps) {
+    const queryClient = useQueryClient();
     const { t } = useTranslation('tournament');
     const { t: tTeam } = useTranslation('team');
     const swissKnockoutOptions = useMemo(
@@ -580,6 +583,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 throw new Error(errorData.message || t('validation.updateFailed'));
             }
 
+            await invalidateTournamentData(queryClient, tournament.id || tournament.Id);
             onSaveSuccess();
             onClose();
         } catch (err: any) {

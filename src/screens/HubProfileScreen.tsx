@@ -2,10 +2,12 @@ import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { HUB_KEY, fetchHub } from '../lib/profileQueries';
+import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
+import { DETAIL_STALE_MS, invalidateHubData } from '../lib/queryPolicy';
 
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
 import { TournamentCard } from '../components/cards/TournamentCard';
@@ -46,6 +48,7 @@ export default function HubProfileScreen() {
     const { id } = route.params;
 
     const { user } = useAuth();
+    const isFocused = useIsFocused();
     const { tournamentApprovals, hubApprovalDetail, tournamentsForHub } = useBadges();
     // Split this hub's pending-approvals total so the Tournaments and Members tabs each show their
     // own share (join requests live on Members; registrations / admin-help live under Tournaments).
@@ -108,8 +111,8 @@ export default function HubProfileScreen() {
     const hubQuery = useQuery({
         queryKey: HUB_KEY(id),
         queryFn: () => fetchHub(id),
-        enabled: !!id,
-        staleTime: 30_000,
+        enabled: !!id && isFocused,
+        staleTime: DETAIL_STALE_MS,
     });
 
     const hubData = hubQuery.data ?? null;
@@ -136,15 +139,9 @@ export default function HubProfileScreen() {
         setHasPendingRequest(hubData.hasPendingJoinRequest || false);
     }, [hubData]);
 
-    useFocusEffect(
-        useCallback(() => {
-            // The mount already fetches whenever there is nothing fresh to paint; invalidating on top of
-            // that cancelled the in-flight request and sent GET_HUB a second time. Every later focus
-            // still refetches.
-            if (queryClient.isFetching({ queryKey: HUB_KEY(id) }) > 0) return;
-            refetchHub();
-        }, [queryClient, id, refetchHub])
-    );
+    useRefetchOnFocusIfStale(hubQuery.refetch, hubQuery.dataUpdatedAt, {
+        enabled: !!id, queryKey: HUB_KEY(id), staleMs: DETAIL_STALE_MS,
+    });
 
     useEffect(() => {
         const seq = ++tournamentsSeq.current;
@@ -294,6 +291,8 @@ export default function HubProfileScreen() {
                 });
                 if (response.ok) {
                     setHasPendingRequest(false);
+                    await invalidateHubData(queryClient, id);
+                    refetchHub();
                 } else {
                     const text = await response.text();
                     Alert.alert(t('profile.unableToCancel'), getErrorMessage(text) || t('profile.cancelRequestFailed'));
@@ -318,6 +317,8 @@ export default function HubProfileScreen() {
                 } else {
                     setHasPendingRequest(true);
                 }
+                await invalidateHubData(queryClient, id);
+                refetchHub();
             } else {
                 const text = await response.text();
                 Alert.alert(t('profile.unableToJoin'), getErrorMessage(text) || t('profile.joinFailed'));
@@ -339,6 +340,8 @@ export default function HubProfileScreen() {
             if (response.ok) {
                 setIsFollowing(false);
                 setShowUnfollowConfirm(false);
+                await invalidateHubData(queryClient, id);
+                refetchHub();
             } else {
                 const text = await response.text();
                 Alert.alert(t('profile.unableToUnfollow'), getErrorMessage(text) || t('profile.unfollowFailed'));
@@ -363,6 +366,7 @@ export default function HubProfileScreen() {
             });
 
             if (response.ok) {
+                await invalidateHubData(queryClient, id);
                 refetchHub();
             }
         } catch (error) {

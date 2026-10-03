@@ -88,6 +88,8 @@ import { NO_REFRESH_FAILURES, retryFailedRefreshes, withRefreshResult, type Refr
 import { LoadFailedState } from '../components/ui/EmptyState';
 import { afterScreenTransition, useModalHandoff } from '../lib/modalHandoff';
 import { createModalReturn, getRouteOpenVersion } from '../lib/modalReturn';
+import { useQueryClient } from '@tanstack/react-query';
+import { fetchTournamentResource, tournamentResourceKey } from '../lib/queryPolicy';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -274,8 +276,11 @@ export default function TournamentDetailsScreen() {
     const { t: tTeam } = useTranslation('team');
     const route = useRoute<TournamentDetailsRouteProp>();
     const { id } = route.params;
+    const routeParamsRef = useRef(route.params);
+    routeParamsRef.current = route.params;
     const requests = useRequestGate(id);
     const { user, token } = useAuth();
+    const queryClient = useQueryClient();
     // Opened earlier in this session: paint from the snapshot, refresh underneath.
     const [snapshot] = useState(() => snapshots.get(snapshotKey(user?.id, id)));
     // A private tournament's join code, when the player arrived holding one — through the
@@ -721,7 +726,7 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const fetchTournamentDetails = async (silent = false) => {
+    const fetchTournamentDetails = async (silent = false, force = true) => {
         const isCurrent = requests.begin('fetchTournamentDetails');
         if (!id) return;
         if (!silent) setIsLoading(true);
@@ -729,18 +734,16 @@ export default function TournamentDetailsScreen() {
         try {
             // v3 = v2 + HasUserRegistered (folds the CHECK_REGISTRATION round-trip inline).
             const url = ENDPOINTS.GET_TOURNAMENT_OVERVIEW_V3(id);
-            const response = await authenticatedFetch(url);
-            if (!isCurrent()) return;
-            if (!response.ok) {
-                // A 404 here is the normal end of a tournament's life, not a failure: this screen is
-                // where push notifications, share links and the notification inbox all land, and any
-                // of those can outlive what they point at. Saying "failed (404)" next to a Retry that
-                // can never succeed reads as a network problem the user should keep poking at.
-                throw new Error(response.status === 404
-                    ? t('details.tournamentGone')
-                    : t('details.fetchTournamentFailed', { status: response.status }));
-            }
-            const data = await response.json();
+            const data = await fetchTournamentResource(queryClient, tournamentResourceKey(id, user?.id, 'overview'), async (signal) => {
+                const response = await authenticatedFetch(url, { signal });
+                if (!response.ok) {
+                    // Links and notifications can outlive the tournament they point at.
+                    throw new Error(response.status === 404
+                        ? t('details.tournamentGone')
+                        : t('details.fetchTournamentFailed', { status: response.status }));
+                }
+                return response.json();
+            }, force);
             if (!isCurrent()) return;
             const rawData = data.result || data;
 
@@ -809,7 +812,7 @@ export default function TournamentDetailsScreen() {
             // Only team tournaments still fetch in parallel — the registration status now
             // comes inline via the overview response.
             if (normalizedTournament.isTeamTournament) {
-                await fetchTournamentTeams(id);
+                await fetchTournamentTeams(id, force);
             }
         } catch (err: any) {
             if (!isCurrent()) return;
@@ -827,7 +830,7 @@ export default function TournamentDetailsScreen() {
     // `silent` keeps the currently rendered bracket on screen while it refreshes underneath —
     // used by the focus refetch and pull-to-refresh, where blanking to a spinner (or to an error
     // screen over a transient blip) would be worse than briefly showing slightly stale cards.
-    const fetchBracket = async (silent = false) => {
+    const fetchBracket = async (silent = false, force = true) => {
         const isCurrent = requests.begin('fetchBracket');
         if (!id) return;
         const showLoadError = !silent || !bracketLoadedRef.current;
@@ -838,12 +841,11 @@ export default function TournamentDetailsScreen() {
         try {
             const url = ENDPOINTS.GET_TOURNAMENT_STRUCTURE_V3(id);
             console.log('Fetching bracket from:', url);
-            const response = await authenticatedFetch(url);
-            if (!isCurrent()) return;
-            if (!response.ok) {
-                throw new Error(t('details.fetchBracketFailed', { status: response.status }));
-            }
-            const data = await response.json();
+            const data = await fetchTournamentResource(queryClient, tournamentResourceKey(id, user?.id, 'bracket'), async (signal) => {
+                const response = await authenticatedFetch(url, { signal });
+                if (!response.ok) throw new Error(t('details.fetchBracketFailed', { status: response.status }));
+                return response.json();
+            }, force);
             if (!isCurrent()) return;
             setBracketError(null);
             setFailedRefreshes((failures) => withRefreshResult(failures, 'bracket', true));
@@ -1530,15 +1532,16 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const fetchParticipants = async () => {
+    const fetchParticipants = async (force = true) => {
         const isCurrent = requests.begin('fetchParticipants');
         if (!id) return;
         try {
             const url = ENDPOINTS.GET_TOURNAMENT_PARTICIPANTS(id);
-            const response = await authenticatedFetch(url);
-            if (!isCurrent()) return;
-            if (!response.ok) throw new Error(t('details.fetchParticipantsFailed'));
-            const data = await response.json();
+            const data = await fetchTournamentResource(queryClient, tournamentResourceKey(id, user?.id, 'participants'), async (signal) => {
+                const response = await authenticatedFetch(url, { signal });
+                if (!response.ok) throw new Error(t('details.fetchParticipantsFailed'));
+                return response.json();
+            }, force);
             if (!isCurrent()) return;
             const list = data.result || data || [];
             // Guard against duplicate participant rows for the same user (legacy data). The list
@@ -1866,11 +1869,12 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    const fetchTournamentTeams = async (tournamentId: string) => {
+    const fetchTournamentTeams = async (tournamentId: string, force = true) => {
         const isCurrent = requests.begin('fetchTournamentTeams');
         try {
             // Populate confirmed list
-            const finalTeams = await getTournamentTeams(tournamentId);
+            const finalTeams = await fetchTournamentResource(queryClient, tournamentResourceKey(tournamentId, user?.id, 'teams'),
+                () => getTournamentTeams(tournamentId), force);
             if (!isCurrent()) return;
             setTournamentTeams(finalTeams);
             setTeamsError(false);
@@ -1879,7 +1883,8 @@ export default function TournamentDetailsScreen() {
             // Find user's team from all teams (including pending) like before
             if (user?.id) {
                 try {
-                    const allTeams = await getPendingTournamentTeams(tournamentId);
+                    const allTeams = await fetchTournamentResource(queryClient, tournamentResourceKey(tournamentId, user?.id, 'pending-teams'),
+                        () => getPendingTournamentTeams(tournamentId), force);
             if (!isCurrent()) return;
                     const myTeam = allTeams.find(teamRow =>
                         teamRow.members && teamRow.members.some(m => (m.userId || m.UserId)?.toLowerCase() === user.id.toLowerCase())
@@ -1971,17 +1976,20 @@ export default function TournamentDetailsScreen() {
         useCallback(() => {
             // First time it mounts, isLoading is already true by default, so silent doesn't matter visually,
             // but for subsequent focuses, silent=true prevents the screen from going blank
-            fetchTournamentDetails(true);
+            // Normal Back reuses fresh resources. A notification explicitly asks for current data.
+            const params = routeParamsRef.current;
+            const fromNotification = !!(params.focusMatchId || params.focusTeamMatchId);
+            fetchTournamentDetails(true, fromNotification);
             // The participants list only feeds the Overview join button and the Players tab.
             // Skip the extra round-trip on refocus when we're on bracket/teams/registrations,
             // which don't use it. The tab-switch effect still fetches it when Players is opened.
             const tab = activeTabRef.current;
-            if (tab === 'overview' || tab === 'players') fetchParticipants();
+            if (tab === 'overview' || tab === 'players') fetchParticipants(fromNotification);
             // The bracket is fetched by the tab-switch effect, which does NOT re-run on refocus —
             // so without this, coming back to an already-open bracket showed whatever was loaded
             // when the tab was first opened, including stale live team scores.
-            if (tab === 'bracket') fetchBracket(true);
-        }, [id])
+            if (tab === 'bracket') fetchBracket(true, fromNotification);
+        }, [id, user?.id])
     );
 
     // Pull-to-refresh: same set as the focus refetch, but always refreshes the data behind the
@@ -2093,16 +2101,16 @@ export default function TournamentDetailsScreen() {
 
     useEffect(() => {
         if (activeTab === 'bracket') {
-            fetchBracket();
+            fetchBracket(true, false);
         } else if (activeTab === 'registrations') {
             fetchPendingRegistrations();
         } else if (activeTab === 'players') {
-            if (playersTab === 'confirmed') fetchParticipants();
+            if (playersTab === 'confirmed') fetchParticipants(false);
             else if (playersTab === 'registrations' && pendingRegistrations.length === 0) fetchPendingRegistrations();
         } else if (activeTab === 'teams' && tournament?.isTeamTournament) {
             if (teamsTab === 'open' && openTeams.length === 0) fetchOpenTeams();
             else if (teamsTab === 'registrations' && pendingRegistrations.length === 0) fetchPendingRegistrations();
-            else if (teamsTab === 'confirmed' && tournamentTeams.length === 0) fetchTournamentTeams(id);
+            else if (teamsTab === 'confirmed') fetchTournamentTeams(id, false);
         }
     }, [id, activeTab, teamsTab, playersTab]);
 
@@ -2775,6 +2783,9 @@ export default function TournamentDetailsScreen() {
                 // without a follow-up GET_TOURNAMENT_STRUCTURE round-trip. Falls back to
                 // fetchBracket() for actions that don't (yet) piggy-back the structure.
                 if (freshStructure) {
+                    requests.begin('fetchBracket');
+                    void queryClient.cancelQueries({ queryKey: tournamentResourceKey(id, user?.id, 'bracket'), exact: true });
+                    queryClient.setQueryData(tournamentResourceKey(id, user?.id, 'bracket'), freshStructure);
                     setStages(freshStructure.stages || []);
                     if (freshStructure.hubOwnerId || freshStructure.HubOwnerId) {
                         setHubOwnerId(freshStructure.hubOwnerId || freshStructure.HubOwnerId);

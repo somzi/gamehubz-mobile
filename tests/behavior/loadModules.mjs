@@ -7,7 +7,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire(join(root, 'package.json'));
 const ts = require('typescript');
 const dir = mkdtempSync(join(tmpdir(), 'gamehubz-behavior-'));
-for (const name of ['mergeMessages', 'chatHistory', 'chatOutbox', 'chatWorkspace', 'modalReturn', 'matchPresentation', 'requestGate', 'fetchWithTimeout', 'signalR', 'refreshFailures', 'coalesce', 'delayedNotice']) {
+for (const name of ['mergeMessages', 'chatHistory', 'chatOutbox', 'chatWorkspace', 'modalReturn', 'matchPresentation', 'queryPolicy', 'requestGate', 'fetchWithTimeout', 'signalR', 'refreshFailures', 'coalesce', 'delayedNotice']) {
     let { outputText } = ts.transpileModule(readFileSync(join(root, `src/lib/${name}.ts`), 'utf8'), {
         compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
     });

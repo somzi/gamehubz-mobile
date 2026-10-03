@@ -7,7 +7,10 @@ const { createRequestGate } = await load('requestGate');
 const { NO_REFRESH_FAILURES, withRefreshResult, retryFailedRefreshes } = await load('refreshFailures');
 
 const failure = { ok: false, status: 503 };
-const shared = () => ({ requests: createRequestGate(), t: key => key, console: { error() {}, log() {} }, getErrorMessage: String });
+const shared = () => ({ requests: createRequestGate(), t: key => key, console: { error() {}, log() {} }, getErrorMessage: String,
+    queryClient: {}, user: { id: 'viewer' }, tournamentResourceKey: (...parts) => parts,
+    fetchTournamentResource: (_client, _key, loader) => loader(undefined),
+});
 function matchFetcher(responses, existing = null) {
     const state = { loading: false, error: null, settled: null };
     const fetch = loadFetcher('src/components/modals/MatchDetailsModal.tsx', 'fetchMatchDetails', {

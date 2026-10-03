@@ -74,7 +74,7 @@ Expo export za Android i iOS uspeva, a `git diff --check` je čist.
 
 ## Dodatne dorade iz review-a: 7 → 6 → 9
 
-Ovi brojevi se odnose na Claude-ov poslednji review, ne na prvobitni plan. Faza 3 nije započeta.
+Ovi brojevi se odnose na Claude-ov poslednji review, ne na prvobitni plan. Ova runda se odnosila samo na faze 1 i 2.
 
 - **7 — spajanje DM-ova:** ostaje trenutno vidljiva ruta (ako su obe skrivene, ostaje prvobitna). Nacrti i red slanja žive izvan pojedinačne rute. Tekst vidljivog razgovora ostaje u unosu; drugi, različit tekst prikazuje se kao sačuvan nacrt. Vraćanje nacrta čuva postojeći unos umesto da ga prepiše. Neuspele poruke prenose se zajedno sa porukama koje se još šalju. Zahtev u toku se ne ponavlja; njegov uspeh ili neuspeh stiže u preživeli razgovor. Stanje je samo u memoriji, oslobađa se pri napuštanju razgovora i odjavi.
 - **6 — povratak modala:** blur turnira pamti otvoreni pojedinačni ili timski meč i aktivni tab, pa skloni oba modala. Back vraća samo zapamćeni prikaz nakon stack tranzicije. Eksplicitna navigacija do turnira, uključujući novu notifikaciju, poništava prethodni povratak. Sačuvan je tok timski meč → pojedinačni meč → profil → Back → zatvori pojedinačni → timski meč. Unosi rezultata, nepotpuni redovi serije, izbor termina, tekst stream forme i chat nacrt/red slanja čuvaju se izvan native podstabla koje se zatvara.
@@ -90,3 +90,5 @@ Dodatna proba na oba uređaja:
 4. Na sporoj mreži otvoriti meč iz žreba, zatim drugi meč. Imena su tačna od prvog prikaza, prethodne akcije/rezultati se ne pojavljuju, a tabovi ostaju na mestu. Proveriti neuspeh i Retry, otvaranje iz notifikacije i tihi povratak na isti meč.
 
 ADB provera za ovu doradu nije našla povezan uređaj/emulator. Proba na uređaju ostaje otvorena. Ovaj paket nije objavljen.
+
+Stavka 12 iz faze 3 implementirana je u narednom paketu, dokumentovanom u [frontend-phase-3-cache.md](frontend-phase-3-cache.md).

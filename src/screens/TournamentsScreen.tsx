@@ -2,9 +2,10 @@ import { useTranslation } from 'react-i18next';
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
+import { LIST_STALE_MS, refreshVisibleList } from '../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { TournamentRegion } from '../types/tournament';
@@ -56,6 +57,7 @@ export default function TournamentsScreen() {
     const { t: tAuth } = useTranslation('auth');
     const navigation = useNavigation<TournamentsScreenNavigationProp>();
     const { user } = useAuth();
+    const isFocused = useIsFocused();
     const queryClient = useQueryClient();
     const insets = useSafeAreaInsets();
 
@@ -69,14 +71,15 @@ export default function TournamentsScreen() {
     // leaks into the new one (which used to skip pages when the manual `page`
     // state carried over). Cold-start persistence flows through the
     // PersistQueryClientProvider in App.tsx.
+    const queryKey = ['tournaments', activeTab, user?.id];
     const tournamentsQuery = useInfiniteQuery<TournamentsPage>({
-        queryKey: ['tournaments', activeTab, user?.id],
+        queryKey,
         initialPageParam: 0,
-        queryFn: async ({ pageParam }) => {
+        queryFn: async ({ pageParam, signal }) => {
             const page = pageParam as number;
             const status = TAB_TO_STATUS[activeTab] ?? 2;
             const url = ENDPOINTS.GET_USER_TOURNAMENTS_V2(user!.id, status, page, PAGE_SIZE);
-            const response = await authenticatedFetch(url);
+            const response = await authenticatedFetch(url, { signal });
             if (!response.ok) {
                 const text = await response.text().catch(() => 'No body');
                 throw new Error(t('list.fetchFailed', { status: response.status, text }));
@@ -95,8 +98,8 @@ export default function TournamentsScreen() {
             };
         },
         getNextPageParam: (lastPage) => lastPage.nextPage,
-        enabled: !!user?.id,
-        staleTime: 30_000,
+        enabled: !!user?.id && isFocused,
+        staleTime: LIST_STALE_MS,
         refetchOnMount: true,
         // Keep showing the previous list while a new key (tab flip) is fetching,
         // instead of blanking to the full-screen "Loading tournaments..." view.
@@ -109,11 +112,11 @@ export default function TournamentsScreen() {
     );
 
     // Bottom tabs keep the screen mounted; useRefetchOnFocusIfStale refetches only
-    // when the first-page snapshot is >30s stale.
+    // when the list is stale. A longer window avoids replaying every loaded page on short visits.
     useRefetchOnFocusIfStale(
         tournamentsQuery.refetch,
         tournamentsQuery.dataUpdatedAt,
-        { enabled: !!user?.id },
+        { enabled: !!user?.id, queryKey, staleMs: LIST_STALE_MS },
     );
 
     // The spinner follows the pull only. Bound to isRefetching it also flipped on the focus refetch,
@@ -122,15 +125,15 @@ export default function TournamentsScreen() {
     const onRefresh = useCallback(async () => {
         setIsPulling(true);
         try {
-            await queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+            await refreshVisibleList(queryClient, queryKey);
         } finally {
             setIsPulling(false);
         }
-    }, [queryClient]);
+    }, [queryClient, activeTab, user?.id]);
 
     const loadMore = useCallback(() => {
-        if (tournamentsQuery.hasNextPage && !tournamentsQuery.isFetchingNextPage) {
-            tournamentsQuery.fetchNextPage();
+        if (tournamentsQuery.hasNextPage && !tournamentsQuery.isFetching) {
+            tournamentsQuery.fetchNextPage({ cancelRefetch: false });
         }
     }, [tournamentsQuery]);
 

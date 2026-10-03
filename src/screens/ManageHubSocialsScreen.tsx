@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateHubData } from '../lib/queryPolicy';
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +25,7 @@ type ManageHubSocialsRouteProp = RouteProp<RootStackParamList, 'ManageHubSocials
 type ManageHubSocialsNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ManageHubSocialsScreen() {
+    const queryClient = useQueryClient();
     const { t } = useTranslation('socials');
     const { t: tCommon } = useTranslation('common');
     const navigation = useNavigation<ManageHubSocialsNavigationProp>();
@@ -134,6 +137,7 @@ export default function ManageHubSocialsScreen() {
             });
 
             if (response.ok) {
+                await invalidateHubData(queryClient, hubId);
                 setNewSocialType(undefined);
                 setNewSocialUsername('');
                 await fetchHubSocials();
@@ -182,6 +186,7 @@ export default function ManageHubSocialsScreen() {
                             });
 
                             if (response.ok) {
+                                await invalidateHubData(queryClient, hubId);
                                 await fetchHubSocials();
                             } else {
                                 setStatusModalConfig({

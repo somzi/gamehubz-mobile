@@ -35,6 +35,8 @@ import { LineupSwapModal, type LineupPlayer } from '../components/modals/LineupS
 import { ENDPOINTS, authenticatedFetch, getErrorMessage, API_BASE_URL } from '../lib/api';
 import { shareTeam } from '../lib/share';
 import type { TeamDto, TeamJoinRequestDto } from '../types/team';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateTournamentData } from '../lib/queryPolicy';
 
 type TeamDashboardRouteProp = RouteProp<RootStackParamList, 'TeamDashboard'>;
 
@@ -42,6 +44,7 @@ export default function TeamDashboardScreen() {
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const route = useRoute<TeamDashboardRouteProp>();
     const { teamId, tournamentId, tournamentStatus } = route.params;
+    const queryClient = useQueryClient();
     const { user } = useAuth();
     const { t } = useTranslation('team');
 
@@ -193,6 +196,7 @@ export default function TeamDashboardScreen() {
         setIsSavingName(true);
         try {
             const updated = await renameTeam(team.teamId, editedName.trim());
+            await invalidateTournamentData(queryClient, tournamentId);
             setTeam(updated);
             setIsEditingName(false);
         } catch (err: unknown) {
@@ -215,6 +219,7 @@ export default function TeamDashboardScreen() {
                 setConfirmModal(prev => ({ ...prev, isLoading: true }));
                 try {
                     await leaveTeam(team.teamId);
+                    await invalidateTournamentData(queryClient, tournamentId);
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
                     navigation.goBack();
                 } catch (err: unknown) {
@@ -238,6 +243,7 @@ export default function TeamDashboardScreen() {
                 setConfirmModal(prev => ({ ...prev, isLoading: true }));
                 try {
                     await kickMember(team.teamId, userId);
+                    await invalidateTournamentData(queryClient, tournamentId);
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
                     fetchTeam();
                 } catch (err: unknown) {
@@ -255,6 +261,7 @@ export default function TeamDashboardScreen() {
         setLineupSwapError(null);
         try {
             const updated = await swapLineupMember(team.teamId, starterUserId, subTarget.userId);
+            await invalidateTournamentData(queryClient, tournamentId);
             setTeam(updated);
             setSubTarget(null);
             // The response carries the new roster, but the fixtures it repointed live elsewhere —
@@ -279,6 +286,7 @@ export default function TeamDashboardScreen() {
                 setConfirmModal(prev => ({ ...prev, isLoading: true }));
                 try {
                     await deleteTeam(team.teamId);
+                    await invalidateTournamentData(queryClient, tournamentId);
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
                     navigation.goBack();
                 } catch (err: unknown) {
@@ -304,6 +312,7 @@ export default function TeamDashboardScreen() {
             // Refresh so isAlreadyRegistered flips to true and the "Registered – Pending"
             // banner replaces the Register button immediately (in case the user stays on /
             // returns to this screen instead of navigating away via the modal).
+            await invalidateTournamentData(queryClient, tournamentId);
             await fetchTeam();
             setStatusModalConfig({
                 type: 'success',
@@ -340,6 +349,7 @@ export default function TeamDashboardScreen() {
                 setConfirmModal(prev => ({ ...prev, isLoading: true }));
                 try {
                     await approveJoinRequest(requestId);
+                    await invalidateTournamentData(queryClient, tournamentId);
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
                     setStatusModalConfig({ type: 'success', title: t('common:success'), message: t('dashboard.approveSuccess') });
                     setShowStatusModal(true);
@@ -365,6 +375,7 @@ export default function TeamDashboardScreen() {
                 setConfirmModal(prev => ({ ...prev, isLoading: true }));
                 try {
                     await rejectJoinRequest(requestId);
+                    await invalidateTournamentData(queryClient, tournamentId);
                     setConfirmModal(prev => ({ ...prev, visible: false, isLoading: false }));
                     if (team?.teamId) fetchRequests(team.teamId);
                 } catch (err: unknown) {

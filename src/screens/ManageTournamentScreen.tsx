@@ -14,6 +14,8 @@ import { MenuItem } from '../components/ui/MenuItem';
 import { SettingsHero, SettingsGroup, SETTINGS_EMBLEM_IMAGE, SETTINGS_EMBLEM_IMAGE_RADIUS } from '../components/ui/SettingsBlocks';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../lib/theme';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateTournamentData } from '../lib/queryPolicy';
 
 // The state under the name: the details screen's labels, each in its colour; live glows.
 const STATUS_TONE: Record<number, string> = {
@@ -33,6 +35,7 @@ export default function ManageTournamentScreen() {
     const route = useRoute<ManageTournamentScreenRouteProp>();
     const navigation = useNavigation<ManageTournamentScreenNavigationProp>();
     const { id } = route.params as { id: string };
+    const queryClient = useQueryClient();
 
     const [tournament, setTournament] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -108,6 +111,7 @@ export default function ManageTournamentScreen() {
                 throw new Error(t('manage.cancelFailedWith', { text }));
             }
 
+            await invalidateTournamentData(queryClient, id);
             setStatusModalConfig({
                 type: 'success',
                 title: tCommon('success'),
@@ -151,6 +155,7 @@ export default function ManageTournamentScreen() {
                 throw new Error(t('manage.deleteFailedWith', { text }));
             }
 
+            await invalidateTournamentData(queryClient, id);
             setStatusModalConfig({
                 type: 'success',
                 title: tCommon('success'),

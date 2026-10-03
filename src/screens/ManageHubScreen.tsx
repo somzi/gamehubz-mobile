@@ -9,6 +9,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../types/navigation';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateHubData } from '../lib/queryPolicy';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { EditHubModal } from '../components/modals/EditHubModal';
 import { CreateTournamentModal } from '../components/modals/CreateTournamentModal';
@@ -29,6 +31,7 @@ export default function ManageHubScreen() {
     const route = useRoute<ManageHubScreenRouteProp>();
     const navigation = useNavigation<ManageHubScreenNavigationProp>();
     const { hubId } = route.params;
+    const queryClient = useQueryClient();
 
     const [hubData, setHubData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -142,6 +145,7 @@ export default function ManageHubScreen() {
                     message: t('manage.avatarUpdatedMessage')
                 });
                 setShowStatusModal(true);
+                await invalidateHubData(queryClient, hubId);
                 await fetchHubDetails();
             } else {
                 throw new Error(t('manage.uploadAvatarFailed'));
@@ -179,6 +183,7 @@ export default function ManageHubScreen() {
             });
 
             if (response.ok) {
+                await invalidateHubData(queryClient, hubId);
                 fetchHubDetails();
             } else {
                 Alert.alert(tCommon('error'), t('manage.updateHubFailed'));
@@ -206,6 +211,7 @@ export default function ManageHubScreen() {
                             });
 
                             if (response.ok) {
+                                await invalidateHubData(queryClient, hubId);
                                 setStatusModalConfig({
                                     type: 'success',
                                     title: t('manage.hubDeleted'),
@@ -387,7 +393,10 @@ export default function ManageHubScreen() {
                 hubId={hubId}
                 isAlreadyVerified={!!hubData?.isVerified}
                 onClose={() => setShowVerificationModal(false)}
-                onSubmitted={fetchHubDetails}
+                onSubmitted={async () => {
+                    await invalidateHubData(queryClient, hubId);
+                    await fetchHubDetails();
+                }}
             />
             <StatusModal
                 visible={showStatusModal}

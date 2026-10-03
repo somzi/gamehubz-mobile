@@ -69,6 +69,10 @@ const queryClient = new QueryClient({
     },
   },
 });
+queryClient.setQueryDefaults(['tournament-resource'], {
+  gcTime: 5 * 60_000,
+  meta: { persist: false },
+});
 
 // Cold-start cache for every useQuery in the app. The persister mirrors the in-memory
 // query cache to AsyncStorage so killing the app and reopening it paints the last
@@ -289,6 +293,9 @@ export default function App() {
             // Bust the whole cache when the app version changes so a shipped schema
             // change never renders against a stale-shape snapshot.
             buster: Constants.expoConfig?.version ?? 'dev',
+            dehydrateOptions: {
+              shouldDehydrateQuery: (query) => query.state.status === 'success' && query.meta?.persist !== false,
+            },
           }}
         >
           {/* i18n sits above AuthProvider because the auth screens are translated too.

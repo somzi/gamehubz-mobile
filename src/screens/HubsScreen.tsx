@@ -2,9 +2,10 @@ import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, Modal, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
+import { LIST_STALE_MS, refreshVisibleList } from '../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types/navigation';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -51,6 +52,7 @@ export default function HubsScreen() {
     const { t } = useTranslation('hub');
     const navigation = useNavigation<HubsScreenNavigationProp>();
     const { user } = useAuth();
+    const isFocused = useIsFocused();
     const { hubApprovals } = useBadges();
     const queryClient = useQueryClient();
 
@@ -83,16 +85,17 @@ export default function HubsScreen() {
     // without polluting the previous one. Cold-start persistence flows through the
     // PersistQueryClientProvider in App.tsx, so a killed-and-reopened app paints the
     // last-seen page instantly.
+    const queryKey = ['hubs', activeTab, debouncedSearch, user?.id];
     const hubsQuery = useInfiniteQuery<HubsPage>({
-        queryKey: ['hubs', activeTab, debouncedSearch, user?.id],
+        queryKey,
         initialPageParam: 0,
-        queryFn: async ({ pageParam }) => {
+        queryFn: async ({ pageParam, signal }) => {
             const page = pageParam as number;
             const uid = user!.id;
             const url = activeTab === 'joined'
                 ? ENDPOINTS.GET_USER_HUBS(uid, page, debouncedSearch)
                 : ENDPOINTS.GET_DISCOVERY_HUBS(uid, page, debouncedSearch);
-            const response = await authenticatedFetch(url);
+            const response = await authenticatedFetch(url, { signal });
             if (!response.ok) {
                 throw new Error(t('list.fetchFailed', { status: response.status }));
             }
@@ -106,8 +109,8 @@ export default function HubsScreen() {
             };
         },
         getNextPageParam: (lastPage) => lastPage.nextPage,
-        enabled: !!user?.id,
-        staleTime: 30_000,
+        enabled: !!user?.id && isFocused,
+        staleTime: LIST_STALE_MS,
         refetchOnMount: true,
         // Keep showing the previous list while a new key (search change / tab flip)
         // is fetching, instead of blanking to the full-screen "Loading hubs..." view
@@ -125,7 +128,7 @@ export default function HubsScreen() {
     useRefetchOnFocusIfStale(
         hubsQuery.refetch,
         hubsQuery.dataUpdatedAt,
-        { enabled: !!user?.id },
+        { enabled: !!user?.id, queryKey, staleMs: LIST_STALE_MS },
     );
 
     // The spinner follows the pull only. Bound to isRefetching it also flipped on the focus refetch,
@@ -134,18 +137,15 @@ export default function HubsScreen() {
     const onRefresh = useCallback(async () => {
         setIsPulling(true);
         try {
-            // Invalidate every ['hubs', ...] entry so both joined and discovery caches
-            // refetch cleanly. Cheap on device because only the currently-mounted key
-            // has active observers and will actually fire.
-            await queryClient.invalidateQueries({ queryKey: ['hubs'] });
+            await refreshVisibleList(queryClient, queryKey);
         } finally {
             setIsPulling(false);
         }
-    }, [queryClient]);
+    }, [queryClient, activeTab, debouncedSearch, user?.id]);
 
     const loadMoreHubs = useCallback(() => {
-        if (hubsQuery.hasNextPage && !hubsQuery.isFetchingNextPage) {
-            hubsQuery.fetchNextPage();
+        if (hubsQuery.hasNextPage && !hubsQuery.isFetching) {
+            hubsQuery.fetchNextPage({ cancelRefetch: false });
         }
     }, [hubsQuery]);
 

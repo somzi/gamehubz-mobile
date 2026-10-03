@@ -26,6 +26,8 @@ import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
 import { useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateHubData } from '../../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { PrivateInviteCard } from '../tournament/PrivateInviteCard';
@@ -94,6 +96,7 @@ const regionMapping: Record<string, number> = {
 };
 
 export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournamentModalProps) {
+    const queryClient = useQueryClient();
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const { t } = useTranslation('tournament');
@@ -638,6 +641,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
             }
 
             console.log('Tournament created successfully');
+            await queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+            if (hubId) await invalidateHubData(queryClient, hubId);
 
             if (isPrivate) {
                 const created = await response.json().catch(() => null);
