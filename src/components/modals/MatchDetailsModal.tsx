@@ -2304,7 +2304,7 @@ export function MatchDetailsModal({
                                 </Text>
                             </View>
                         ) : selectedImages.length > 0 ? (
-                            <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
+                            <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} onAdd={pickImages} />
                         ) : (
                             <Pressable onPress={pickImages} className="h-20 border border-dashed border-white/10 rounded-2xl items-center justify-center bg-white/[0.02]">
                                 <Ionicons name="images-outline" size={22} color="#334155" />

@@ -11,7 +11,7 @@ interface EvidenceSectionProps {
     uploadedCount?: number;
     /** Screenshots picked on-device but not sent yet. */
     pendingCount?: number;
-    /** Opens the picker. Omit for viewers who can't attach anything — the Add pill disappears. */
+    /** Opens the picker. Omit for viewers who can't attach anything — the row then only expands. */
     onAdd?: () => void;
     /** Controlled so the host can pop the section open right after a pick. */
     open: boolean;
@@ -25,9 +25,12 @@ interface EvidenceSectionProps {
  *
  * The gallery + upload dropzone is the tallest thing on the match screen and is empty most of
  * the time, which pushed everything below it (notably "Need Help?") off screen. Collapsed it
- * costs one row — but the Add pill stays on that row, so attaching a screenshot is still one
- * tap and the summary line spells out what the section is for. Tapping Add opens the picker
- * *and* expands, so the picked shots are visible where they landed.
+ * costs one row.
+ *
+ * While nothing is attached the row itself is the dropzone — dashed edge, and its line says what
+ * to add — so one tap opens the picker and expands, showing the picked shots where they landed.
+ * Once something is attached it is a plain section that expands to the gallery, where more can
+ * be added.
  */
 export function EvidenceSection({
     uploadedCount = 0,
@@ -39,26 +42,42 @@ export function EvidenceSection({
     className,
 }: EvidenceSectionProps) {
     const { t } = useTranslation('match');
-    // Collapsed-state recap: what's here, or — when there's nothing — what it's for.
+    const isEmptySlot = !!onAdd && uploadedCount === 0 && pendingCount === 0;
+    // Collapsed-state recap: what's here, or — when there's nothing — what to add.
     const summary = pendingCount > 0
         ? t('evidence.readyToUpload', { count: pendingCount })
         : uploadedCount > 0
             ? t('evidence.attached', { count: uploadedCount })
             : t('evidence.addScreenshots');
 
+    const onRowPress = () => {
+        if (isEmptySlot) {
+            onToggle(true);
+            onAdd?.();
+        } else {
+            onToggle(!open);
+        }
+    };
+
     return (
         <Animated.View
             layout={LinearTransition.duration(200)}
-            className={cn('rounded-[20px] bg-card/60 border border-white/[0.05] overflow-hidden', className)}
+            className={cn(
+                'rounded-[20px] overflow-hidden border',
+                isEmptySlot ? 'border-dashed border-primary/30 bg-primary/[0.04]' : 'bg-card/60 border-white/[0.05]',
+                className,
+            )}
         >
             <Pressable
-                onPress={() => onToggle(!open)}
-                className="flex-row items-center gap-2.5 p-3.5 active:opacity-70"
+                onPress={onRowPress}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('evidence.evidence')}. ${summary}`}
+                className="flex-row items-center gap-3 p-3.5 active:opacity-70"
             >
-                <View className="w-8 h-8 rounded-xl bg-primary/10 items-center justify-center border border-primary/20">
-                    <Ionicons name="images-outline" size={15} color={COLORS.primary} />
+                <View className="w-9 h-9 rounded-xl bg-primary/10 items-center justify-center border border-primary/20">
+                    <Ionicons name={isEmptySlot ? 'add' : 'images-outline'} size={isEmptySlot ? 20 : 16} color={COLORS.primaryBright} />
                 </View>
-                <View className="flex-1 mr-1">
+                <View className="flex-1">
                     <View className="flex-row items-center gap-2">
                         <Text className="text-[11px] font-black text-white uppercase tracking-[2px]">{t('evidence.evidence')}</Text>
                         {uploadedCount > 0 && (
@@ -68,24 +87,19 @@ export function EvidenceSection({
                         )}
                     </View>
                     <Text
-                        numberOfLines={1}
-                        className={cn('text-[10px] font-medium mt-0.5', pendingCount > 0 ? 'text-warning' : 'text-slate-500')}
+                        numberOfLines={2}
+                        className={cn(
+                            'mt-0.5',
+                            isEmptySlot
+                                ? 'text-[12px] leading-[16px] font-semibold text-primary-bright'
+                                : cn('text-[11px] leading-[15px] font-medium', pendingCount > 0 ? 'text-warning' : 'text-slate-500'),
+                        )}
                     >
                         {summary}
                     </Text>
                 </View>
 
-                {onAdd && (
-                    <Pressable
-                        onPress={() => { onToggle(true); onAdd(); }}
-                        hitSlop={6}
-                        className="flex-row items-center bg-primary/10 border border-primary/20 px-2.5 py-1.5 rounded-xl active:opacity-70"
-                    >
-                        <Ionicons name="add" size={14} color={COLORS.primary} />
-                        <Text className="text-[10px] font-black text-primary ml-1 uppercase tracking-wider">{t('evidence.add')}</Text>
-                    </Pressable>
-                )}
-                <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={COLORS.slate600} />
+                {!isEmptySlot && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={COLORS.slate600} />}
             </Pressable>
 
             {open && (

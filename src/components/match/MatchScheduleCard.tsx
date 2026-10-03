@@ -2019,7 +2019,7 @@ function MatchScheduleCardBase({
                                                             </Text>
                                                         </View>
                                                     ) : selectedImages.length > 0 ? (
-                                                        <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} />
+                                                        <PendingEvidenceStrip files={selectedImages} onRemove={removeImage} onAdd={pickImages} />
                                                     ) : (
                                                         <Pressable onPress={pickImages} className={cn("h-20 border border-dashed rounded-2xl items-center justify-center", isPremium ? "border-white/[0.08] bg-white/[0.01]" : "border-border/20 bg-muted/5")}
                                                             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}

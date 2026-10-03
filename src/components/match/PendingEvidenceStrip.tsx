@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +9,8 @@ import { PreparedEvidence } from '../../lib/evidence';
 interface PendingEvidenceStripProps {
     files: PreparedEvidence[];
     onRemove: (uri: string) => void;
+    /** Opens the picker again — drawn as a dashed tile after the picked files. */
+    onAdd?: () => void;
     size?: number;
 }
 
@@ -19,7 +22,8 @@ interface PendingEvidenceStripProps {
  * picking and uploading. The badge and the extension say what it is, which is all that is needed
  * before the real poster appears in the gallery after upload.
  */
-export function PendingEvidenceStrip({ files, onRemove, size = 80 }: PendingEvidenceStripProps) {
+export function PendingEvidenceStrip({ files, onRemove, onAdd, size = 80 }: PendingEvidenceStripProps) {
+    const { t } = useTranslation('match');
     return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {files.map((file, index) => (
@@ -50,6 +54,17 @@ export function PendingEvidenceStrip({ files, onRemove, size = 80 }: PendingEvid
                     </Pressable>
                 </View>
             ))}
+            {onAdd && (
+                <Pressable
+                    onPress={onAdd}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('evidence.add')}
+                    className="mb-2 rounded-2xl border border-dashed border-primary/30 bg-primary/[0.04] items-center justify-center active:opacity-70"
+                    style={{ width: size, height: size }}
+                >
+                    <Ionicons name="add" size={24} color={COLORS.primaryBright} />
+                </Pressable>
+            )}
         </ScrollView>
     );
 }
