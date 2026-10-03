@@ -157,9 +157,16 @@ export const MatchHistoryCard = React.memo(function MatchHistoryCard({
                             </Text>
                         </View>
                         {!!hubName && (
-                            <View className="flex-row items-center" style={{ gap: 5, maxWidth: '45%' }}>
+                            // The hub's name gets its full width first; the tournament gives way, and a
+                            // name too long even then shrinks a little before it is cut.
+                            <View className="flex-row items-center" style={{ gap: 5, maxWidth: '65%', flexShrink: 0 }}>
                                 <Ionicons name="planet" size={12} color={COLORS.slate500} />
-                                <Text className="shrink text-[12px] font-semibold text-slate-400" numberOfLines={1}>
+                                <Text
+                                    className="shrink text-[12px] font-semibold text-slate-400"
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.8}
+                                >
                                     {hubName}
                                 </Text>
                             </View>
