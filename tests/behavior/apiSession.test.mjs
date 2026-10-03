@@ -2,6 +2,38 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadApi, deferred, reply, unauthorized, flush } from './loadApi.mjs';
 
+test('authenticated GET passes cancellation to the actual Axios transport', async () => {
+    const api = loadApi(), controller = new AbortController(), started = deferred();
+    let aborted = false;
+    api.setAuthToken('access-A');
+    api.apiClient.defaults.adapter = config => new Promise((resolve, reject) => {
+        config.signal?.addEventListener('abort', () => {
+            aborted = true;
+            reject(Object.assign(Error('cancelled'), { config, code: 'ERR_CANCELED' }));
+        }, { once: true });
+        started.resolve(() => resolve(reply(config)));
+    });
+    const request = api.authenticatedFetch('/bracket', { signal: controller.signal });
+    const finish = await started.promise;
+    controller.abort();
+    // Also release a broken adapter path so a regression fails instead of hanging the suite.
+    finish();
+    const response = await request;
+    assert.equal(aborted, true);
+    assert.equal(response.ok, false);
+    assert.equal(api.refreshCalls(), 0);
+});
+
+test('an already cancelled GET never starts an Axios transport', async () => {
+    const api = loadApi(), controller = new AbortController(); let calls = 0;
+    api.setAuthToken('access-A');
+    api.apiClient.defaults.adapter = async config => { calls++; return reply(config); };
+    controller.abort();
+    const response = await api.authenticatedFetch('/bracket', { signal: controller.signal });
+    assert.equal(response.ok, false);
+    assert.equal(calls, 0);
+});
+
 test('an old account 401 cannot replay its mutation under the newly logged-in account', async () => {
     const api = loadApi(), waiting = deferred(); let calls = 0, firstConfig;
     api.setAuthToken('access-A');

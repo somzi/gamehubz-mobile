@@ -16,7 +16,8 @@ function loadFunction(path, select, bindings) {
     };
     visit(source);
     if (!initializer) throw Error('Missing callback in: ' + path);
-    const { outputText } = ts.transpileModule('const run = ' + initializer.getText(source) + ';', {
+    const expression = initializer.getText(source).replace(/^export\s+(?:default\s+)?/, '');
+    const { outputText } = ts.transpileModule('const run = ' + expression + ';', {
         compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
     });
     return new Function(...Object.keys(bindings), outputText + ';return run;')(...Object.values(bindings));
@@ -24,6 +25,15 @@ function loadFunction(path, select, bindings) {
 
 export const loadFetcher = (path, name, bindings) => loadFunction(path, (node, source) =>
     ts.isVariableDeclaration(node) && node.name.getText(source) === name ? node.initializer : null, bindings);
+
+export const loadDeclaredFunction = (path, name, bindings) => loadFunction(path, node =>
+    ts.isFunctionDeclaration(node) && node.name?.text === name ? node : null, bindings);
+
+export const loadJsxProp = (path, tag, prop, bindings) => loadFunction(path, (node, source) => {
+    if (!(ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) || node.tagName.getText(source) !== tag) return null;
+    const attribute = node.attributes.properties.find(item => ts.isJsxAttribute(item) && item.name.getText(source) === prop);
+    return attribute?.initializer && ts.isJsxExpression(attribute.initializer) ? attribute.initializer.expression : null;
+}, bindings);
 
 export const loadConversationCallback = (path, name, bindings) => loadFunction(path, (node, source) => {
     if (!ts.isCallExpression(node) || node.expression.getText(source) !== 'useChatConversation') return null;

@@ -43,3 +43,22 @@ Keš ne odlaže lokalne uspešne izmene jer one odmah poništavaju podatke. Izme
 7. Otvoriti meč iz notifikacije, uključujući drugi meč dok je turnir već otvoren; proveriti da nova navigacija i prikaz meča rade kao ranije.
 
 Ostatak faze 3 i faza 4 nisu obuhvaćeni ovim paketom.
+
+## Ispravke nakon nezavisnog review-a — 3. oktobar 2026.
+
+- Kartice Home / My Matches uz uspešnu izmenu prosleđuju ID turnira. Roditelj osvežava mečeve i poništava keš tog turnira, pa brz povratak na žreb proverava novi rezultat/termin. Ostali turniri zadržavaju svoj keš. Retry bez izmene osvežava samo mečeve, uključujući slučaj kada dugme prosledi native press događaj.
+- Uspešne lokalne radnje u `TournamentDetailsScreen` označavaju sve filtere liste turnira za osvežavanje: prijave i odobravanja, uklanjanja, registracija timova, status registracije, izmene žreba/rasporeda i callback-i mečeva. Detalji nastavljaju da koriste postojeće ciljane refreshe. Neuspešna prijava ne poništava keš liste.
+- Zajednička invalidacija liste prvo otkazuje stariji zahtev, čak i dok je ekran skriven. Njegov zakasneli odgovor zato ne može ponovo da označi stare podatke kao sveže.
+- `authenticatedFetch` sada prosleđuje `AbortSignal` Axios-u za standardne zahteve. Otkazivanje React Query zahteva prekida i mrežni transport; već otkazan zahtev ne kreće. Ovo ne menja poseban FormData upload tok.
+- Ukupno **138/138 testova** prolazi (11 novih uz postojeća 127). Novi testovi pokrivaju stvarne callback-e oba ekrana i kartice, povratak liste posle prijave, zakasneli odgovor liste, Axios transport i čuvanje chata pri uklanjanju modalovog podstabla. TypeScript i `git diff --check` prolaze.
+- Lokalni Expo export nakon ovih ispravki prolazi za Android i iOS (2.136 modula po platformi).
+
+Pre predaje probati na telefonu: izmeniti rezultat/termin na Home-u pa odmah otvoriti prethodno učitan žreb; prijaviti igrača ili promeniti status turnira pa odmah Back na listu; na sporoj mreži prekinuti paginaciju povlačenjem za osvežavanje. Proba native ponašanja na uređaju još nije izvršena.
+
+## Dopuna posle Claudeovog review-a
+
+Tournaments/Hubs sada čuvaju zahtev za sledeću stranicu koji stigne tokom osvežavanja i izvršavaju ga čim postojeći zahtev završi. Greška prekida automatsko ponavljanje i prikazuje Retry u podnožju. Promena filtera ili napuštanje ekrana odbacuje čekanje.
+
+Notifikacija za već fokusiran turnir dobija novi ključ osvežavanja, pa se pregled i žreb proveravaju odmah iako je prethodni keš svež. Običan Back zadržava dosadašnje korišćenje keša. Detalji kartice dele zahtev između pollinga i slanja rezultata; uspešna izmena meča izričito traži nov odgovor.
+
+Ceo frontend paket sada prolazi **163/163 testa**, uključujući ove slučajeve. Potpuna mapa svih 11 nalaza i plan native probe nalaze se u [frontend-phases-1-2.md](frontend-phases-1-2.md).

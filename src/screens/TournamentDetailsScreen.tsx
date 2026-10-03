@@ -89,7 +89,7 @@ import { LoadFailedState } from '../components/ui/EmptyState';
 import { afterScreenTransition, useModalHandoff } from '../lib/modalHandoff';
 import { createModalReturn, getRouteOpenVersion } from '../lib/modalReturn';
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchTournamentResource, tournamentResourceKey } from '../lib/queryPolicy';
+import { fetchTournamentResource, tournamentResourceKey, invalidateTournamentLists } from '../lib/queryPolicy';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -547,6 +547,7 @@ export default function TournamentDetailsScreen() {
                 throw new Error(errorData.message || errorData.Message || t('details.joinFailed'));
             }
 
+            await invalidateTournamentLists(queryClient);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.congratulations'),
@@ -603,6 +604,7 @@ export default function TournamentDetailsScreen() {
                 });
             }
             setShowStatusModal(true);
+            await invalidateTournamentLists(queryClient);
             fetchTournamentDetails(true); // silent refresh
             if (activeTab === 'teams' && teamsTab === 'open') {
                 fetchOpenTeams();
@@ -884,7 +886,7 @@ export default function TournamentDetailsScreen() {
             if (!isCurrent()) return;
             console.error('Bracket fetch error:', err);
             if (showLoadError) setBracketError(t('details.bracketLoadFailed'));
-            else setFailedRefreshes((failures) => withRefreshResult(failures, 'bracket', false));
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'bracket', false));
         } finally {
             if (!isCurrent()) return;
             setLoadingBracket(false);
@@ -1293,6 +1295,7 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
 
+            await invalidateTournamentLists(queryClient);
             setShowDrawModal(false);
             setStatusModalConfig({
                 type: 'success',
@@ -1327,6 +1330,7 @@ export default function TournamentDetailsScreen() {
                 const text = await response.text().catch(() => 'No response body');
                 throw new Error(text);
             }
+            await invalidateTournamentLists(queryClient);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.bracketDrawn'),
@@ -1352,6 +1356,7 @@ export default function TournamentDetailsScreen() {
                 const text = await response.text().catch(() => 'No response body');
                 throw new Error(text);
             }
+            await invalidateTournamentLists(queryClient);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.bracketResetTitle'),
@@ -1428,6 +1433,7 @@ export default function TournamentDetailsScreen() {
                 const text = await response.text().catch(() => 'No response body');
                 throw new Error(text);
             }
+            await invalidateTournamentLists(queryClient);
             setShowSwapModal(false);
             setStatusModalConfig({ type: 'success', title: t('details.positionsSwapped'), message: t('details.positionsSwappedMessage') });
             setShowStatusModal(true);
@@ -1459,6 +1465,7 @@ export default function TournamentDetailsScreen() {
                 title: tCommon('success'),
                 message: t('details.registrationClosed')
             });
+            await invalidateTournamentLists(queryClient);
             setShowStatusModal(true);
             fetchTournamentDetails(true); // Refresh details
         } catch (err: any) {
@@ -1493,6 +1500,7 @@ export default function TournamentDetailsScreen() {
                 title: tCommon('success'),
                 message: t('details.registrationOpened')
             });
+            await invalidateTournamentLists(queryClient);
             setShowStatusModal(true);
             fetchTournamentDetails(true); // Refresh details
         } catch (err: any) {
@@ -1521,10 +1529,12 @@ export default function TournamentDetailsScreen() {
             if (!isCurrent()) return;
             setPendingRegistrations(data.result || data || []);
             setPendingError(false);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'pending', true));
         } catch (err) {
             if (!isCurrent()) return;
             console.error('Pending registrations fetch error:', err);
             setPendingError(true);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'pending', false));
         } finally {
             if (!isCurrent()) return;
             setIsLoadingPending(false);
@@ -1558,11 +1568,13 @@ export default function TournamentDetailsScreen() {
                 : list;
             setParticipants(deduped);
             setParticipantsError(false);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'participants', true));
             if (Array.isArray(deduped)) rememberSnapshot(user?.id, id, { participants: deduped });
         } catch (err) {
             if (!isCurrent()) return;
             console.error('Participants fetch error:', err);
             setParticipantsError(true);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'participants', false));
         } finally {
             if (!isCurrent()) return;
             setParticipantsLoaded(true);
@@ -1585,6 +1597,7 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
 
+            await invalidateTournamentLists(queryClient);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.approvedTitle'),
@@ -1628,6 +1641,7 @@ export default function TournamentDetailsScreen() {
                 title: tCommon('success'),
                 message: t('details.participantRemoved')
             });
+            await invalidateTournamentLists(queryClient);
             setShowStatusModal(true);
             fetchParticipants(); // Refresh list
             fetchTournamentDetails(true); // Update participant count
@@ -1649,6 +1663,7 @@ export default function TournamentDetailsScreen() {
     // standings have to be re-read too — the participant list alone would still show the old name
     // inside the fixtures.
     const handleParticipantSwapped = (incomingUsername: string) => {
+        void invalidateTournamentLists(queryClient);
         setParticipantSwapTarget(null);
         setStatusModalConfig({
             type: 'success',
@@ -1676,6 +1691,7 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
 
+            await invalidateTournamentLists(queryClient);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.rejectedTitle'),
@@ -1730,6 +1746,7 @@ export default function TournamentDetailsScreen() {
                 title: tCommon('success'),
                 message: t('details.allApproved')
             });
+            await invalidateTournamentLists(queryClient);
             setShowStatusModal(true);
             fetchPendingRegistrations();
             fetchParticipants();
@@ -1816,6 +1833,7 @@ export default function TournamentDetailsScreen() {
                 throw new Error(text);
             }
 
+            await invalidateTournamentLists(queryClient);
             // Format is a separate endpoint (it has its own "already reported" rules), and only
             // called when the organizer actually changed it.
             let formatNote = '';
@@ -1878,6 +1896,7 @@ export default function TournamentDetailsScreen() {
             if (!isCurrent()) return;
             setTournamentTeams(finalTeams);
             setTeamsError(false);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'teams', true));
             rememberSnapshot(user?.id, tournamentId, { teams: finalTeams });
 
             // Find user's team from all teams (including pending) like before
@@ -1891,15 +1910,18 @@ export default function TournamentDetailsScreen() {
                     );
                     setUserTeam(myTeam || null);
                     rememberSnapshot(user.id, tournamentId, { userTeam: myTeam || null });
+                    setFailedRefreshes((failures) => withRefreshResult(failures, 'pending-teams', true));
                 } catch (checkErr) {
             if (!isCurrent()) return;
                     console.error('Error verifying user team status:', checkErr);
+                    setFailedRefreshes((failures) => withRefreshResult(failures, 'pending-teams', false));
                 }
             }
         } catch (err) {
             if (!isCurrent()) return;
             console.error('Error fetching tournament teams:', err);
             setTeamsError(true);
+            setFailedRefreshes((failures) => withRefreshResult(failures, 'teams', false));
         } finally {
             if (!isCurrent()) return;
             setTeamsLoaded(true);
@@ -1907,6 +1929,7 @@ export default function TournamentDetailsScreen() {
     };
 
     const handleTeamJoined = (team: TeamDto) => {
+        void invalidateTournamentLists(queryClient);
         setUserTeam(team);
         setShowTeamRegistration(false);
         if (tournament?.isTeamTournament) {
@@ -1942,6 +1965,7 @@ export default function TournamentDetailsScreen() {
                                 message: t('details.teamRemovedMessage', { teamName })
                             });
                             setShowStatusModal(true);
+                            await invalidateTournamentLists(queryClient);
                             setTournamentTeams(prev => prev.filter(teamRow => (teamRow.teamId || teamRow.TeamId) !== teamId));
                             // The optimistic filter above already removed the row; the authoritative
                             // reload comes from fetchTournamentDetails, which refetches the teams for
@@ -1971,14 +1995,17 @@ export default function TournamentDetailsScreen() {
         setShowTeamMatchDetail(true);
     };
 
-    // Load initial data and silently refresh when coming back to this screen
-    useFocusEffect(
-        useCallback(() => {
+    // Params can change while this route stays focused. Consume each push once; Back still reuses cache.
+    const notificationRefreshKey = route.params.notificationRefreshKey;
+    const consumedNotification = useRef<number | undefined>(undefined);
+    const refreshTournamentOnFocus = useCallback(() => {
             // First time it mounts, isLoading is already true by default, so silent doesn't matter visually,
             // but for subsequent focuses, silent=true prevents the screen from going blank
             // Normal Back reuses fresh resources. A notification explicitly asks for current data.
             const params = routeParamsRef.current;
-            const fromNotification = !!(params.focusMatchId || params.focusTeamMatchId);
+            const freshNotification = notificationRefreshKey !== undefined && consumedNotification.current !== notificationRefreshKey;
+            consumedNotification.current = notificationRefreshKey;
+            const fromNotification = freshNotification || !!(params.focusMatchId || params.focusTeamMatchId);
             fetchTournamentDetails(true, fromNotification);
             // The participants list only feeds the Overview join button and the Players tab.
             // Skip the extra round-trip on refocus when we're on bracket/teams/registrations,
@@ -1988,9 +2015,9 @@ export default function TournamentDetailsScreen() {
             // The bracket is fetched by the tab-switch effect, which does NOT re-run on refocus —
             // so without this, coming back to an already-open bracket showed whatever was loaded
             // when the tab was first opened, including stale live team scores.
-            if (tab === 'bracket') fetchBracket(true, fromNotification);
-        }, [id, user?.id])
-    );
+            if (tab === 'bracket' || freshNotification) fetchBracket(true, fromNotification);
+        }, [id, user?.id, notificationRefreshKey]);
+    useFocusEffect(refreshTournamentOnFocus);
 
     // Pull-to-refresh: same set as the focus refetch, but always refreshes the data behind the
     // tab actually on screen, and reports progress through the pull spinner instead of silently.
@@ -2778,6 +2805,7 @@ export default function TournamentDetailsScreen() {
             onTabChange={tab => { matchActiveTabRef.current = tab; }}
             onOpenProfile={handleOpenProfileFromMatch}
             onMatchUpdate={(freshStructure?: any) => {
+                void invalidateTournamentLists(queryClient);
                 // Backend now returns the refreshed bracket structure inline on
                 // matchResult / approve / reject, so we can update local state directly
                 // without a follow-up GET_TOURNAMENT_STRUCTURE round-trip. Falls back to
@@ -2786,6 +2814,10 @@ export default function TournamentDetailsScreen() {
                     requests.begin('fetchBracket');
                     void queryClient.cancelQueries({ queryKey: tournamentResourceKey(id, user?.id, 'bracket'), exact: true });
                     queryClient.setQueryData(tournamentResourceKey(id, user?.id, 'bracket'), freshStructure);
+                    setLoadingBracket(false);
+                    setBracketLoaded(true);
+                    setBracketError(null);
+                    setFailedRefreshes((failures) => withRefreshResult(failures, 'bracket', true));
                     setStages(freshStructure.stages || []);
                     if (freshStructure.hubOwnerId || freshStructure.HubOwnerId) {
                         setHubOwnerId(freshStructure.hubOwnerId || freshStructure.HubOwnerId);
@@ -2824,6 +2856,7 @@ export default function TournamentDetailsScreen() {
             currentUserId={user?.id}
             onOpenSubMatch={handleOpenSubMatchFromTeam}
             onMatchUpdate={() => {
+                void invalidateTournamentLists(queryClient);
                 fetchBracket();
                 if (tournament?.isTeamTournament) fetchTournamentTeams(id);
             }}
@@ -2922,6 +2955,10 @@ export default function TournamentDetailsScreen() {
                                     await retryFailedRefreshes(failedRefreshes, {
                                         overview: () => fetchTournamentDetails(true),
                                         bracket: () => fetchBracket(true),
+                                        participants: () => fetchParticipants(),
+                                        pending: () => fetchPendingRegistrations(),
+                                        teams: () => fetchTournamentTeams(id),
+                                        'pending-teams': () => failedRefreshes.has('teams') ? Promise.resolve() : fetchTournamentTeams(id),
                                     });
                                 } finally {
                                     setIsRetryingRefresh(false);

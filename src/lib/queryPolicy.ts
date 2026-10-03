@@ -36,12 +36,19 @@ export async function invalidateHubData(client: QueryClient, hubId: string) {
 export const tournamentResourceKey = (id: string, userId?: string, resource?: string): QueryKey =>
     resource ? ['tournament-resource', id, userId, resource] : ['tournament-resource', id];
 
+/** A successful mutation affects every status filter. An older hidden read must not mark it fresh. */
+export async function invalidateTournamentLists(client: QueryClient) {
+    const queryKey = ['tournaments'];
+    await client.cancelQueries({ queryKey });
+    await client.invalidateQueries({ queryKey });
+}
+
 export async function invalidateTournamentData(client: QueryClient, id: string) {
     const queryKey = tournamentResourceKey(id);
     await client.cancelQueries({ queryKey });
     await Promise.all([
         client.invalidateQueries({ queryKey, refetchType: 'none' }),
-        client.invalidateQueries({ queryKey: ['tournaments'] }),
+        invalidateTournamentLists(client),
     ]);
 }
 

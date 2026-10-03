@@ -4,6 +4,8 @@ import { View, Text, Pressable, Modal, TextInput, ActivityIndicator, Platform, K
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueuedPagination } from '../hooks/useQueuedPagination';
+import { LoadFailedState } from '../components/ui/EmptyState';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { LIST_STALE_MS, refreshVisibleList } from '../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -143,11 +145,7 @@ export default function HubsScreen() {
         }
     }, [queryClient, activeTab, debouncedSearch, user?.id]);
 
-    const loadMoreHubs = useCallback(() => {
-        if (hubsQuery.hasNextPage && !hubsQuery.isFetching) {
-            hubsQuery.fetchNextPage({ cancelRefetch: false });
-        }
-    }, [hubsQuery]);
+    const loadMoreHubs = useQueuedPagination(hubsQuery, queryKey, isFocused);
 
     const renderHubItem = useCallback(({ item, index }: { item: Hub; index: number }) => (
         <View className="mb-3">
@@ -355,6 +353,11 @@ export default function HubsScreen() {
                             <View className="py-6 items-center justify-center">
                                 <ActivityIndicator size="small" color="#818CF8" />
                             </View>
+                        ) : hubsQuery.isError ? (
+                            <LoadFailedState retrying={hubsQuery.isFetching} onRetry={() => {
+                                if (hubsQuery.isFetchNextPageError) void hubsQuery.fetchNextPage({ cancelRefetch: false });
+                                else void hubsQuery.refetch({ cancelRefetch: false });
+                            }} />
                         ) : null
                     }
                 />

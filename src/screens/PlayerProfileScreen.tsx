@@ -304,9 +304,9 @@ export default function PlayerProfileScreen() {
         const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
         const paddingToBottom = 50;
         if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-            if (activeTab === 'tournaments' && hasMoreTournaments && !isLoadingMoreTournaments) {
+            if (activeTab === 'tournaments' && hasMoreTournaments && !isLoadingMoreTournaments && !tournamentsError) {
                 loadMoreTournaments();
-            } else if (activeTab === 'matches' && hasMoreMatches && !isLoadingMoreMatches) {
+            } else if (activeTab === 'matches' && hasMoreMatches && !isLoadingMoreMatches && !matchesError) {
                 loadMoreMatches();
             }
         }

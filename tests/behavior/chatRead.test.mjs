@@ -1,10 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { loadConversationCallback } from './loadFetcher.mjs';
+import { loadConversationCallback, loadFetcher } from './loadFetcher.mjs';
 import { deferred, flush } from './loadApi.mjs';
 const require = createRequire(new URL('../../package.json', import.meta.url));
 const { QueryClient, QueryObserver } = require('@tanstack/query-core');
+
+test('a failed DM read reconciles its optimistic badge and reports failure so the queue can retry', async () => {
+    let invalidations = 0;
+    const read = loadFetcher('src/screens/DirectChatScreen.tsx', 'markChatRead', {
+        useCallback: fn => fn, updateCachedChat() {}, refreshCounts() {},
+        queryClient: { invalidateQueries() { invalidations++; } },
+        authenticatedFetch: async () => ({ ok: false, status: 503 }), ENDPOINTS: { MARK_DIRECT_CHAT_READ: id => id },
+    });
+    await assert.rejects(read('chat'), /503/);
+    assert.equal(invalidations, 1);
+});
 
 test('a delayed match-read response reconciles a newer unread badge with server state', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
@@ -58,7 +69,7 @@ test('a failed read leaves the badge alone', async () => {
         queryClient, refreshCounts() {}, scheduleMatchesRefresh() {},
         authenticatedFetch: async () => ({ ok: false, status: 503 }), ENDPOINTS: { MARK_MATCH_CHAT_READ: id => id },
     });
-    await markRead('match-A');
+    await assert.rejects(markRead('match-A'), /503/);
     assert.equal(queryClient.getQueryData(queryKey)[0].unreadMessages, 2);
     queryClient.clear();
 });

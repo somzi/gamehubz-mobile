@@ -604,6 +604,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
             url: routeUrl,
             data: options.body,
             headers: headers,
+            signal: options.signal ?? undefined,
         });
 
         // Pakujemo Axios odgovor da izgleda kao standardni Fetch Response

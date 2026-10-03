@@ -4,6 +4,8 @@ import { View, Text, FlatList, ActivityIndicator, RefreshControl, Pressable } fr
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueuedPagination } from '../hooks/useQueuedPagination';
+import { LoadFailedState } from '../components/ui/EmptyState';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
 import { LIST_STALE_MS, refreshVisibleList } from '../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -131,11 +133,7 @@ export default function TournamentsScreen() {
         }
     }, [queryClient, activeTab, user?.id]);
 
-    const loadMore = useCallback(() => {
-        if (tournamentsQuery.hasNextPage && !tournamentsQuery.isFetching) {
-            tournamentsQuery.fetchNextPage({ cancelRefetch: false });
-        }
-    }, [tournamentsQuery]);
+    const loadMore = useQueuedPagination(tournamentsQuery, queryKey, isFocused);
 
     const getRegionName = (region?: number) => {
         switch (region) {
@@ -303,6 +301,11 @@ export default function TournamentsScreen() {
                             <View className="py-6 items-center justify-center">
                                 <ActivityIndicator size="small" color="#818CF8" />
                             </View>
+                        ) : tournamentsQuery.isError ? (
+                            <LoadFailedState retrying={tournamentsQuery.isFetching} onRetry={() => {
+                                if (tournamentsQuery.isFetchNextPageError) void tournamentsQuery.fetchNextPage({ cancelRefetch: false });
+                                else void tournamentsQuery.refetch({ cancelRefetch: false });
+                            }} />
                         ) : null
                     }
                     removeClippedSubviews

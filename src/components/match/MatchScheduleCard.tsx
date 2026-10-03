@@ -27,6 +27,8 @@ import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import * as ImagePicker from 'expo-image-picker';
 import { PendingEvidenceStrip } from './PendingEvidenceStrip';
 import { MatchChatPanel } from './MatchChatPanel';
+import { ChatWorkspace } from '../../lib/chatWorkspace';
+import { createSingleFlight } from '../../lib/singleFlight';
 import { EvidenceThumb } from './EvidenceThumb';
 import { EvidencePreviewModal } from './EvidencePreviewModal';
 import { ResultVerificationCard } from './ResultVerificationCard';
@@ -92,7 +94,7 @@ interface MatchScheduleCardProps {
      *  kick-off as clock + date instead of one pre-localized blob. */
     scheduledTimeIso?: string | null;
     opponentAvailability?: string[];
-    onMatchUpdate?: () => void;
+    onMatchUpdate?: (tournamentId: string) => void;
     onPress?: () => void;
     variant?: 'default' | 'compact';
     isRoundLocked?: boolean;
@@ -155,6 +157,9 @@ function MatchScheduleCardBase({
     const { refresh: refreshBadges } = useBadges();
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const requests = useRequestGate(matchId);
+    // Native Modal unmounts its children on close. A profile trip keeps this card alive,
+    // so it owns the draft and outbox until the match itself leaves the list.
+    const chatWorkspace = React.useMemo(() => new ChatWorkspace(), [matchId]);
     const insets = useSafeAreaInsets();
 
     // The shared chat updates the cached unread count after the read succeeds.
@@ -456,7 +461,8 @@ function MatchScheduleCardBase({
         }
     };
 
-    const fetchDbHomeUserId = async (): Promise<string | null> => {
+    const detailsRead = React.useMemo(() => createSingleFlight<string | null>(), [matchId]);
+    const fetchDbHomeUserId = (force = false): Promise<string | null> => detailsRead(async () => {
         const isCurrent = requests.begin('fetchDbHomeUserId');
         if (!matchId) {
             // Nothing to wait for, and the gate below must not strand the form behind a spinner:
@@ -595,7 +601,7 @@ function MatchScheduleCardBase({
             setDetailsLoaded(true);
         }
         return null;
-    };
+    }, force);
 
     const handleApproveProposal = async () => {
         if (!matchId) return;
@@ -614,7 +620,7 @@ function MatchScheduleCardBase({
             // The consumed proposal drops both this user's "result to confirm" badge and the
             // organizer pill cascade — refresh eagerly instead of relying on the SignalR push.
             refreshBadges();
-            if (onMatchUpdate) onMatchUpdate();
+            if (onMatchUpdate) onMatchUpdate(tournamentId);
         } catch (err: any) {
             console.error('[MatchScheduleCard] Approve error:', err);
             setError(err.message || t('card.approveError'));
@@ -637,9 +643,9 @@ function MatchScheduleCardBase({
                 throw new Error(text || t('card.rejectFailed'));
             }
             // Refresh details so the modal returns to the empty-score state and the proposer can resubmit.
-            await fetchDbHomeUserId();
+            await fetchDbHomeUserId(true);
             refreshBadges();
-            if (onMatchUpdate) onMatchUpdate();
+            if (onMatchUpdate) onMatchUpdate(tournamentId);
         } catch (err: any) {
             console.error('[MatchScheduleCard] Reject error:', err);
             setError(err.message || t('card.rejectError'));
@@ -724,7 +730,7 @@ function MatchScheduleCardBase({
 
                 // Notify parent to refresh immediately
                 if (onMatchUpdate) {
-                    onMatchUpdate();
+                    onMatchUpdate(tournamentId);
                 }
             }
         } catch (error) {
@@ -751,7 +757,7 @@ function MatchScheduleCardBase({
                 setMatchTimeIso(undefined);
                 
                 if (onMatchUpdate) {
-                    onMatchUpdate();
+                    onMatchUpdate(tournamentId);
                 }
             } else {
                 const errorText = await response.text().catch(() => t('card.markScheduledFailed'));
@@ -949,7 +955,7 @@ function MatchScheduleCardBase({
             hapticSuccess();
 
             if (onMatchUpdate) {
-                onMatchUpdate();
+                onMatchUpdate(tournamentId);
             }
 
             // Two cases keep the modal open and refetch instead of closing:
@@ -963,7 +969,7 @@ function MatchScheduleCardBase({
                 setHomeScore('');
                 setAwayScore('');
                 setSelectedImages([]);
-                await fetchDbHomeUserId();
+                await fetchDbHomeUserId(true);
             } else {
                 setModalVisible(false);
             }
@@ -2038,7 +2044,7 @@ function MatchScheduleCardBase({
                                                                     setIsSubmitting(true);
                                                                     await authenticatedFetch(ENDPOINTS.UPLOAD_MATCH_EVIDENCE(matchId), { method: 'POST', body: formData });
                                                                     setSelectedImages([]);
-                                                                    await fetchDbHomeUserId();
+                                                                    await fetchDbHomeUserId(true);
                                                                 } catch (e) {
                                                                     console.error('[MatchScheduleCard] Upload evidence error:', e);
                                                                 } finally {
@@ -2081,7 +2087,7 @@ function MatchScheduleCardBase({
                                                     requestedByMe={!!user?.id && adminHelpRequestedByUserId?.toLowerCase() === user.id.toLowerCase()}
                                                     isParticipant={true}
                                                     canResolve={!!user?.id && !!hubOwnerUserId && hubOwnerUserId.toLowerCase() === user.id.toLowerCase()}
-                                                    onChanged={() => { fetchDbHomeUserId(); refreshBadges(); }}
+                                                    onChanged={() => { fetchDbHomeUserId(true); refreshBadges(); }}
                                                 />
                                             </View>
                                         )}
@@ -2110,6 +2116,7 @@ function MatchScheduleCardBase({
                                     <MatchChatPanel
                                         key={matchId}
                                         matchId={matchId}
+                                        workspace={chatWorkspace}
                                         active={modalVisible && activeModalTab === 'chat'}
                                         participantIds={[dbHomeUserId, dbAwayUserId]}
                                         avatarsByUserId={{ [opponentUserId?.toLowerCase() ?? '']: opponentAvatarUrl ?? undefined }}
@@ -2154,7 +2161,7 @@ function MatchScheduleCardBase({
                         onVerified={() => {
                             verification.refresh();
                             // The clip is ordinary evidence too; the gallery row counts it.
-                            fetchDbHomeUserId();
+                            fetchDbHomeUserId(true);
                         }}
                     />
                 )}

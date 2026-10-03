@@ -3,6 +3,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadStackTransitions } from './loadStackRouter.mjs';
+import { loadFetcher, loadDeclaredFunction } from '../behavior/loadFetcher.mjs';
 
 // One manual clock for timers, animation frames and Date.now.
 let now = 0;
@@ -28,7 +29,34 @@ function advance(ms) {
     now = until;
 }
 
-const { afterStackTransition, noteStackTransitionStart, noteStackTransitionEnd, resetStackTransitions } = await loadStackTransitions();
+const { afterStackTransition, noteStackTransitionStart, noteStackTransitionEnd, resetStackTransitions, observeStackTransitions } = await loadStackTransitions();
+
+for (const interruptedPush of [false, true]) {
+    test(`real navigation emitter delivers removed-route POP transitions (interrupted push: ${interruptedPush})`, () => {
+        const React = { useRef: current => ({ current }), useCallback: fn => fn, useMemo: fn => fn(), useInsertionEffect: fn => fn() };
+        const useEventEmitter = loadDeclaredFunction('node_modules/@react-navigation/core/src/useEventEmitter.tsx', 'useEventEmitter', { React });
+        const state = { routes: [{ key: 'tournament', name: 'TournamentDetails' }, { key: 'profile', name: 'PlayerProfile' }], index: 1 };
+        let filteredEvents = 0;
+        const emitter = loadFetcher('node_modules/@react-navigation/core/src/useNavigationBuilder.tsx', 'emitter', {
+            useEventEmitter, state, screens: { PlayerProfile: { props: {} }, TournamentDetails: { props: {} } },
+            descriptors: { profile: { navigation: {} } }, onEmitEvent: undefined,
+            screenListeners: { transitionStart: () => filteredEvents++, transitionEnd: () => filteredEvents++ },
+        });
+        const release = observeStackTransitions(emitter.create('profile'));
+        if (interruptedPush) emitter.emit({ type: 'transitionStart', target: 'profile', data: { closing: false } });
+        state.routes.pop(); state.index = 0;
+        let opened = false;
+        afterStackTransition(() => { opened = true; });
+        emitter.emit({ type: 'transitionStart', target: 'profile', data: { closing: true } });
+        advance(300);
+        assert.equal(opened, false);
+        emitter.emit({ type: 'transitionEnd', target: 'profile', data: { closing: true } });
+        advance(16);
+        assert.equal(opened, true);
+        assert.equal(filteredEvents, interruptedPush ? 1 : 0); // screenListeners misses both POP events.
+        release();
+    });
+}
 
 beforeEach(() => {
     // Leave no transition running between tests.

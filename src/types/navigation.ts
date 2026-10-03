@@ -6,6 +6,8 @@ export type RootStackParamList = {
     MainTabs: undefined;
     TournamentDetails: {
         id: string;
+        /** A distinct notification tap also refreshes an already focused tournament. */
+        notificationRefreshKey?: number;
         /** Push deep-link: pop the admin help-requests inbox on open. */
         openAdminHelp?: boolean;
         /** Push deep-link: open this match's details modal on open. */

@@ -104,9 +104,10 @@ export default function DirectChatScreen() {
             // the committed server state. Prefix invalidation covers cached searches.
             queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
             refreshCounts();
-        } catch {
+        } catch (error) {
             // The optimistic clear must not become permanent if the write failed.
             queryClient.invalidateQueries({ queryKey: ['direct-chats'] });
+            throw error; // Let the conversation retry the read after its next history refresh.
         }
     }, [queryClient, refreshCounts, updateCachedChat]);
 

@@ -8,6 +8,7 @@ import { MatchCardSkeleton } from '../components/match/MatchCardSkeleton';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateTournamentData } from '../lib/queryPolicy';
 import { useHomeMatches, type MatchOverviewDto } from '../lib/homeMatches';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { EmptyState, LoadFailedState } from '../components/ui/EmptyState';
@@ -32,8 +33,12 @@ export default function MyMatchesScreen() {
     // Stable: it is handed to every MatchScheduleCard as onMatchUpdate, and the card is memoized —
     // a fresh function here would invalidate every row on every render and undo the memo entirely.
     // Invalidating the shared key refreshes Home's cards as well.
-    const refreshMatches = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+    const refreshMatches = useCallback(async (tournamentId?: string) => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['home-matches'] }),
+            // Retry is also a Pressable handler and may supply its native event.
+            typeof tournamentId === 'string' && tournamentId ? invalidateTournamentData(queryClient, tournamentId) : undefined,
+        ]);
     }, [queryClient]);
 
     // The spinner follows the pull only — a background refetch (a card's own update) must not

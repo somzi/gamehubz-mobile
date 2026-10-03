@@ -9,6 +9,7 @@ import { startSignalRWithRetry } from '../lib/signalR';
 import { useRequestGate } from './useRequestGate';
 import { loadChatHistory } from '../lib/chatHistory';
 import { ChatWorkspace } from '../lib/chatWorkspace';
+import { createChatReadReceipts } from '../lib/chatReadReceipts';
 export type { OutgoingMessage } from '../lib/chatOutbox';
 
 type Message = { id: string; content: string; sentAt: string };
@@ -54,7 +55,7 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
         ? ENDPOINTS.GET_MATCH_COMMENTS(id!, take, before)
         : ENDPOINTS.GET_DIRECT_CHAT_MESSAGES(id!, take, before);
     const visible = () => latest.current.id === id && latest.current.active && navigation.isFocused() && AppState.currentState === 'active';
-    const read = () => { if (id && visible()) void Promise.resolve(latest.current.onRead(id)).catch(() => {}); };
+    const reads = useRef<ReturnType<typeof createChatReadReceipts> | undefined>(undefined);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', (state) => setForeground(state === 'active'));
@@ -98,7 +99,7 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
             if (result.hasMore !== undefined) setHasMore(result.hasMore);
             setMessages((previous) => mergeMessagesById(previous, result.messages));
             loadedRef.current = true; setLoaded(true);
-            read();
+            reads.current?.schedule(historyAnchor.current?.id ?? 'empty');
         } catch (e) {
             if (current() && visible()) setError(getErrorMessage(e));
         } finally {
@@ -129,8 +130,8 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
     useFocusEffect(useCallback(() => {
         if (!id || !active || !foreground) return;
         let alive = true;
-        let readTimer: ReturnType<typeof setTimeout> | undefined;
-        let readPending = false;
+        const readQueue = createChatReadReceipts(() => latest.current.onRead(id), READ_DELAY_MS);
+        reads.current = readQueue;
         void refreshRef.current();
         const connection = new HubConnectionBuilder()
             .withUrl(kind === 'match' ? `${API_BASE_URL}/hubs/chat` : ENDPOINTS.SIGNALR_DM_HUB, {
@@ -149,10 +150,7 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
             if (kind === 'direct' && (raw.chatId ?? raw.ChatId)?.toLowerCase() !== id.toLowerCase()) return;
             const message = latest.current.map(raw);
             setMessages((previous) => mergeMessagesById(previous, [message]));
-            readPending = true;
-            if (readTimer === undefined) {
-                readTimer = setTimeout(() => { readTimer = undefined; readPending = false; read(); }, READ_DELAY_MS);
-            }
+            readQueue.schedule(message.id);
         });
         connection.onreconnecting(() => { if (alive) setConnectionStatus('reconnecting'); });
         connection.onreconnected(() => { void join().catch(() => {
@@ -164,9 +162,8 @@ export function useChatConversation<T extends Message>(options: Options<T>) {
         });
         return () => {
             alive = false;
-            clearTimeout(readTimer);
-            // Seen on screen, not yet reported: leaving inside the window still counts as reading it.
-            if (readPending) void Promise.resolve(latest.current.onRead(id)).catch(() => {});
+            readQueue.close();
+            if (reads.current === readQueue) reads.current = undefined;
             requests.clear();
             paging.current = false; setLoadingMore(false);
             connection.off('ReceiveMessage');

@@ -65,7 +65,7 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
             const lists = () => queryClient.getQueryCache().findAll({ queryKey: ['home-matches'] });
             const asOfRead = new Map(lists().map(query => [query.queryHash, query.state.dataUpdateCount]));
             const response = await authenticatedFetch(ENDPOINTS.MARK_MATCH_CHAT_READ(id), {method:'POST'});
-            if (!response.ok) return;
+            if (!response.ok) throw new Error(`MARK_MATCH_CHAT_READ failed: ${response.status}`);
             for (const query of lists()) {
                 if (asOfRead.get(query.queryHash) !== query.state.dataUpdateCount) continue;
                 queryClient.setQueryData<MatchOverviewDto[]>(query.queryKey, current => current?.map(match =>

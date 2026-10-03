@@ -34,6 +34,18 @@ const act = (state, action) => router.getStateForAction(state, action, options);
 const nav = (state, name, params, source) => act(state, { ...CommonActions.navigate(name, params), ...(source ? { source } : {}) });
 const top = (state) => state.routes[state.index];
 const fromTop = (state) => top(state).key;
+
+test('a repeated explicit nested tab instruction gets fresh params after a manual tab switch', () => {
+    let s = nav(start(), 'MainTabs', { screen: 'Hubs' });
+    const firstParams = top(s).params, key = top(s).key;
+    // The child navigator switched manually; the parent still holds { screen: Hubs }.
+    s = nav(s, 'ManageHub', { hubId: 'H' });
+    s = nav(s, 'MainTabs', { screen: 'Hubs' });
+    assert.equal(top(s).key, key);
+    assert.notEqual(top(s).params, firstParams);
+    assert.equal(top(s).params.screen, 'Hubs');
+    assert.equal(s.routes.length, 1);
+});
 const stack = (state) => state.routes.map((r) => {
     const p = r.params ?? {};
     const id = p.id ?? p.chatId ?? p.otherUserId ?? p.hubId ?? p.teamId ?? p.screen;

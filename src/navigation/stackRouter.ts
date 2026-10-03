@@ -165,9 +165,12 @@ function goToExisting(state: StackState, index: number, params: Params): StackSt
     const target = state.routes[index];
     const previous = target.params as Params;
     const nextParams = KEEPS_PARAMS_ON_RETURN.has(target.name) ? previous : returnParams(previous, params);
-    const updated = shallowEqual(previous, nextParams)
+    // Nested navigators consume a new params object as an instruction to select a tab.
+    // Repeating { screen: 'Hubs' } must work after the user manually switched tabs.
+    const selectsNestedScreen = HOSTS_NAVIGATOR.has(target.name) && typeof nextParams?.screen === 'string';
+    const updated = !selectsNestedScreen && shallowEqual(previous, nextParams)
         ? target
-        : ({ ...target, params: nextParams } as typeof target);
+        : ({ ...target, params: selectsNestedScreen ? { ...nextParams } : nextParams } as typeof target);
 
     if (index === state.index) {
         return updated === target ? state : { ...state, routes: state.routes.map((r, i) => (i === index ? updated : r)) };

@@ -1,8 +1,41 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from './loadModules.mjs';
+import { loadFetcher, loadJsxProp } from './loadFetcher.mjs';
 const { ChatWorkspace } = await load('chatWorkspace');
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => {resolve=a; reject=b;}); return {promise,resolve,reject}; };
+
+test('the actual match card owns chat drafts and outbox across modal subtree remounts', async () => {
+    const path = 'src/components/match/MatchScheduleCard.tsx';
+    let memo;
+    const React = { useMemo(create, deps) {
+        if (!memo || deps.some((value, i) => value !== memo.deps[i])) memo = { deps, value: create() };
+        return memo.value;
+    } };
+    const renderCard = matchId => {
+        const chatWorkspace = loadFetcher(path, 'chatWorkspace', { React, ChatWorkspace, matchId });
+        return loadJsxProp(path, 'MatchChatPanel', 'workspace', { chatWorkspace });
+    };
+    const original = renderCard('A'), response = deferred();
+    original.setDraft('unsent draft');
+    const unbind = original.bindSender(() => response.promise);
+    const sending = original.send('in flight');
+    unbind(); // Native Modal removes the panel while the card stays mounted.
+    response.reject(Error('offline')); await sending;
+    const returned = renderCard('A');
+    assert.equal(returned, original);
+    assert.equal(returned.getSnapshot().draft, 'unsent draft');
+    assert.equal(returned.getSnapshot().pending[0].content, 'in flight');
+    let posts = 0;
+    returned.bindSender(async () => { posts++; });
+    await returned.retry(returned.getSnapshot().pending[0]);
+    assert.equal(posts, 1);
+    assert.equal(returned.getSnapshot().pending.length, 0);
+    const other = renderCard('B');
+    assert.notEqual(other, original);
+    assert.equal(other.getSnapshot().draft, '');
+    assert.deepEqual(other.getSnapshot().pending, []);
+});
 
 test('merging keeps the visible draft and restores the other without overwriting either', () => {
     const visible = new ChatWorkspace(), hidden = new ChatWorkspace();

@@ -3,8 +3,30 @@
 // tap supersedes the first. Run: npm run test:frontend
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFetcher } from './loadFetcher.mjs';
+import { loadFetcher, loadDeclaredFunction } from './loadFetcher.mjs';
 import { deferred, flush } from './loadApi.mjs';
+
+test('every tournament notification refreshes an already-focused route; ordinary Back reuses cache', async () => {
+    const calls = [], consumedNotification = { current: undefined }, activeTabRef = { current: 'overview' };
+    const routeParamsRef = { current: {} };
+    const dispatches = [];
+    const route = loadDeclaredFunction('src/lib/notificationRouting.ts', 'routeFromNotification', { notificationRefreshSequence: 0 });
+    const nav = { navigate: (name, params) => dispatches.push({ name, params }) };
+    const focus = key => loadFetcher('src/screens/TournamentDetailsScreen.tsx', 'refreshTournamentOnFocus', {
+        useCallback: fn => fn, id: 'A', user: { id: 'viewer' }, notificationRefreshKey: key, consumedNotification, activeTabRef, routeParamsRef,
+        fetchTournamentDetails: (silent, force) => calls.push(['overview', force]),
+        fetchParticipants: force => calls.push(['participants', force]), fetchBracket: (silent, force) => calls.push(['bracket', force]),
+    });
+    await route(nav, { type: 'tournamentwon', tournamentId: 'A' });
+    const first = focus(dispatches[0].params.notificationRefreshKey); first();
+    assert.deepEqual(calls.splice(0), [['overview', true], ['participants', true], ['bracket', true]]);
+    first(); // Return from a profile, with no new notification.
+    assert.deepEqual(calls.splice(0), [['overview', false], ['participants', false]]);
+    await route(nav, { type: 'tournamentwon', tournamentId: 'A' });
+    assert.notEqual(dispatches[0].params.notificationRefreshKey, dispatches[1].params.notificationRefreshKey);
+    focus(dispatches[1].params.notificationRefreshKey)();
+    assert.deepEqual(calls, [['overview', true], ['participants', true], ['bracket', true]]);
+});
 
 function inbox(route) {
     const state = { opening: null, alerts: 0 };

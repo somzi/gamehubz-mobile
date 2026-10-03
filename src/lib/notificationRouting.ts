@@ -38,6 +38,8 @@ export interface NotificationTarget {
     params?: object;
 }
 
+let notificationRefreshSequence = 0;
+
 // Dispatches the deep link for a notification payload and returns the top-level stack
 // route it navigated to (`null` when the payload carries nothing routable). The caller
 // uses it to confirm the navigation actually took — the screen AND its subject, since the
@@ -51,6 +53,9 @@ export async function routeFromNotification(
     const data = rawData as Record<string, any>;
 
     const go = async (name: string, params?: object): Promise<NotificationTarget> => {
+        if (name === 'TournamentDetails') {
+            params = { ...params, notificationRefreshKey: ++notificationRefreshSequence };
+        }
         if (name === 'DirectChat') {
             params = await prepareDirectChatTarget((params as { chatId: string }).chatId, nav.getState?.().routes ?? [], async (id) => {
                 const response = await authenticatedFetch(ENDPOINTS.GET_DIRECT_CHAT_BY_ID(id));

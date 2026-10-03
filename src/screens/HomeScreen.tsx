@@ -7,6 +7,7 @@ import { CompositeNavigationProp, useNavigation } from '@react-navigation/native
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRefetchOnFocusIfStale } from '../hooks/useRefetchOnFocusIfStale';
+import { invalidateTournamentData } from '../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
@@ -153,8 +154,12 @@ export default function HomeScreen() {
 
     // Stable callback so MatchScheduleCard's React.memo actually skips
     // re-renders when unrelated Home state changes.
-    const invalidateMatches = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ['home-matches'] });
+    const invalidateMatches = useCallback(async (tournamentId?: string) => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['home-matches'] }),
+            // Retry is also a Pressable handler and may supply its native event.
+            typeof tournamentId === 'string' && tournamentId ? invalidateTournamentData(queryClient, tournamentId) : undefined,
+        ]);
     }, [queryClient]);
 
     // Stable so the memoized FeedCard doesn't invalidate on every parent

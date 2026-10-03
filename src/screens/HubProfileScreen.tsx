@@ -580,8 +580,8 @@ export default function HubProfileScreen() {
                 onScroll={({ nativeEvent }) => {
                     const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
                     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 50) {
-                        if (hubTab === 'tournaments') loadMoreTournaments();
-                        else if (hubTab === 'members') loadMoreMembers();
+                        if (hubTab === 'tournaments' && !tournamentsError) loadMoreTournaments();
+                        else if (hubTab === 'members' && !membersError) loadMoreMembers();
                     }
                 }}
                 scrollEventThrottle={16}

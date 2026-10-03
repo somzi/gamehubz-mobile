@@ -13,7 +13,7 @@ const policy = await load('queryPolicy');
 const { createRequestGate } = await load('requestGate');
 const { withRefreshResult } = await load('refreshFailures');
 const { DETAIL_STALE_MS, LIST_STALE_MS, shouldRefreshOnFocus, fetchTournamentResource,
-    tournamentResourceKey, invalidateHubData, invalidateTournamentData, refreshVisibleList } = policy;
+    tournamentResourceKey, invalidateHubData, invalidateTournamentData, invalidateTournamentLists, refreshVisibleList } = policy;
 const clientFor = t => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
     t.after(() => client.clear());
@@ -296,3 +296,95 @@ test('the actual hub edit invalidates its cached header and list, then reloads m
     assert.equal(client.getQueryState(key).isInvalidated, true);
     assert.equal(client.getQueryState(['hubs', 'joined']).isInvalidated, true);
 });
+
+for (const [screen, callback] of [['HomeScreen', 'invalidateMatches'], ['MyMatchesScreen', 'refreshMatches']]) {
+    test(`${screen}: a card mutation refreshes the affected tournament even on immediate return`, async t => {
+        const client = clientFor(t), key = tournamentResourceKey('A', 'viewer', 'bracket');
+        const otherKey = tournamentResourceKey('B', 'viewer', 'bracket');
+        client.setQueryData(key, { score: '0:0' }); client.setQueryData(otherKey, { score: '0:0' });
+        client.setQueryData(['home-matches', 'viewer'], []);
+        const update = loadFetcher(`src/screens/${screen}.tsx`, callback, {
+            useCallback: fn => fn, queryClient: client, invalidateTournamentData,
+        });
+        await update('A');
+        let reads = 0;
+        const result = await fetchTournamentResource(client, key, async () => { reads++; return { score: '2:1' }; });
+        assert.equal(reads, 1);
+        assert.equal(result.score, '2:1');
+        assert.equal(client.getQueryState(otherKey).isInvalidated, false);
+        assert.equal(client.getQueryState(['home-matches', 'viewer']).isInvalidated, true);
+    });
+
+    test(`${screen}: Retry refreshes matches without treating a native press event as a tournament ID`, async t => {
+        const client = clientFor(t), key = tournamentResourceKey('A', 'viewer', 'bracket');
+        client.setQueryData(key, {}); client.setQueryData(['tournaments', 'live'], []);
+        client.setQueryData(['home-matches', 'viewer'], []);
+        const retry = loadFetcher(`src/screens/${screen}.tsx`, callback, {
+            useCallback: fn => fn, queryClient: client, invalidateTournamentData,
+        });
+        await retry({ nativeEvent: { timestamp: 1 } });
+        assert.equal(client.getQueryState(key).isInvalidated, false);
+        assert.equal(client.getQueryState(['tournaments', 'live']).isInvalidated, false);
+        assert.equal(client.getQueryState(['home-matches', 'viewer']).isInvalidated, true);
+    });
+}
+
+test('the actual successful registration invalidates tournament filters; a rejected registration does not', async t => {
+    for (const ok of [true, false]) {
+        const client = clientFor(t), listKeys = [['tournaments', 'live', 'viewer'], ['tournaments', 'upcoming', 'viewer']];
+        listKeys.forEach(key => client.setQueryData(key, { pages: [{ items: [] }], pageParams: [0] }));
+        const join = loadFetcher('src/screens/TournamentDetailsScreen.tsx', 'handleJoin', {
+            queryClient: client, invalidateTournamentLists: policy.invalidateTournamentLists,
+            id: 'A', user: { id: 'viewer' }, inviteCode: null, tournament: {},
+            ENDPOINTS: { REGISTER_TOURNAMENT: 'join' }, authenticatedFetch: async () => ({ ok, json: async () => ({ message: 'rejected' }) }),
+            setIsRegistering() {}, setStatusModalConfig() {}, setShowStatusModal() {}, t: key => key,
+            fetchTournamentDetails() {}, fetchParticipants() {}, getErrorMessage: String, isRejectedTournamentJoinCode: () => false,
+        });
+        await join();
+        for (const key of listKeys) assert.equal(client.getQueryState(key).isInvalidated, ok);
+        let reads = 0;
+        const options = { queryKey: listKeys[0], staleTime: LIST_STALE_MS, enabled: false,
+            initialPageParam: 0, getNextPageParam: () => undefined,
+            queryFn: async () => { reads++; return { items: [{ participants: 2 }] }; } };
+        const observer = new InfiniteQueryObserver(client, options), unsubscribe = observer.subscribe(() => {});
+        t.after(unsubscribe);
+        observer.setOptions({ ...options, enabled: true });
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(reads, ok ? 1 : 0);
+    }
+});
+
+test('a list read started before a mutation cannot make the hidden tournament list fresh again', async t => {
+    const client = clientFor(t), key = ['tournaments', 'live'], old = deferred();
+    client.setQueryData(key, { participants: 1 });
+    const read = client.fetchQuery({ queryKey: key, queryFn: () => old.promise });
+    await invalidateTournamentLists(client);
+    old.resolve({ participants: 99 });
+    // With existing data, QueryClient cancellation resolves to that previous snapshot.
+    await read;
+    assert.equal(client.getQueryState(key).isInvalidated, true);
+    assert.deepEqual(client.getQueryData(key), { participants: 1 });
+    let reads = 0;
+    const updated = await client.fetchQuery({ queryKey: key, staleTime: LIST_STALE_MS,
+        queryFn: async () => { reads++; return { participants: 2 }; } });
+    assert.equal(reads, 1);
+    assert.equal(updated.participants, 2);
+});
+
+for (const [name, args] of [['handleApproveProposal', []], ['handleAvailabilitySubmit', [[], ['2026-10-03T17:00:00Z']]]]) {
+    test(`the actual card ${name} reports its tournament only after a successful mutation`, async () => {
+        for (const ok of [true, false]) {
+            const changed = [];
+            const run = loadFetcher('src/components/match/MatchScheduleCard.tsx', name, {
+                matchId: 'M', tournamentId: 'A', onMatchUpdate: id => changed.push(id),
+                ENDPOINTS: { APPROVE_MATCH_RESULT: 'approve', SUBMIT_MATCH_AVAILABILITY: 'availability' },
+                authenticatedFetch: async () => ({ ok, json: async () => ({}), text: async () => 'rejected' }),
+                setIsApproving() {}, setIsSubmitting() {}, setError() {}, setModalVisible() {}, refreshBadges() {},
+                setMySlots() {}, console: { error() {} }, t: key => key,
+            });
+            if (!ok && name === 'handleAvailabilitySubmit') await assert.rejects(run(...args));
+            else await run(...args);
+            assert.deepEqual(changed, ok ? ['A'] : []);
+        }
+    });
+}

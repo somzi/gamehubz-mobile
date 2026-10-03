@@ -92,3 +92,42 @@ Dodatna proba na oba uređaja:
 ADB provera za ovu doradu nije našla povezan uređaj/emulator. Proba na uređaju ostaje otvorena. Ovaj paket nije objavljen.
 
 Stavka 12 iz faze 3 implementirana je u narednom paketu, dokumentovanom u [frontend-phase-3-cache.md](frontend-phase-3-cache.md).
+
+## Review pre predaje — 3. oktobar 2026.
+
+- Ispravljeno čuvanje chata i na karticama Home / My Matches. `MatchScheduleCard` sada poseduje `ChatWorkspace` izvan native modala i prosleđuje ga `MatchChatPanel`-u. Odlazak na profil i Back čuvaju nacrt, neuspele poruke i ishod slanja koje je već krenulo. Drugi meč dobija zasebno stanje. Podaci i dalje žive samo u memoriji dok kartica postoji.
+- Regresiona provera koristi stvarno povezivanje kartice i panela, simulira uklanjanje panela tokom slanja, vraćanje i ponavljanje neuspele poruke. Native animacija se ne simulira.
+- Sa tri ispravke keša i transporta opisane u dokumentu faze 3, ceo frontend paket prolazi **138/138 testova**; TypeScript i `git diff --check` su čisti.
+- Na telefonu proveriti: Home / My Matches → chat nacrt ili neuspešno slanje → tab meča / profil protivnika → Back → chat. Tekst ostaje, neuspešna poruka može da se ponovi jednom, a drugi meč ne nasleđuje njen sadržaj.
+
+## Provera i ispravke Claudeovih 11 nalaza — 3. oktobar 2026.
+
+Brojevi u ovoj tabeli odnose se na poslednji review HEAD-a `a6b1f58`, ne na brojeve prvobitnih faza. Nalazi su potvrđeni u kodu; 2 i 8 već su bili rešeni prethodnim izmenama. Preostalih devet je rešeno ovom dopunom.
+
+| Nalaz | Ispravka |
+| --- | --- |
+| 1 — modal se vraća pre kraja Back animacije | Svaki montirani stack ekran registruje svoje transition listenere. Oni primaju i POP događaje posle uklanjanja rute iz navigacionog stanja, dok je izlazni ekran još u animaciji. Ostaje rezervni izlaz ako biblioteka ne pošalje kraj animacije. |
+| 2 — AbortSignal | Već rešeno: signal stiže do Axios transporta, pokriveno transportnim testovima. |
+| 3 — duplo označavanje chata kao pročitanog | Istorija, dopuna nakon ulaska u grupu, reconnect i nove poruke koriste zajednički red. Prva potvrda se šalje odmah po učitavanju poruka. Isti poslednji pročitani ID se ne šalje ponovo, zahtevi ne idu paralelno, a naredne potvrde se objedinjuju u prozoru od jedne sekunde. Izlazak odmah šalje preostale viđene poruke; neuspeh ostavlja mogućnost ponavljanja pri sledećem osvežavanju. |
+| 4 — nevidljive greške posle akcija | Neuspeh običnog ili tihog osvežavanja žreba, učesnika, prijava ili timova ulazi u traku sa ponavljanjem. Učitani sadržaj ostaje, a uspeh jednog resursa ne skriva grešku drugog. |
+| 5 — sveža struktura ostavlja loader/grešku | Inline odgovor sa žrebom poništava stariji GET, završava učitavanje i briše samo grešku žreba. Zakasneli GET ne može da prepiše nove podatke. |
+| 6 — ponavljanje neuspele stranice na svaki skrol | Profil, tuđi profil i hub prestaju sa automatskim zahtevima posle greške; korisnik ponavlja postojećim Retry dugmetom ili osvežavanjem. |
+| 7 — izgubljeno učitavanje na kraju liste | Tournaments i Hubs pamte jedan zahtev za sledeću stranicu dok traje osvežavanje. Izvršavaju ga kada se osvežavanje završi; promena filtera, napuštanje ekrana ili greška ga odbacuju. Greška stranice ima ručno ponavljanje u podnožju liste. |
+| 8 — zastarela lista turnira | Već rešeno: uspešne lokalne radnje poništavaju keš svih filtera liste turnira. |
+| 9 — notifikacija za već otvoren turnir | Svaki tap nosi novi ključ osvežavanja. Fokusirani turnir tada proverava pregled i žreb; običan Back i dalje koristi svež keš. |
+| 10 — ponovljen prelaz na Hubs | Nova eksplicitna navigacija na tab daje ugnježdenom navigatoru nove parametre čak i kada su vrednosti iste; zadržava se jedna MainTabs ruta. |
+| 11 — slanje rezultata i check-in polling | Obično učitavanje, polling i provera domaćina pri slanju dele zahtev u toku. Posle uspešne izmene meča eksplicitno se čitaju sveži podaci; stariji odgovor ne može da ih prepiše. |
+
+Provere: **163/163 frontend testa**, TypeScript i `git diff --check` bez grešaka; lokalni Expo export prolazi za Android i iOS. Novi testovi uključuju stvarni emitter i filtriranje događaja iz instalirane React Navigation biblioteke, neuspele i zakasnele odgovore, čekanje paginacije, notifikacije za istu rutu i deljenje zahteva pri slanju rezultata. To ne zamenjuje probu native animacija na uređaju.
+
+Dodatna proba na Androidu i iOS-u pre predaje:
+
+1. Turnir/Home/My Matches → meč → profil → strelica nazad; ponoviti sa Android Back i iOS swipe-back. Pritisnuti Back i dok profil još ulazi. Modal se vraća tek kada profil izađe, uz očuvane unose.
+2. Dok je turnir otvoren, tapnuti njegovu novu notifikaciju; pregled/žreb se osvežavaju. Ponoviti sa notifikacijom za drugi turnir dok je modal otvoren i proveriti zatvaranje prethodnog modala.
+3. Na sporoj mreži stići do dna Tournaments/Hubs tokom osvežavanja; naredna stranica dolazi bez odlaska sa dna. Posle greške mreže skrol ne šalje zahteve u petlji; Retry uspeva kad se mreža vrati.
+4. Posle izmene rezultata ili učesnika izazvati neuspeh narednog GET-a: postojeći sadržaj ostaje uz vidljivo ponavljanje. Uspešan Retry sklanja odgovarajuću grešku i spinner.
+5. Ući u chat, izazvati reconnect i brzo izaći; proveriti poruke i bedževe. Na kartici sa aktivnim check-in proveriti slanje rezultata uz sporu mrežu. Ponoviti prelaz na Hubs posle ručne promene taba.
+
+Native proba na telefonu ostaje otvorena. Izmene nisu objavljene.
+
+Naknadna UX dorada čitanja chata: prva potvrda sada kreće odmah, dok naredne zadržavaju objedinjavanje i zaštitu od dupliranja. Regresioni test je pao sa prethodnim odlaganjem, a sa doradom ceo paket prolazi **164/164 testa**. Na telefonu proveriti nestanak bedža nakon uspešne prve potvrde, reconnect i izlazak dok naredna potvrda još čeka.

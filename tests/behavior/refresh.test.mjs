@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadFetcher } from './loadFetcher.mjs';
+import { loadFetcher, loadJsxProp } from './loadFetcher.mjs';
 import { load } from './loadModules.mjs';
 import { deferred } from './loadApi.mjs';
 const { createRequestGate } = await load('requestGate');
@@ -92,4 +92,64 @@ test('a later successful bracket refresh clears its own failure', async () => {
     const { state, run } = bracketFetcher(['fail', 'ok']);
     await run(true); await run(true);
     assert.equal(state.failures.size, 0);
+});
+
+test('a failed ordinary post-action refresh retains a loaded bracket and exposes its retry banner', async () => {
+    const { state, run } = bracketFetcher(['fail']);
+    const stages = [{ id: 'loaded' }]; state.stages = stages;
+    await run();
+    assert.equal(state.stages, stages);
+    assert.deepEqual([...state.failures], ['bracket']);
+});
+
+for (const resource of ['participants', 'pending', 'teams', 'pending-teams']) {
+    test(`${resource}: a failed refresh preserves loaded rows and its own retry clears the failure`, async () => {
+        const state = { rows: [{ id: 'existing' }], failures: new Set(['bracket']) };
+        const original = state.rows;
+        let fail = true;
+        const answer = () => fail ? failure : { ok: true, json: async () => [{ id: 'new' }] };
+        const bindings = {
+            ...shared(), id: 'A', withRefreshResult, rememberSnapshot() {},
+            setFailedRefreshes: update => { state.failures = update(state.failures); },
+            authenticatedFetch: async () => answer(),
+            ENDPOINTS: { GET_PENDING_REGISTRATIONS: id => id, GET_TOURNAMENT_PARTICIPANTS: id => id },
+            setParticipants: rows => { state.rows = rows; }, setParticipantsError() {}, setParticipantsLoaded() {},
+            setPendingRegistrations: rows => { state.rows = rows; }, setPendingError() {}, setIsLoadingPending() {}, setPendingLoaded() {},
+            setTournamentTeams: rows => { if (resource === 'teams') state.rows = rows; }, setTeamsError() {}, setTeamsLoaded() {},
+            setUserTeam: row => { if (resource === 'pending-teams') state.rows = [row]; },
+            getTournamentTeams: async () => { if (fail && resource === 'teams') throw Error('503'); return [{ id: 'new' }]; },
+            getPendingTournamentTeams: async () => {
+                if (fail && resource === 'pending-teams') throw Error('503');
+                return [{ id: 'new', members: [{ userId: 'viewer' }] }];
+            },
+        };
+        const name = resource === 'participants' ? 'fetchParticipants' : resource === 'pending' ? 'fetchPendingRegistrations' : 'fetchTournamentTeams';
+        const run = loadFetcher('src/screens/TournamentDetailsScreen.tsx', name, bindings);
+        await run(resource.includes('teams') ? 'A' : undefined);
+        assert.equal(state.rows, original); assert.ok(state.failures.has(resource));
+        fail = false; await run(resource.includes('teams') ? 'A' : undefined);
+        assert.equal(state.rows[0].id, 'new'); assert.deepEqual([...state.failures], ['bracket']);
+    });
+}
+
+test('inline bracket results supersede a pending GET, release its spinner, and clear only bracket errors', async () => {
+    const response = deferred(), state = { loading: false, loaded: false, error: 'old-error',
+        failures: new Set(['bracket', 'participants']), stages: [] };
+    const bindings = {
+        ...shared(), id: 'A', bracketLoadedRef: { current: true }, withRefreshResult,
+        ENDPOINTS: { GET_TOURNAMENT_STRUCTURE_V3: id => id }, authenticatedFetch: () => response.promise,
+        setLoadingBracket: v => { state.loading = v; }, setBracketLoaded: v => { state.loaded = v; },
+        setBracketError: v => { state.error = v; }, setFailedRefreshes: fn => { state.failures = fn(state.failures); },
+        setStages: v => { state.stages = v; }, setBracketCanManage() {}, setBracketRequireResultApproval() {},
+        queryClient: { cancelQueries: async () => {}, setQueryData() {} }, invalidateTournamentLists() {},
+        refreshBadges() {}, canManage: false,
+    };
+    const fetch = loadFetcher('src/screens/TournamentDetailsScreen.tsx', 'fetchBracket', bindings);
+    const update = loadJsxProp('src/screens/TournamentDetailsScreen.tsx', 'MatchDetailsModal', 'onMatchUpdate', bindings);
+    const waiting = fetch(); assert.equal(state.loading, true);
+    const stages = [{ id: 'fresh' }]; update({ stages });
+    assert.equal(state.loading, false); assert.equal(state.loaded, true); assert.equal(state.error, null);
+    assert.deepEqual([...state.failures], ['participants']); assert.equal(state.stages, stages);
+    response.resolve(failure); await waiting;
+    assert.equal(state.stages, stages); assert.equal(state.error, null); assert.equal(state.loading, false);
 });
