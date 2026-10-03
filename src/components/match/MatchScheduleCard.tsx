@@ -1110,21 +1110,30 @@ function MatchScheduleCardBase({
                     />
 
                     <View style={{ paddingLeft: 16, paddingRight: 14, paddingVertical: 12 }}>
-                        {/* Where: the hub top-left in the section's colour, the tournament top-right */}
-                        <View className="flex-row items-center" style={{ gap: 10 }}>
-                            <View className="flex-1 flex-row items-center" style={{ gap: 6 }}>
+                        {/* Where: the hub top-left in the section's colour, the tournament top-right.
+                            Neither has a fixed share of the row: when both don't fit, each gives way in
+                            proportion to its length and its text shrinks a little before it is cut. */}
+                        <View className="flex-row items-center justify-between" style={{ gap: 10 }}>
+                            <View className="shrink flex-row items-center" style={{ gap: 6 }}>
                                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: tone.accent }} />
                                 <Text
-                                    className="flex-1 text-[10.5px] font-black uppercase tracking-[1.5px]"
+                                    className="shrink text-[10.5px] font-black uppercase tracking-[1.5px]"
                                     style={{ color: tone.text }}
                                     numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.7}
                                 >
                                     {roundName}
                                 </Text>
                             </View>
-                            <View className="flex-row items-center" style={{ gap: 4, maxWidth: '50%' }}>
+                            <View className="shrink flex-row items-center" style={{ gap: 4 }}>
                                 <Ionicons name="trophy" size={11} color={COLORS.slate400} />
-                                <Text className="shrink text-[11px] font-bold text-slate-300" numberOfLines={1}>
+                                <Text
+                                    className="shrink text-[11px] font-bold text-slate-300"
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.7}
+                                >
                                     {tournamentName}
                                 </Text>
                             </View>
