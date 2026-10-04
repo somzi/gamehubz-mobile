@@ -15,6 +15,7 @@ interface ToggleProps {
     activeColor?: string;
     inactiveColor?: string;
     size?: 'sm' | 'md' | 'lg';
+    accessibilityLabel?: string;
 }
 
 const SIZES = {
@@ -30,6 +31,7 @@ export function Toggle({
     activeColor = '#10B981',
     inactiveColor = '#1E293B',
     size = 'md',
+    accessibilityLabel,
 }: ToggleProps) {
     const dims = SIZES[size];
     const travel = dims.track.width - dims.thumb - dims.padding * 2;
@@ -60,6 +62,10 @@ export function Toggle({
 
     return (
         <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel={accessibilityLabel}
+            accessibilityState={{ checked: value, disabled }}
+            hitSlop={10}
             onPress={() => !disabled && onValueChange(!value)}
             disabled={disabled}
             style={({ pressed }) => ({ opacity: disabled ? 0.5 : pressed ? 0.85 : 1 })}

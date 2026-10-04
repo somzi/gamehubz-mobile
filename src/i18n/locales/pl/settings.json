@@ -44,6 +44,27 @@
     "moderatedChats": "Czaty, które moderuję",
     "moderatedChatsHint": "Powiadamiaj mnie, gdy gracze odpowiadają na czacie meczu, w którym uczestniczę jako organizator.",
     "saveFailedTitle": "Nie udało się zapisać",
-    "saveFailedMessage": "Ustawienie powiadomień nie zostało zaktualizowane. Spróbuj ponownie za chwilę."
+    "saveFailedMessage": "Ustawienie powiadomień nie zostało zaktualizowane. Spróbuj ponownie za chwilę.",
+    "sourcesTitle": "Wybierz źródła powiadomień",
+    "sourcesHint": "Wyłącz powiadomienia z huba lub turnieju. Wyciszenie huba obejmuje także jego turnieje i alerty o meczach. Zmiany dotyczą nowych powiadomień.",
+    "hubs": "Huby",
+    "tournaments": "Turnieje",
+    "search": {
+      "hubs": "Szukaj w swoich hubach",
+      "tournaments": "Szukaj turniejów"
+    },
+    "empty": {
+      "hubs": "Tutaj pojawią się huby, do których dołączysz.",
+      "tournaments": "Brak dostępnych turniejów dla Twojego konta."
+    },
+    "noResults": "Brak wyników wyszukiwania.",
+    "receiving": "Powiadomienia włączone",
+    "muted": "Powiadomienia wyłączone",
+    "mutedByHub": "Wyłączone — najpierw włącz powiadomienia huba",
+    "sourceLabel": "Powiadomienia z {{name}}",
+    "loadFailed": "Nie udało się wczytać ustawień powiadomień.",
+    "retry": "Spróbuj ponownie",
+    "loadMore": "Pokaż więcej",
+    "sourcesUnavailable": "Ustawienia powiadomień dla hubów i turniejów nie są jeszcze dostępne. Spróbuj ponownie później."
   }
 }

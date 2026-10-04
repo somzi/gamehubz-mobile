@@ -44,6 +44,27 @@
     "moderatedChats": "Chats que eu modero",
     "moderatedChatsHint": "Me avise quando jogadores responderem em um chat de partida em que entrei como organizador.",
     "saveFailedTitle": "Não foi possível salvar",
-    "saveFailedMessage": "Sua configuração de notificação não foi atualizada. Tente novamente em instantes."
+    "saveFailedMessage": "Sua configuração de notificação não foi atualizada. Tente novamente em instantes.",
+    "sourcesTitle": "Escolha de onde receber notificações",
+    "sourcesHint": "Desative as notificações de um hub ou torneio. Silenciar um hub também silencia seus torneios e alertas de partidas. As alterações valem para novas notificações.",
+    "hubs": "Hubs",
+    "tournaments": "Torneios",
+    "search": {
+      "hubs": "Buscar nos seus hubs",
+      "tournaments": "Buscar torneios"
+    },
+    "empty": {
+      "hubs": "Os hubs dos quais você participar aparecerão aqui.",
+      "tournaments": "Ainda não há torneios disponíveis para sua conta."
+    },
+    "noResults": "Nenhum resultado para esta busca.",
+    "receiving": "Notificações ativadas",
+    "muted": "Notificações desativadas",
+    "mutedByHub": "Desativadas — ative primeiro as do hub",
+    "sourceLabel": "Notificações de {{name}}",
+    "loadFailed": "Não foi possível carregar as preferências de notificações.",
+    "retry": "Tentar novamente",
+    "loadMore": "Mostrar mais",
+    "sourcesUnavailable": "As configurações de notificações por hub e torneio ainda não estão disponíveis. Tente novamente mais tarde."
   }
 }

@@ -44,6 +44,27 @@
     "moderatedChats": "Četovi koje moderiram",
     "moderatedChatsHint": "Obavesti me kad igrači odgovore u četu meča koji moderiram kao organizator.",
     "saveFailedTitle": "Čuvanje nije uspelo",
-    "saveFailedMessage": "Podešavanje obaveštenja nije sačuvano. Pokušaj ponovo za trenutak."
+    "saveFailedMessage": "Podešavanje obaveštenja nije sačuvano. Pokušaj ponovo za trenutak.",
+    "sourcesTitle": "Izaberi odakle primaš obaveštenja",
+    "sourcesHint": "Isključi obaveštenja za hub ili turnir. Utišan hub utišava i njegove turnire i obaveštenja o mečevima. Promene važe za nova obaveštenja.",
+    "hubs": "Hubovi",
+    "tournaments": "Turniri",
+    "search": {
+      "hubs": "Pretraži svoje hubove",
+      "tournaments": "Pretraži turnire"
+    },
+    "empty": {
+      "hubs": "Ovde će se pojaviti hubovi kojima se pridružiš.",
+      "tournaments": "Još nema dostupnih turnira za tvoj nalog."
+    },
+    "noResults": "Nema rezultata za ovu pretragu.",
+    "receiving": "Obaveštenja uključena",
+    "muted": "Obaveštenja isključena",
+    "mutedByHub": "Isključeno — prvo uključi obaveštenja za hub",
+    "sourceLabel": "Obaveštenja za {{name}}",
+    "loadFailed": "Učitavanje podešavanja obaveštenja nije uspelo.",
+    "retry": "Pokušaj ponovo",
+    "loadMore": "Prikaži još",
+    "sourcesUnavailable": "Podešavanja obaveštenja za hubove i turnire još nisu dostupna. Pokušaj ponovo kasnije."
   }
 }

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTranslation } from 'react-i18next';
 import { Skeleton } from '../ui/Skeleton';
+import { EmblemImage } from '../ui/HeroCard';
 import { COLORS } from '../../lib/theme';
 import { formatLocalTime } from '../../lib/utils';
 import { notificationMeta } from '../../lib/notificationRouting';
@@ -11,6 +12,8 @@ import type { NotificationItem } from '../../types/notifications';
 
 const CARD_RADIUS = 18;
 const ICON_SIZE = 42;
+// Hub avatars are rounded squares across the app (hub card, hub header).
+const HUB_RADIUS = 13;
 
 /**
  * The notification's kind as a round badge. Unread, it is lit in the kind's colour — a gradient
@@ -41,6 +44,30 @@ function KindBadge({ icon, accent, lit }: { icon: keyof typeof Ionicons.glyphMap
                 style={[StyleSheet.absoluteFill, { borderRadius: ICON_SIZE / 2 }]}
             />
             <Ionicons name={icon} size={19} color={accent} />
+        </View>
+    );
+}
+
+/**
+ * A hub or tournament notification wears the hub's own avatar, with the kind as a small badge on
+ * its corner — lit while unread, grey once read, like the plain badge.
+ */
+function HubBadge({ src, icon, accent, lit }: { src: string; icon: keyof typeof Ionicons.glyphMap; accent: string; lit: boolean }) {
+    return (
+        <View style={{ width: ICON_SIZE, height: ICON_SIZE }}>
+            <View
+                style={[
+                    styles.hubFrame,
+                    { borderColor: lit ? accent + '73' : 'rgba(255,255,255,0.10)' },
+                    lit && Platform.OS === 'ios' && { shadowColor: accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
+                ]}
+            >
+                <EmblemImage src={src} name="" size={ICON_SIZE - 4} radius={HUB_RADIUS - 2} />
+            </View>
+            {/* Ringed in the card's own colour, so the dot reads as cut out of the avatar's corner */}
+            <View style={[styles.kindDot, { backgroundColor: lit ? accent : COLORS.slate600, borderColor: lit ? COLORS.cardRaised : COLORS.card }]}>
+                <Ionicons name={icon} size={10} color={lit ? '#04150F' : COLORS.slate300} />
+            </View>
         </View>
     );
 }
@@ -104,7 +131,14 @@ export const NotificationRow = React.memo(function NotificationRow({ item, onPre
                 )}
 
                 <View className="flex-row items-start" style={styles.body}>
-                    <KindBadge icon={meta.icon} accent={meta.accent} lit={unread} />
+                    {/* The server attaches the avatar to every row that names a hub or a tournament —
+                        match rows included (a help request, a ready check), whose kind stays readable
+                        on the badge's corner. */}
+                    {item.hubAvatarUrl ? (
+                        <HubBadge src={item.hubAvatarUrl} icon={meta.icon} accent={meta.accent} lit={unread} />
+                    ) : (
+                        <KindBadge icon={meta.icon} accent={meta.accent} lit={unread} />
+                    )}
 
                     <View className="flex-1" style={{ paddingTop: 1 }}>
                         <View className="flex-row items-center" style={{ gap: 8 }}>
@@ -222,6 +256,26 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
+    },
+    hubFrame: {
+        width: ICON_SIZE,
+        height: ICON_SIZE,
+        borderRadius: HUB_RADIUS,
+        borderWidth: 1,
+        padding: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    kindDot: {
+        position: 'absolute',
+        right: -4,
+        bottom: -4,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
     },
     badgeQuiet: {
         backgroundColor: 'rgba(255,255,255,0.04)',

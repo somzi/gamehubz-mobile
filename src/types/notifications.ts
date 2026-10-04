@@ -19,6 +19,9 @@ export interface NotificationItem {
     data: Record<string, unknown> | null;
     createdOn: string;
     readOn: string | null;
+    /** Avatar of the hub the notification is about (its hub, or its tournament's hub). Absent from
+     *  an older backend and when the hub has none. */
+    hubAvatarUrl?: string | null;
 }
 
 /** Mirrors backend NotificationPageDto. */

@@ -44,6 +44,27 @@
     "moderatedChats": "Chats I moderate",
     "moderatedChatsHint": "Alert me when players reply in a match chat I joined as an organizer.",
     "saveFailedTitle": "Could not save",
-    "saveFailedMessage": "Your notification setting was not updated. Try again in a moment."
+    "saveFailedMessage": "Your notification setting was not updated. Try again in a moment.",
+    "sourcesTitle": "Choose where notifications come from",
+    "sourcesHint": "Turn off notifications for a hub or tournament. Muting a hub also mutes its tournaments and match alerts. Changes apply to new notifications.",
+    "hubs": "Hubs",
+    "tournaments": "Tournaments",
+    "search": {
+      "hubs": "Search your hubs",
+      "tournaments": "Search tournaments"
+    },
+    "empty": {
+      "hubs": "Hubs you join will appear here.",
+      "tournaments": "No tournaments available for your account yet."
+    },
+    "noResults": "No results for this search.",
+    "receiving": "Notifications on",
+    "muted": "Notifications off",
+    "mutedByHub": "Off — enable notifications for the hub first",
+    "sourceLabel": "Notifications for {{name}}",
+    "loadFailed": "Could not load notification preferences.",
+    "retry": "Try again",
+    "loadMore": "Show more",
+    "sourcesUnavailable": "Hub and tournament notification settings are not available yet. Please try again later."
   }
 }

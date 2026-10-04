@@ -140,4 +140,22 @@ export interface ApprovalsBreakdown {
 export interface NotificationSettings {
     /** Notify me about match chats I only moderate. Never affects the user's own matches. */
     moderatedChatNotifications: boolean;
+    /** Absent on older servers that do not support source muting. */
+    mutedHubIds?: string[];
+    mutedTournamentIds?: string[];
+}
+
+export type NotificationSourceKind = 'hubs' | 'tournaments';
+
+export interface NotificationSource {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+    hubId: string | null;
+    hubName: string | null;
+}
+
+export interface NotificationSourcePage {
+    items: NotificationSource[];
+    nextPage: number | null;
 }
