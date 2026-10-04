@@ -151,6 +151,8 @@ export interface NotificationSource {
     id: string;
     name: string;
     avatarUrl?: string | null;
+    /** A tournament being played right now — the server lists these first. */
+    isLive?: boolean;
     hubId: string | null;
     hubName: string | null;
 }

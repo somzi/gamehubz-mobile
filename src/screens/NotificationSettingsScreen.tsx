@@ -187,7 +187,20 @@ export default function NotificationSettingsScreen() {
                             />
                             <View className="flex-1 mx-3">
                                 <Text className="text-white text-[15px] font-semibold" numberOfLines={2}>{item.name}</Text>
-                                {kind === 'tournaments' && item.hubName && <Text className="text-slate-500 text-xs mt-1" numberOfLines={1}>{item.hubName}</Text>}
+                                {kind === 'tournaments' && (item.isLive || item.hubName) && (
+                                    <View className="flex-row items-center mt-1" style={{ gap: 6 }}>
+                                        {/* Why it sits at the top: it's being played, so it's the one sending alerts now */}
+                                        {item.isLive && (
+                                            <View className="flex-row items-center px-1.5 py-0.5 rounded-md" style={{ gap: 4, backgroundColor: COLORS.live + '1F' }}>
+                                                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.live }} />
+                                                <Text className="text-[10px] font-black uppercase tracking-[0.8px]" style={{ color: '#FB7185' }}>
+                                                    {t('bracket:card.live')}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        {!!item.hubName && <Text className="shrink text-slate-500 text-xs" numberOfLines={1}>{item.hubName}</Text>}
+                                    </View>
+                                )}
                                 <Text className="text-slate-400 text-xs mt-1">{t(inheritedMute ? 'notifications.mutedByHub' : enabled ? 'notifications.receiving' : 'notifications.muted')}</Text>
                             </View>
                             <Toggle size="sm" value={enabled} accessibilityLabel={t('notifications.sourceLabel', { name: item.name })}
