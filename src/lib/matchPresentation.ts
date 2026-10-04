@@ -14,3 +14,13 @@ export function appendMatchTabs<T extends string>(previous: T[], available: T[])
     const added = available.filter(tab => !previous.includes(tab));
     return added.length ? [...previous, ...added] : previous;
 }
+
+/** Verification is actionable only after scheduling; existing proof remains readable as history. */
+export function resultVerificationPresentation(options: {
+    required: boolean; hasRecords: boolean; scheduled: boolean; completed: boolean;
+}) {
+    return {
+        show: options.hasRecords || (options.required && options.scheduled),
+        canStart: options.required && options.scheduled && !options.completed,
+    };
+}

@@ -3,9 +3,9 @@ import { fetchVerificationPanel, VerificationPanel } from '../lib/resultVerifica
 
 /**
  * The verification panel of one match, for the two match sheets (bracket MatchDetailsModal and the
- * Home / My Matches MatchScheduleCard). Only fetched while `enabled` — the tournament setting, which
- * both sheets already learn from the details they load — so a tournament that does not verify costs
- * nothing extra.
+ * Home / My Matches MatchScheduleCard). Only fetched while `enabled`: the match is scheduled and
+ * requires verification, or already carries records to review. Unscheduled matches without records
+ * cost nothing extra, even when the tournament enables verification.
  */
 export function useResultVerification(matchId: string | undefined, enabled: boolean) {
     const [panel, setPanel] = useState<VerificationPanel | null>(null);

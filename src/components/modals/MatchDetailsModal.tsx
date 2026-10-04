@@ -49,7 +49,7 @@ import { cn, parseUtcDate, formatDateTimeShort } from '../../lib/utils';
 import { MatchStage } from '../../types/tournament';
 import type { SeriesScoreDraft } from '../match/SeriesScoreEntry';
 import { ChatWorkspace } from '../../lib/chatWorkspace';
-import { appendMatchTabs, matchPresentation } from '../../lib/matchPresentation';
+import { appendMatchTabs, matchPresentation, resultVerificationPresentation } from '../../lib/matchPresentation';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
 import { SeriesBreakdown } from '../match/SeriesBreakdown';
 import { ResultBoard } from '../match/ResultBoard';
@@ -327,11 +327,16 @@ export function MatchDetailsModal({
     // Image preview state
     const [previewItem, setPreviewItem] = useState<EvidenceItem | null>(null);
 
-    // Result verification: the panel and the flow sheet. Shown while the tournament requires it — and,
-    // once an organizer switches it off, still for matches that carry records, so what they were
-    // verified with does not vanish with the setting. Keyed on `visible` too, so reopening a match reads
-    // a verification made since it was last shown.
-    const showVerification = !!matchDetails?.requireResultVerification || !!matchDetails?.hasResultVerifications;
+    // The tournament setting alone must not offer verification before the pair agrees a time.
+    // Existing records remain readable even after a schedule or the setting is removed.
+    const verificationPresentation = resultVerificationPresentation({
+        required: !!matchDetails?.requireResultVerification,
+        hasRecords: !!matchDetails?.hasResultVerifications,
+        scheduled: currentStatus !== 'pending_availability'
+            && !!(confirmedTimeIso || matchDetails?.scheduledTime || confirmedTime),
+        completed: status === 'completed' || matchDetails?.status === 4 || isNoShow,
+    });
+    const showVerification = verificationPresentation.show;
     const verification = useResultVerification(matchId, visible && showVerification);
     const [showVerifySheet, setShowVerifySheet] = useState(false);
 
@@ -446,8 +451,8 @@ export function MatchDetailsModal({
     // A verification never outlives the modal it was started from: reopening the same match must not
     // bring the sheet straight back up (the per-match reset above only runs when the match changes).
     useEffect(() => {
-        if (!visible) setShowVerifySheet(false);
-    }, [visible]);
+        if (!visible || !verificationPresentation.canStart) setShowVerifySheet(false);
+    }, [visible, verificationPresentation.canStart]);
 
     useEffect(() => {
         if (visible && matchId) {
@@ -1533,6 +1538,7 @@ export function MatchDetailsModal({
                         panel={verification.panel}
                         isLoading={verification.isLoading}
                         currentUserId={user?.id}
+                        allowVerify={verificationPresentation.canStart}
                         onVerify={() => setShowVerifySheet(true)}
                         onOpenEvidence={setPreviewItem}
                         onOpenProfile={navigateToProfile}
@@ -1905,6 +1911,7 @@ export function MatchDetailsModal({
                         panel={verification.panel}
                         isLoading={verification.isLoading}
                         currentUserId={user?.id}
+                        allowVerify={verificationPresentation.canStart}
                         onVerify={() => setShowVerifySheet(true)}
                         onOpenEvidence={setPreviewItem}
                         onOpenProfile={navigateToProfile}
@@ -2575,7 +2582,7 @@ export function MatchDetailsModal({
                 not a Modal of its own, which is what failed on iOS (see VerifyResultSheet). */}
             {!!user?.id && (
                 <VerifyResultSheet
-                    visible={showVerifySheet}
+                    visible={showVerifySheet && verificationPresentation.canStart}
                     onClose={() => setShowVerifySheet(false)}
                     matchId={matchId}
                     userId={user.id}

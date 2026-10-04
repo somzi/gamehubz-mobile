@@ -34,6 +34,7 @@ import { EvidencePreviewModal } from './EvidencePreviewModal';
 import { ResultVerificationCard } from './ResultVerificationCard';
 import { VerifyResultSheet } from './VerifyResultSheet';
 import { useResultVerification } from '../../hooks/useResultVerification';
+import { resultVerificationPresentation } from '../../lib/matchPresentation';
 import { ConfirmationModal } from '../modals/ConfirmationModal';
 import {
     EvidenceItem,
@@ -248,15 +249,23 @@ function MatchScheduleCardBase({
         checkInDeadline: checkIn?.checkInDeadline ?? null,
     });
 
-    // Result verification. The setting arrives with the details the sheet fetches on open; the panel
-    // is only fetched while the sheet is open and the tournament requires it — a list of these cards
-    // costs nothing extra.
+    // Only load verification after scheduling, or to read records already attached to the match.
     const [requireResultVerification, setRequireResultVerification] = useState(false);
     // Records already on the match keep the card up after an organizer switches the setting off.
     const [hasResultVerifications, setHasResultVerifications] = useState(false);
-    const showVerification = requireResultVerification || hasResultVerifications;
+    const verificationPresentation = resultVerificationPresentation({
+        required: requireResultVerification,
+        hasRecords: hasResultVerifications,
+        scheduled: currentStatus !== 'pending_availability' && !!(matchTimeIso || matchTime),
+        completed: currentStatus === 'completed',
+    });
+    const showVerification = verificationPresentation.show;
     const verification = useResultVerification(matchId, modalVisible && showVerification);
     const [showVerifySheet, setShowVerifySheet] = useState(false);
+
+    useEffect(() => {
+        if (!verificationPresentation.canStart) setShowVerifySheet(false);
+    }, [verificationPresentation.canStart]);
 
     // The card outlives a list refetch (same key), so a check-in the opponent made in the
     // meantime has to reach it — the same reason the deadline is synced above.
@@ -1585,6 +1594,7 @@ function MatchScheduleCardBase({
                                                         panel={verification.panel}
                                                         isLoading={verification.isLoading}
                                                         currentUserId={user?.id}
+                                                        allowVerify={verificationPresentation.canStart}
                                                         onVerify={() => setShowVerifySheet(true)}
                                                         onOpenEvidence={setPreviewItem}
                                                         onOpenProfile={userId => openPlayerProfile(userId)}
@@ -2167,7 +2177,7 @@ function MatchScheduleCardBase({
                     never showed on iOS (see VerifyResultSheet). */}
                 {!!user?.id && requireResultVerification && (
                     <VerifyResultSheet
-                        visible={showVerifySheet}
+                        visible={showVerifySheet && verificationPresentation.canStart}
                         onClose={() => setShowVerifySheet(false)}
                         matchId={matchId}
                         userId={user.id}

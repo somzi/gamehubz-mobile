@@ -23,6 +23,8 @@ interface ResultVerificationCardProps {
     panel: VerificationPanel | null;
     isLoading: boolean;
     currentUserId?: string | null;
+    /** The match must be scheduled and open; the server's canVerify still decides permission. */
+    allowVerify: boolean;
     onVerify: () => void;
     onOpenEvidence: (item: EvidenceItem) => void;
     onOpenProfile?: (userId: string) => void;
@@ -359,6 +361,7 @@ export function ResultVerificationCard({
     panel,
     isLoading,
     currentUserId,
+    allowVerify,
     onVerify,
     onOpenEvidence,
     onOpenProfile,
@@ -387,7 +390,7 @@ export function ResultVerificationCard({
 
     const mine = panel.mine;
     const iVerified = isVerified(mine);
-    const needsAction = panel.canVerify && !iVerified;
+    const needsAction = allowVerify && panel.canVerify && !iVerified;
     // The viewer's own record may contain more detail than the row in records.
     const listedRecords = playerRecords
         .filter(r => panel.isManager || !needsAction || !sameId(r.userId, currentUserId))
@@ -428,7 +431,7 @@ export function ResultVerificationCard({
                 <Text numberOfLines={1} className="flex-1 text-[10px] font-black text-white uppercase tracking-[2px]">
                     {t('verification.title')}
                 </Text>
-                {panel.required && !iVerified && (
+                {allowVerify && panel.required && !iVerified && (
                     <View className="px-2 py-[3px] rounded-md border border-warning/30 bg-warning/10">
                         <Text
                             numberOfLines={1}
