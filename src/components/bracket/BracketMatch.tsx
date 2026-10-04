@@ -1,10 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { View, Text, StyleSheet, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { PressableScale } from '../ui/PressableScale';
 import { RaisedCard } from '../ui/RaisedCard';
 import { COLORS } from '../../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -302,16 +300,7 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
             : null;
 
         return (
-            <View style={styles.row}>
-                {won && (
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={['rgba(16,185,129,0.16)', 'rgba(16,185,129,0.03)']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={StyleSheet.absoluteFill}
-                    />
-                )}
+            <View style={[styles.row, won && styles.winnerRow]}>
                 {isTeamTournament ? (
                     <View style={[styles.teamTile, isMe && styles.meEdge]}>
                         <Ionicons name="people" size={15} color={isMe ? CARD_ACCENT.go.text : COLORS.slate400} />
@@ -356,11 +345,10 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
     };
 
     return (
-        <PressableScale
+        <Pressable
             onPress={s.canShowDetails ? onPress : undefined}
             disabled={!s.canShowDetails}
-            pressedScale={0.98}
-            className={className}
+            className={s.canShowDetails ? `${className ?? ''} active:opacity-80` : className}
             accessibilityRole="button"
             accessibilityLabel={[
                 `${home?.username ?? emptyLabel} vs ${away?.username ?? emptyLabel}`,
@@ -413,7 +401,7 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
                 <View style={styles.divider} />
                 {renderSide(away, 'away')}
             </RaisedCard>
-        </PressableScale>
+        </Pressable>
     );
 });
 
@@ -445,6 +433,9 @@ const styles = StyleSheet.create({
         height: 44,
         paddingLeft: 14,
         paddingRight: 14,
+    },
+    winnerRow: {
+        backgroundColor: 'rgba(16,185,129,0.09)',
     },
     divider: {
         height: 1,

@@ -386,12 +386,11 @@ export default function TournamentDetailsScreen() {
     // first structure load per tournament — later refetches (focus, result submit, SignalR) must
     // not yank the user off a stage they picked by hand.
     const autoSelectedStageForId = useRef<string | null>(null);
-    const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
-    // Stage (tournament:stage) whose group tab has already been opened on the viewer's own group —
-    // once per stage, and never after they pick a group themselves.
-    const autoSelectedGroupFor = useRef<string | null>(null);
+    // Null follows the viewer's group as bracket/team data arrives. A manual choice wins until
+    // the next stage switch, so refreshes never move the viewer away from a group they picked.
+    const [selectedGroupIndex, setSelectedGroupIndex] = useState<number | null>(null);
     const groupStripRef = useRef<ScrollView>(null);
-    const groupChipX = useRef<Record<number, number>>({});
+    const groupChipX = useRef<Record<string, number>>({});
     const [loadingBracket, setLoadingBracket] = useState(false);
     const [bracketError, setBracketError] = useState<string | null>(null);
     // Until the first structure response the bracket tab has nothing to say yet, not "no bracket".
@@ -905,10 +904,8 @@ export default function TournamentDetailsScreen() {
             if (autoSelectedStageForId.current !== id && nextStages.length > 0) {
                 autoSelectedStageForId.current = id;
                 const defaultStage = pickDefaultStageIndex(nextStages);
-                if (defaultStage > 0) {
-                    setSelectedStageIndex(defaultStage);
-                    setSelectedGroupIndex(0);
-                }
+                setSelectedStageIndex(defaultStage);
+                setSelectedGroupIndex(null);
             }
 
             // Extract hubOwnerId from bracket response
@@ -1022,7 +1019,7 @@ export default function TournamentDetailsScreen() {
     useEffect(() => {
         if (stages.length > 0 && selectedStageIndex >= stages.length) {
             setSelectedStageIndex(0);
-            setSelectedGroupIndex(0);
+            setSelectedGroupIndex(null);
         }
     }, [stages, selectedStageIndex]);
 
@@ -2485,31 +2482,52 @@ export default function TournamentDetailsScreen() {
         return { currentStage, stageType, isLosersBracket, swissZones, groupZones, swissTotalRounds, stageRounds, thirdPlaceMatch, grandFinalMatch, grandFinalResetMatch, bracketRounds };
     }, [stages, selectedStageIndex, tournament]);
 
-    // Group stages open on the viewer's own group instead of Group A: in an eight-group stage the
-    // player came to see their table, not the first one. Team tournaments wait for the team to load.
-    useEffect(() => {
+    // Badge pushes also render this screen. Count phase progress only when bracket data changes.
+    const stageTiles = useMemo(() => stages.map((stage: any, idx: number) => {
+        let total = 0;
+        let done = 0;
+        for (const match of stageMatches(stage)) {
+            const decided = isMatchDecided(match);
+            const home = match.home ?? match.Home;
+            const away = match.away ?? match.Away;
+            // A settled bye was never a game, so it doesn't contribute to phase progress.
+            if (decided && !home !== !away) continue;
+            total++;
+            if (decided) done++;
+        }
+        return { stage, idx, type: Number(stage?.type ?? stage?.Type), total, done };
+    }), [stages]);
+
+    // Resolve the default in the same render as the stage change, rather than mounting Group A
+    // and replacing it in an effect. Late bracket/team data uses this same path without a tap.
+    const groupSelection = useMemo(() => {
         const stage = stages[selectedStageIndex];
-        if (!stage) return;
-        const key = `${id}:${stage.stageId ?? stage.StageId ?? selectedStageIndex}`;
-        if (autoSelectedGroupFor.current === key) return;
-
         const groups = sortGroupsForTabs(stage);
-        if (groups.length === 0) {
-            autoSelectedGroupFor.current = key;
-            return;
-        }
-        const index = findViewerGroupIndex(groups, user?.id, userTeam);
-        if (index < 0 && tournament?.isTeamTournament && !userTeam) return;
+        const viewerGroupIndex = findViewerGroupIndex(groups, user?.id, userTeam);
+        return {
+            key: `${id}:${stage?.stageId ?? stage?.StageId ?? selectedStageIndex}`,
+            groups,
+            viewerGroupIndex,
+            activeGroupIndex: selectedGroupIndex !== null && groups[selectedGroupIndex]
+                ? selectedGroupIndex
+                : Math.max(0, viewerGroupIndex),
+        };
+    }, [stages, selectedStageIndex, selectedGroupIndex, id, user?.id, userTeam]);
 
-        autoSelectedGroupFor.current = key;
-        if (index > 0) {
-            setSelectedGroupIndex(index);
-            // Strip already on screen: its chips won't lay out again, so scroll it here. Not on
-            // screen yet: the chip scrolls itself into view when it mounts.
-            const x = groupChipX.current[index];
-            if (x != null) requestAnimationFrame(() => groupStripRef.current?.scrollTo({ x: Math.max(0, x - 16), animated: true }));
-        }
-    }, [stages, selectedStageIndex, id, user?.id, userTeam, tournament?.isTeamTournament]);
+    const handleStagePress = (stageIndex: number) => {
+        if (stageIndex === selectedStageIndex) return;
+        setSelectedStageIndex(stageIndex);
+        setSelectedGroupIndex(null);
+    };
+
+    // Chips already laid out won't fire onLayout when late team data changes the selection.
+    // This only scrolls the strip; it never triggers another render of the group contents.
+    useEffect(() => {
+        const x = groupChipX.current[`${groupSelection.key}:${groupSelection.activeGroupIndex}`];
+        if (x == null) return;
+        const frame = requestAnimationFrame(() => groupStripRef.current?.scrollTo({ x: Math.max(0, x - 16), animated: false }));
+        return () => cancelAnimationFrame(frame);
+    }, [groupSelection.key, groupSelection.activeGroupIndex]);
 
     const renderStages = () => {
         // Not fetched yet, or the fetch failed: neither means there is no bracket, and the empty
@@ -2585,32 +2603,14 @@ export default function TournamentDetailsScreen() {
             <View key={currentStage.stageId || selectedStageIndex} className="mb-8">
                 {stages.length > 1 && (() => {
                     // Each phase as a tile: what it is, and how far through its matches it is.
-                    const tiles = stages.map((stage: any, idx: number) => {
-                        const counted = stageMatches(stage).filter((m: any) => {
-                            const home = m.home ?? m.Home;
-                            const away = m.away ?? m.Away;
-                            // A bye is settled at the draw and was never a game.
-                            return !(isMatchDecided(m) && !home !== !away);
-                        });
-                        return {
-                            stage,
-                            idx,
-                            type: Number(stage?.type ?? stage?.Type),
-                            total: counted.length,
-                            done: counted.filter(isMatchDecided).length,
-                        };
-                    });
-                    const renderTile = (tile: (typeof tiles)[number], stretch: boolean) => {
+                    const renderTile = (tile: (typeof stageTiles)[number], stretch: boolean) => {
                         const active = selectedStageIndex === tile.idx;
                         const waiting = tile.total === 0;
                         const finished = !waiting && tile.done === tile.total;
                         return (
                             <Pressable
                                 key={tile.stage.stageId || tile.idx}
-                                onPress={() => {
-                                    setSelectedStageIndex(tile.idx);
-                                    setSelectedGroupIndex(0); // Reset group on stage change
-                                }}
+                                onPress={() => handleStagePress(tile.idx)}
                                 accessibilityRole="tab"
                                 accessibilityState={{ selected: active }}
                                 className={cn(
@@ -2663,7 +2663,7 @@ export default function TournamentDetailsScreen() {
                     };
                     return stages.length <= 2 ? (
                         <View className="flex-row px-4 mb-5" style={{ gap: 10 }}>
-                            {tiles.map((tile) => renderTile(tile, true))}
+                            {stageTiles.map((tile) => renderTile(tile, true))}
                         </View>
                     ) : (
                         <ScrollView
@@ -2672,7 +2672,7 @@ export default function TournamentDetailsScreen() {
                             className="mb-5"
                             contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}
                         >
-                            {tiles.map((tile) => renderTile(tile, false))}
+                            {stageTiles.map((tile) => renderTile(tile, false))}
                         </ScrollView>
                     );
                 })()}
@@ -2763,8 +2763,7 @@ export default function TournamentDetailsScreen() {
                             <View className="px-4 mb-4 flex-row">{adminPills}</View>
                         )}
                         {(() => {
-                            const sortedGroups = sortGroupsForTabs(currentStage);
-                            const viewerGroupIndex = findViewerGroupIndex(sortedGroups, user?.id, userTeam);
+                            const { groups: sortedGroups, viewerGroupIndex, activeGroupIndex, key: groupKey } = groupSelection;
                             return (
                                 <>
                                     <ScrollView
@@ -2775,18 +2774,15 @@ export default function TournamentDetailsScreen() {
                                         contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
                                     >
                                         {sortedGroups.map((group: any, idx: number) => {
-                                            const active = selectedGroupIndex === idx;
+                                            const active = activeGroupIndex === idx;
                                             return (
                                                 <Pressable
                                                     key={group.groupId || idx}
-                                                    onPress={() => {
-                                                        autoSelectedGroupFor.current = `${id}:${currentStage.stageId ?? currentStage.StageId ?? selectedStageIndex}`;
-                                                        setSelectedGroupIndex(idx);
-                                                    }}
+                                                    onPress={() => setSelectedGroupIndex(idx)}
                                                     // The viewer's group can sit far down the strip — bring it into view
                                                     // when the tab opens on it.
                                                     onLayout={(e) => {
-                                                        groupChipX.current[idx] = e.nativeEvent.layout.x;
+                                                        groupChipX.current[`${groupKey}:${idx}`] = e.nativeEvent.layout.x;
                                                         if (active) groupStripRef.current?.scrollTo({ x: Math.max(0, e.nativeEvent.layout.x - 16), animated: false });
                                                     }}
                                                     accessibilityRole="tab"
@@ -2813,9 +2809,9 @@ export default function TournamentDetailsScreen() {
                                         })}
                                     </ScrollView>
 
-                                    {sortedGroups[selectedGroupIndex] && (
+                                    {sortedGroups[activeGroupIndex] && (
                                         <TournamentGroups
-                                            groups={[sortedGroups[selectedGroupIndex]]}
+                                            groups={[sortedGroups[activeGroupIndex]]}
                                             onMatchPress={tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress}
                                             currentUserId={user?.id}
                                             currentUsername={user?.username}
