@@ -29,7 +29,7 @@ import { COLORS } from '../lib/theme';
 import { parseUtcDate } from '../lib/utils';
 import { dateLocale } from '../i18n';
 import { RootStackParamList } from '../types/navigation';
-import type { NotificationFilter, NotificationItem, NotificationPage } from '../types/notifications';
+import { NotificationCategory, type NotificationFilter, type NotificationItem, type NotificationPage } from '../types/notifications';
 
 type NotificationsNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -70,12 +70,14 @@ function dayTitle(date: Date, todayLabel: string, yesterdayLabel: string): strin
     if (localDayKey(date) === localDayKey(now)) return todayLabel;
     if (localDayKey(date) === localDayKey(yesterday)) return yesterdayLabel;
 
-    return date.toLocaleDateString(dateLocale(), {
+    const label = date.toLocaleDateString(dateLocale(), {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
         ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}),
     });
+    // Sentence case like "Today" — several locales spell the weekday in lower case ("subota, 4. oktobar").
+    return label.charAt(0).toLocaleUpperCase() + label.slice(1);
 }
 
 function groupByDay(items: NotificationItem[], todayLabel: string, yesterdayLabel: string): DaySection[] {
@@ -248,25 +250,31 @@ export default function NotificationsScreen() {
     const renderItem = useCallback<SectionListRenderItem<NotificationItem, DaySection>>(
         ({ item }) => (
             <View className="px-4">
-                <NotificationRow item={item} onPress={handlePress} opening={openingId === item.id} />
+                <NotificationRow
+                    item={item}
+                    onPress={handlePress}
+                    opening={openingId === item.id}
+                    // Among updates (All), an unread action says it's waiting on the user; on its own
+                    // tab the tab already says so.
+                    needsYou={filter === 'all' && item.category === NotificationCategory.Action && !item.readOn}
+                />
             </View>
         ),
-        [handlePress, openingId],
+        [handlePress, openingId, filter],
     );
 
     const renderSectionHeader = useCallback(
         ({ section }: { section: SectionListData<NotificationItem, DaySection> }) => (
+            // The day, then a hairline to the edge — opaque, since it sticks over the cards scrolling under it.
             <View
-                className="bg-background px-5 pt-5 pb-2 flex-row items-center"
-                style={{ gap: 8 }}
+                className="bg-background px-5 pt-5 pb-2.5 flex-row items-center"
+                style={{ gap: 10 }}
                 accessibilityRole="header"
             >
-                <Text className="text-slate-400 text-[11px] font-black uppercase tracking-[1.6px]">
+                <Text className="text-slate-200 text-[13px] font-bold" numberOfLines={1}>
                     {section.title}
                 </Text>
-                <Text className="text-slate-600 text-[11px] font-bold" style={{ fontVariant: ['tabular-nums'] }}>
-                    {section.data.length}
-                </Text>
+                <View className="flex-1 h-px bg-white/[0.07]" />
             </View>
         ),
         [],
