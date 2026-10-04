@@ -148,24 +148,30 @@ export const MatchHistoryCard = React.memo(function MatchHistoryCard({
                         <Side name={opponentName} avatarUrl={opponentAvatarUrl} lost={result === 'win'} />
                     </View>
 
-                    {/* ─── Where: the tournament, then its hub ─── */}
-                    <View className="flex-row items-center mt-3.5 pt-3 border-t border-white/[0.06]" style={{ gap: 14 }}>
-                        <View className="flex-1 flex-row items-center min-w-0" style={{ gap: 6 }}>
+                    {/* ─── Where: the tournament, then its hub ───
+                        Same rule as the Home match card: neither name has a fixed share of the row.
+                        When both don't fit, each gives way in proportion to its length and its text
+                        shrinks to fit before it is cut. */}
+                    <View className="flex-row items-center justify-between mt-3.5 pt-3 border-t border-white/[0.06]" style={{ gap: 12 }}>
+                        <View className="shrink flex-row items-center" style={{ gap: 6 }}>
                             <Ionicons name="trophy" size={12} color={COLORS.slate500} />
-                            <Text className="shrink text-[12.5px] font-bold text-slate-200" numberOfLines={1}>
+                            <Text
+                                className="shrink text-[12.5px] font-bold text-slate-200"
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.7}
+                            >
                                 {tournamentName}
                             </Text>
                         </View>
                         {!!hubName && (
-                            // The hub's name gets its full width first; the tournament gives way, and a
-                            // name too long even then shrinks a little before it is cut.
-                            <View className="flex-row items-center" style={{ gap: 5, maxWidth: '65%', flexShrink: 0 }}>
+                            <View className="shrink flex-row items-center" style={{ gap: 5 }}>
                                 <Ionicons name="planet" size={12} color={COLORS.slate500} />
                                 <Text
                                     className="shrink text-[12px] font-semibold text-slate-400"
                                     numberOfLines={1}
                                     adjustsFontSizeToFit
-                                    minimumFontScale={0.8}
+                                    minimumFontScale={0.7}
                                 >
                                     {hubName}
                                 </Text>
