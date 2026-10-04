@@ -1076,7 +1076,6 @@ function MatchScheduleCardBase({
     const kickOffDate = kickOff && hasKickOff ? formatKickOffDate(kickOff) : null;
     const deadlineDate = localDeadline && localDeadline !== 'TBD' ? parseUtcDate(localDeadline) : null;
     const hasDeadline = !!deadlineDate && !isNaN(deadlineDate.getTime());
-    const opponentGameName = !isSetAvailability && hasNickname(opponentNickname) ? opponentNickname!.trim() : null;
 
     return (
         <>
@@ -1192,14 +1191,6 @@ function MatchScheduleCardBase({
                                     <Text className="text-[12px] font-semibold text-slate-400 mt-1" numberOfLines={1}>
                                         {matchTime}
                                     </Text>
-                                ) : opponentGameName ? (
-                                    // The name to look for in the game, drawn like the profile header's gamepad line.
-                                    <View className="flex-row items-center mt-1" style={{ gap: 5 }}>
-                                        <Ionicons name="game-controller" size={13} color={tone.accent} />
-                                        <Text className="shrink text-[12px] font-semibold text-slate-400" numberOfLines={1}>
-                                            {opponentGameName}
-                                        </Text>
-                                    </View>
                                 ) : null}
                             </View>
 
