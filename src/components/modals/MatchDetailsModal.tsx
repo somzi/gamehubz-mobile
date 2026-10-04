@@ -1380,9 +1380,9 @@ export function MatchDetailsModal({
     //  - spectators tapping a bracket match keep the read-only match view
     const isTournamentCompleted = Number(tournamentStatus) === 4;
     const showChatTab = !isTournamentCompleted && (isParticipant || isPrivileged);
-    // Matchup form only makes sense once both sides are known. It stays available to spectators
-    // too — for a participant the left side is always "you"; everyone else sees home vs away.
-    const showInsightsTab = !!effectiveHome?.userId && !!effectiveAway?.userId
+    // Matchup form is for the two players only — spectators and organizers don't get the tab.
+    // It also needs both sides known; the left side is always "you".
+    const showInsightsTab = isParticipant && !!effectiveHome?.userId && !!effectiveAway?.userId
         && effectiveHome.userId.toLowerCase() !== effectiveAway.userId.toLowerCase();
     // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
