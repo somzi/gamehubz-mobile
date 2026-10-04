@@ -43,12 +43,17 @@ export function EvidenceSection({
 }: EvidenceSectionProps) {
     const { t } = useTranslation('match');
     const isEmptySlot = !!onAdd && uploadedCount === 0 && pendingCount === 0;
+    // Nothing attached and nothing this viewer can add (a settled match, a spectator): the row only
+    // says so — there is nothing to open.
+    const isEmptyReadOnly = !onAdd && uploadedCount === 0 && pendingCount === 0;
     // Collapsed-state recap: what's here, or — when there's nothing — what to add.
     const summary = pendingCount > 0
         ? t('evidence.readyToUpload', { count: pendingCount })
         : uploadedCount > 0
             ? t('evidence.attached', { count: uploadedCount })
-            : t('evidence.addScreenshots');
+            : isEmptyReadOnly
+                ? t('details.noEvidenceAttached')
+                : t('evidence.addScreenshots');
 
     const onRowPress = () => {
         if (isEmptySlot) {
@@ -70,12 +75,20 @@ export function EvidenceSection({
         >
             <Pressable
                 onPress={onRowPress}
-                accessibilityRole="button"
+                disabled={isEmptyReadOnly}
+                accessibilityRole={isEmptyReadOnly ? undefined : 'button'}
                 accessibilityLabel={`${t('evidence.evidence')}. ${summary}`}
                 className="flex-row items-center gap-3 p-3.5 active:opacity-70"
             >
-                <View className="w-9 h-9 rounded-xl bg-primary/10 items-center justify-center border border-primary/20">
-                    <Ionicons name={isEmptySlot ? 'add' : 'images-outline'} size={isEmptySlot ? 20 : 16} color={COLORS.primaryBright} />
+                <View className={cn(
+                    'w-9 h-9 rounded-xl items-center justify-center border',
+                    isEmptyReadOnly ? 'bg-white/[0.04] border-white/[0.08]' : 'bg-primary/10 border-primary/20',
+                )}>
+                    <Ionicons
+                        name={isEmptySlot ? 'add' : 'images-outline'}
+                        size={isEmptySlot ? 20 : 16}
+                        color={isEmptyReadOnly ? COLORS.slate500 : COLORS.primaryBright}
+                    />
                 </View>
                 <View className="flex-1">
                     <View className="flex-row items-center gap-2">
@@ -99,10 +112,10 @@ export function EvidenceSection({
                     </Text>
                 </View>
 
-                {!isEmptySlot && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={COLORS.slate600} />}
+                {!isEmptySlot && !isEmptyReadOnly && <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={15} color={COLORS.slate600} />}
             </Pressable>
 
-            {open && (
+            {open && !isEmptyReadOnly && (
                 <Animated.View entering={FadeIn.duration(150)} className="px-3.5 pb-3.5">
                     {children}
                 </Animated.View>

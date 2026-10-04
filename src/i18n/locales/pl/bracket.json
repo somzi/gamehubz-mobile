@@ -88,6 +88,8 @@
     "pts": "Pkt",
     "you": "Ty",
     "matches": "Mecze",
+    "roundOf": "Runda {{n}} z {{total}}",
+    "champion": "Mistrz",
     "editSchedule": "Edytuj termin",
     "lbFinal": "Finał LB",
     "lbSemifinal": "Półfinał LB",

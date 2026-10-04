@@ -78,6 +78,8 @@
     "pts": "Pts",
     "you": "Tú",
     "matches": "Partidos",
+    "roundOf": "Ronda {{n}} de {{total}}",
+    "champion": "Campeón",
     "editSchedule": "Editar programación",
     "lbFinal": "Final perdedores",
     "lbSemifinal": "Semis perdedores",

@@ -1,13 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import i18n, { dateLocale } from '../../i18n';
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
-import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
+import { teamProgressFrom, checkInFrom } from './BracketMatch';
+import { GroupFixtureCard } from './GroupFixtureCard';
 import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
+import { Panel } from '../ui/Panel';
 import { cn, parseUtcDate } from '../../lib/utils';
+import { COLORS } from '../../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { isTerminalMatchStatus } from '../../types/matchStatus';
 
@@ -84,17 +87,24 @@ interface TournamentGroupsProps {
     isTeamTournament?: boolean;
 }
 
+type Zone = 'direct' | 'playIn' | null;
+
+const ZONE_COLOR = { direct: '#10B981', playIn: '#F59E0B' } as const;
+const EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+
+// Column widths sized so the whole table fits a phone without sideways scrolling; the name takes
+// whatever is left.
+const COL = { pos: 22, stat: 22, goals: 44, diff: 30, opp: 30, pts: 30 } as const;
+
+/** A fixture both sides have been drawn into — byes and empty slots aren't games to count. */
+const isRealFixture = (m: Match) => !!m.home && !!m.away;
+
 export function TournamentGroups({ groups, onMatchPress, currentUserId, currentUsername, isAdmin, onEditDeadline, tournamentStatus, qualificationZones, totalRounds, isTeamTournament }: TournamentGroupsProps) {
     const { t } = useTranslation('bracket');
     const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
     const [selectedRounds, setSelectedRounds] = useState<Record<string, number>>({});
-
-    const handlePlayerPress = (participant: any) => {
-        const userId = participant.id || participant.userId || participant.UserId;
-        if (userId) {
-            navigation.navigate('PlayerProfile', { id: userId });
-        }
-    };
 
     const getUsername = (userId: string, matches: Match[]) => {
         for (const match of matches) {
@@ -104,12 +114,21 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
         return i18n.t('common:unknown');
     };
 
-    const handleTabPress = (groupId: string, roundNum: number, isLocked: boolean) => {
-        setSelectedRounds(prev => ({ ...prev, [groupId]: roundNum }));
+    const zoneOf = (position: number): Zone => {
+        if (qualificationZones) {
+            if (position <= qualificationZones.direct) return 'direct';
+            if (position <= qualificationZones.playInEnd) return 'playIn';
+            return null;
+        }
+        return position <= 2 ? 'direct' : null;
     };
 
+    const isMeRow = (standing: Standing) =>
+        (!!currentUserId && !!standing.userId && standing.userId.toLowerCase() === currentUserId.toLowerCase())
+        || (!!currentUsername && !!standing.username && standing.username.toLowerCase() === currentUsername.toLowerCase());
+
     return (
-        <View className="flex-col gap-8 p-4">
+        <View className="px-4 gap-8">
             {groups.map((group) => {
                 const groupedMatches = group.matches.reduce((acc, match) => {
                     const roundNum = match.round !== undefined && match.round !== 0 ? match.round : (match.order !== undefined && match.order !== 0 ? match.order : 1);
@@ -119,229 +138,276 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                 }, {} as Record<number, Match[]>);
 
                 const rounds = Object.keys(groupedMatches).map(Number).sort((a, b) => a - b);
-                const activeRound = selectedRounds[group.groupId] || (rounds.length > 0 ? rounds[0] : 1);
+                const isRoundDone = (roundNum: number) =>
+                    groupedMatches[roundNum].filter(isRealFixture).every((m) => isTerminalMatchStatus(m.status));
+                // Open on the round being played — the first with a game still owed — rather than
+                // round 1, which a few weeks in is history. Once everything is played, the last.
+                const currentRound = rounds.find((r) => !isRoundDone(r)) ?? rounds[rounds.length - 1] ?? 1;
+                const activeRound = selectedRounds[group.groupId] ?? currentRound;
                 const currentRoundMatches = groupedMatches[activeRound] || [];
                 const roundFormat = roundSeriesFormat(currentRoundMatches);
+                const activeRoundDone = currentRoundMatches.length > 0 && isRoundDone(activeRound);
+
+                const fixtures = group.matches.filter(isRealFixture);
+                const fixturesPlayed = fixtures.filter((m) => isTerminalMatchStatus(m.status)).length;
 
                 // Buchholz column visible when at least one row carries it — i.e. on Swiss groups.
-                // Sits between Pts and W/D/L since it ranks tied players right after Pts.
+                // Sits right before Pts since it ranks tied players right after them.
                 const showBuchholz = group.standings.some(s => s.opponentPointsSum != null);
 
-                return (
-                    <View key={group.groupId} className="flex-col gap-6">
-                        <View>
-                            <View className="flex-row items-center gap-2.5 mb-4">
-                                <View
-                                    className="w-9 h-9 rounded-2xl items-center justify-center"
-                                    style={{ backgroundColor: 'rgba(99,102,241,0.12)', borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)' }}
-                                >
-                                    <Ionicons name="grid" size={16} color="#818CF8" />
-                                </View>
-                                <Text className="text-lg font-black text-white flex-1" numberOfLines={1}>{group.name}</Text>
-                            </View>
+                const deadline = currentRoundMatches[0]?.roundDeadline ? parseUtcDate(currentRoundMatches[0].roundDeadline!) : null;
+                const hasDeadline = !!deadline && !isNaN(deadline.getTime());
+                const msLeft = hasDeadline ? deadline!.getTime() - Date.now() : 0;
+                const deadlineColor = activeRoundDone
+                    ? COLORS.slate500
+                    : msLeft < 0 ? '#F87171' : msLeft < DAY_MS ? '#FBBF24' : COLORS.slate300;
+                const canEditSchedule = !!isAdmin && tournamentStatus !== 4 && currentRoundMatches.length > 0 && !activeRoundDone;
 
-                            <View
-                                className="rounded-[22px] border border-white/[0.06] overflow-hidden"
-                                style={{ backgroundColor: '#131B2E', shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 4 }}
+                const renderRoundTab = (roundNum: number, stretch: boolean) => {
+                    const rMatches = groupedMatches[roundNum];
+                    const isLocked = rMatches.length > 0 && !!rMatches[0].isRoundLocked;
+                    const isActive = activeRound === roundNum;
+                    const done = isRoundDone(roundNum);
+
+                    return (
+                        <Pressable
+                            key={`tab-${roundNum}`}
+                            onPress={() => setSelectedRounds(prev => ({ ...prev, [group.groupId]: roundNum }))}
+                            accessibilityRole="tab"
+                            accessibilityState={{ selected: isActive }}
+                            className={cn(
+                                'h-9 flex-row items-center justify-center gap-1.5 rounded-xl border',
+                                stretch ? 'flex-1 px-1' : 'px-4',
+                                isActive ? 'bg-[#1E293B] border-white/10' : 'border-transparent active:bg-white/[0.04]',
+                            )}
+                        >
+                            <Text
+                                className={cn('text-[12.5px] font-bold', isActive ? 'text-white' : 'text-slate-500')}
+                                numberOfLines={1}
                             >
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    <View className="min-w-full">
-                                        <View className="flex-row bg-white/[0.03] py-3 px-4 border-b border-white/[0.04]">
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">#</Text>
-                                            <Text numberOfLines={1} className="w-32 text-[10px] font-black text-slate-500 ml-2 uppercase tracking-wider">{t('card.player')}</Text>
-                                            <Text numberOfLines={1} className="w-12 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('card.pts')}</Text>
-                                            {showBuchholz && (
-                                                <Text numberOfLines={1} className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('common:app.opp')}</Text>
-                                            )}
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.played')}</Text>
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.won')}</Text>
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.drawn')}</Text>
-                                            <Text className="w-8 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.lost')}</Text>
-                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.goalsFor')}</Text>
-                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.goalsAgainst')}</Text>
-                                            <Text className="w-10 text-[10px] font-black text-slate-500 text-center uppercase tracking-wider">{t('table.goalDiff')}</Text>
-                                        </View>
-                                        {group.standings.map((standing, index) => {
-                                            const isMe = (!!currentUserId && !!standing.userId && standing.userId.toLowerCase() === currentUserId.toLowerCase())
-                                                || (!!currentUsername && !!standing.username && standing.username.toLowerCase() === currentUsername.toLowerCase());
-                                            const isDirect = qualificationZones
-                                                ? standing.position <= qualificationZones.direct
-                                                : standing.position <= 2;
-                                            const isPlayIn = !!qualificationZones
-                                                && !isDirect
-                                                && standing.position <= qualificationZones.playInEnd;
-                                            const zoneColor = isDirect ? '#10B981' : isPlayIn ? '#F59E0B' : null;
-                                            // Team rows carry no real user (UserId = empty GUID) — disable the tap so we
-                                            // don't navigate to a non-existent player profile (the backend 500s on it).
-                                            const canOpenProfile = !!standing.userId && standing.userId !== '00000000-0000-0000-0000-000000000000';
-                                            return (
-                                                <Pressable
-                                                    key={standing.participantId}
-                                                    onPress={canOpenProfile ? () => handlePlayerPress(standing) : undefined}
-                                                    disabled={!canOpenProfile}
-                                                    className={cn(
-                                                        "flex-row py-3 px-4 border-b border-white/[0.03] items-center",
-                                                        index === group.standings.length - 1 && "border-b-0"
-                                                    )}
-                                                    style={({ pressed }: { pressed: boolean }) => ({
-                                                        backgroundColor: pressed
-                                                            ? 'rgba(255,255,255,0.05)'
-                                                            : isMe
-                                                                ? 'rgba(16,185,129,0.08)'
-                                                                : 'transparent',
-                                                    })}
-                                                >
-                                                    {zoneColor && (
-                                                        <View
-                                                            style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderTopRightRadius: 3, borderBottomRightRadius: 3, backgroundColor: zoneColor }}
-                                                        />
-                                                    )}
-                                                    <View className="w-8 items-center justify-center">
-                                                        <View className={cn(
-                                                            "w-5 h-5 rounded-md items-center justify-center",
-                                                            isDirect ? "bg-emerald-500/15" : isPlayIn ? "bg-amber-500/15" : "bg-white/[0.04]"
-                                                        )}>
-                                                            <Text className={cn(
-                                                                "text-[10px] font-black",
-                                                                isDirect ? "text-emerald-400" : isPlayIn ? "text-amber-400" : "text-slate-500"
-                                                            )}>{standing.position}</Text>
-                                                        </View>
-                                                    </View>
-                                                    <View className="w-32 ml-2 flex-row items-center gap-1.5">
-                                                        <Text className={cn("text-xs font-bold flex-1", isMe ? "text-emerald-300" : "text-slate-200")} numberOfLines={1}>
-                                                            {standing.name || standing.username || getUsername(standing.userId, group.matches)}
-                                                        </Text>
-                                                        {isMe && (
-                                                            <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
-                                                                <Text numberOfLines={1} className="text-[8px] font-black uppercase tracking-wider text-emerald-300">{t('card.you')}</Text>
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                    <Text className="w-12 text-xs text-center font-black text-indigo-400">{standing.points}</Text>
-                                                    {showBuchholz && (
-                                                        <Text className="w-10 text-xs text-center font-semibold text-slate-400">{standing.opponentPointsSum ?? 0}</Text>
-                                                    )}
-                                                    <Text className="w-8 text-xs text-center text-slate-500">{standing.matchesPlayed}</Text>
-                                                    <Text className="w-8 text-xs text-center text-slate-400">{standing.wins}</Text>
-                                                    <Text className="w-8 text-xs text-center text-slate-500">{standing.draws}</Text>
-                                                    <Text className="w-8 text-xs text-center text-slate-500">{standing.losses}</Text>
-                                                    <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsFor}</Text>
-                                                    <Text className="w-10 text-xs text-center text-slate-500">{standing.goalsAgainst}</Text>
-                                                    <Text className={cn(
-                                                        "w-10 text-xs text-center font-bold",
-                                                        standing.goalDifference > 0 ? "text-emerald-400" : standing.goalDifference < 0 ? "text-red-400" : "text-slate-500"
-                                                    )}>{standing.goalDifference > 0 ? `+${standing.goalDifference}` : standing.goalDifference}</Text>
-                                                </Pressable>
-                                            );
-                                        })}
-                                    </View>
-                                </ScrollView>
-                            </View>
-                        </View>
+                                {t('tournament:details.roundNumber', { number: roundNum })}
+                            </Text>
+                            {done ? (
+                                <Ionicons name="checkmark-circle" size={12} color={isActive ? '#34D399' : 'rgba(52,211,153,0.6)'} />
+                            ) : isLocked ? (
+                                <Ionicons name="lock-closed" size={11} color={COLORS.slate500} />
+                            ) : null}
+                        </Pressable>
+                    );
+                };
 
-                        <View>
-                            <View className="flex-row items-center justify-between mb-4">
-                                <Text numberOfLines={1} className="text-xs font-black text-slate-500 uppercase tracking-widest">{t('card.matches')}</Text>
-                                {totalRounds != null && totalRounds > 0 && (
-                                    <Text className="text-[11px] font-bold text-slate-500">
-                                        Round {activeRound} of {totalRounds}
+                return (
+                    <View key={group.groupId} className="gap-8">
+                        {/* ─── Standings ─── */}
+                        <Panel>
+                            <View className="flex-row items-center px-4 pt-3.5 pb-3" style={{ gap: 12 }}>
+                                <Text className="flex-1 text-[16px] font-black text-white" numberOfLines={1}>
+                                    {group.name}
+                                </Text>
+                                {fixtures.length > 0 && (
+                                    <Text style={TABULAR} className="text-[12px] font-semibold text-slate-400" numberOfLines={1}>
+                                        {t('tournament:progress.fixturesPlayed', { done: fixturesPlayed, total: fixtures.length })}
                                     </Text>
                                 )}
                             </View>
 
-                            {/* Horizontal Round Tabs */}
-                            {rounds.length > 0 && (
-                                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ gap: 6 }}>
-                                    {rounds.map(roundNum => {
-                                        const rMatches = groupedMatches[roundNum];
-                                        const isLocked = rMatches.length > 0 && !!rMatches[0].isRoundLocked;
-                                        const isActive = activeRound === roundNum;
+                            <View className="flex-row items-center px-3.5 py-2 bg-white/[0.025] border-y border-white/[0.05]">
+                                <Text style={{ width: COL.pos }} className="text-[10px] font-black text-slate-500 text-center">#</Text>
+                                <Text numberOfLines={1} className="flex-1 ml-2.5 text-[10px] font-black text-slate-500 uppercase tracking-[0.8px]">
+                                    {t('card.player')}
+                                </Text>
+                                {[t('table.played'), t('table.won'), t('table.drawn'), t('table.lost')].map((label) => (
+                                    <Text key={label} style={{ width: COL.stat }} numberOfLines={1} className="text-[10px] font-black text-slate-500 text-center uppercase">
+                                        {label}
+                                    </Text>
+                                ))}
+                                <Text style={{ width: COL.goals }} numberOfLines={1} className="text-[10px] font-black text-slate-500 text-center uppercase">
+                                    {t('table.goalsFor')}:{t('table.goalsAgainst')}
+                                </Text>
+                                <Text style={{ width: COL.diff }} numberOfLines={1} className="text-[10px] font-black text-slate-500 text-center uppercase">
+                                    {t('table.goalDiff')}
+                                </Text>
+                                {showBuchholz && (
+                                    <Text style={{ width: COL.opp }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} className="text-[10px] font-black text-slate-500 text-center uppercase">
+                                        {t('common:app.opp')}
+                                    </Text>
+                                )}
+                                <Text style={{ width: COL.pts }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} className="text-[10px] font-black text-white text-center uppercase">
+                                    {t('card.pts')}
+                                </Text>
+                            </View>
 
-                                        return (
-                                            <Pressable
-                                                key={`tab-${roundNum}`}
-                                                onPress={() => handleTabPress(group.groupId, roundNum, isLocked)}
-                                                className={cn(
-                                                    "flex-row items-center gap-1.5 px-4 py-2 rounded-xl border",
-                                                    isActive
-                                                        ? "bg-indigo-500/10 border-indigo-500/20"
-                                                        : "bg-transparent border-white/[0.04]"
-                                                )}
-                                            >
-                                                <Text className={cn(
-                                                    "text-xs font-bold",
-                                                    isActive ? "text-white" : "text-slate-600"
-                                                )}>
-                                                    Round {roundNum}
-                                                </Text>
-                                                {isLocked && (
-                                                    <Ionicons name="lock-closed" size={11} color={isActive ? "#818CF8" : "#475569"} />
-                                                )}
-                                            </Pressable>
-                                        );
-                                    })}
-                                </ScrollView>
-                            )}
+                            {group.standings.map((standing, index) => {
+                                const isMe = isMeRow(standing);
+                                const zone = zoneOf(standing.position);
+                                const next = group.standings[index + 1];
+                                // A line in the zone's colour under its last row marks the cut, the way
+                                // league tables do; elsewhere rows part on a hairline.
+                                const cutBelow = !!next && zone !== null && zoneOf(next.position) !== zone;
+                                // Team rows carry no real user (UserId = empty GUID) — disable the tap so we
+                                // don't navigate to a non-existent player profile (the backend 500s on it).
+                                const canOpenProfile = !!standing.userId && standing.userId !== EMPTY_GUID;
+                                const diff = standing.goalDifference;
 
-                            {/* Active Round Content */}
-                            {currentRoundMatches.length > 0 && (
-                                <View className="mb-4">
-                                    {/* Best-of caption for the round — one line above the cards instead of a strip on
-                                        each of them, matching the bracket columns. */}
-                                    {roundFormat && (
-                                        <SeriesFormatChip
-                                            format={roundFormat}
-                                            isTeamTournament={isTeamTournament}
-                                            style={{ paddingHorizontal: 4, marginBottom: 12 }}
-                                        />
-                                    )}
-                                    {/* Deadline + Edit Schedule row (only if deadline exists or admin) */}
-                                    {(currentRoundMatches[0]?.roundDeadline || (isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => isTerminalMatchStatus(m.status))))) && (
-                                        <View className="flex-row items-center justify-between px-1 mb-4">
-                                            {currentRoundMatches[0]?.roundDeadline ? (
-                                                <View className="flex-row items-center gap-1.5">
-                                                    <Ionicons name="time-outline" size={11} color="#EF4444" />
-                                                    <Text className="text-[10px] text-red-400 font-semibold">
-                                                        {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleDateString(dateLocale())} {parseUtcDate(currentRoundMatches[0].roundDeadline!).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                return (
+                                    <React.Fragment key={standing.participantId}>
+                                        <Pressable
+                                            onPress={canOpenProfile ? () => navigation.navigate('PlayerProfile', { id: standing.userId }) : undefined}
+                                            disabled={!canOpenProfile}
+                                            className={cn(
+                                                'flex-row items-center px-3.5 h-11',
+                                                isMe ? 'bg-emerald-500/[0.08]' : 'active:bg-white/[0.04]',
+                                            )}
+                                        >
+                                            <View style={{ width: COL.pos }} className="items-center">
+                                                <View
+                                                    className="w-[22px] h-[22px] rounded-[7px] items-center justify-center"
+                                                    style={zone ? { backgroundColor: ZONE_COLOR[zone] + '26' } : undefined}
+                                                >
+                                                    <Text
+                                                        style={[TABULAR, { color: zone === 'direct' ? '#34D399' : zone === 'playIn' ? '#FBBF24' : COLORS.slate500 }]}
+                                                        className="text-[11px] font-black"
+                                                    >
+                                                        {standing.position}
                                                     </Text>
                                                 </View>
-                                            ) : <View />}
-                                            {isAdmin && tournamentStatus !== 4 && !(currentRoundMatches.every(m => isTerminalMatchStatus(m.status))) && (
-                                                <Pressable
-                                                    onPress={() => onEditDeadline?.({ roundNumber: Number(activeRound), roundDeadline: currentRoundMatches[0]?.roundDeadline, roundOpenAt: currentRoundMatches[0]?.matchOpensAt })}
-                                                    className="flex-row items-center gap-1 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20 active:opacity-70"
-                                                >
-                                                    <Ionicons name="calendar-outline" size={10} color="#818CF8" />
-                                                    <Text numberOfLines={1} className="text-[9px] font-bold text-indigo-400 uppercase tracking-[1.5px]">
-                                                        {t('card.editSchedule')}
+                                            </View>
+                                            <Text
+                                                className={cn('flex-1 ml-2.5 mr-1 text-[13.5px] font-bold', isMe ? 'text-emerald-300' : 'text-slate-100')}
+                                                numberOfLines={1}
+                                                adjustsFontSizeToFit
+                                                minimumFontScale={0.8}
+                                            >
+                                                {standing.name || standing.username || getUsername(standing.userId, group.matches)}
+                                            </Text>
+                                            {[standing.matchesPlayed, standing.wins, standing.draws, standing.losses].map((value, i) => (
+                                                <Text key={i} style={[TABULAR, { width: COL.stat }]} className="text-[13px] text-center font-medium text-slate-400">
+                                                    {value}
+                                                </Text>
+                                            ))}
+                                            <Text style={[TABULAR, { width: COL.goals }]} numberOfLines={1} className="text-[12.5px] text-center font-medium text-slate-500">
+                                                {standing.goalsFor}:{standing.goalsAgainst}
+                                            </Text>
+                                            <Text
+                                                style={[TABULAR, { width: COL.diff }]}
+                                                numberOfLines={1}
+                                                className={cn(
+                                                    'text-[13px] text-center font-semibold',
+                                                    diff > 0 ? 'text-emerald-400/90' : diff < 0 ? 'text-red-400/90' : 'text-slate-500',
+                                                )}
+                                            >
+                                                {diff > 0 ? `+${diff}` : diff}
+                                            </Text>
+                                            {showBuchholz && (
+                                                <Text style={[TABULAR, { width: COL.opp }]} className="text-[13px] text-center font-medium text-slate-400">
+                                                    {standing.opponentPointsSum ?? 0}
+                                                </Text>
+                                            )}
+                                            <Text style={[TABULAR, { width: COL.pts }]} className="text-[14px] text-center font-black text-white">
+                                                {standing.points}
+                                            </Text>
+                                        </Pressable>
+                                        {next && (
+                                            cutBelow ? (
+                                                <View style={{ height: 1, backgroundColor: ZONE_COLOR[zone!] + '80' }} />
+                                            ) : (
+                                                <View className="mx-3.5" style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+                                            )
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </Panel>
+
+                        {/* ─── Matches ─── */}
+                        {rounds.length > 0 && (
+                            <View>
+                                <View className="flex-row items-center justify-between mb-3 px-0.5">
+                                    <Text numberOfLines={1} className="text-[11px] font-black text-slate-400 uppercase tracking-[2px]">
+                                        {t('card.matches')}
+                                    </Text>
+                                    {totalRounds != null && totalRounds > 0 && (
+                                        <Text style={TABULAR} className="text-[12px] font-semibold text-slate-500">
+                                            {t('card.roundOf', { n: activeRound, total: totalRounds })}
+                                        </Text>
+                                    )}
+                                </View>
+
+                                {/* Round picker — a joined track, quieter than the group pills above it */}
+                                <View className="rounded-2xl p-1 bg-card border border-white/[0.05]">
+                                    {rounds.length <= 4 ? (
+                                        <View className="flex-row" style={{ gap: 4 }}>
+                                            {rounds.map((roundNum) => renderRoundTab(roundNum, true))}
+                                        </View>
+                                    ) : (
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
+                                            {rounds.map((roundNum) => renderRoundTab(roundNum, false))}
+                                        </ScrollView>
+                                    )}
+                                </View>
+
+                                {/* What holds for the whole round: its deadline and its format */}
+                                {(hasDeadline || roundFormat || canEditSchedule) && (
+                                    <View className="flex-row items-center mt-3.5 px-0.5" style={{ gap: 12 }}>
+                                        <View className="flex-1" style={{ gap: 6 }}>
+                                            {hasDeadline && (
+                                                <View className="flex-row items-center" style={{ gap: 6 }}>
+                                                    <Ionicons name="time-outline" size={14} color={deadlineColor} />
+                                                    <Text className="shrink text-[12.5px]" numberOfLines={1}>
+                                                        <Text className="font-semibold" style={{ color: deadlineColor }}>
+                                                            {msLeft < 0 && !activeRoundDone ? t('tournament:progress.deadlinePassed') : t('tournament:progress.deadline')}
+                                                        </Text>
+                                                        <Text className="font-bold text-white" style={TABULAR}>
+                                                            {'  '}
+                                                            {deadline!.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })}
+                                                            {', '}
+                                                            {deadline!.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        </Text>
                                                     </Text>
-                                                </Pressable>
+                                                </View>
+                                            )}
+                                            {roundFormat && (
+                                                <SeriesFormatChip format={roundFormat} isTeamTournament={isTeamTournament} />
                                             )}
                                         </View>
-                                    )}
-                                    <View className="flex-col gap-3 items-center">
-                                        {currentRoundMatches.map((match) => (
-                                            <BracketMatch
-                                                key={match.id}
-                                                home={match.home}
-                                                away={match.away}
-                                                startTime={match.startTime}
-                                                status={match.status}
-                                                className="w-full"
-                                                onPress={() => onMatchPress?.({ ...match, isRoundLocked: !!match.isRoundLocked })}
-                                                currentUserId={currentUserId}
-                                                currentUsername={currentUsername}
-                                                isAdmin={isAdmin}
-                                                isTeamTournament={isTeamTournament}
-                                                proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
-                                                teamProgress={teamProgressFrom(match)}
-                                                checkIn={checkInFrom(match)}
-                                            />
-                                        ))}
+                                        {canEditSchedule && (
+                                            <Pressable
+                                                onPress={() => onEditDeadline?.({ roundNumber: Number(activeRound), roundDeadline: currentRoundMatches[0]?.roundDeadline, roundOpenAt: currentRoundMatches[0]?.matchOpensAt })}
+                                                accessibilityRole="button"
+                                                hitSlop={6}
+                                                className="flex-row items-center h-9 px-3 rounded-xl border border-white/10 bg-white/[0.04] active:opacity-70"
+                                                style={{ gap: 6 }}
+                                            >
+                                                <Ionicons name="calendar-outline" size={14} color={COLORS.slate300} />
+                                                <Text numberOfLines={1} className="text-[12.5px] font-bold text-slate-200">
+                                                    {t('card.editSchedule')}
+                                                </Text>
+                                            </Pressable>
+                                        )}
                                     </View>
+                                )}
+
+                                <View className="mt-4" style={{ gap: 12 }}>
+                                    {currentRoundMatches.map((match) => (
+                                        <GroupFixtureCard
+                                            key={match.id}
+                                            home={match.home}
+                                            away={match.away}
+                                            startTime={match.startTime}
+                                            status={match.status}
+                                            onPress={() => onMatchPress?.({ ...match, isRoundLocked: !!match.isRoundLocked })}
+                                            currentUserId={currentUserId}
+                                            currentUsername={currentUsername}
+                                            isAdmin={isAdmin}
+                                            isTeamTournament={isTeamTournament}
+                                            proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
+                                            teamProgress={teamProgressFrom(match)}
+                                            checkIn={checkInFrom(match)}
+                                        />
+                                    ))}
                                 </View>
-                            )}
-                        </View>
+                            </View>
+                        )}
                     </View>
                 );
             })}

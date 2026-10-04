@@ -24,6 +24,8 @@
     "lbSemifinal": "LB: півфінал",
     "live": "Триває",
     "matches": "Матчі",
+    "roundOf": "Раунд {{n}} з {{total}}",
+    "champion": "Чемпіон",
     "noShow": "Неявка",
     "perGame": " · ЗА ГРУ",
     "player": "Гравець",

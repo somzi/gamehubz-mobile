@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import i18n, { dateLocale } from '../../i18n';
+import i18n from '../../i18n';
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
-import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
-import { parseUtcDate } from '../../lib/utils';
-import { Ionicons } from '@expo/vector-icons';
-import { MatchStatus, isPlayableMatchStatus } from '../../types/matchStatus';
+import { roundSeriesFormat } from './SeriesFormatChip';
+import {
+    RoundHeader, ZoomControls, roundStatusOf, isSettled,
+    CONNECTOR_STROKE as STROKE, LINE_IDLE, LINE_PLAYED, LINE_MY_PATH,
+} from './BracketChrome';
 
 // LB layout is a flat column-per-round grid: match counts don't halve cleanly between rounds
 // (a "minor" consolidation round is followed by a "major" round with the same count once a
@@ -21,14 +22,10 @@ const MATCH_GAP = 16;
 const MATCH_W = 220;
 const COL_GAP = 40;            // gap between round columns — also the lane the connectors live in
 const HEADER_H = 64;
-const FORMAT_ROW_H = 18;       // extra header height when the round shows its best-of caption
-// A card with a status header stands ~16px taller than its MATCH_H slot, plus its shadow. The
-// canvas is clipped to its computed height, so this reserve keeps the bottom card of a column
-// from being sliced off.
-const CARD_OVERHANG = 24;
-const STROKE = 1.5;
-const LINE_DEFAULT = 'rgba(255,255,255,0.06)';
-const LINE_MY_PATH = 'rgba(99,102,241,0.25)';
+const FORMAT_ROW_H = 20;       // extra header height when the round shows its best-of caption
+// Cards are centred in their MATCH_H slot and stay under it; a little breathing room is kept
+// under the last one (the canvas is clipped to its computed height).
+const CARD_OVERHANG = 8;
 
 interface Participant {
     participantId: string;
@@ -70,15 +67,6 @@ interface LosersBracketProps {
     isTeamTournament?: boolean;
     /** Rendered on the left of the zoom-controls row (e.g. the admin Help Requests pill). */
     headerLeft?: React.ReactNode;
-}
-
-type RoundStatus = 'completed' | 'active' | 'upcoming';
-
-function getRoundStatus(round: Round): RoundStatus {
-    if (!round.matches.length) return 'upcoming';
-    if (round.matches.every(m => m.status === MatchStatus.Completed)) return 'completed';
-    if (round.matches.some(m => isPlayableMatchStatus(m.status))) return 'active';
-    return 'upcoming';
 }
 
 // LB rounds alternate: round 1 takes WB R1 losers, round 2 takes WB R2 losers, then 3 is a
@@ -226,7 +214,8 @@ export function LosersBracket({
                     sy: src.centerY,
                     tx: tgt.leftX,
                     ty: tgt.centerY,
-                    color: onMyPath ? LINE_MY_PATH : LINE_DEFAULT,
+                    // Lit once this match's winner has gone down it.
+                    color: onMyPath ? LINE_MY_PATH : isSettled(m) ? LINE_PLAYED : LINE_IDLE,
                 });
             });
         });
@@ -263,7 +252,7 @@ export function LosersBracket({
 
             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
             {rounds.map((round, roundIdx) => {
-                const roundStatus = getRoundStatus(round);
+                const roundStatus = roundStatusOf(round.matches);
                 const canEditRound =
                     isAdmin && tournamentStatus !== 4 && roundStatus !== 'completed';
                 const label = getLbRoundLabel(round.roundNumber, maxRoundNumber);
@@ -271,108 +260,15 @@ export function LosersBracket({
                 return (
                     <React.Fragment key={round.roundNumber}>
                         <View style={{ width: MATCH_W }}>
-                            <View
-                                style={{
-                                    height: headerH,
-                                    alignItems: 'center',
-                                    justifyContent: 'flex-end',
-                                    paddingBottom: 10,
-                                }}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <View
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            gap: 6,
-                                            paddingHorizontal: 12,
-                                            paddingVertical: 6,
-                                            borderRadius: 999,
-                                            borderWidth: 1,
-                                            backgroundColor:
-                                                roundStatus === 'active'
-                                                    ? 'rgba(244,63,94,0.7)'
-                                                    : 'rgba(255,255,255,0.03)',
-                                            borderColor:
-                                                roundStatus === 'active'
-                                                    ? 'rgba(251,113,133,0.4)'
-                                                    : 'rgba(255,255,255,0.07)',
-                                        }}
-                                    >
-                                        {roundStatus === 'completed' && (
-                                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' }} />
-                                        )}
-                                        {roundStatus === 'active' && (
-                                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FECDD3' }} />
-                                        )}
-                                        <Text
-                                            style={{
-                                                fontSize: 11,
-                                                fontWeight: '700',
-                                                color:
-                                                    roundStatus === 'active'
-                                                        ? '#FFFFFF'
-                                                        : roundStatus === 'completed'
-                                                          ? '#64748B'
-                                                          : '#94A3B8',
-                                            }}
-                                            numberOfLines={1}
-                                        >
-                                            {label}
-                                        </Text>
-                                        <Text
-                                            style={{
-                                                fontSize: 10,
-                                                fontWeight: '600',
-                                                color: roundStatus === 'active' ? 'rgba(254,205,211,0.85)' : '#475569',
-                                            }}
-                                        >
-                                            {round.matches.length}
-                                        </Text>
-                                    </View>
-
-                                    {canEditRound && (
-                                        <Pressable
-                                            onPress={() => onEditDeadline?.(round)}
-                                            style={{
-                                                width: 28,
-                                                height: 28,
-                                                borderRadius: 14,
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                backgroundColor: 'rgba(244,63,94,0.1)',
-                                                borderWidth: 1,
-                                                borderColor: 'rgba(244,63,94,0.2)',
-                                            }}
-                                        >
-                                            <Ionicons name="calendar-outline" size={12} color="#FB7185" />
-                                        </Pressable>
-                                    )}
-                                </View>
-                                {round.roundDeadline && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                                        <Ionicons name="time-outline" size={9} color="#F87171" />
-                                        <Text style={{ fontSize: 9, color: '#F87171', fontWeight: '600' }}>
-                                            {parseUtcDate(round.roundDeadline).toLocaleDateString(dateLocale(), {
-                                                month: 'short',
-                                                day: 'numeric',
-                                            })}{' '}
-                                            {parseUtcDate(round.roundDeadline).toLocaleTimeString(dateLocale(), {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                hour12: false,
-                                            })}
-                                        </Text>
-                                    </View>
-                                )}
-                                {roundFormats[roundIdx] && (
-                                    <SeriesFormatChip
-                                        format={roundFormats[roundIdx]!}
-                                        isTeamTournament={isTeamTournament}
-                                        style={{ marginTop: 4 }}
-                                    />
-                                )}
-                            </View>
+                            <RoundHeader
+                                name={label}
+                                status={roundStatus}
+                                deadline={round.roundDeadline}
+                                format={roundFormats[roundIdx]}
+                                isTeamTournament={isTeamTournament}
+                                onEdit={canEditRound ? () => onEditDeadline?.(round) : undefined}
+                                height={headerH}
+                            />
 
                             <View style={{ width: MATCH_W, height: totalH, position: 'relative' }}>
                                 {round.matches.map((match) => {
@@ -380,7 +276,7 @@ export function LosersBracket({
                                     return (
                                         <View
                                             key={match.id}
-                                            style={{ position: 'absolute', top, left: 0, width: MATCH_W }}
+                                            style={{ position: 'absolute', top, left: 0, width: MATCH_W, height: MATCH_H, justifyContent: 'center' }}
                                         >
                                             <BracketMatch
                                                 home={match.home}
@@ -399,7 +295,7 @@ export function LosersBracket({
                                                 }
                                                 teamProgress={teamProgressFrom(match)}
                                                 checkIn={checkInFrom(match)}
-                                                className={myPathIds.has(match.id) ? 'border-indigo-500/30' : undefined}
+                                                onMyPath={myPathIds.has(match.id)}
                                             />
                                         </View>
                                     );
@@ -429,45 +325,15 @@ export function LosersBracket({
             >
                 {/* Grows so the admin strip can fill the row instead of sizing to its own
                     text; the zoom controls keep their intrinsic width on the right. */}
-                <View style={{ flex: 1, flexDirection: 'row', marginRight: headerLeft ? 8 : 0 }}>
+                <View style={{ flex: 1, flexDirection: 'row', marginRight: headerLeft ? 10 : 0 }}>
                     {headerLeft ?? null}
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Pressable
-                        onPress={zoomOut}
-                        disabled={scale <= ZOOM_MIN}
-                        style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 8,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'rgba(255,255,255,0.06)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(255,255,255,0.08)',
-                            opacity: scale <= ZOOM_MIN ? 0.35 : 1,
-                        }}
-                    >
-                        <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>−</Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={zoomIn}
-                        disabled={scale >= ZOOM_MAX}
-                        style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 8,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'rgba(255,255,255,0.06)',
-                            borderWidth: 1,
-                            borderColor: 'rgba(255,255,255,0.08)',
-                            opacity: scale >= ZOOM_MAX ? 0.35 : 1,
-                        }}
-                    >
-                        <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>+</Text>
-                    </Pressable>
-                </View>
+                <ZoomControls
+                    onZoomOut={zoomOut}
+                    onZoomIn={zoomIn}
+                    canZoomOut={scale > ZOOM_MIN}
+                    canZoomIn={scale < ZOOM_MAX}
+                />
             </View>
 
             <ScrollView

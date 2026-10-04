@@ -83,6 +83,8 @@
     "pts": "Bod.",
     "you": "Ti",
     "matches": "Mečevi",
+    "roundOf": "Runda {{n}} od {{total}}",
+    "champion": "Šampion",
     "editSchedule": "Izmeni termin",
     "lbFinal": "Finale donje grane",
     "lbSemifinal": "Polufinale donje grane",

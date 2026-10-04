@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
-import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
-import { parseUtcDate } from '../../lib/utils';
-import { Ionicons } from '@expo/vector-icons';
-import { dateLocale } from '../../i18n';
-import { MatchStatus, isPlayableMatchStatus } from '../../types/matchStatus';
+import { roundSeriesFormat } from './SeriesFormatChip';
+import {
+    RoundHeader, ZoomControls, ChampionPlate, roundStatusOf, isSettled,
+    CONNECTOR_STROKE as STROKE, LINE_IDLE, LINE_PLAYED, LINE_MY_PATH,
+} from './BracketChrome';
+import { MatchStatus } from '../../types/matchStatus';
 
 /* ── Layout constants ─────────────────────────────────────────────── */
 const MATCH_H = 130;            // vertical slot per match card
@@ -14,14 +15,12 @@ const UNIT = MATCH_H + BASE_GAP; // 146 px per R1 slot
 const MATCH_W = 220;            // fixed card width
 const CONNECTOR_W = 40;         // width of connector column between rounds
 const HEADER_H = 64;            // height of round header row
-const FORMAT_ROW_H = 18;        // extra header height when the round shows its best-of caption
-// A card with a status header ("Report Result", "Completed", …) stands ~16px taller than its
-// MATCH_H slot, and drops a shadow below that. The canvas is clipped to its computed height, so
-// without this reserve the bottom card of a column comes out visibly sliced off.
-const CARD_OVERHANG = 24;
-const STROKE = 1.5;
-const LINE_DEFAULT = 'rgba(255,255,255,0.06)';
-const LINE_MY_PATH = 'rgba(99,102,241,0.25)';
+const FORMAT_ROW_H = 20;        // extra header height when the round shows its best-of caption
+const CHAMPION_W = 200;         // the champion plate after the final
+// Cards are centred in their MATCH_H slot and stay under it, so only a little breathing room is
+// kept under the last one (the canvas is clipped to its computed height).
+const CARD_OVERHANG = 8;
+const LINE_CHAMPION = 'rgba(251,191,36,0.5)';
 
 /** Absolute top of a match card within its round's match-area View. */
 function computeMatchTop(roundIdx: number, matchIdx: number): number {
@@ -70,15 +69,11 @@ interface TournamentBracketProps {
     isTeamTournament?: boolean;
     /** Rendered on the left of the zoom-controls row (e.g. the admin Help Requests pill). */
     headerLeft?: React.ReactNode;
-}
-
-type RoundStatus = 'completed' | 'active' | 'upcoming';
-
-function getRoundStatus(round: Round): RoundStatus {
-    if (!round.matches.length) return 'upcoming';
-    if (round.matches.every(m => m.status === MatchStatus.Completed)) return 'completed';
-    if (round.matches.some(m => isPlayableMatchStatus(m.status))) return 'active';
-    return 'upcoming';
+    /**
+     * The final of this bracket decides the tournament (single elimination) — end it in the
+     * champion plate. Off for a winners bracket, whose final only feeds the grand final.
+     */
+    showChampion?: boolean;
 }
 
 export function TournamentBracket({
@@ -91,6 +86,7 @@ export function TournamentBracket({
     tournamentStatus,
     isTeamTournament,
     headerLeft,
+    showChampion,
 }: TournamentBracketProps) {
     if (!rounds?.length) return null;
 
@@ -116,8 +112,16 @@ export function TournamentBracket({
     /* One height for every column, so the cards of all rounds stay on the same baseline. */
     const headerH = HEADER_H + (roundFormats.some(Boolean) ? FORMAT_ROW_H : 0);
 
+    /* The final, when this bracket ends in a single match that crowns someone */
+    const lastRound = rounds[rounds.length - 1];
+    const finalMatch = showChampion && lastRound.matches.length === 1 ? lastRound.matches[0] : null;
+    const champion = finalMatch && finalMatch.status === MatchStatus.Completed
+        ? (finalMatch.home?.isWinner ? finalMatch.home : finalMatch.away?.isWinner ? finalMatch.away : null)
+        : null;
+
     /* Exact pixel dimensions of the bracket canvas */
-    const contentWidth = rounds.length * MATCH_W + (rounds.length - 1) * CONNECTOR_W;
+    const contentWidth = rounds.length * MATCH_W + (rounds.length - 1) * CONNECTOR_W
+        + (finalMatch ? CONNECTOR_W + CHAMPION_W : 0);
     const contentHeight = headerH + totalH;
 
     /* Match id → Match lookup */
@@ -154,10 +158,12 @@ export function TournamentBracket({
         return highlighted;
     }, [rounds, currentUserId, currentUsername, matchById]);
 
+    const finalCenter = finalMatch ? headerH + computeMatchTop(rounds.length - 1, 0) + MATCH_H / 2 : 0;
+
     const innerContent = (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
             {rounds.map((round, roundIdx) => {
-                    const roundStatus = getRoundStatus(round);
+                    const roundStatus = roundStatusOf(round.matches);
                     const isLastRound = roundIdx === rounds.length - 1;
                     const canEditRound = isAdmin &&
                         tournamentStatus !== 4 &&
@@ -167,83 +173,24 @@ export function TournamentBracket({
                         <React.Fragment key={round.roundNumber}>
                             {/* ── Round column ──────────────────────────────── */}
                             <View style={{ width: MATCH_W }}>
+                                <RoundHeader
+                                    name={round.name}
+                                    status={roundStatus}
+                                    deadline={round.roundDeadline}
+                                    format={roundFormats[roundIdx]}
+                                    isTeamTournament={isTeamTournament}
+                                    onEdit={canEditRound ? () => onEditDeadline?.(round) : undefined}
+                                    height={headerH}
+                                />
 
-                                {/* Header pill */}
-                                <View style={{ height: headerH, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 10 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <View style={{
-                                            flexDirection: 'row', alignItems: 'center', gap: 6,
-                                            paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
-                                            borderWidth: 1,
-                                            backgroundColor: roundStatus === 'active' ? 'rgba(79,70,229,0.8)' : 'rgba(255,255,255,0.03)',
-                                            borderColor: roundStatus === 'active' ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.07)',
-                                        }}>
-                                            {roundStatus === 'completed' && (
-                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' }} />
-                                            )}
-                                            {roundStatus === 'active' && (
-                                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#C7D2FE' }} />
-                                            )}
-                                            <Text
-                                                style={{
-                                                    fontSize: 11, fontWeight: '700',
-                                                    color: roundStatus === 'active' ? '#FFFFFF' : roundStatus === 'completed' ? '#64748B' : '#94A3B8',
-                                                }}
-                                                numberOfLines={1}
-                                            >
-                                                {round.name}
-                                            </Text>
-                                            <Text style={{
-                                                fontSize: 10, fontWeight: '600',
-                                                color: roundStatus === 'active' ? 'rgba(199,210,254,0.7)' : '#475569',
-                                            }}>
-                                                {round.matches.length}
-                                            </Text>
-                                        </View>
-
-                                        {/* Admin calendar button */}
-                                        {canEditRound && (
-                                            <Pressable
-                                                onPress={() => onEditDeadline?.(round)}
-                                                style={{
-                                                    width: 28, height: 28, borderRadius: 14,
-                                                    alignItems: 'center', justifyContent: 'center',
-                                                    backgroundColor: 'rgba(99,102,241,0.1)',
-                                                    borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)',
-                                                }}
-                                            >
-                                                <Ionicons name="calendar-outline" size={12} color="#818CF8" />
-                                            </Pressable>
-                                        )}
-                                    </View>
-                                    {round.roundDeadline && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                                            <Ionicons name="time-outline" size={9} color="#F87171" />
-                                            <Text style={{ fontSize: 9, color: '#F87171', fontWeight: '600' }}>
-                                                {parseUtcDate(round.roundDeadline).toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' })}
-                                                {' '}
-                                                {parseUtcDate(round.roundDeadline).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {roundFormats[roundIdx] && (
-                                        <SeriesFormatChip
-                                            format={roundFormats[roundIdx]!}
-                                            isTeamTournament={isTeamTournament}
-                                            style={{ marginTop: 4 }}
-                                        />
-                                    )}
-                                </View>
-
-                                {/* Match cards — absolutely positioned within the match area */}
+                                {/* Match cards — each centred in its slot, so the connectors meet it mid-height */}
                                 <View style={{ width: MATCH_W, height: totalH, position: 'relative' }}>
                                     {round.matches.map((match, matchIdx) => {
                                         const top = computeMatchTop(roundIdx, matchIdx);
-                                        const isHighlighted = myPathIds.has(match.id);
                                         return (
                                             <View
                                                 key={match.id}
-                                                style={{ position: 'absolute', top, left: 0, width: MATCH_W }}
+                                                style={{ position: 'absolute', top, left: 0, width: MATCH_W, height: MATCH_H, justifyContent: 'center' }}
                                             >
                                                 <BracketMatch
                                                     home={match.home}
@@ -258,7 +205,7 @@ export function TournamentBracket({
                                                     proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                     teamProgress={teamProgressFrom(match)}
                                                     checkIn={checkInFrom(match)}
-                                                    className={isHighlighted ? 'border-indigo-500/30' : undefined}
+                                                    onMyPath={myPathIds.has(match.id)}
                                                 />
                                             </View>
                                         );
@@ -285,21 +232,28 @@ export function TournamentBracket({
                                             : botMatch.nextMatchId
                                                 ? matchById[botMatch.nextMatchId]
                                                 : null;
-                                        const onMyPath =
-                                            (myPathIds.has(topMatch.id) || myPathIds.has(botMatch.id)) &&
-                                            !!nextMatch && myPathIds.has(nextMatch.id);
-                                        const lineColor = onMyPath ? LINE_MY_PATH : LINE_DEFAULT;
+                                        const nextOnMyPath = !!nextMatch && myPathIds.has(nextMatch.id);
+                                        // Each feeder's stub lights up once its winner has gone through it;
+                                        // the joint and the stub into the next match once both have.
+                                        const stubColor = (m: Match) =>
+                                            myPathIds.has(m.id) && nextOnMyPath ? LINE_MY_PATH : isSettled(m) ? LINE_PLAYED : LINE_IDLE;
+                                        const topColor = stubColor(topMatch);
+                                        const botColor = stubColor(botMatch);
+                                        const jointColor = (myPathIds.has(topMatch.id) || myPathIds.has(botMatch.id)) && nextOnMyPath
+                                            ? LINE_MY_PATH
+                                            : isSettled(topMatch) && isSettled(botMatch) ? LINE_PLAYED : LINE_IDLE;
 
                                         return (
                                             <React.Fragment key={j}>
                                                 {/* Top horizontal stub */}
-                                                <View style={{ position: 'absolute', left: 0, top: topCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: lineColor }} />
+                                                <View style={{ position: 'absolute', left: 0, top: topCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: topColor }} />
                                                 {/* Bottom horizontal stub */}
-                                                <View style={{ position: 'absolute', left: 0, top: botCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: lineColor }} />
-                                                {/* Vertical connector */}
-                                                <View style={{ position: 'absolute', left: halfW - STROKE / 2, top: topCenter, width: STROKE, height: botCenter - topCenter, backgroundColor: lineColor }} />
+                                                <View style={{ position: 'absolute', left: 0, top: botCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: botColor }} />
+                                                {/* Vertical connector — each half in its feeder's colour */}
+                                                <View style={{ position: 'absolute', left: halfW - STROKE / 2, top: topCenter - STROKE / 2, width: STROKE, height: midCenter - topCenter + STROKE / 2, backgroundColor: topColor }} />
+                                                <View style={{ position: 'absolute', left: halfW - STROKE / 2, top: midCenter, width: STROKE, height: botCenter - midCenter + STROKE / 2, backgroundColor: botColor }} />
                                                 {/* Right stub into next-round match */}
-                                                <View style={{ position: 'absolute', left: halfW, top: midCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: lineColor }} />
+                                                <View style={{ position: 'absolute', left: halfW, top: midCenter - STROKE / 2, width: halfW, height: STROKE, backgroundColor: jointColor }} />
                                             </React.Fragment>
                                         );
                                     })}
@@ -308,7 +262,26 @@ export function TournamentBracket({
                         </React.Fragment>
                     );
                 })}
-            </View>
+
+            {/* ── The champion, where the road ends ─────────────── */}
+            {finalMatch && (
+                <>
+                    <View style={{ width: CONNECTOR_W, height: headerH + totalH, position: 'relative' }}>
+                        <View
+                            style={{
+                                position: 'absolute', left: 0, top: finalCenter - STROKE / 2, width: CONNECTOR_W, height: STROKE,
+                                backgroundColor: champion ? LINE_CHAMPION : LINE_IDLE,
+                            }}
+                        />
+                    </View>
+                    <View style={{ width: CHAMPION_W, height: headerH + totalH }}>
+                        <View style={{ position: 'absolute', top: finalCenter - MATCH_H / 2, left: 0, width: CHAMPION_W, height: MATCH_H, justifyContent: 'center' }}>
+                            <ChampionPlate champion={champion} isTeamTournament={isTeamTournament} width={CHAMPION_W} />
+                        </View>
+                    </View>
+                </>
+            )}
+        </View>
     );
 
     return (
@@ -317,37 +290,15 @@ export function TournamentBracket({
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 }}>
                 {/* Grows so the admin strip can fill the row instead of sizing to its own
                     text; the zoom controls keep their intrinsic width on the right. */}
-                <View style={{ flex: 1, flexDirection: 'row', marginRight: headerLeft ? 8 : 0 }}>
+                <View style={{ flex: 1, flexDirection: 'row', marginRight: headerLeft ? 10 : 0 }}>
                     {headerLeft ?? null}
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <Pressable
-                        onPress={zoomOut}
-                        disabled={scale <= ZOOM_MIN}
-                        style={{
-                            width: 28, height: 28, borderRadius: 8,
-                            alignItems: 'center', justifyContent: 'center',
-                            backgroundColor: 'rgba(255,255,255,0.06)',
-                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-                            opacity: scale <= ZOOM_MIN ? 0.35 : 1,
-                        }}
-                    >
-                        <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>−</Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={zoomIn}
-                        disabled={scale >= ZOOM_MAX}
-                        style={{
-                            width: 28, height: 28, borderRadius: 8,
-                            alignItems: 'center', justifyContent: 'center',
-                            backgroundColor: 'rgba(255,255,255,0.06)',
-                            borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-                            opacity: scale >= ZOOM_MAX ? 0.35 : 1,
-                        }}
-                    >
-                        <Text style={{ color: '#94A3B8', fontWeight: '700', fontSize: 16, lineHeight: 20 }}>+</Text>
-                    </Pressable>
-                </View>
+                <ZoomControls
+                    onZoomOut={zoomOut}
+                    onZoomIn={zoomIn}
+                    canZoomOut={scale > ZOOM_MIN}
+                    canZoomIn={scale < ZOOM_MAX}
+                />
             </View>
 
             <ScrollView

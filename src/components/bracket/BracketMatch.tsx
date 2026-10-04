@@ -1,15 +1,15 @@
+import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, Text, Pressable } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../../types/navigation';
+import type { TFunction } from 'i18next';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
-import { cn } from '../../lib/utils';
+import { PressableScale } from '../ui/PressableScale';
+import { RaisedCard } from '../ui/RaisedCard';
+import { COLORS } from '../../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { MatchStatus, isPlayableMatchStatus } from '../../types/matchStatus';
 
-interface Participant {
+export interface Participant {
     participantId: string;
     userId: string;
     username: string;
@@ -72,6 +72,8 @@ interface BracketMatchProps {
     startTime?: string | null;
     status?: number;
     className?: string;
+    /** The viewer played (or plays) this match on their way through the bracket. */
+    onMyPath?: boolean;
     onPress?: () => void;
     currentUserId?: string;
     currentUsername?: string;
@@ -85,12 +87,29 @@ interface BracketMatchProps {
     checkIn?: CardCheckIn | null;
 }
 
-type NavigationProp = StackNavigationProp<RootStackParamList>;
+interface MatchCardStateInput {
+    home: Participant | null;
+    away: Participant | null;
+    startTime?: string | null;
+    status?: number;
+    /** Whether the card has somewhere to go when tapped (the match modal). */
+    hasOnPress: boolean;
+    currentUserId?: string;
+    currentUsername?: string;
+    isAdmin?: boolean;
+    proposedByUserId?: string | null;
+    teamProgress?: TeamProgress | null;
+    checkIn?: CardCheckIn | null;
+}
 
-export function BracketMatch({ home, away, startTime, status, className, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, checkIn }: BracketMatchProps) {
-    const { t } = useTranslation('bracket');
-    const navigation = useNavigation<NavigationProp>();
-
+/**
+ * Everything a match card needs to know about where its match stands and what the viewer may do
+ * with it. Shared by the bracket card and the group fixture card, so both offer the same actions
+ * in the same states.
+ */
+export function matchCardState({
+    home, away, startTime, status, hasOnPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn,
+}: MatchCardStateInput) {
     // A team fixture with at least one game decided but no settled result yet. The final Score
     // stays null until the fixture settles, so this is the only way the card knows it is under way.
     // Deliberately NOT "decided < total": a 1-1 fixture waiting on tie-break representatives has
@@ -99,117 +118,9 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
         && teamProgress.decided > 0
         && status !== MatchStatus.Completed;
 
-    const handlePlayerClick = (userId: string) => {
-        if (onPress) {
-            onPress();
-        } else if (userId) {
-            navigation.navigate('PlayerProfile', { id: userId });
-        }
-    };
-
     // A completed match with exactly one side is a bye (Swiss free win / walkover) —
     // label the empty slot BYE instead of TBD since nobody is coming.
     const isCompletedBye = status === MatchStatus.Completed && (!home !== !away);
-
-    const renderParticipant = (participant: Participant | null, position: 'top' | 'bottom') => {
-        const isTop = position === 'top';
-
-        if (!participant) {
-            return (
-                <View className={cn(
-                    "flex-row items-center px-4 py-3",
-                    isTop ? "rounded-t-2xl" : "rounded-b-2xl",
-                )}>
-                    <View
-                        className="w-7 h-7 rounded-full items-center justify-center"
-                        style={{ borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', borderStyle: 'dashed' }}
-                    />
-                    <Text className="text-xs text-slate-700 italic ml-3 flex-1 font-medium">
-                        {isCompletedBye ? t('bye') : t('common:app.tbd')}
-                    </Text>
-                    <View className="w-8 h-8 rounded-xl bg-white/[0.02] items-center justify-center">
-                        <Text className="text-xs text-slate-700 font-black">—</Text>
-                    </View>
-                </View>
-            );
-        }
-
-        const isWinner = participant.isWinner;
-        const hasMatchScore = participant.score !== null && participant.score !== undefined;
-        // Mid-fixture stand-in for the final score: games won so far by this side.
-        const liveScore = !hasMatchScore && isTeamInProgress
-            ? (isTop ? teamProgress!.homeWins : teamProgress!.awayWins)
-            : null;
-
-        return (
-            <Pressable
-                onPress={() => handlePlayerClick(participant.userId)}
-                className={cn(
-                    "flex-row items-center px-4 py-3",
-                    isTop ? "rounded-t-2xl" : "rounded-b-2xl",
-                    isWinner ? "bg-emerald-500/[0.06]" : undefined,
-                )}
-            >
-                {/* Winner accent bar */}
-                {isWinner && (
-                    <View
-                        className="absolute left-0 w-[3px] bg-emerald-400 rounded-full"
-                        style={{ top: 6, bottom: 6 }}
-                    />
-                )}
-
-                {isTeamTournament ? (
-                    <View className={cn(
-                        "w-7 h-7 rounded-xl items-center justify-center",
-                        isWinner ? "bg-emerald-500/20" : "bg-white/[0.05]"
-                    )}>
-                        <Ionicons name="people" size={13} color={isWinner ? '#34D399' : '#475569'} />
-                    </View>
-                ) : (
-                    <PlayerAvatar
-                        name={participant.username}
-                        src={participant.avatarUrl ?? (participant as any).AvatarUrl ?? undefined}
-                        size="sm"
-                        className={isWinner ? "border-emerald-400/70" : "border-white/10"}
-                    />
-                )}
-
-                <Text
-                    className={cn(
-                        "text-sm font-semibold flex-1 ml-3",
-                        isWinner ? "text-emerald-300" : "text-slate-200"
-                    )}
-                    numberOfLines={1}
-                >
-                    {participant.username}
-                </Text>
-
-                {/* Score chip */}
-                <View className={cn(
-                    "min-w-[32px] h-8 px-2 rounded-xl items-center justify-center ml-2",
-                    isWinner ? "bg-emerald-500/20" : liveScore !== null ? "bg-white/[0.07]" : "bg-white/[0.04]"
-                )}>
-                    {hasMatchScore ? (
-                        <Text className={cn(
-                            "text-sm font-black",
-                            isWinner ? "text-emerald-300" : "text-slate-500"
-                        )}>
-                            {participant.score}
-                        </Text>
-                    ) : liveScore !== null ? (
-                        // Brighter than a settled loser's score, dimmer than a winner's: this is a
-                        // running number, not a result.
-                        <Text className="text-sm font-black text-slate-200">
-                            {liveScore}
-                        </Text>
-                    ) : (
-                        <Text className="text-xs text-slate-700 font-bold">—</Text>
-                    )}
-                </View>
-
-            </Pressable>
-        );
-    };
 
     const getUserId = (p: any) => p?.userId || p?.UserId || p?.id || p?.Id;
     const getUsername = (p: any) => p?.username || p?.Username || p?.name || p?.Name;
@@ -259,7 +170,7 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     // TieBreakRequired likewise — that is where the tiebreak games get reported.
     // Spelled out rather than a numeric range: `status` is optional, and a range check would also
     // silently swallow any value the backend adds to the enum later.
-    const canShowDetails = !!onPress && !!home && !!away && (
+    const canShowDetails = hasOnPress && !!home && !!away && (
         status === MatchStatus.Pending
         || status === MatchStatus.Scheduled
         || status === MatchStatus.Live
@@ -279,165 +190,279 @@ export function BracketMatch({ home, away, startTime, status, className, onPress
     // While a proposal is pending we hide the "Report Result" CTA — the opponent should Approve / Reject instead.
     // A tiebreak-pending match keeps its CTA despite already having a score: the reported series is
     // exactly what makes the next games necessary.
-    const canReport = canShowDetails && !isAwaitingApproval && !checkInPending && canUserReport
+    const canReport = canShowDetails && !isAwaitingApproval && !checkInPending && !!canUserReport
         && (isTieBreakNeeded || (!isAlreadyReported && isPlayableMatchStatus(status)));
 
     // The check-in banner is for the two players; an organizer scanning the bracket sees the
     // scheduled state as before.
     const showCheckIn = checkInPending && isParticipant && !isCompleted && !isNoShow;
 
-    const glow = canReport || isScheduled ? '#10B981' : isAwaitingApproval || showCheckIn ? '#F59E0B' : null;
+    return {
+        isTeamInProgress, isCompletedBye, isHome, isAway, isParticipant, isCompleted, isNoShow,
+        isDoubleWalkover, isScheduled, isTieBreakNeeded, isAwaitingApproval, canShowDetails,
+        checkedInCount, canReport, showCheckIn,
+    };
+}
+
+/** Green: the match is on. Amber: it's waiting on someone, or ended without a game. */
+export const CARD_ACCENT = {
+    go: { main: '#10B981', bright: '#A7F3D0', text: '#34D399' },
+    wait: { main: '#F59E0B', bright: '#FDE68A', text: '#FBBF24' },
+} as const;
+
+export type CardLabelKind =
+    | 'report' | 'checkIn' | 'live' | 'approval' | 'tiebreak' | 'noShow' | 'doubleWalkover' | 'completed' | 'scheduled';
+
+export interface CardLabel {
+    kind: CardLabelKind;
+    text: string;
+    /** null = neutral (a finished match). */
+    accent: (typeof CARD_ACCENT)[keyof typeof CARD_ACCENT] | null;
+    /** A count that rides along: check-ins so far, team games decided. */
+    trailing?: string;
+}
+
+/**
+ * The one line a match card says about where its match stands. `includeReport` puts the viewer's
+ * own "Report result" first — the bracket card says it here, the group card has a button for it.
+ */
+export function matchCardLabel(
+    s: ReturnType<typeof matchCardState>,
+    t: TFunction,
+    teamProgress: TeamProgress | null | undefined,
+    includeReport: boolean,
+): CardLabel | null {
+    const games = s.isTeamInProgress && teamProgress ? `${teamProgress.decided}/${teamProgress.total}` : undefined;
+
+    if (includeReport && s.canReport) {
+        return s.isTieBreakNeeded
+            ? { kind: 'report', text: t('bracket:card.reportTiebreak'), accent: CARD_ACCENT.wait, trailing: games }
+            : { kind: 'report', text: t('bracket:card.reportResult'), accent: CARD_ACCENT.go, trailing: games };
+    }
+    // A ready check owed beats the plain "Scheduled": it's the one thing these two have to do now.
+    if (!s.canReport && s.showCheckIn) {
+        return { kind: 'checkIn', text: t('bracket:card.checkIn'), accent: CARD_ACCENT.wait, trailing: `${s.checkedInCount}/2` };
+    }
+    if (!s.canReport && !s.isAwaitingApproval && s.isTeamInProgress) {
+        return { kind: 'live', text: t('bracket:card.live'), accent: CARD_ACCENT.go, trailing: games };
+    }
+    if (!s.canReport && s.isAwaitingApproval) {
+        return { kind: 'approval', text: t('bracket:card.awaitingApproval'), accent: CARD_ACCENT.wait };
+    }
+    if (!s.canReport && s.isTieBreakNeeded) {
+        return { kind: 'tiebreak', text: t('bracket:card.tiebreakNeeded'), accent: CARD_ACCENT.wait };
+    }
+    if (s.isNoShow) return { kind: 'noShow', text: t('bracket:card.noShow'), accent: CARD_ACCENT.wait };
+    if (s.isDoubleWalkover) return { kind: 'doubleWalkover', text: t('bracket:card.doubleWalkover'), accent: CARD_ACCENT.wait };
+    if (s.isCompleted) return { kind: 'completed', text: t('bracket:card.completed'), accent: null };
+    if (s.isScheduled) return { kind: 'scheduled', text: t('bracket:card.scheduled'), accent: CARD_ACCENT.go };
+    return null;
+}
+
+const TABULAR = { fontVariant: ['tabular-nums' as const] };
+const DIMMED = 0.5;
+
+/**
+ * A knockout match: the two sides stacked, the winner bright and the loser faded, and a line on
+ * top saying where it stands — in the state's colour, with a rail of the same colour down the
+ * left edge. Kept under the bracket's 130px slot; the bracket centres it there, so the connector
+ * lines meet it in the middle whatever its height.
+ */
+export const BracketMatch = React.memo(function BracketMatch({ home, away, startTime, status, className, onMyPath, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, checkIn }: BracketMatchProps) {
+    const { t } = useTranslation('bracket');
+    const s = matchCardState({ home, away, startTime, status, hasOnPress: !!onPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn });
+    const label = matchCardLabel(s, t, teamProgress, true);
+    const accent = label?.accent ?? null;
+
+    const nobodyPlayed = s.isNoShow || s.isDoubleWalkover;
+    const decided = s.isCompleted && (!!home?.isWinner || !!away?.isWinner);
+    const emptyLabel = s.isCompletedBye ? t('bye') : t('common:app.tbd');
+
+    const renderSide = (participant: Participant | null, side: 'home' | 'away') => {
+        if (!participant) {
+            return (
+                <View style={styles.row}>
+                    <View style={styles.emptyAvatar} />
+                    <Text className="flex-1 ml-2.5 text-[13px] font-semibold italic text-slate-600" numberOfLines={1}>
+                        {emptyLabel}
+                    </Text>
+                    <Text style={[TABULAR, styles.score, { color: COLORS.slate700 }]}>–</Text>
+                </View>
+            );
+        }
+
+        const isMe = side === 'home' ? s.isHome : s.isAway;
+        const won = !!participant.isWinner;
+        const dimmed = nobodyPlayed || (decided && !won);
+        const hasScore = participant.score !== null && participant.score !== undefined;
+        // Mid-fixture stand-in for the final score: games won so far by this side.
+        const liveScore = !hasScore && s.isTeamInProgress && teamProgress
+            ? (side === 'home' ? teamProgress.homeWins : teamProgress.awayWins)
+            : null;
+
+        return (
+            <View style={[styles.row, dimmed && { opacity: DIMMED }]}>
+                {isTeamTournament ? (
+                    <View style={[styles.teamTile, isMe && styles.meEdge]}>
+                        <Ionicons name="people" size={15} color={isMe ? CARD_ACCENT.go.text : COLORS.slate400} />
+                    </View>
+                ) : (
+                    <PlayerAvatar
+                        name={participant.username}
+                        src={participant.avatarUrl ?? (participant as any).AvatarUrl ?? undefined}
+                        size="sm"
+                        className={isMe ? 'border-emerald-400/70' : 'border-white/10'}
+                    />
+                )}
+                <Text
+                    className={
+                        isMe
+                            ? 'flex-1 ml-2.5 text-[13.5px] font-bold text-emerald-300'
+                            : won
+                                ? 'flex-1 ml-2.5 text-[13.5px] font-bold text-white'
+                                : 'flex-1 ml-2.5 text-[13.5px] font-semibold text-slate-200'
+                    }
+                    numberOfLines={1}
+                >
+                    {participant.username}
+                </Text>
+                <Text
+                    style={[
+                        TABULAR,
+                        styles.score,
+                        { color: hasScore || liveScore !== null ? '#FFFFFF' : COLORS.slate600 },
+                    ]}
+                >
+                    {hasScore ? participant.score : liveScore !== null ? liveScore : '–'}
+                </Text>
+            </View>
+        );
+    };
 
     return (
-        <Pressable
-            onPress={canShowDetails ? onPress : undefined}
-            disabled={!canShowDetails}
-            className={cn(
-                "rounded-[20px] bg-card border overflow-hidden",
-                canReport ? "border-emerald-500/30" : isAwaitingApproval ? "border-warning/25" : "border-white/[0.06]",
-                className
-            )}
-            style={({ pressed }) => ({
-                opacity: pressed && canShowDetails ? 0.8 : 1,
-                transform: [{ scale: pressed && canShowDetails ? 0.985 : 1 }],
-                shadowColor: glow ?? '#000000',
-                shadowOpacity: glow ? 0.2 : 0.28,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 5 },
-                elevation: 5,
-            })}
+        <PressableScale
+            onPress={s.canShowDetails ? onPress : undefined}
+            disabled={!s.canShowDetails}
+            pressedScale={0.98}
+            className={className}
+            accessibilityRole="button"
+            accessibilityLabel={[
+                `${home?.username ?? emptyLabel} vs ${away?.username ?? emptyLabel}`,
+                label?.text,
+            ].filter(Boolean).join('. ')}
         >
-            {glow && (
-                <LinearGradient
-                    colors={[glow + '1F', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0.9, y: 0 }}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                />
-            )}
+            <RaisedCard
+                style={[
+                    styles.card,
+                    s.canReport && accent
+                        ? { borderColor: accent.main + '40', borderTopColor: accent.main + '5C' }
+                        : onMyPath
+                            ? { borderColor: 'rgba(52,211,153,0.22)', borderTopColor: 'rgba(52,211,153,0.32)' }
+                            : null,
+                ]}
+            >
+                {/* The state's rail down the left edge */}
+                {accent && (
+                    <View
+                        pointerEvents="none"
+                        style={[
+                            styles.rail,
+                            { backgroundColor: accent.main },
+                            Platform.OS === 'ios' && { shadowColor: accent.main, shadowOpacity: 0.7, shadowRadius: 5, shadowOffset: { width: 0, height: 0 } },
+                        ]}
+                    />
+                )}
 
-            {/* Status / action header */}
-            {(canReport || isAwaitingApproval || showCheckIn || isScheduled || isCompleted || isNoShow || isTeamInProgress || isTieBreakNeeded) && (
-                <View className={cn(
-                    "flex-row items-center justify-between px-4 py-2",
-                    canReport
-                        ? "bg-emerald-500/[0.08]"
-                        : showCheckIn || isAwaitingApproval || isNoShow
-                            ? "bg-warning/[0.10]"
-                            : isScheduled || isTeamInProgress
-                                ? "bg-emerald-500/[0.06]"
-                                : "bg-white/[0.02]"
-                )}>
-                    {canReport && (
-                        <>
-                            <View className="flex-row items-center gap-1.5">
-                                <View className={cn("w-1.5 h-1.5 rounded-full", isTieBreakNeeded ? "bg-warning" : "bg-emerald-400")} />
-                                <Text numberOfLines={1} className={cn(
-                                    "text-[10px] font-black uppercase tracking-[1.5px]",
-                                    isTieBreakNeeded ? "text-warning" : "text-emerald-400",
-                                )}>
-                                    {isTieBreakNeeded ? t('card.reportTiebreak') : t('card.reportResult')}
-                                </Text>
-                            </View>
-                            <View className="flex-row items-center gap-1.5">
-                                {/* Progress rides along with the CTA — an admin reporting game 2 of 2
-                                    wants to see that game 1 is already in. */}
-                                {isTeamInProgress && (
-                                    <Text className="text-[10px] font-black text-emerald-300/70 tracking-[0.5px]">
-                                        {teamProgress!.decided}/{teamProgress!.total}
-                                    </Text>
-                                )}
-                                <Ionicons name="chevron-forward" size={11} color="#34D399" />
-                            </View>
-                        </>
-                    )}
-                    {/* Ready check owed — takes the header over the plain "Scheduled" state, since
-                        it is the one thing these two players have to act on right now. */}
-                    {!canReport && showCheckIn && (
-                        <>
-                            <View className="flex-row items-center gap-1.5">
-                                <Ionicons name="hand-left-outline" size={11} color="#F59E0B" />
-                                <Text numberOfLines={1} className="text-[10px] font-black text-warning uppercase tracking-[1.5px]">
-                                    {t('card.checkIn')}
-                                </Text>
-                            </View>
-                            <Text className="text-[10px] font-black text-warning/70 tracking-[0.5px]">
-                                {checkedInCount}/2
+                {label && (
+                    <View style={styles.labelRow}>
+                        <Text
+                            className="flex-1 text-[10px] font-black uppercase tracking-[1.4px]"
+                            style={{ color: accent?.text ?? COLORS.slate500 }}
+                            numberOfLines={1}
+                        >
+                            {label.text}
+                        </Text>
+                        {!!label.trailing && (
+                            <Text style={[TABULAR, { color: accent?.text ?? COLORS.slate500, opacity: 0.75 }]} className="text-[10.5px] font-black ml-2">
+                                {label.trailing}
                             </Text>
-                        </>
-                    )}
+                        )}
+                        {(label.kind === 'report' || label.kind === 'approval') && (
+                            <Ionicons name="chevron-forward" size={12} color={accent?.text ?? COLORS.slate500} style={{ marginLeft: 4 }} />
+                        )}
+                    </View>
+                )}
 
-                    {/* Everyone without a report affordance still gets the live state. */}
-                    {!canReport && !isAwaitingApproval && !showCheckIn && isTeamInProgress && (
-                        <>
-                            <View className="flex-row items-center gap-1.5">
-                                <View className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                <Text numberOfLines={1} className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
-                                    {t('card.live')}
-                                </Text>
-                            </View>
-                            <Text className="text-[10px] font-black text-emerald-300/70 tracking-[0.5px]">
-                                {teamProgress!.decided}/{teamProgress!.total} Done
-                            </Text>
-                        </>
-                    )}
-                    {!canReport && isAwaitingApproval && (
-                        <>
-                            <View className="flex-row items-center gap-1.5">
-                                <Ionicons name="hourglass-outline" size={11} color="#F59E0B" />
-                                <Text numberOfLines={1} className="text-[10px] font-black text-warning uppercase tracking-[1.5px]">
-                                    {t('card.awaitingApproval')}
-                                </Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={11} color="#F59E0B" />
-                        </>
-                    )}
-                    {!canReport && !isAwaitingApproval && !showCheckIn && !isTeamInProgress && isScheduled && (
-                        <View className="flex-row items-center gap-1.5">
-                            <Ionicons name="time-outline" size={11} color="#34D399" />
-                            <Text numberOfLines={1} className="text-[10px] font-black text-emerald-300 uppercase tracking-[1.5px]">
-                                {t('card.scheduled')}
-                            </Text>
-                        </View>
-                    )}
-                    {!canReport && !isAwaitingApproval && isCompleted && !isDoubleWalkover && (
-                        <View className="flex-row items-center gap-1.5">
-                            <Ionicons name="checkmark-circle" size={11} color="#34D399" />
-                            <Text numberOfLines={1} className="text-[10px] font-bold text-slate-500 uppercase tracking-[1.5px]">
-                                {t('card.completed')}
-                            </Text>
-                        </View>
-                    )}
-                    {!canReport && !isAwaitingApproval && isDoubleWalkover && (
-                        <View className="flex-row items-center gap-1.5">
-                            <Ionicons name="play-skip-forward-outline" size={11} color="#F59E0B" />
-                            <Text numberOfLines={1} className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
-                                {t('card.doubleWalkover')}
-                            </Text>
-                        </View>
-                    )}
-                    {!canReport && isNoShow && (
-                        <View className="flex-row items-center gap-1.5">
-                            <Ionicons name="ban-outline" size={11} color="#F59E0B" />
-                            <Text numberOfLines={1} className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
-                                {t('card.noShow')}
-                            </Text>
-                        </View>
-                    )}
-                    {!canReport && isTieBreakNeeded && (
-                        <View className="flex-row items-center gap-1.5">
-                            <Ionicons name="flash-outline" size={11} color="#F59E0B" />
-                            <Text numberOfLines={1} className="text-[10px] font-bold text-warning uppercase tracking-[1.5px]">
-                                {t('card.tiebreakNeeded')}
-                            </Text>
-                        </View>
-                    )}
-                </View>
-            )}
-
-            {renderParticipant(home, 'top')}
-            <View className="h-px mx-4" style={{ backgroundColor: 'rgba(255,255,255,0.04)' }} />
-            {renderParticipant(away, 'bottom')}
-        </Pressable>
+                {renderSide(home, 'home')}
+                <View style={styles.divider} />
+                {renderSide(away, 'away')}
+            </RaisedCard>
+        </PressableScale>
     );
-}
+});
+
+const styles = StyleSheet.create({
+    card: {
+        overflow: 'hidden',
+        paddingVertical: 4,
+    },
+    rail: {
+        position: 'absolute',
+        left: 0,
+        top: 10,
+        bottom: 10,
+        width: 3,
+        borderTopRightRadius: 3,
+        borderBottomRightRadius: 3,
+    },
+    labelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 14,
+        paddingRight: 12,
+        paddingTop: 5,
+        paddingBottom: 1,
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: 44,
+        paddingLeft: 14,
+        paddingRight: 14,
+    },
+    divider: {
+        height: 1,
+        marginLeft: 14,
+        marginRight: 14,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    score: {
+        minWidth: 22,
+        marginLeft: 8,
+        textAlign: 'right',
+        fontSize: 17,
+        lineHeight: 22,
+        fontWeight: '900',
+    },
+    teamTile: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.10)',
+    },
+    meEdge: {
+        borderColor: 'rgba(52,211,153,0.6)',
+    },
+    emptyAvatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 999,
+        borderWidth: 1.5,
+        borderStyle: 'dashed',
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+});

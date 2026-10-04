@@ -14,6 +14,8 @@ export interface StatStripItem {
     /** Tiny caption underneath. */
     label: string;
     tone: StatStripTone;
+    /** 0–1: draws a thin bar along the cell's foot (how far through the matches the event is). */
+    progress?: number;
     onPress?: () => void;
 }
 
@@ -40,7 +42,7 @@ export function StatStrip({ items }: { items: StatStripItem[] }) {
             {items.map((item, index) => {
                 const color = TONES[item.tone];
                 const content = (
-                    <View className="flex-1 items-center justify-center py-2 px-1.5">
+                    <View className="flex-1 items-center justify-center pt-2 pb-2.5 px-1.5">
                         <View className="flex-row items-center gap-1.5">
                             <Ionicons name={item.icon} size={12} color={color} />
                             <Text
@@ -52,11 +54,19 @@ export function StatStrip({ items }: { items: StatStripItem[] }) {
                             </Text>
                         </View>
                         <Text
-                            className="text-[8px] font-black uppercase tracking-widest text-slate-500 mt-0.5"
+                            className="text-[9px] font-black uppercase tracking-[1.2px] text-slate-500 mt-0.5"
                             numberOfLines={1}
                         >
                             {item.label}
                         </Text>
+                        {item.progress != null && (
+                            <View className="absolute left-3 right-3 bottom-1 h-[2px] rounded-full bg-white/[0.06] overflow-hidden">
+                                <View
+                                    className="h-full rounded-full"
+                                    style={{ width: `${Math.round(Math.min(1, Math.max(0, item.progress)) * 100)}%`, backgroundColor: color }}
+                                />
+                            </View>
+                        )}
                     </View>
                 );
 

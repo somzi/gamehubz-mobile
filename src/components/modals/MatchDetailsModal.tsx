@@ -2,6 +2,7 @@
 import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import type { AvailabilityDraft } from '../match/HourlyAvailabilityPicker';
 import { HourlyAvailabilityPicker } from '../match/HourlyAvailabilityPicker';
@@ -51,6 +52,8 @@ import { ChatWorkspace } from '../../lib/chatWorkspace';
 import { appendMatchTabs, matchPresentation } from '../../lib/matchPresentation';
 import { SeriesScoreEntry } from '../match/SeriesScoreEntry';
 import { SeriesBreakdown } from '../match/SeriesBreakdown';
+import { ResultBoard } from '../match/ResultBoard';
+import { COLORS } from '../../lib/theme';
 import { scrollRowIntoView } from '../../lib/scrollIntoView';
 import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import {
@@ -1504,127 +1507,24 @@ export function MatchDetailsModal({
 
         return (
             <View>
-                {/* Score Card */}
-                <View className="mx-5 mt-4 mb-5">
-                    <View className="bg-[#111827]/60 rounded-[32px] border border-white/[0.06] p-6 overflow-hidden">
-                        {/* Status Badge */}
-                        <View className="items-center mb-5">
-                            <View className={cn(
-                                "px-4 py-1.5 rounded-full border",
-                                isNoShow ? "bg-warning/10 border-warning/20" : "bg-primary/10 border-primary/20"
-                            )}>
-                                <Text className={cn(
-                                    "text-[9px] font-black uppercase tracking-[3px]",
-                                    isNoShow ? "text-warning" : "text-primary"
-                                )}>
-                                    {isNoShow ? t('details.noShowHeading') : t('details.finalScore')}
-                                </Text>
-                            </View>
-                            {isNoShow && (
-                                <Text className="text-[10px] text-slate-500 mt-2 font-bold text-center px-6">
-                                    {t('details.nobodyPlayed')}
-                                </Text>
-                            )}
-                        </View>
-
-                        {/* Players & Score - fixed alignment */}
-                        <View className="flex-row items-start justify-between">
-                            {/* Home Player */}
-                            <Pressable onPress={() => navigateToProfile(matchDetails.homeUserId)} className="flex-1 items-center">
-                                {/* Avatar with winner ring — fixed size wrapper so border doesn't shift layout */}
-                                <View
-                                    style={{
-                                        width: 60,
-                                        height: 60,
-                                        borderRadius: 16,
-                                        borderWidth: 2,
-                                        borderColor: winner === 'home' ? 'rgba(16,185,129,0.4)' : 'transparent',
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    <PlayerAvatar
-                                        src={homeAvatar}
-                                        name={homeIdentity.username}
-                                        size="lg"
-                                        className="rounded-2xl border-0"
-                                    />
-                                </View>
-                                <PlayerIdentity
-                                    className="mt-2.5"
-                                    username={homeIdentity.username}
-                                    nickname={homeIdentity.nickname}
-                                    countryFlag={homeIdentity.countryFlag}
-                                    countryName={homeIdentity.countryName}
-                                    tone="home"
-                                    reserveNicknameSpace={pairingHasNickname}
-                                />
-                                {/* Always render winner space to keep names at same height */}
-                                <View className="mt-1.5 h-5 items-center justify-center">
-                                    {winner === 'home' && (
-                                        <View className="bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">{t('details.winner')}</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </Pressable>
-
-                            {/* Score Center — a no-show has no score to show, so dashes stand in
-                                for the 0:0 the DTO reports (see getWinnerSide). */}
-                            <View className="items-center px-2 pt-1">
-                                <View className="flex-row items-baseline">
-                                    <Text className={`text-5xl font-black ${winner === 'home' ? 'text-primary' : 'text-white/20'}`}>
-                                        {isNoShow ? '—' : matchDetails.homeUserScore}
-                                    </Text>
-                                    <Text className="text-2xl font-black text-white/10 mx-2">:</Text>
-                                    <Text className={`text-5xl font-black ${winner === 'away' ? 'text-primary' : 'text-white/20'}`}>
-                                        {isNoShow ? '—' : matchDetails.awayUserScore}
-                                    </Text>
-                                </View>
-                            </View>
-
-                            {/* Away Player */}
-                            <Pressable onPress={() => navigateToProfile(matchDetails.awayUserId)} className="flex-1 items-center">
-                                <View
-                                    style={{
-                                        width: 60,
-                                        height: 60,
-                                        borderRadius: 16,
-                                        borderWidth: 2,
-                                        borderColor: winner === 'away' ? 'rgba(16,185,129,0.4)' : 'transparent',
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    <PlayerAvatar
-                                        src={awayAvatar}
-                                        name={awayIdentity.username}
-                                        size="lg"
-                                        className="rounded-2xl border-0"
-                                    />
-                                </View>
-                                <PlayerIdentity
-                                    className="mt-2.5"
-                                    username={awayIdentity.username}
-                                    nickname={awayIdentity.nickname}
-                                    countryFlag={awayIdentity.countryFlag}
-                                    countryName={awayIdentity.countryName}
-                                    tone="away"
-                                    reserveNicknameSpace={pairingHasNickname}
-                                />
-                                <View className="mt-1.5 h-5 items-center justify-center">
-                                    {winner === 'away' && (
-                                        <View className="bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-                                            <Text className="text-[8px] font-black text-primary uppercase tracking-widest">{t('details.winner')}</Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </Pressable>
-                        </View>
-
-                        {/* Series breakdown. The big number above is the deciding series' tally —
-                            without the games behind it, "2 : 1" says nothing about what was played. */}
-                        <SeriesBreakdown className="mt-5" games={reportedGames} format={seriesFormat} />
-                    </View>
-                </View>
+                <ResultBoard
+                    className="mx-5 mt-4 mb-5"
+                    home={{ ...homeIdentity, userId: matchDetails.homeUserId, avatarUrl: homeAvatar }}
+                    away={{ ...awayIdentity, userId: matchDetails.awayUserId, avatarUrl: awayAvatar }}
+                    // A no-show has no score to show — the DTO reports 0:0 (see getWinnerSide).
+                    homeScore={isNoShow ? null : matchDetails.homeUserScore}
+                    awayScore={isNoShow ? null : matchDetails.awayUserScore}
+                    winner={winner}
+                    tone={isNoShow ? 'noShow' : 'final'}
+                    label={isNoShow ? t('details.noShowHeading') : t('details.finalScore')}
+                    note={isNoShow ? t('details.nobodyPlayed') : null}
+                    reserveNicknameSpace={pairingHasNickname}
+                    onPressSide={navigateToProfile}
+                >
+                    {/* The big number is the deciding series' tally — without the games behind it,
+                        "2 : 1" says nothing about what was played. */}
+                    <SeriesBreakdown className="mt-5" games={reportedGames} format={seriesFormat} />
+                </ResultBoard>
 
                 {/* What the result was verified with — the record an organizer reviews after the fact. */}
                 {showVerification && (
@@ -1639,73 +1539,65 @@ export function MatchDetailsModal({
                     />
                 )}
 
-                {/* Evidence Gallery — same collapsed row as the reporting view. */}
+                {/* Evidence Gallery — same collapsed row as the reporting view; with nothing attached it
+                    just says so. */}
                 <EvidenceSection
                     className="mx-5 mb-5"
                     uploadedCount={matchDetails.evidenceItems?.length ?? 0}
                     open={isEvidenceOpen}
                     onToggle={setIsEvidenceOpen}
                 >
-                    {matchDetails.evidenceItems && matchDetails.evidenceItems.length > 0 ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            {matchDetails.evidenceItems.map((item, idx) => (
-                                <EvidenceThumb
-                                    key={idx}
-                                    item={item}
-                                    width={144}
-                                    height={192}
-                                    className="mr-3"
-                                    onPress={() => setPreviewItem(item)}
-                                />
-                            ))}
-                        </ScrollView>
-                    ) : (
-                        <View className="bg-white/5 rounded-2xl py-6 items-center justify-center border border-white/10 border-dashed">
-                            <View className="w-10 h-10 rounded-full bg-indigo-500/10 items-center justify-center mb-2">
-                                <Ionicons name="images-outline" size={18} color="#818CF8" />
-                            </View>
-                            <Text className="text-[11px] font-black text-slate-400 uppercase tracking-widest w-full text-center" numberOfLines={1}>{t('details.noEvidenceAttached')}</Text>
-                        </View>
-                    )}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {(matchDetails.evidenceItems ?? []).map((item, idx) => (
+                            <EvidenceThumb
+                                key={idx}
+                                item={item}
+                                width={144}
+                                height={192}
+                                className="mr-3"
+                                onPress={() => setPreviewItem(item)}
+                            />
+                        ))}
+                    </ScrollView>
                 </EvidenceSection>
 
-                {/* Edit / Delete Result Buttons */}
+                {/* Edit / Delete Result */}
                 {canEditResult && (
-                    <View className="mx-5 mb-6 gap-3">
+                    <View className="mx-5 mb-6">
                         {error && (
-                            <View className="bg-red-500/10 p-3 rounded-2xl border border-red-500/20">
+                            <View className="bg-red-500/10 p-3 rounded-2xl border border-red-500/20 mb-3">
                                 <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
                             </View>
                         )}
-                        <Pressable
-                            onPress={handleEditResult}
-                            className="bg-white/[0.03] rounded-2xl border border-white/[0.06] p-4 flex-row items-center justify-center gap-2.5 active:opacity-70"
-                        >
-                            <View className="w-8 h-8 rounded-xl bg-primary/10 items-center justify-center">
-                                <Ionicons name="create-outline" size={16} color="#10B981" />
-                            </View>
-                            <Text className="text-sm font-black text-primary uppercase tracking-widest" numberOfLines={1}>
-                                {isNoShow ? t('details.enterResult') : t('details.editResult')}
-                            </Text>
-                        </Pressable>
-                        <Pressable
-                            onPress={handleDeleteResult}
-                            disabled={isDeletingResult}
-                            className="bg-red-500/[0.06] rounded-2xl border border-red-500/20 p-4 flex-row items-center justify-center gap-2.5 active:opacity-70"
-                        >
-                            {isDeletingResult ? (
-                                <ActivityIndicator size="small" color="#F87171" />
-                            ) : (
-                                <>
-                                    <View className="w-8 h-8 rounded-xl bg-red-500/10 items-center justify-center">
-                                        <Ionicons name="trash-outline" size={16} color="#F87171" />
-                                    </View>
-                                    <Text className="text-sm font-black text-red-400 uppercase tracking-widest" numberOfLines={1}>
-                                        {isNoShow ? t('details.undoNoShow') : t('details.deleteResultBtn')}
-                                    </Text>
-                                </>
-                            )}
-                        </Pressable>
+                        <View className="flex-row" style={{ gap: 10 }}>
+                            <Pressable
+                                onPress={handleEditResult}
+                                accessibilityRole="button"
+                                className="flex-1 h-12 flex-row items-center justify-center gap-2 px-3 rounded-2xl border border-emerald-400/30 bg-emerald-500/[0.08] active:opacity-70"
+                            >
+                                <Ionicons name="create-outline" size={17} color={COLORS.primaryBright} />
+                                <Text className="shrink text-[14px] font-bold text-emerald-300" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                    {isNoShow ? t('details.enterResult') : t('details.editResult')}
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                onPress={handleDeleteResult}
+                                disabled={isDeletingResult}
+                                accessibilityRole="button"
+                                className="flex-1 h-12 flex-row items-center justify-center gap-2 px-3 rounded-2xl border border-red-500/25 bg-red-500/[0.07] active:opacity-70"
+                            >
+                                {isDeletingResult ? (
+                                    <ActivityIndicator size="small" color="#F87171" />
+                                ) : (
+                                    <>
+                                        <Ionicons name={isNoShow ? 'arrow-undo-outline' : 'trash-outline'} size={17} color="#F87171" />
+                                        <Text className="shrink text-[14px] font-bold text-red-400" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                            {isNoShow ? t('details.undoNoShow') : t('details.deleteResultBtn')}
+                                        </Text>
+                                    </>
+                                )}
+                            </Pressable>
+                        </View>
                     </View>
                 )}
             </View>
@@ -1884,115 +1776,78 @@ export function MatchDetailsModal({
             ? homeIdentity.username
             : awayIdentity.username;
 
+        const showEdit = (isProposer || isPrivileged) && !isEditingProposal;
+
         return (
-            <View className="mx-5 mt-4 mb-3">
-                <View className="bg-[#111827]/60 rounded-[32px] border border-white/[0.06] p-6 overflow-hidden">
-                    <View className="items-center mb-5">
-                        <View className="bg-warning/10 px-4 py-1.5 rounded-full">
-                            <Text className="text-[9px] font-black text-warning uppercase tracking-[3px]">
-                                {isProposer ? t('details.awaitingApprovalHeading') : t('details.resultReported')}
-                            </Text>
-                        </View>
-                        <Text className="text-[10px] text-slate-400 mt-2 font-bold text-center">
-                            {isProposer
-                                ? t('details.opponentMustConfirm')
-                                : t('details.proposerReported', { name: proposerName })}
-                        </Text>
+            <View className="mb-5">
+                {error && (
+                    <View className="bg-red-500/10 p-3 rounded-2xl mb-3 border border-red-500/20">
+                        <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
                     </View>
-
-                    {error && (
-                        <View className="bg-red-500/10 p-3 rounded-2xl mb-4 border border-red-500/20">
-                            <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
-                        </View>
-                    )}
-
-                    <View className="flex-row items-start justify-between">
-                        <Pressable onPress={() => navigateToProfile(matchDetails.homeUserId)} className="flex-1 items-center">
-                            <PlayerAvatar src={homeAvatar} name={homeIdentity.username} size="lg" className="rounded-2xl border-0" />
-                            <PlayerIdentity
-                                className="mt-2.5"
-                                username={homeIdentity.username}
-                                nickname={homeIdentity.nickname}
-                                countryFlag={homeIdentity.countryFlag}
-                                countryName={homeIdentity.countryName}
-                                tone="home"
-                                reserveNicknameSpace={pairingHasNickname}
-                            />
-                        </Pressable>
-
-                        <View className="items-center px-2 pt-1">
-                            <View className="flex-row items-baseline">
-                                <Text className="text-5xl font-black text-warning">{phs}</Text>
-                                <Text className="text-2xl font-black text-white/10 mx-2">:</Text>
-                                <Text className="text-5xl font-black text-warning">{pas}</Text>
-                            </View>
-                        </View>
-
-                        <Pressable onPress={() => navigateToProfile(matchDetails.awayUserId)} className="flex-1 items-center">
-                            <PlayerAvatar src={awayAvatar} name={awayIdentity.username} size="lg" className="rounded-2xl border-0" />
-                            <PlayerIdentity
-                                className="mt-2.5"
-                                username={awayIdentity.username}
-                                nickname={awayIdentity.nickname}
-                                countryFlag={awayIdentity.countryFlag}
-                                countryName={awayIdentity.countryName}
-                                tone="away"
-                                reserveNicknameSpace={pairingHasNickname}
-                            />
-                        </Pressable>
-                    </View>
-
+                )}
+                <ResultBoard
+                    home={{ ...homeIdentity, userId: matchDetails.homeUserId, avatarUrl: homeAvatar }}
+                    away={{ ...awayIdentity, userId: matchDetails.awayUserId, avatarUrl: awayAvatar }}
+                    homeScore={phs}
+                    awayScore={pas}
+                    winner={null}
+                    tone="proposed"
+                    label={isProposer ? t('details.awaitingApprovalHeading') : t('details.resultReported')}
+                    note={isProposer ? t('details.opponentMustConfirm') : t('details.proposerReported', { name: proposerName })}
+                    reserveNicknameSpace={pairingHasNickname}
+                    onPressSide={navigateToProfile}
+                >
                     {/* The games behind the proposed headline. Approving is a judgement on what was
                         played, so the same breakdown the settled result gets belongs here too —
                         otherwise the decision is made on a single number. */}
                     <SeriesBreakdown className="mt-5" games={proposedGames} format={seriesFormat} tone="proposed" />
 
-                    {(canDecideOnProposal || ((isProposer || isPrivileged) && !isEditingProposal)) && (
-                        <View className="flex-row gap-2.5 mt-6">
+                    {(canDecideOnProposal || showEdit) && (
+                        <View className="flex-row mt-5" style={{ gap: 10 }}>
                             {canDecideOnProposal && (
                                 <Pressable
                                     onPress={handleRejectProposal}
                                     disabled={isRejecting || isApproving}
-                                    className="flex-1 bg-red-500/10 border border-red-500/20 rounded-2xl py-3.5 items-center active:opacity-70"
+                                    accessibilityRole="button"
+                                    className="flex-1 h-12 rounded-2xl items-center justify-center px-2 border border-red-500/25 bg-red-500/[0.08] active:opacity-70"
                                 >
                                     {isRejecting ? (
                                         <ActivityIndicator size="small" color="#F87171" />
                                     ) : (
-                                        <Text className="text-xs font-black text-red-400 uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('details.reject')}</Text>
+                                        <Text className="text-[14px] font-bold text-red-400" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t('details.reject')}</Text>
                                     )}
                                 </Pressable>
                             )}
-                            {canDecideOnProposal && (
-                                <Pressable
-                                    onPress={handleApproveProposal}
-                                    disabled={isApproving || isRejecting}
-                                    className="flex-1 bg-primary rounded-2xl py-3.5 items-center active:opacity-80"
-                                >
-                                    {isApproving ? (
-                                        <ActivityIndicator size="small" color="#0F172A" />
-                                    ) : (
-                                        <Text className="text-xs font-black text-primary-foreground uppercase tracking-wider w-full text-center" numberOfLines={1}>{t('details.approve')}</Text>
-                                    )}
-                                </Pressable>
-                            )}
-                            {(isProposer || isPrivileged) && !isEditingProposal && (
+                            {showEdit && (
                                 <Pressable
                                     onPress={() => {
                                         setHomeScore(String(phs ?? ''));
                                         setAwayScore(String(pas ?? ''));
                                         setIsEditingProposal(true);
                                     }}
-                                    className="flex-1 bg-warning/10 border border-warning/25 rounded-2xl py-3.5 items-center active:opacity-70"
+                                    accessibilityRole="button"
+                                    className="flex-1 h-12 rounded-2xl items-center justify-center px-2 border border-amber-400/30 bg-amber-500/[0.08] active:opacity-70"
                                 >
-                                    <Text className="text-xs font-black text-warning uppercase tracking-wider w-full text-center" numberOfLines={1}>{tCommon('edit')}</Text>
+                                    <Text className="text-[14px] font-bold text-amber-300" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tCommon('edit')}</Text>
+                                </Pressable>
+                            )}
+                            {canDecideOnProposal && (
+                                <Pressable
+                                    onPress={handleApproveProposal}
+                                    disabled={isApproving || isRejecting}
+                                    accessibilityRole="button"
+                                    className="flex-1 h-12 rounded-2xl items-center justify-center px-2 bg-primary active:opacity-80"
+                                >
+                                    {isApproving ? (
+                                        <ActivityIndicator size="small" color="#0F172A" />
+                                    ) : (
+                                        <Text className="text-[14px] font-black text-primary-foreground" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{t('details.approve')}</Text>
+                                    )}
                                 </Pressable>
                             )}
                         </View>
                     )}
-                </View>
-
-                {/* Slim divider before the evidence section */}
-                <View className="h-px bg-white/[0.08] mt-5" />
+                </ResultBoard>
             </View>
         );
     };
@@ -2379,34 +2234,52 @@ export function MatchDetailsModal({
                     paddingBottom: modalBottomPadding,
                 }}
             >
-                {/* Header Bar */}
-                <View className="flex-row items-center justify-between px-6 pb-4 mb-1 border-b border-white/5">
-                    <Pressable onPress={onClose} className="w-10 h-10 rounded-full bg-white/5 items-center justify-center active:bg-white/10">
-                        <Ionicons name="close" size={20} color="#94A3B8" />
-                    </Pressable>
-                    <View className="items-center flex-1 mx-4">
+                {/* Header — the tournament's violet-and-gold tile, as on the Home match window */}
+                <View className="flex-row items-center px-5 pb-4">
+                    <LinearGradient
+                        colors={['#4C1D95', '#312E81']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 16,
+                            marginRight: 14,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: 'rgba(251,191,36,0.35)',
+                        }}
+                    >
+                        <Ionicons name="trophy" size={21} color="#FBBF24" />
+                    </LinearGradient>
+                    <View className="flex-1 mr-3">
                         <Text
-                            className="text-sm font-black text-white uppercase tracking-[3px] w-full text-center"
-                            numberOfLines={1}
+                            className="text-white font-black tracking-tight"
+                            style={{ fontSize: 20, lineHeight: 24 }}
+                            numberOfLines={2}
                             adjustsFontSizeToFit
-                            minimumFontScale={0.7}
+                            minimumFontScale={0.75}
                         >
                             {tournamentName}
                         </Text>
-                        <Text className="text-[10px] text-slate-500 font-bold mt-0.5">{roundName}</Text>
+                        {!!roundName && (
+                            <Text className="text-[12.5px] font-semibold text-slate-400 mt-0.5" numberOfLines={1}>
+                                {roundName}
+                            </Text>
+                        )}
                     </View>
-                    {/* Same 40pt footprint whichever way it renders, so the title stays centred
-                        and nothing shifts when the user moves between tabs. */}
-                    {activeTab === 'chat' && showChatTab && chatMute.isMuted !== null ? (
+                    {activeTab === 'chat' && showChatTab && chatMute.isMuted !== null && (
                         <Pressable
                             onPress={chatMute.toggle}
                             disabled={chatMute.isSaving}
                             hitSlop={6}
+                            accessibilityRole="button"
                             className={cn(
-                                'w-10 h-10 rounded-full items-center justify-center border active:opacity-60',
+                                'w-10 h-10 rounded-2xl items-center justify-center border mr-2 active:opacity-60',
                                 chatMute.isMuted
                                     ? 'bg-warning/10 border-warning/30'
-                                    : 'bg-white/5 border-white/[0.06]',
+                                    : 'bg-white/[0.05] border-white/10',
                                 chatMute.isSaving && 'opacity-50',
                             )}
                         >
@@ -2416,10 +2289,24 @@ export function MatchDetailsModal({
                                 color={chatMute.isMuted ? '#F59E0B' : '#94A3B8'}
                             />
                         </Pressable>
-                    ) : (
-                        <View className="w-10" />
                     )}
+                    <Pressable
+                        onPress={onClose}
+                        accessibilityRole="button"
+                        className="w-10 h-10 rounded-2xl items-center justify-center bg-white/[0.05] border border-white/10 active:opacity-60"
+                    >
+                        <Ionicons name="close" size={18} color="#94A3B8" />
+                    </Pressable>
                 </View>
+
+                {/* Hairline under the header, fading out at both ends */}
+                <LinearGradient
+                    pointerEvents="none"
+                    colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.09)', 'rgba(255,255,255,0)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ height: 1 }}
+                />
 
                 {holding ? (
                     <View className="flex-1 items-center justify-center" accessibilityRole="progressbar">
@@ -2434,30 +2321,75 @@ export function MatchDetailsModal({
                     </View>
                 ) : (
                 <>
-                <View className="mx-6 mt-3 mb-2 rounded-2xl bg-card border border-white/[0.04]">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 4 }}>
-                        {orderedTabs.map(tab => {
-                            const enabled = availableTabs.includes(tab) && (!preview || tab === 'match');
-                            return <Pressable key={tab} accessibilityRole="tab"
-                                accessibilityState={{ selected: activeTab === tab, disabled: !enabled }}
-                                disabled={!enabled} onPress={() => setActiveTab(tab)}
-                                style={{ width: 112, opacity: enabled ? 1 : 0.4 }}
-                                className={cn('py-2.5 px-1 items-center justify-center rounded-xl', activeTab === tab ? 'bg-primary/15' : 'bg-transparent')}>
-                                <View className="flex-row items-center gap-1">
-                                    {(tab === 'chat' || tab === 'insights') && <Ionicons name={tab === 'chat' ? 'chatbubbles-outline' : 'pulse'} size={12} color={activeTab === tab ? '#10B981' : '#64748B'} />}
-                                    <Text numberOfLines={1} className={cn('text-[10px] font-black uppercase', activeTab === tab ? 'text-primary' : 'text-slate-500')}>
+                <View
+                    className="flex-row mx-5 mt-4 mb-2 rounded-2xl p-1"
+                    style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', gap: 4 }}
+                >
+                    {orderedTabs.map(tab => {
+                        const enabled = availableTabs.includes(tab) && (!preview || tab === 'match');
+                        const active = activeTab === tab;
+                        // Stats wears indigo, as on the Home match window; the rest emerald.
+                        const tint = tab === 'insights'
+                            ? { glow: '#818CF8', from: 'rgba(129,140,248,0.28)', to: 'rgba(129,140,248,0.10)', text: 'text-indigo-300', icon: '#A5B4FC' }
+                            : { glow: '#10B981', from: 'rgba(16,185,129,0.28)', to: 'rgba(16,185,129,0.10)', text: 'text-emerald-300', icon: '#34D399' };
+                        return (
+                            <Pressable
+                                key={tab}
+                                accessibilityRole="tab"
+                                accessibilityState={{ selected: active, disabled: !enabled }}
+                                disabled={!enabled}
+                                onPress={() => setActiveTab(tab)}
+                                className="flex-1 py-2.5 px-1 items-center justify-center rounded-xl overflow-hidden"
+                                style={[
+                                    { opacity: enabled ? 1 : 0.4 },
+                                    active && { shadowColor: tint.glow, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+                                ]}
+                            >
+                                {active && (
+                                    <LinearGradient
+                                        colors={[tint.from, tint.to]}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 0, y: 1 }}
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                                    />
+                                )}
+                                <View className="flex-row items-center gap-1.5 max-w-full">
+                                    {(tab === 'chat' || tab === 'insights') && (
+                                        <Ionicons
+                                            name={tab === 'chat' ? 'chatbubbles-outline' : 'pulse'}
+                                            size={12}
+                                            color={active ? tint.icon : COLORS.slate500}
+                                        />
+                                    )}
+                                    <Text
+                                        numberOfLines={1}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.8}
+                                        className={cn(
+                                            'shrink font-black uppercase',
+                                            orderedTabs.length >= 4 ? 'text-[10px] tracking-wider' : 'text-xs tracking-widest',
+                                            active ? tint.text : 'text-slate-500',
+                                        )}
+                                    >
                                         {tabLabels[tab]}
                                     </Text>
-                                    {((tab === 'chat' && adminHelpRequested) || (tab === 'schedule' && scheduleNeedsAttention)) && <View className="w-1.5 h-1.5 rounded-full bg-warning" />}
-                                    {tab === 'stream' && hasLiveStream && <Text className="text-[8px] text-red-400 font-bold">{t('details.liveBadge')}</Text>}
+                                    {((tab === 'chat' && adminHelpRequested) || (tab === 'schedule' && scheduleNeedsAttention)) && (
+                                        <View className="w-1.5 h-1.5 rounded-full bg-warning" />
+                                    )}
+                                    {tab === 'stream' && hasLiveStream && (
+                                        <View className="flex-row items-center gap-1 bg-red-500/15 px-1.5 py-0.5 rounded-md">
+                                            <View className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                            <Text className="text-[8px] text-red-400 font-black">{t('details.liveBadge')}</Text>
+                                        </View>
+                                    )}
                                 </View>
-                            </Pressable>;
-                        })}
-                    </ScrollView>
+                            </Pressable>
+                        );
+                    })}
                 </View>
 
                 {preview ? (
-                    <View className="flex-1 px-6 pt-5">
+                    <View className="flex-1 px-5 pt-5">
                         <View className="flex-row items-center justify-between gap-4 rounded-3xl bg-white/5 p-5">
                             {[home, away].map((player, index) => <Pressable key={index} className="flex-1 items-center gap-3"
                                 disabled={!player?.userId} onPress={() => player?.userId && navigateToProfile(player.userId)}>
@@ -2475,7 +2407,7 @@ export function MatchDetailsModal({
                 ) : (
                 <>
                 {activeTab === 'insights' && showInsightsTab ? (
-                    <View className="flex-1 px-6 pt-2">
+                    <View className="flex-1 px-5 pt-2">
                         <MatchInsightsPanel
                             active={visible && activeTab === 'insights'}
                             primary={insightPrimary}
@@ -2487,7 +2419,7 @@ export function MatchDetailsModal({
                 ) : activeTab === 'schedule' && showScheduleTab && adminAvailability ? (
                     <ScrollView
                         keyboardShouldPersistTaps="handled"
-                        className="flex-1 px-6 pt-2"
+                        className="flex-1 px-5 pt-2"
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 32 }}
                     >
@@ -2505,7 +2437,7 @@ export function MatchDetailsModal({
                         />
                     </ScrollView>
                 ) : activeTab === 'stream' && showStreamTab ? (
-                    <View className="flex-1 px-6 pt-2">
+                    <View className="flex-1 px-5 pt-2">
                         <MatchStreamPanel
                             matchId={matchId}
                             isParticipant={isParticipant}

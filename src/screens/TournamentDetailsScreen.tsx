@@ -13,7 +13,8 @@ import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
 import { BracketMatch, teamProgressFrom, checkInFrom } from '../components/bracket/BracketMatch';
-import { SeriesFormatChip, matchSeriesFormat } from '../components/bracket/SeriesFormatChip';
+import { matchSeriesFormat } from '../components/bracket/SeriesFormatChip';
+import { BracketSectionTitle, ChampionPlate } from '../components/bracket/BracketChrome';
 
 import { Button } from '../components/ui/Button';
 import { PlayerAvatar } from '../components/ui/PlayerAvatar';
@@ -204,6 +205,40 @@ const pickDefaultStageIndex = (stages: any[]): number => {
     return lastWithContent;
 };
 
+/** Icon per StageType: groups, league, single elimination, winners, losers, Swiss, play-in. */
+const STAGE_ICONS: Record<number, keyof typeof Ionicons.glyphMap> = {
+    1: 'grid',
+    2: 'list',
+    3: 'git-network',
+    4: 'trophy',
+    5: 'return-down-forward',
+    6: 'shuffle',
+    7: 'enter',
+};
+
+/** A stage's groups in tab order: Group A, Group B, … Group Z, Group AA — see compareGroupNames. */
+const sortGroupsForTabs = (stage: any): any[] =>
+    [...(stage?.groups ?? stage?.Groups ?? [])].sort((a: any, b: any) =>
+        compareGroupNames(a?.name ?? a?.Name, b?.name ?? b?.Name)
+    );
+
+/**
+ * Tab index of the group the viewer plays in, or -1. Solo rows carry the player's user id; team
+ * rows carry none, so they match on the viewer's team instead.
+ */
+const findViewerGroupIndex = (groups: any[], userId?: string, team?: TeamDto | null): number => {
+    const me = userId?.toLowerCase();
+    const teamId = (team?.teamId ?? team?.TeamId)?.toLowerCase();
+    const teamName = (team?.teamName ?? team?.TeamName)?.trim().toLowerCase();
+    if (!me && !teamId && !teamName) return -1;
+
+    return groups.findIndex((g: any) => (g?.standings ?? g?.Standings ?? []).some((s: any) => {
+        if (me && String(s?.userId ?? s?.UserId ?? '').toLowerCase() === me) return true;
+        if (teamId && String(s?.participantId ?? s?.ParticipantId ?? '').toLowerCase() === teamId) return true;
+        return !!teamName && String(s?.name ?? s?.Name ?? '').trim().toLowerCase() === teamName;
+    }));
+};
+
 /**
  * What a tournament looked like the last time it was open in this app session: the overview, the
  * roster and the teams. Opening it again paints this at once instead of a loading screen, and the
@@ -352,6 +387,11 @@ export default function TournamentDetailsScreen() {
     // not yank the user off a stage they picked by hand.
     const autoSelectedStageForId = useRef<string | null>(null);
     const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
+    // Stage (tournament:stage) whose group tab has already been opened on the viewer's own group —
+    // once per stage, and never after they pick a group themselves.
+    const autoSelectedGroupFor = useRef<string | null>(null);
+    const groupStripRef = useRef<ScrollView>(null);
+    const groupChipX = useRef<Record<number, number>>({});
     const [loadingBracket, setLoadingBracket] = useState(false);
     const [bracketError, setBracketError] = useState<string | null>(null);
     // Until the first structure response the bracket tab has nothing to say yet, not "no bracket".
@@ -2244,6 +2284,7 @@ export default function TournamentDetailsScreen() {
                 icon: progressSummary.remaining > 0 ? 'stats-chart' : 'checkmark-done',
                 value: `${Math.round((progressSummary.done / progressSummary.total) * 100)}%`,
                 label: t('details.progress'),
+                progress: progressSummary.done / progressSummary.total,
                 tone: progressSummary.remaining > 0 ? 'info' : 'primary',
                 onPress: () => setShowProgressModal(true),
             });
@@ -2336,10 +2377,10 @@ export default function TournamentDetailsScreen() {
                 {canSwap && (
                     <Pressable
                         onPress={() => setShowSwapModal(true)}
-                        className="w-full flex-row items-center justify-center gap-2 py-3 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 active:opacity-70"
+                        className="w-full flex-row items-center justify-center gap-2 py-3 rounded-2xl border border-white/10 bg-white/[0.04] active:opacity-70"
                     >
-                        <Ionicons name="swap-horizontal" size={16} color="#818CF8" />
-                        <Text className="text-sm font-bold text-indigo-300">{t('details.swapSeeds')}</Text>
+                        <Ionicons name="swap-horizontal" size={16} color={COLORS.slate300} />
+                        <Text className="text-sm font-bold text-slate-200">{t('details.swapSeeds')}</Text>
                     </Pressable>
                 )}
                 {showReset && (
@@ -2444,6 +2485,32 @@ export default function TournamentDetailsScreen() {
         return { currentStage, stageType, isLosersBracket, swissZones, groupZones, swissTotalRounds, stageRounds, thirdPlaceMatch, grandFinalMatch, grandFinalResetMatch, bracketRounds };
     }, [stages, selectedStageIndex, tournament]);
 
+    // Group stages open on the viewer's own group instead of Group A: in an eight-group stage the
+    // player came to see their table, not the first one. Team tournaments wait for the team to load.
+    useEffect(() => {
+        const stage = stages[selectedStageIndex];
+        if (!stage) return;
+        const key = `${id}:${stage.stageId ?? stage.StageId ?? selectedStageIndex}`;
+        if (autoSelectedGroupFor.current === key) return;
+
+        const groups = sortGroupsForTabs(stage);
+        if (groups.length === 0) {
+            autoSelectedGroupFor.current = key;
+            return;
+        }
+        const index = findViewerGroupIndex(groups, user?.id, userTeam);
+        if (index < 0 && tournament?.isTeamTournament && !userTeam) return;
+
+        autoSelectedGroupFor.current = key;
+        if (index > 0) {
+            setSelectedGroupIndex(index);
+            // Strip already on screen: its chips won't lay out again, so scroll it here. Not on
+            // screen yet: the chip scrolls itself into view when it mounts.
+            const x = groupChipX.current[index];
+            if (x != null) requestAnimationFrame(() => groupStripRef.current?.scrollTo({ x: Math.max(0, x - 16), animated: true }));
+        }
+    }, [stages, selectedStageIndex, id, user?.id, userTeam, tournament?.isTeamTournament]);
+
     const renderStages = () => {
         // Not fetched yet, or the fetch failed: neither means there is no bracket, and the empty
         // state below offered an organiser "Create bracket" over one that already exists.
@@ -2496,40 +2563,119 @@ export default function TournamentDetailsScreen() {
         if (!stageDerivation) return null;
         const { currentStage, stageType, isLosersBracket, swissZones, groupZones, swissTotalRounds, stageRounds, thirdPlaceMatch, grandFinalMatch, grandFinalResetMatch, bracketRounds } = stageDerivation;
 
+        // A match outside the tree (grand final, reset, third place), full width under its heading.
+        const renderStandaloneMatch = (match: any) => (
+            <BracketMatch
+                home={match.home}
+                away={match.away}
+                startTime={match.startTime}
+                status={match.status}
+                onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(match)}
+                currentUserId={user?.id}
+                currentUsername={user?.username}
+                isAdmin={canManage}
+                isTeamTournament={tournament?.isTeamTournament}
+                proposedByUserId={match.proposedByUserId ?? match.ProposedByUserId ?? null}
+                teamProgress={teamProgressFrom(match)}
+                checkIn={checkInFrom(match)}
+            />
+        );
+
         return (
             <View key={currentStage.stageId || selectedStageIndex} className="mb-8">
-                {stages.length > 1 && (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        className="px-4 mb-6"
-                        contentContainerStyle={{ gap: 8 }}
-                    >
-                        {stages.map((stage, idx) => (
+                {stages.length > 1 && (() => {
+                    // Each phase as a tile: what it is, and how far through its matches it is.
+                    const tiles = stages.map((stage: any, idx: number) => {
+                        const counted = stageMatches(stage).filter((m: any) => {
+                            const home = m.home ?? m.Home;
+                            const away = m.away ?? m.Away;
+                            // A bye is settled at the draw and was never a game.
+                            return !(isMatchDecided(m) && !home !== !away);
+                        });
+                        return {
+                            stage,
+                            idx,
+                            type: Number(stage?.type ?? stage?.Type),
+                            total: counted.length,
+                            done: counted.filter(isMatchDecided).length,
+                        };
+                    });
+                    const renderTile = (tile: (typeof tiles)[number], stretch: boolean) => {
+                        const active = selectedStageIndex === tile.idx;
+                        const waiting = tile.total === 0;
+                        const finished = !waiting && tile.done === tile.total;
+                        return (
                             <Pressable
-                                key={stage.stageId || idx}
+                                key={tile.stage.stageId || tile.idx}
                                 onPress={() => {
-                                    setSelectedStageIndex(idx);
+                                    setSelectedStageIndex(tile.idx);
                                     setSelectedGroupIndex(0); // Reset group on stage change
                                 }}
+                                accessibilityRole="tab"
+                                accessibilityState={{ selected: active }}
                                 className={cn(
-                                    "px-4 py-2 rounded-full border",
-                                    selectedStageIndex === idx
-                                        ? "bg-primary border-primary"
-                                        : "bg-muted/10 border-border/10"
+                                    "flex-row items-center gap-3 pl-2.5 pr-3 py-2.5 rounded-2xl border",
+                                    stretch ? "flex-1" : "w-[176px]",
+                                    active
+                                        ? "bg-emerald-500/[0.08] border-emerald-400/35"
+                                        : "bg-card border-white/[0.06] active:bg-white/[0.04]"
                                 )}
                             >
-                                <Text className={cn(
-                                    "text-xs font-bold",
-                                    selectedStageIndex === idx ? "text-primary-foreground" : "text-muted-foreground"
+                                <View className={cn(
+                                    "w-[34px] h-[34px] rounded-[11px] items-center justify-center",
+                                    active ? "bg-emerald-500/[0.16]" : "bg-white/[0.05]"
                                 )}>
-                                    {stage.name || t('details.stageNumber', { number: idx + 1 })}
-                                </Text>
+                                    <Ionicons name={STAGE_ICONS[tile.type] ?? 'layers'} size={16} color={active ? '#34D399' : COLORS.slate400} />
+                                </View>
+                                <View className="flex-1">
+                                    <Text
+                                        className={cn("text-[14px] font-bold", active ? "text-white" : "text-slate-300")}
+                                        numberOfLines={1}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.8}
+                                    >
+                                        {tile.stage.name || t('details.stageNumber', { number: tile.idx + 1 })}
+                                    </Text>
+                                    <View className="flex-row items-center mt-1.5" style={{ gap: 6 }}>
+                                        {waiting && <Ionicons name="hourglass-outline" size={11} color={COLORS.slate500} />}
+                                        <View className="flex-1 h-[3px] rounded-full bg-white/[0.07] overflow-hidden">
+                                            {!waiting && (
+                                                <View
+                                                    className="h-full rounded-full"
+                                                    style={{
+                                                        width: `${Math.round((tile.done / tile.total) * 100)}%`,
+                                                        backgroundColor: active || finished ? '#34D399' : 'rgba(52,211,153,0.55)',
+                                                    }}
+                                                />
+                                            )}
+                                        </View>
+                                        {finished ? (
+                                            <Ionicons name="checkmark-circle" size={13} color="#34D399" />
+                                        ) : !waiting ? (
+                                            <Text style={{ fontVariant: ['tabular-nums'] }} className="text-[11px] font-semibold text-slate-400">
+                                                {tile.done}/{tile.total}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                </View>
                             </Pressable>
-                        ))}
-                    </ScrollView>
-                )}
-
+                        );
+                    };
+                    return stages.length <= 2 ? (
+                        <View className="flex-row px-4 mb-5" style={{ gap: 10 }}>
+                            {tiles.map((tile) => renderTile(tile, true))}
+                        </View>
+                    ) : (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            className="mb-5"
+                            contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}
+                        >
+                            {tiles.map((tile) => renderTile(tile, false))}
+                        </ScrollView>
+                    );
+                })()}
 
                 {stageRounds.length > 0 ? (
                     <>
@@ -2556,108 +2702,57 @@ export default function TournamentDetailsScreen() {
                                 tournamentStatus={tournament?.status}
                                 isTeamTournament={tournament?.isTeamTournament}
                                 headerLeft={adminPills}
+                                showChampion={stageType === 3 && !grandFinalMatch}
                             />
                         )}
                         {grandFinalMatch && (
                             <View className="px-4 mt-6">
-                                <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
-                                    <Ionicons name="trophy" size={16} color="#FBBF24" />
-                                    <Text className="text-sm font-bold text-white">{t('details.grandFinal')}</Text>
-                                    {matchSeriesFormat(grandFinalMatch) && (
-                                        <SeriesFormatChip
-                                            format={matchSeriesFormat(grandFinalMatch)!}
-                                            isTeamTournament={tournament?.isTeamTournament}
-                                            style={{ marginLeft: 2 }}
-                                        />
-                                    )}
-                                </View>
-                                <View style={{ maxWidth: 320 }}>
-                                    <BracketMatch
-                                        home={grandFinalMatch.home}
-                                        away={grandFinalMatch.away}
-                                        startTime={grandFinalMatch.startTime}
-                                        status={grandFinalMatch.status}
-                                        onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(grandFinalMatch)}
-                                        currentUserId={user?.id}
-                                        currentUsername={user?.username}
-                                        isAdmin={canManage}
-                                        isTeamTournament={tournament?.isTeamTournament}
-                                        teamProgress={teamProgressFrom(grandFinalMatch)}
-                                        checkIn={checkInFrom(grandFinalMatch)}
-                                    />
-                                </View>
+                                <BracketSectionTitle
+                                    icon="trophy"
+                                    color="#FBBF24"
+                                    title={t('details.grandFinal')}
+                                    format={matchSeriesFormat(grandFinalMatch)}
+                                    isTeamTournament={tournament?.isTeamTournament}
+                                />
+                                {renderStandaloneMatch(grandFinalMatch)}
                             </View>
                         )}
                         {grandFinalResetMatch && (
                             <View className="px-4 mt-6">
-                                <View className="flex-row items-center mb-3" style={{ gap: 6 }}>
-                                    <Ionicons name="trophy" size={16} color="#FBBF24" />
-                                    <Text className="text-sm font-bold text-white">{t('details.grandFinalReset')}</Text>
-                                    {matchSeriesFormat(grandFinalResetMatch) && (
-                                        <SeriesFormatChip
-                                            format={matchSeriesFormat(grandFinalResetMatch)!}
-                                            isTeamTournament={tournament?.isTeamTournament}
-                                            style={{ marginLeft: 2 }}
-                                        />
-                                    )}
-                                </View>
-                                <View style={{ maxWidth: 320 }}>
-                                    <BracketMatch
-                                        home={grandFinalResetMatch.home}
-                                        away={grandFinalResetMatch.away}
-                                        startTime={grandFinalResetMatch.startTime}
-                                        status={grandFinalResetMatch.status}
-                                        onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(grandFinalResetMatch)}
-                                        currentUserId={user?.id}
-                                        currentUsername={user?.username}
-                                        isAdmin={canManage}
-                                        isTeamTournament={tournament?.isTeamTournament}
-                                        teamProgress={teamProgressFrom(grandFinalResetMatch)}
-                                        checkIn={checkInFrom(grandFinalResetMatch)}
-                                    />
-                                </View>
+                                <BracketSectionTitle
+                                    icon="trophy"
+                                    color="#FBBF24"
+                                    title={t('details.grandFinalReset')}
+                                    format={matchSeriesFormat(grandFinalResetMatch)}
+                                    isTeamTournament={tournament?.isTeamTournament}
+                                />
+                                {renderStandaloneMatch(grandFinalResetMatch)}
                             </View>
                         )}
+                        {grandFinalMatch && (() => {
+                            // The reset, when the losers-bracket side forced one, is what crowns.
+                            const decider = grandFinalResetMatch ?? grandFinalMatch;
+                            const champion = decider.status === 4
+                                ? (decider.home?.isWinner ? decider.home : decider.away?.isWinner ? decider.away : null)
+                                : null;
+                            return (
+                                <View className="px-4 mt-4">
+                                    <ChampionPlate champion={champion} isTeamTournament={tournament?.isTeamTournament} />
+                                </View>
+                            );
+                        })()}
                         {thirdPlaceMatch && (thirdPlaceMatch.home || thirdPlaceMatch.away) && (
-                            <View className="px-4 mt-4">
-                                <Pressable
-                                    onPress={() => setIsThirdPlaceExpanded(prev => !prev)}
-                                    className="flex-row items-center justify-between mb-3"
-                                >
-                                    <View className="flex-row items-center" style={{ gap: 6 }}>
-                                        <Ionicons name="medal-outline" size={16} color="#CD7F32" />
-                                        <Text className="text-sm font-bold text-white">{t('details.thirdPlaceMatch')}</Text>
-                                        {matchSeriesFormat(thirdPlaceMatch) && (
-                                            <SeriesFormatChip
-                                                format={matchSeriesFormat(thirdPlaceMatch)!}
-                                                isTeamTournament={tournament?.isTeamTournament}
-                                                style={{ marginLeft: 2 }}
-                                            />
-                                        )}
-                                    </View>
-                                    <Ionicons
-                                        name={isThirdPlaceExpanded ? 'chevron-up' : 'chevron-down'}
-                                        size={16}
-                                        color="#94A3B8"
-                                    />
-                                </Pressable>
-                                {isThirdPlaceExpanded && (
-                                    <View style={{ maxWidth: 320 }}>
-                                        <BracketMatch
-                                            home={thirdPlaceMatch.home}
-                                            away={thirdPlaceMatch.away}
-                                            startTime={thirdPlaceMatch.startTime}
-                                            status={thirdPlaceMatch.status}
-                                            onPress={() => (tournament?.isTeamTournament ? handleTeamMatchPress : handleMatchPress)(thirdPlaceMatch)}
-                                            currentUserId={user?.id}
-                                            currentUsername={user?.username}
-                                            isAdmin={canManage}
-                                            isTeamTournament={tournament?.isTeamTournament}
-                                            teamProgress={teamProgressFrom(thirdPlaceMatch)}
-                                            checkIn={checkInFrom(thirdPlaceMatch)}
-                                        />
-                                    </View>
-                                )}
+                            <View className="px-4 mt-6">
+                                <BracketSectionTitle
+                                    icon="medal"
+                                    color="#D4925A"
+                                    title={t('details.thirdPlaceMatch')}
+                                    format={matchSeriesFormat(thirdPlaceMatch)}
+                                    isTeamTournament={tournament?.isTeamTournament}
+                                    expanded={isThirdPlaceExpanded}
+                                    onToggle={() => setIsThirdPlaceExpanded(prev => !prev)}
+                                />
+                                {isThirdPlaceExpanded && renderStandaloneMatch(thirdPlaceMatch)}
                             </View>
                         )}
                     </>
@@ -2667,38 +2762,55 @@ export default function TournamentDetailsScreen() {
                         {adminPills && (
                             <View className="px-4 mb-4 flex-row">{adminPills}</View>
                         )}
-                        {/* Group A, Group B, … Group Z, Group AA — see compareGroupNames */}
                         {(() => {
-                            const sortedGroups = [...currentStage.groups].sort((a: any, b: any) =>
-                                compareGroupNames(a.name, b.name)
-                            );
+                            const sortedGroups = sortGroupsForTabs(currentStage);
+                            const viewerGroupIndex = findViewerGroupIndex(sortedGroups, user?.id, userTeam);
                             return (
                                 <>
                                     <ScrollView
+                                        ref={groupStripRef}
                                         horizontal
                                         showsHorizontalScrollIndicator={false}
-                                        className="px-4 mb-6"
-                                        contentContainerStyle={{ gap: 8 }}
+                                        className="mb-5"
+                                        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
                                     >
-                                        {sortedGroups.map((group: any, idx: number) => (
-                                            <Pressable
-                                                key={group.groupId || idx}
-                                                onPress={() => setSelectedGroupIndex(idx)}
-                                                className={cn(
-                                                    "px-4 py-2 rounded-lg border",
-                                                    selectedGroupIndex === idx
-                                                        ? "bg-accent/20 border-accent/40"
-                                                        : "bg-muted/5 border-border/5"
-                                                )}
-                                            >
-                                                <Text className={cn(
-                                                    "text-xs font-bold",
-                                                    selectedGroupIndex === idx ? "text-accent" : "text-muted-foreground"
-                                                )}>
-                                                    {group.name || groupName(idx, sortedGroups.length)}
-                                                </Text>
-                                            </Pressable>
-                                        ))}
+                                        {sortedGroups.map((group: any, idx: number) => {
+                                            const active = selectedGroupIndex === idx;
+                                            return (
+                                                <Pressable
+                                                    key={group.groupId || idx}
+                                                    onPress={() => {
+                                                        autoSelectedGroupFor.current = `${id}:${currentStage.stageId ?? currentStage.StageId ?? selectedStageIndex}`;
+                                                        setSelectedGroupIndex(idx);
+                                                    }}
+                                                    // The viewer's group can sit far down the strip — bring it into view
+                                                    // when the tab opens on it.
+                                                    onLayout={(e) => {
+                                                        groupChipX.current[idx] = e.nativeEvent.layout.x;
+                                                        if (active) groupStripRef.current?.scrollTo({ x: Math.max(0, e.nativeEvent.layout.x - 16), animated: false });
+                                                    }}
+                                                    accessibilityRole="tab"
+                                                    accessibilityState={{ selected: active }}
+                                                    className={cn(
+                                                        "h-9 flex-row items-center gap-1.5 px-4 rounded-full border",
+                                                        active
+                                                            ? "bg-emerald-500/[0.14] border-emerald-400/40"
+                                                            : "bg-card border-white/[0.06] active:bg-white/[0.05]"
+                                                    )}
+                                                >
+                                                    {/* Where the viewer plays */}
+                                                    {idx === viewerGroupIndex && (
+                                                        <View className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                    )}
+                                                    <Text className={cn(
+                                                        "text-[13px] font-bold",
+                                                        active ? "text-emerald-300" : "text-slate-400"
+                                                    )}>
+                                                        {group.name || groupName(idx, sortedGroups.length)}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
                                     </ScrollView>
 
                                     {sortedGroups[selectedGroupIndex] && (

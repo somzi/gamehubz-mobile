@@ -24,6 +24,8 @@
     "lbSemifinal": "LB: полуфинал",
     "live": "Идёт",
     "matches": "Матчи",
+    "roundOf": "Раунд {{n}} из {{total}}",
+    "champion": "Чемпион",
     "noShow": "Неявка",
     "perGame": " · ЗА ИГРУ",
     "player": "Игрок",
