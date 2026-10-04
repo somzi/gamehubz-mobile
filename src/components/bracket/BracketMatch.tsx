@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PlayerAvatar } from '../ui/PlayerAvatar';
 import { PressableScale } from '../ui/PressableScale';
 import { RaisedCard } from '../ui/RaisedCard';
@@ -260,12 +261,12 @@ export function matchCardLabel(
 }
 
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
-const DIMMED = 0.5;
 
 /**
- * A knockout match: the two sides stacked, the winner bright and the loser faded, and a line on
- * top saying where it stands — in the state's colour, with a rail of the same colour down the
- * left edge. Kept under the bracket's 130px slot; the bracket centres it there, so the connector
+ * A knockout match: the two sides stacked, the winner's row on a soft green wash with its score in
+ * green — readable at the bracket's small zoom, where a ring or a badge would be a speck — and
+ * nobody faded. A line on top says where the match stands, in the state's colour, with a rail of
+ * the same colour down the left edge. Kept under the bracket's 130px slot; the bracket centres it there, so the connector
  * lines meet it in the middle whatever its height.
  */
 export const BracketMatch = React.memo(function BracketMatch({ home, away, startTime, status, className, onMyPath, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, checkIn }: BracketMatchProps) {
@@ -274,9 +275,10 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
     const label = matchCardLabel(s, t, teamProgress, true);
     const accent = label?.accent ?? null;
 
-    const nobodyPlayed = s.isNoShow || s.isDoubleWalkover;
-    const decided = s.isCompleted && (!!home?.isWinner || !!away?.isWinner);
     const emptyLabel = s.isCompletedBye ? t('bye') : t('common:app.tbd');
+    // A winner exists: the other score steps back to grey. A level series still owing a tiebreak
+    // has no winner, so both of its scores stay white.
+    const decided = !!home?.isWinner || !!away?.isWinner;
 
     const renderSide = (participant: Participant | null, side: 'home' | 'away') => {
         if (!participant) {
@@ -293,7 +295,6 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
 
         const isMe = side === 'home' ? s.isHome : s.isAway;
         const won = !!participant.isWinner;
-        const dimmed = nobodyPlayed || (decided && !won);
         const hasScore = participant.score !== null && participant.score !== undefined;
         // Mid-fixture stand-in for the final score: games won so far by this side.
         const liveScore = !hasScore && s.isTeamInProgress && teamProgress
@@ -301,7 +302,16 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
             : null;
 
         return (
-            <View style={[styles.row, dimmed && { opacity: DIMMED }]}>
+            <View style={styles.row}>
+                {won && (
+                    <LinearGradient
+                        pointerEvents="none"
+                        colors={['rgba(16,185,129,0.16)', 'rgba(16,185,129,0.03)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                    />
+                )}
                 {isTeamTournament ? (
                     <View style={[styles.teamTile, isMe && styles.meEdge]}>
                         <Ionicons name="people" size={15} color={isMe ? CARD_ACCENT.go.text : COLORS.slate400} />
@@ -330,7 +340,13 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
                     style={[
                         TABULAR,
                         styles.score,
-                        { color: hasScore || liveScore !== null ? '#FFFFFF' : COLORS.slate600 },
+                        {
+                            color: won
+                                ? CARD_ACCENT.go.text
+                                : liveScore !== null || (hasScore && !decided)
+                                    ? '#FFFFFF'
+                                    : hasScore ? COLORS.slate400 : COLORS.slate600,
+                        },
                     ]}
                 >
                     {hasScore ? participant.score : liveScore !== null ? liveScore : '–'}
