@@ -188,6 +188,42 @@ export function MatchTimingStrip({
 
 
 /**
+ * One-line "when is it played" bar for a collapsed match card — the deadline bar's twin, so a
+ * card reads its two times the same way, one under the other. Date and clock only (no "today").
+ * Renders nothing without an agreed kick-off.
+ */
+export function MatchTimeBar({
+    matchTimeIso,
+    iconColor = COLORS.primary,
+    className,
+}: {
+    matchTimeIso?: string | null;
+    /** The card section's colour. */
+    iconColor?: string;
+    className?: string;
+}) {
+    const { t } = useTranslation('match');
+    const matchDate = useMemo(() => toDate(matchTimeIso), [matchTimeIso]);
+    if (!matchDate) return null;
+
+    return (
+        <View className={cn('flex-row items-center', className)} style={{ gap: 5 }}>
+            <Ionicons name="time-outline" size={12} color={iconColor} />
+            <Text numberOfLines={1} className="text-[11px] font-medium text-slate-500">
+                {t('timing.matchTime')}
+            </Text>
+            <Text
+                numberOfLines={1}
+                style={{ fontVariant: ['tabular-nums'] }}
+                className="flex-1 text-[11px] font-bold text-slate-200"
+            >
+                {formatShortStamp(matchDate)}
+            </Text>
+        </View>
+    );
+}
+
+/**
  * One-line "when is this due" bar for a collapsed match card.
  *
  * The full strip only lives inside the match modal, so a player scrolling Home had no way to

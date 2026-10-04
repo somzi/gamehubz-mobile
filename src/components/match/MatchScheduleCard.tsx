@@ -9,7 +9,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HourlyAvailabilityPicker } from './HourlyAvailabilityPicker';
-import { MatchTimingStrip, MatchDeadlineBar } from './MatchTimingStrip';
+import { MatchTimingStrip, MatchDeadlineBar, MatchTimeBar } from './MatchTimingStrip';
 import { hapticError, hapticSuccess } from '../../lib/haptics';
 import { MatchCheckInPanel, MatchCheckInBar, type MatchCheckInState } from './MatchCheckInPanel';
 import { PlayerIdentity, hasNickname } from './PlayerIdentity';
@@ -117,11 +117,11 @@ const FACE_TONES: Record<MatchStatus, { accent: string; text: string }> = {
 
 const TABULAR = { fontVariant: ['tabular-nums' as const] };
 
-// 24-hour, like the Match Time box inside the sheet.
+// 24-hour, like the Match Time box inside the sheet. Read out in the card's accessibility label.
 const formatKickOffClock = (d: Date) =>
     d.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 
-// The kick-off date on the clock tile's band: day and short month in the locale's order
+// The kick-off date for the same label: day and short month in the locale's order
 // ("30. sep", "Sep 30").
 const formatKickOffDate = (d: Date) =>
     d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' });
@@ -1067,14 +1067,15 @@ function MatchScheduleCardBase({
     }
 
     const tone = FACE_TONES[currentStatus];
-    // The tile on the right is the card's clock, drawn like a small calendar page: the date on a
-    // coloured band, the kick-off time underneath. A match with no agreed time shows an empty
-    // clock, which is exactly why it sits under Needs Attention. "Agreed outside the app" is
-    // booked but has no time to print.
+    // The kick-off sits at the foot of the card, on the line above the deadline. A match with no
+    // agreed time has none to show, which is exactly why it sits under Needs Attention; "Agreed
+    // outside the app" is booked but has no time to print, so its line under the name says so.
     const kickOff = matchTimeIso ? parseUtcDate(matchTimeIso) : null;
     const hasKickOff = !!kickOff && !isNaN(kickOff.getTime());
     const kickOffClock = kickOff && hasKickOff ? formatKickOffClock(kickOff) : null;
     const kickOffDate = kickOff && hasKickOff ? formatKickOffDate(kickOff) : null;
+    const deadlineDate = localDeadline && localDeadline !== 'TBD' ? parseUtcDate(localDeadline) : null;
+    const hasDeadline = !!deadlineDate && !isNaN(deadlineDate.getTime());
     const opponentGameName = !isSetAvailability && hasNickname(opponentNickname) ? opponentNickname!.trim() : null;
 
     return (
@@ -1212,53 +1213,8 @@ function MatchScheduleCardBase({
                                 </View>
                             )}
 
-                            <View
-                                style={{
-                                    width: 68,
-                                    height: 44,
-                                    borderRadius: 12,
-                                    overflow: 'hidden',
-                                    borderWidth: 1,
-                                    borderColor: tone.accent + '66',
-                                    backgroundColor: 'rgba(2, 6, 23, 0.55)',
-                                }}
-                            >
-                                <View
-                                    className="items-center justify-center px-1"
-                                    style={{ height: 15, backgroundColor: tone.accent }}
-                                >
-                                    {kickOffDate ? (
-                                        <Text
-                                            className="text-[9px] leading-[11px] font-black uppercase tracking-[0.6px]"
-                                            style={{ color: COLORS.background }}
-                                            numberOfLines={1}
-                                            adjustsFontSizeToFit
-                                            minimumFontScale={0.75}
-                                        >
-                                            {kickOffDate}
-                                        </Text>
-                                    ) : (
-                                        <Ionicons
-                                            name={isSetAvailability ? 'calendar' : 'checkmark'}
-                                            size={10}
-                                            color={COLORS.background}
-                                        />
-                                    )}
-                                </View>
-                                <View className="flex-1 items-center justify-center">
-                                    {kickOffClock ? (
-                                        <Text style={TABULAR} className="text-[16px] leading-[20px] font-black text-white" numberOfLines={1}>
-                                            {kickOffClock}
-                                        </Text>
-                                    ) : isSetAvailability ? (
-                                        <Text style={[TABULAR, { color: tone.text }]} className="text-[16px] leading-[20px] font-black">
-                                            --:--
-                                        </Text>
-                                    ) : (
-                                        <Ionicons name="checkmark-done" size={18} color={COLORS.foreground} />
-                                    )}
-                                </View>
-                            </View>
+                            {/* The whole card opens the match — same cue as the Highlights cards below. */}
+                            <Ionicons name="chevron-forward" size={16} color={COLORS.slate600} />
                         </View>
 
                         {/* Ready check, when this match is running one. Sits above the deadline
@@ -1280,14 +1236,15 @@ function MatchScheduleCardBase({
                             />
                         )}
 
-                        {/* Round deadline. It only lived inside the modal, so nothing on a list
-                            told a player which of their open matches was about to time out.
-                            Renders nothing without a deadline, and is meaningless once played. */}
-                        {currentStatus !== 'completed' && (
-                            <MatchDeadlineBar
-                                deadline={localDeadline}
-                                className="mt-2 pt-2 border-t border-white/[0.06]"
-                            />
+                        {/* When it's played and when it's due, one quiet line each under a shared
+                            hairline. The deadline only lived inside the modal, so nothing on a list
+                            told a player which open match was about to time out; it means nothing
+                            once the match is played. Neither line renders without its time. */}
+                        {(hasKickOff || (currentStatus !== 'completed' && hasDeadline)) && (
+                            <View className="mt-2 pt-2 border-t border-white/[0.06]" style={{ gap: 5 }}>
+                                <MatchTimeBar matchTimeIso={matchTimeIso} iconColor={tone.accent} />
+                                {currentStatus !== 'completed' && <MatchDeadlineBar deadline={localDeadline} />}
+                            </View>
                         )}
                     </View>
                 </RaisedCard>
