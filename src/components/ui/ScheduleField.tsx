@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatSchedulePickerValue } from '../../lib/utils';
+import { RAISED_FIELD } from './FormField';
 
 function withAlpha(hex: string, alpha: number): string {
     const c = hex.replace('#', '');
@@ -50,8 +51,8 @@ export function ScheduleField({
                 onPress={onPress}
                 disabled={disabled}
                 activeOpacity={0.7}
-                className={`bg-black/25 border border-white/[0.08] rounded-[14px] px-3 py-2.5 flex-row items-center ${disabled ? 'opacity-50' : ''}`}
-                style={{ minHeight: 56 }}
+                className={`border rounded-[14px] px-3 py-2.5 flex-row items-center ${disabled ? 'opacity-50' : ''}`}
+                style={{ minHeight: 56, ...RAISED_FIELD }}
             >
                 <View
                     className="w-9 h-9 rounded-xl items-center justify-center mr-2.5"

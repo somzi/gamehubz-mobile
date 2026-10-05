@@ -7,16 +7,21 @@ interface SegmentedToggleProps {
     value: string;
     onChange: (value: string) => void;
     disabled?: boolean;
+    /** The lighter surface the tournament form uses for its fields. */
+    raised?: boolean;
 }
 
 /** Segmented control for small exclusive choices (YES/NO, SOLO/TEAM, SINGLE/DOUBLE), set into the
  *  form like the fields around it. The active segment fills with the primary green. */
-export function SegmentedToggle({ options, value, onChange, disabled = false }: SegmentedToggleProps) {
+export function SegmentedToggle({ options, value, onChange, disabled = false, raised = false }: SegmentedToggleProps) {
     return (
-        <View className={cn(
-            "bg-black/25 p-1 rounded-[14px] flex-row border border-white/[0.08]",
-            disabled && "opacity-50"
-        )}>
+        <View
+            className={cn(
+                "bg-black/25 p-1 rounded-[14px] flex-row border border-white/[0.08]",
+                disabled && "opacity-50"
+            )}
+            style={raised ? { backgroundColor: 'rgba(148,163,184,0.09)', borderColor: 'rgba(148,163,184,0.18)' } : undefined}
+        >
             {options.map(opt => {
                 const active = opt.value === value;
                 return (

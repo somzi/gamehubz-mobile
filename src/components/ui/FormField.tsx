@@ -17,6 +17,16 @@ export const FIELD_HINT = 'text-[11px] leading-4 text-slate-500 mt-1.5 ml-0.5';
 export const FIELD_PLACEHOLDER = COLORS.slate600;
 
 const SAVE_GRADIENT = ['#1FBF88', '#0E9F6E'] as const;
+
+/**
+ * A lighter, glassy surface for a control that sits on a panel: lifted off the card rather than sunk
+ * into it. The tournament form uses it for every field; the darker inset stays the default.
+ */
+export const RAISED_FIELD = {
+    backgroundColor: 'rgba(148,163,184,0.09)',
+    borderColor: 'rgba(148,163,184,0.18)',
+    borderTopColor: 'rgba(255,255,255,0.13)',
+} as const;
 const FOCUS_BORDER = 'rgba(52,211,153,0.55)';
 
 /** A block of the form: card navy, hairline edge, a brighter top edge. */
@@ -28,10 +38,12 @@ interface FieldInputProps extends TextInputProps {
     label?: string;
     icon?: keyof typeof Ionicons.glyphMap;
     hint?: string;
+    /** The lighter surface (RAISED_FIELD) instead of the dark inset. */
+    raised?: boolean;
 }
 
 /** Labelled inset field; the edge and icon turn emerald while it has focus. */
-export function FieldInput({ label, icon, hint, multiline, style, onFocus, onBlur, ...props }: FieldInputProps) {
+export function FieldInput({ label, icon, hint, multiline, raised = false, style, onFocus, onBlur, ...props }: FieldInputProps) {
     const [focused, setFocused] = useState(false);
 
     return (
@@ -40,8 +52,11 @@ export function FieldInput({ label, icon, hint, multiline, style, onFocus, onBlu
             <View
                 style={[
                     styles.field,
+                    raised && RAISED_FIELD,
                     multiline ? styles.fieldMultiline : styles.fieldSingle,
                     focused && { borderColor: FOCUS_BORDER },
+                    // A locked field reads as one at a glance.
+                    props.editable === false && { opacity: 0.5 },
                 ]}
             >
                 {icon ? (

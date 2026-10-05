@@ -23,6 +23,12 @@
     "groupsBracket": "Grupe + eliminacija",
     "swiss": "Švajcarski sistem"
   },
+  "formatGroupHint": {
+    "league": "Svako igra sa svakim",
+    "bracket": "Žreb na ispadanje",
+    "groupsBracket": "Grupe, pa eliminacija",
+    "swiss": "Parovi po učinku svake runde"
+  },
   "form": {
     "newTournament": "Novi turnir",
     "createTournament": "Napravi turnir",

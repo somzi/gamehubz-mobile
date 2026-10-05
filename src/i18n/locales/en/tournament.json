@@ -23,6 +23,12 @@
     "groupsBracket": "Groups + Bracket",
     "swiss": "Swiss"
   },
+  "formatGroupHint": {
+    "league": "Everyone plays everyone",
+    "bracket": "Knockout bracket",
+    "groupsBracket": "Groups, then a knockout",
+    "swiss": "Paired by record each round"
+  },
   "form": {
     "newTournament": "New Tournament",
     "createTournament": "Create Tournament",

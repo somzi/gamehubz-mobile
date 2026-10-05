@@ -23,6 +23,12 @@
     "groupsBracket": "Grupos + Chaveamento",
     "swiss": "Suíço"
   },
+  "formatGroupHint": {
+    "league": "Todos contra todos",
+    "bracket": "Chave eliminatória",
+    "groupsBracket": "Grupos e depois mata-mata",
+    "swiss": "Pares por desempenho a cada rodada"
+  },
   "form": {
     "newTournament": "Novo torneio",
     "createTournament": "Criar torneio",

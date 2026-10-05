@@ -8,35 +8,39 @@ import {
     Pressable,
     Modal,
     KeyboardAvoidingView,
+    Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ENDPOINTS, authenticatedFetch } from '../../lib/api';
-import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TOURNAMENT_FORMAT_OPTIONS, TournamentFormat, TournamentRegion } from '../../types/tournament';
+import { SWISS_KNOCKOUT_OPTIONS, TEAM_TOURNAMENT_FORMATS, TournamentFormat, TournamentRegion } from '../../types/tournament';
 import { useTranslation } from 'react-i18next';
 import { CountryPicker } from '../ui/CountryPicker';
 import { DateTimePickerModal } from './DateTimePickerModal';
 import { ScheduleField } from '../ui/ScheduleField';
-import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FIELD_LABEL, FIELD_INPUT, FIELD_MULTILINE, FIELD_HINT, FIELD_PLACEHOLDER, GradientButton } from '../ui/FormField';
+import { FIELD_HINT, GradientButton, FormPanel } from '../ui/FormField';
+import { StepHeader, Field, ChoiceCards, Choice, ToggleCard, FormError, FormStep, StepArrow, SelectField, FormInput } from '../tournament/TournamentFormKit';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
-import { dateLocale } from '../../i18n';
 import { PRIVATE_COLORS } from '../ui/PrivateBadge';
 import { useQueryClient } from '@tanstack/react-query';
+import { useKeyboardInset } from '../../hooks/useKeyboardInset';
+import { useFormScroll, FormScrollProvider } from '../ui/FormScroll';
 import { invalidateTournamentData } from '../../lib/queryPolicy';
 
-// Values stay at module scope; labels are resolved per render so a language switch applies.
-const YES_NO_OPTIONS = [
-    { value: 'no', labelKey: 'common:no' },
-    { value: 'yes', labelKey: 'common:yes' },
-] as const;
+// The form's steps, the same as when creating: who it is, who plays, how it is played, the rules of
+// a match, when.
+const STEP_KEYS = ['basics', 'players', 'format', 'matches', 'schedule'] as const;
+// Space between the fields of one panel.
+const PANEL_GAP = { gap: 18 };
 
-// Violet into gold: the tournament's colours from its cover and share card.
-const TOURNAMENT_EDGE = ['rgba(167,139,250,0)', 'rgba(167,139,250,0.7)', 'rgba(251,191,36,0.6)', 'rgba(251,191,36,0)'] as const;
+// The format as it is picked: a bracket is one choice, with single or double elimination under it.
+type FormatGroup = 'league' | 'bracket' | 'groups-bracket' | 'swiss';
+
 
 interface EditTournamentModalProps {
     visible: boolean;
@@ -116,9 +120,6 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const { t: tTeam } = useTranslation('team');
     const swissKnockoutOptions = useMemo(
         () => SWISS_KNOCKOUT_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
-    const tournamentFormatOptions = useMemo(
-        () => TOURNAMENT_FORMAT_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
-    const yesNoOptions = useMemo(() => YES_NO_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
     const regions = useMemo(() => REGION_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
     const durationUnits = useMemo(() => DURATION_UNIT_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
     const teamWinConditions = useMemo(() => TEAM_WIN_CONDITION_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t]);
@@ -240,25 +241,23 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [showDurationUnitPicker, setShowDurationUnitPicker] = useState(false);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showFormatPicker, setShowFormatPicker] = useState(false);
     const [showRegionPicker, setShowRegionPicker] = useState(false);
     const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
     const [showStartDatePicker, setShowStartDatePicker] = useState(false);
     const [showRegDeadlinePicker, setShowRegDeadlinePicker] = useState(false);
     const [showRegOpensPicker, setShowRegOpensPicker] = useState(false);
-    const [showTeamWinConditionPicker, setShowTeamWinConditionPicker] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const getFormatLabel = () => {
-        return tournamentFormatOptions.find(f => f.value === selectedFormat)?.label || t('form.selectFormat');
-    };
-
-    // Team tournaments only support a subset of formats (no Swiss / Groups-then-X), so the
-    // picker is restricted to those. Solo tournaments get the full list. The format stays
-    // editable until the tournament starts (canEditAll), since no bracket exists yet.
-    const formatOptions = isTeamTournament
-        ? tournamentFormatOptions.filter(o => TEAM_TOURNAMENT_FORMATS.some(f => f === Number(o.value)))
-        : tournamentFormatOptions;
+    // One step on screen at a time; every step stays one tap away on the bar above.
+    const [step, setStep] = useState(0);
+    const keyboardUp = useKeyboardInset(0, visible) > 0;
+    // Moves the step to the field being typed in; each step's scroll starts back at the top.
+    const formScroll = useFormScroll();
+    useEffect(() => { formScroll.resetOffset(); }, [step, formScroll.resetOffset]);
+    useEffect(() => {
+        if (!visible) return;
+        setStep(0);
+    }, [visible]);
 
     // Number of bracket entrants: players for solo, teams for team tournaments.
     // Use the editable teamSize so the format/third-place gates reflect the user's pending edit.
@@ -310,6 +309,36 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         && selectedFormat !== String(TournamentFormat.SingleElimination)
         && selectedFormat !== String(TournamentFormat.DoubleElimination);
     const firstPhaseLabel = isSwiss ? t('form.swissRounds') : t('form.groupStage');
+
+    const formatGroup: FormatGroup =
+        selectedFormat === String(TournamentFormat.League) ? 'league' :
+        selectedFormat === String(TournamentFormat.GroupStageWithKnockout) ? 'groups-bracket' :
+        isSwiss ? 'swiss' : 'bracket';
+    // Switching into 'bracket' keeps the current single / double choice; otherwise single.
+    const handleFormatGroupChange = (group: FormatGroup) => {
+        if (group === 'league') setSelectedFormat(String(TournamentFormat.League));
+        else if (group === 'bracket') {
+            if (selectedFormat !== String(TournamentFormat.SingleElimination)
+                && selectedFormat !== String(TournamentFormat.DoubleElimination)) {
+                setSelectedFormat(String(TournamentFormat.SingleElimination));
+            }
+        } else if (group === 'groups-bracket') setSelectedFormat(String(TournamentFormat.GroupStageWithKnockout));
+        else setSelectedFormat(String(TournamentFormat.Swiss));
+    };
+    // For a bracket the choice IS the format (3 vs 4); after groups or Swiss it is the knockout's style.
+    const showElimChoice = formatGroup === 'bracket' || showKnockoutTypeToggle;
+    const currentElimType: '1' | '2' = formatGroup === 'bracket'
+        ? (selectedFormat === String(TournamentFormat.DoubleElimination) ? '2' : '1')
+        : (knockoutType === '2' ? '2' : '1');
+    const setCurrentElimType = (value: '1' | '2') => {
+        if (formatGroup === 'bracket') {
+            setSelectedFormat(value === '2'
+                ? String(TournamentFormat.DoubleElimination)
+                : String(TournamentFormat.SingleElimination));
+        } else {
+            setKnockoutType(value);
+        }
+    };
 
     useEffect(() => {
         if (!isTeamTournament) {
@@ -398,85 +427,78 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         return prizeCurrencies.find(c => c.value === prizeCurrency)?.label || t('form.currency');
     };
 
-    const handleSave = async () => {
-        if (!name.trim()) {
-            setError(t('validation.nameRequired'));
-            return;
-        }
-
-        if (!maxPlayers || isNaN(parseInt(maxPlayers)) || parseInt(maxPlayers) <= 0) {
-            setError(t('validation.maxPlayersRequired'));
-            return;
-        }
-
-        if (isTeamTournament) {
-            const selectedFormatValue = Number(selectedFormat);
-            const isAllowedTeamFormat = TEAM_TOURNAMENT_FORMATS.some((format) => format === selectedFormatValue);
-            if (!isAllowedTeamFormat) {
-                setError(t('validation.teamFormatUnsupported'));
-                return;
-            }
-            // Team size and Max Players must still produce ≥ 2 teams once the bracket is built.
-            if (canEditAll) {
-                const ts = parseInt(teamSize);
-                if (!teamSize || isNaN(ts) || ts < 2 || ts > 11) {
-                    setError(t('validation.teamSizeRange'));
-                    return;
-                }
-                const mp = parseInt(maxPlayers);
-                if (mp < ts * 2) {
-                    setError(t('validation.maxPlayersForTeams', { min: ts * 2 }));
-                    return;
-                }
-                if (allowReserves) {
-                    const mr = parseInt(maxReserves);
-                    if (!maxReserves || isNaN(mr) || mr < 1 || mr > 11) {
-                        setError(t('validation.reservesRange'));
-                        return;
+    // What stops each step — checked on every Save, which then opens the step that needs fixing.
+    const stepError = (index: number): string | null => {
+        switch (STEP_KEYS[index]) {
+            case 'basics':
+                if (!name.trim()) return t('validation.nameRequired');
+                return null;
+            case 'players': {
+                if (!maxPlayers || isNaN(parseInt(maxPlayers)) || parseInt(maxPlayers) <= 0) return t('validation.maxPlayersRequired');
+                // Team size and Max Players must still produce ≥ 2 teams once the bracket is built.
+                if (isTeamTournament && canEditAll) {
+                    const ts = parseInt(teamSize);
+                    if (!teamSize || isNaN(ts) || ts < 2 || ts > 11) return t('validation.teamSizeRange');
+                    if (parseInt(maxPlayers) < ts * 2) return t('validation.maxPlayersForTeams', { min: ts * 2 });
+                    if (allowReserves) {
+                        const mr = parseInt(maxReserves);
+                        if (!maxReserves || isNaN(mr) || mr < 1 || mr > 11) return t('validation.reservesRange');
                     }
                 }
+                if (canEditAll && scopeMode === 'country' && selectedCountries.length === 0) return t('validation.countryRequired');
+                return null;
+            }
+            case 'format': {
+                if (isTeamTournament && !TEAM_TOURNAMENT_FORMATS.some((format) => format === Number(selectedFormat))) {
+                    return t('validation.teamFormatUnsupported');
+                }
+                if (selectedFormat === String(TournamentFormat.DoubleElimination) && participantCount > 0 && participantCount < 4) {
+                    return t('validation.doubleElimMinPlayers');
+                }
+                // Groups + Bracket pads the knockout up to the next power of two with byes (single- and
+                // double-elimination alike), so any qualifier count >= 2 works.
+                if (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers < 2) {
+                    return t('validation.groupsQualifiersMin');
+                }
+                if (isSwiss && swissKnockoutSize > 0) {
+                    if (swissKnockoutSize > participantCount) {
+                        return t('validation.knockoutExceedsPlayers', { knockout: swissKnockoutSize, players: participantCount });
+                    }
+                    if (isNaN(swissDirectCount) || swissDirectCount < 0 || swissDirectCount > swissKnockoutSize) {
+                        return t('validation.directQualifiersRange', { max: swissKnockoutSize });
+                    }
+                    if (swissPlayInPlayers > 0 && swissDirectCount + swissPlayInPlayers > participantCount) {
+                        return t('validation.playInNeedsPlayers', { needed: swissDirectCount + swissPlayInPlayers, direct: swissDirectCount, playIn: swissPlayInPlayers, players: participantCount });
+                    }
+                }
+                return null;
+            }
+            case 'matches':
+                return null;
+            case 'schedule': {
+                // Moving the opening past the deadline would leave a tournament nobody can ever join.
+                if (isScheduled && registrationOpensAt && registrationDeadline) {
+                    const opensAt = new Date(String(registrationOpensAt).replace(' ', 'T'));
+                    const deadline = new Date(String(registrationDeadline).replace(' ', 'T'));
+                    if (opensAt >= deadline) return t('validation.opensBeforeDeadline');
+                }
+                return null;
             }
         }
+        return null;
+    };
 
-        if (canEditAll && scopeMode === 'country' && selectedCountries.length === 0) {
-            setError(t('validation.countryRequired'));
-            return;
-        }
+    const goToStep = (index: number) => {
+        setError(null);
+        setStep(Math.max(0, Math.min(index, STEP_KEYS.length - 1)));
+    };
 
-        // Moving the opening past the deadline would leave a tournament nobody can ever join.
-        if (isScheduled && registrationOpensAt && registrationDeadline) {
-            const opensAt = new Date(String(registrationOpensAt).replace(' ', 'T'));
-            const deadline = new Date(String(registrationDeadline).replace(' ', 'T'));
-
-            if (opensAt >= deadline) {
-                setError(t('validation.opensBeforeDeadline'));
-                return;
-            }
-        }
-
-        if (selectedFormat === String(TournamentFormat.DoubleElimination) && participantCount > 0 && participantCount < 4) {
-            setError(t('validation.doubleElimMinPlayers'));
-            return;
-        }
-
-        // Groups + Bracket pads the knockout up to the next power of two with byes (single- and
-        // double-elimination alike), so any qualifier count >= 2 works.
-        if (selectedFormat === String(TournamentFormat.GroupStageWithKnockout) && groupsTotalQualifiers < 2) {
-            setError(t('validation.groupsQualifiersMin'));
-            return;
-        }
-
-        if (isSwiss && swissKnockoutSize > 0) {
-            if (swissKnockoutSize > participantCount) {
-                setError(t('validation.knockoutExceedsPlayers', { knockout: swissKnockoutSize, players: participantCount }));
-                return;
-            }
-            if (isNaN(swissDirectCount) || swissDirectCount < 0 || swissDirectCount > swissKnockoutSize) {
-                setError(t('validation.directQualifiersRange', { max: swissKnockoutSize }));
-                return;
-            }
-            if (swissPlayInPlayers > 0 && swissDirectCount + swissPlayInPlayers > participantCount) {
-                setError(t('validation.playInNeedsPlayers', { needed: swissDirectCount + swissPlayInPlayers, direct: swissDirectCount, playIn: swissPlayInPlayers, players: participantCount }));
+    const handleSave = async () => {
+        for (let index = 0; index < STEP_KEYS.length; index++) {
+            const problem = stepError(index);
+            if (problem) {
+                setStep(index);
+                setError(problem);
                 return;
             }
         }
@@ -594,23 +616,6 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         }
     };
 
-    // `standalone` = rendered on its own in a column. The default flex-1 is for row
-    // usage — in an auto-height column flex-1 collapses the field to height 0 and it
-    // paints over the next field.
-    const renderSelectField = (label: string, value: string, onPress: () => void, disabled = false, standalone = false) => (
-        <View className={standalone ? undefined : 'flex-1'}>
-            <Text className={FIELD_LABEL}>{label}</Text>
-            <TouchableOpacity
-                onPress={onPress}
-                disabled={disabled}
-                className={`bg-black/25 px-4 h-12 rounded-[14px] border border-white/[0.08] flex-row justify-between items-center ${disabled ? 'opacity-50' : ''}`}
-            >
-                <Text className="shrink text-white text-[15px]" numberOfLines={1}>{value}</Text>
-                {!disabled && <Ionicons name="chevron-down" size={16} color={COLORS.slate500} />}
-            </TouchableOpacity>
-        </View>
-    );
-
     const renderOptionsModal = (
         visible: boolean,
         onCloseModal: () => void,
@@ -658,643 +663,584 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
 
     if (!visible) return null;
 
-    // Collapsed-header recaps so a skimmed form still reads at a glance.
-    const basicsSummary = [
-        name.trim() || t('form.summaryUnnamed'),
-        isPrivate ? t('form.summaryPrivate') : null,
-        getFormatLabel(),
-        maxPlayers ? t('form.summaryPlayers', { count: Number(maxPlayers) }) : null,
-    ].filter(Boolean).join(' · ');
-    const detailsSummary = (String(description).trim() || String(rules).trim()) ? t('form.summaryAdded') : t('form.summaryOptional');
-    const accessSummary = [
-        isTeamTournament ? tTeam('modeTeam') : tTeam('modeSolo'),
-        isTeamTournament && allowReserves && maxReserves ? t('form.summaryReserves', { count: Number(maxReserves) }) : null,
-        scopeMode === 'region' ? getRegionLabel() : t('form.summaryCountries', { count: selectedCountries.length }),
-        isExclusive ? t('form.summaryExclusive') : null,
-    ].filter(Boolean).join(' · ');
-    const matchSettingsSummary = [
-        bestOf > 1 ? `Bo${bestOf} · ${seriesWinCondition === 1 ? t('form.summaryTotalScore') : t('form.summaryGamesWon')}` : t('form.summarySingleGame'),
-        requireResultApproval ? t('form.summaryResultApproval') : null,
-        allowScheduleOutsideApp ? null : t('form.summaryCalendarOnly'),
-        requireMatchCheckIn ? t('form.summaryReadyCheck') : null,
-        requireResultVerification ? t('form.summaryResultVerification') : null,
-        canShowThirdPlace && hasThirdPlaceMatch ? t('form.summaryThirdPlace') : null,
-        (selectedFormat === '0' || selectedFormat === '5') && doubleRoundRobin ? t('form.summaryDoubleRoundRobin') : null,
-    ].filter(Boolean).join(' · ') || t('form.summaryDefaults');
-    const scheduleSummary = startDate
-        ? (isScheduled && registrationOpensAt
-            ? t('form.summaryOpensAt', { opens: new Date(registrationOpensAt).toLocaleString(dateLocale()) })
-            : t('form.summaryStartsAt', { starts: new Date(startDate).toLocaleString(dateLocale()) }))
-        : t('form.summaryNotSetShort');
-    const prizeSummary = prize && prize !== '0' ? `${prize} ${getCurrencyLabel()}` : t('form.none');
+    const steps: FormStep[] = [
+        { key: 'basics', icon: 'trophy', color: '#34D399', title: t('form.sectionBasicInfo') },
+        { key: 'players', icon: 'people', color: '#818CF8', title: t('form.sectionPlayersAccess') },
+        { key: 'format', icon: 'git-network', color: '#38BDF8', title: t('form.format') },
+        { key: 'matches', icon: 'shield-checkmark', color: '#FBBF24', title: t('form.sectionMatchSettings') },
+        { key: 'schedule', icon: 'calendar', color: '#A78BFA', title: t('form.sectionSchedule') },
+    ];
+    const lastStep = STEP_KEYS.length - 1;
+
+    const formatChoices: Choice<FormatGroup>[] = [
+        { value: 'league', icon: 'list', label: t('formatGroup.league'), hint: t('formatGroupHint.league'), color: '#38BDF8' },
+        { value: 'bracket', icon: 'git-network', label: t('formatGroup.bracket'), hint: t('formatGroupHint.bracket'), color: '#38BDF8' },
+        { value: 'groups-bracket', icon: 'grid', label: t('formatGroup.groupsBracket'), hint: t('formatGroupHint.groupsBracket'), color: '#38BDF8' },
+        // Teams play every format but Swiss.
+        { value: 'swiss', icon: 'swap-horizontal', label: t('formatGroup.swiss'), hint: t('formatGroupHint.swiss'), color: '#38BDF8', disabled: isTeamTournament },
+    ];
+
+    const renderBasics = () => (
+        <View className="gap-4">
+            <FormPanel>
+                <FormInput
+                    label={t('form.name')}
+                    icon="trophy-outline"
+                    placeholder={t('form.namePlaceholder')}
+                    value={name}
+                    onChangeText={setName}
+                    editable={canEditAll}
+                />
+            </FormPanel>
+
+            {/* Invite-only can change for the whole life of the tournament — it only changes who can find it. */}
+            <Field label={t('form.visibility')}>
+                <ChoiceCards
+                    options={[
+                        { value: 'public', icon: 'globe-outline', label: t('form.visibilityPublic') },
+                        { value: 'private', icon: 'lock-closed', label: t('form.visibilityPrivate'), color: PRIVATE_COLORS.icon },
+                    ]}
+                    value={isPrivate ? 'private' : 'public'}
+                    onChange={(v) => setIsPrivate(v === 'private')}
+                />
+                {isPrivate && (
+                    <View
+                        className="flex-row items-start gap-2 mt-2.5 px-3 py-2.5 rounded-xl"
+                        style={{ backgroundColor: PRIVATE_COLORS.bg, borderWidth: 1, borderColor: PRIVATE_COLORS.border }}
+                    >
+                        <Ionicons name="lock-closed" size={13} color={PRIVATE_COLORS.icon} style={{ marginTop: 1 }} />
+                        <Text className="flex-1 text-[11px] leading-4" style={{ color: PRIVATE_COLORS.text }}>
+                            {t('form.visibilityPrivateEditHint')}
+                        </Text>
+                    </View>
+                )}
+            </Field>
+
+            <FormPanel style={PANEL_GAP}>
+                <Field label={t('form.sectionPrizePool')}>
+                    <View className="flex-row" style={{ gap: 10 }}>
+                        <View className="flex-1">
+                            <FormInput
+                                icon="cash-outline"
+                                placeholder={t('form.amountPlaceholder')}
+                                keyboardType="numeric"
+                                value={prize}
+                                onChangeText={setPrize}
+                                editable={canEditAll}
+                            />
+                        </View>
+                        <View style={{ width: 118 }}>
+                            <SelectField value={getCurrencyLabel()} onPress={() => setShowCurrencyPicker(true)} disabled={!canEditAll} />
+                        </View>
+                    </View>
+                </Field>
+                <FormInput
+                    label={t('form.description')}
+                    icon="document-text-outline"
+                    multiline
+                    placeholder={t('form.descriptionPlaceholder')}
+                    value={description}
+                    onChangeText={setDescription}
+                />
+            </FormPanel>
+        </View>
+    );
+
+    const renderPlayers = () => (
+        <View className="gap-4">
+            {/* Solo or team is fixed once the tournament exists; shown for what it is. */}
+            <Field label={tTeam('modeLabel')}>
+                <ChoiceCards
+                    options={[
+                        { value: 'solo', icon: 'person', label: tTeam('modeSolo'), color: '#818CF8' },
+                        { value: 'team', icon: 'people', label: tTeam('modeTeam'), color: '#818CF8' },
+                    ]}
+                    value={isTeamTournament ? 'team' : 'solo'}
+                    onChange={() => {}}
+                    disabled
+                />
+            </Field>
+
+            <FormPanel style={PANEL_GAP}>
+                {isTeamTournament && (
+                    <FormInput
+                        label={`${tTeam('teamSizeLabel')} *`}
+                        icon="people-circle-outline"
+                        placeholder={tTeam('teamSizePlaceholder')}
+                        keyboardType="numeric"
+                        value={teamSize}
+                        onChangeText={setTeamSize}
+                        editable={canEditAll}
+                    />
+                )}
+                {/* Two outcomes, both named in full — a dropdown cut the chosen one to "Match…". */}
+                {isTeamTournament && (
+                    <Field label={t('form.winCondition')}>
+                        <ChoiceCards
+                            compact
+                            options={[
+                                { value: '0', icon: 'podium-outline', label: t('teamWinCondition.matchWins'), color: '#818CF8' },
+                                { value: '1', icon: 'calculator-outline', label: t('teamWinCondition.aggregateScore'), color: '#818CF8' },
+                            ]}
+                            value={teamWinCondition === '1' ? '1' : '0'}
+                            onChange={setTeamWinCondition}
+                            disabled={!canEditAll}
+                        />
+                    </Field>
+                )}
+
+                <FormInput
+                    label={t('form.maxPlayers')}
+                    icon="people-outline"
+                    placeholder={t('form.egMaxPlayers')}
+                    keyboardType="numeric"
+                    value={maxPlayers}
+                    onChangeText={setMaxPlayers}
+                    editable={canEditAll}
+                />
+
+                <Field label={t('form.tournamentScope')}>
+                    <SegmentedToggle
+                        raised
+                        options={[
+                            { value: 'region', label: t('form.byRegion') },
+                            { value: 'country', label: t('form.byCountry') },
+                        ]}
+                        value={scopeMode}
+                        onChange={(v) => setScopeMode(v as 'region' | 'country')}
+                        disabled={!canEditAll}
+                    />
+                    <View className="mt-3">
+                        {scopeMode === 'region' ? (
+                            <SelectField icon="earth-outline" value={getRegionLabel()} onPress={() => setShowRegionPicker(true)} disabled={!canEditAll} />
+                        ) : (
+                            <View pointerEvents={canEditAll ? 'auto' : 'none'} style={{ opacity: canEditAll ? 1 : 0.5 }}>
+                                <CountryPicker
+                                    placeholder={t('form.selectCountries')}
+                                    multiple
+                                    values={selectedCountries}
+                                    onToggle={toggleCountry}
+                                />
+                            </View>
+                        )}
+                    </View>
+                </Field>
+            </FormPanel>
+
+            {/* Reserves — structural, so locked once the bracket exists (rosters are already split
+                into lineup and bench by then). */}
+            {isTeamTournament && (
+                <ToggleCard
+                    icon="person-add"
+                    color="#818CF8"
+                    title={t('form.allowReserves')}
+                    value={allowReserves}
+                    onChange={setAllowReserves}
+                    disabled={!canEditAll}
+                >
+                    <FormInput
+                        label={t('form.reservesPerTeam')}
+                        icon="person-add-outline"
+                        hint={t('form.reservesDetailHint', { lineup: teamSize || t('form.lineupWord') })}
+                        placeholder={t('form.egQualifiers')}
+                        keyboardType="numeric"
+                        value={maxReserves}
+                        onChangeText={setMaxReserves}
+                        editable={canEditAll}
+                    />
+                </ToggleCard>
+            )}
+
+            <ToggleCard
+                icon="star"
+                color="#FBBF24"
+                title={t('form.exclusiveOnly')}
+                hint={t('form.exclusiveHint')}
+                value={isExclusive}
+                onChange={setIsExclusive}
+                disabled={!canEditAll}
+            />
+        </View>
+    );
+
+    const renderFormat = () => (
+        <View className="gap-4">
+            <ChoiceCards options={formatChoices} value={formatGroup} onChange={handleFormatGroupChange} disabled={!canEditAll} />
+
+            {(selectedFormat === '5' || isSwiss || showElimChoice) && (
+                <FormPanel style={PANEL_GAP}>
+                    {selectedFormat === '5' && (
+                        <View className="flex-row" style={{ gap: 10 }}>
+                            <View className="flex-1">
+                                <FormInput
+                                    label={t('form.groupsCount')}
+                                    icon="grid-outline"
+                                    placeholder={t('form.egGroups')}
+                                    keyboardType="numeric"
+                                    value={groupsCount}
+                                    onChangeText={setGroupsCount}
+                                    editable={canEditAll}
+                                />
+                            </View>
+                            <View className="flex-1">
+                                <FormInput
+                                    label={t('form.qualifiersPerGroup')}
+                                    icon="arrow-up-circle-outline"
+                                    placeholder={t('form.egQualifiers')}
+                                    keyboardType="numeric"
+                                    value={qualifiersPerGroup}
+                                    onChangeText={setQualifiersPerGroup}
+                                    editable={canEditAll}
+                                />
+                            </View>
+                        </View>
+                    )}
+
+                    {isSwiss && (
+                        <View className="flex-row" style={{ gap: 10 }}>
+                            <View className="flex-1">
+                                <FormInput
+                                    label={t('form.swissRounds')}
+                                    icon="repeat-outline"
+                                    placeholder={t('form.swissRoundsPlaceholder')}
+                                    keyboardType="numeric"
+                                    value={swissRounds}
+                                    onChangeText={setSwissRounds}
+                                    editable={canEditAll}
+                                />
+                            </View>
+                            <View className="flex-1">
+                                <SelectField
+                                    label={t('form.knockoutStage')}
+                                    icon="git-merge-outline"
+                                    value={swissKnockoutOptions.find(o => o.value === swissKnockout)?.label || t('form.none')}
+                                    onPress={() => setShowSwissKnockoutPicker(true)}
+                                    disabled={!canEditAll}
+                                />
+                            </View>
+                        </View>
+                    )}
+
+                    {isSwiss && swissKnockoutSize > 0 && (
+                        <FormInput
+                            label={t('form.directQualifiers')}
+                            icon="flash-outline"
+                            hint={swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
+                                ? t('form.swissPlayInHintShort', { direct: swissDirectCount, from: swissDirectCount + 1, to: swissDirectCount + swissPlayInPlayers, spots: swissKnockoutSize - swissDirectCount })
+                                : t('form.swissDirectHint', { size: swissKnockoutSize, second: swissKnockoutSize - 1 })}
+                            placeholder={t('form.directQualifiersPlaceholder', { count: swissKnockoutSize })}
+                            keyboardType="numeric"
+                            value={swissDirect}
+                            onChangeText={setSwissDirect}
+                            editable={canEditAll}
+                        />
+                    )}
+
+                    {/* Single vs double elimination: the format itself for a bracket, the knockout's style after groups or Swiss. */}
+                    {showElimChoice && (
+                        <Field label={t('form.knockoutBracket')} hint={t('form.knockoutHint')}>
+                            <SegmentedToggle
+                                raised
+                                options={[
+                                    { value: '1', label: t('form.single') },
+                                    { value: '2', label: t('form.double') },
+                                ]}
+                                value={currentElimType}
+                                onChange={(v) => setCurrentElimType(v as '1' | '2')}
+                                disabled={!canEditAll}
+                            />
+                        </Field>
+                    )}
+                </FormPanel>
+            )}
+
+            {/* Editable at any point in the tournament: matches already reported keep the format they
+                were played under, so this only reaches fixtures still to come. */}
+            <FormPanel>
+                <MatchFormatPicker
+                    bestOf={bestOf}
+                    onBestOfChange={setBestOf}
+                    winCondition={seriesWinCondition}
+                    onWinConditionChange={setSeriesWinCondition}
+                    tiebreakBestOf={tiebreakBestOf}
+                    onTiebreakBestOfChange={setTiebreakBestOf}
+                    hasSeparateKnockoutPhase={hasSeparateKnockoutPhase}
+                    firstPhaseLabel={firstPhaseLabel}
+                    knockoutBestOf={knockoutBestOf}
+                    onKnockoutBestOfChange={setKnockoutBestOf}
+                    hasKnockout={hasKnockoutPhase}
+                    isTeamTournament={isTeamTournament}
+                />
+            </FormPanel>
+
+            {canShowThirdPlace && (
+                <ToggleCard
+                    icon="medal"
+                    color="#FBBF24"
+                    title={t('form.thirdPlaceMatch')}
+                    hint={t('form.thirdPlaceHintEdit')}
+                    value={hasThirdPlaceMatch}
+                    onChange={setHasThirdPlaceMatch}
+                    disabled={!canEditAll}
+                />
+            )}
+
+            {(selectedFormat === '0' || selectedFormat === '5') && (
+                <ToggleCard
+                    icon="repeat"
+                    color="#38BDF8"
+                    title={t('form.doubleRoundRobin')}
+                    hint={t('form.doubleRoundRobinHint')}
+                    value={doubleRoundRobin}
+                    onChange={setDoubleRoundRobin}
+                    disabled={!canEditAll}
+                />
+            )}
+
+            {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
+                <FormPanel>
+                    <Field label={t('form.roundDuration')}>
+                        <View className="flex-row" style={{ gap: 10 }}>
+                            <View className="flex-1">
+                                <FormInput
+                                    icon="timer-outline"
+                                    placeholder={t('form.egQualifiers')}
+                                    keyboardType="numeric"
+                                    value={roundDurationValue}
+                                    onChangeText={setRoundDurationValue}
+                                    editable={canEditAll}
+                                />
+                            </View>
+                            <View className="flex-1">
+                                <SelectField
+                                    value={durationUnits.find(u => u.value === roundDurationUnit)?.label ?? roundDurationUnit}
+                                    onPress={() => setShowDurationUnitPicker(true)}
+                                    disabled={!canEditAll}
+                                />
+                            </View>
+                        </View>
+                    </Field>
+                </FormPanel>
+            )}
+        </View>
+    );
+
+    // Safe to switch any time, even mid-tournament: each only reaches fixtures still to be played.
+    const renderMatches = () => (
+        <View className="gap-3">
+            <ToggleCard
+                icon="checkmark-done"
+                color="#34D399"
+                title={t('form.requireApproval')}
+                hint={t('form.requireApprovalHintShort')}
+                value={requireResultApproval}
+                onChange={setRequireResultApproval}
+            />
+            <ToggleCard
+                icon="chatbubbles"
+                color="#38BDF8"
+                title={t('form.allowOutsideApp')}
+                hint={t('form.allowOutsideAppHint')}
+                value={allowScheduleOutsideApp}
+                onChange={setAllowScheduleOutsideApp}
+            />
+            <ToggleCard
+                icon="hand-left"
+                color="#FBBF24"
+                title={t('form.readyCheck')}
+                hint={t('form.readyCheckHint')}
+                value={requireMatchCheckIn}
+                onChange={setRequireMatchCheckIn}
+            >
+                <Field label={t('form.checkInGrace')} hint={t('form.checkInGraceHint')}>
+                    <View className="flex-row items-center" style={{ gap: 10 }}>
+                        <View className="flex-1">
+                            <FormInput
+                                icon="hourglass-outline"
+                                placeholder="10"
+                                keyboardType="numeric"
+                                value={checkInGraceMinutes}
+                                onChangeText={setCheckInGraceMinutes}
+                            />
+                        </View>
+                        <Text className="text-slate-400 text-sm font-bold">{t('duration.minutes')}</Text>
+                    </View>
+                </Field>
+            </ToggleCard>
+            <ToggleCard
+                icon="finger-print"
+                color="#A78BFA"
+                title={t('form.resultVerification')}
+                hint={t('form.resultVerificationHint')}
+                value={requireResultVerification}
+                onChange={setRequireResultVerification}
+            />
+
+            <FormPanel style={{ marginTop: 6 }}>
+                <FormInput
+                    label={t('form.rules')}
+                    icon="reader-outline"
+                    multiline
+                    placeholder={t('form.rulesPlaceholderShort')}
+                    value={rules}
+                    onChangeText={setRules}
+                />
+            </FormPanel>
+        </View>
+    );
+
+    const renderSchedule = () => (
+        <View className="gap-4">
+            <FormPanel style={{ gap: 14 }}>
+                <ScheduleField
+                    label={t('form.regDeadlinePlain')}
+                    value={registrationDeadline}
+                    placeholder={t('form.select')}
+                    iconName="time-outline"
+                    iconColor={COLORS.warning}
+                    onPress={() => setShowRegDeadlinePicker(true)}
+                    disabled={!canEditDeadline}
+                    standalone
+                />
+                <ScheduleField
+                    label={t('form.startDatePlain')}
+                    value={startDate}
+                    placeholder={t('form.select')}
+                    iconName="calendar-outline"
+                    iconColor={COLORS.primary}
+                    onPress={() => setShowStartDatePicker(true)}
+                    disabled={!canEditAll}
+                    standalone
+                />
+            </FormPanel>
+            {isScheduled && (
+                <FormPanel>
+                    <ScheduleField
+                        label={t('form.registrationOpens')}
+                        value={registrationOpensAt}
+                        placeholder={t('form.select')}
+                        iconName="lock-open-outline"
+                        iconColor={COLORS.info}
+                        onPress={() => setShowRegOpensPicker(true)}
+                        standalone
+                    />
+                    <Text className={FIELD_HINT}>{t('form.opensClosedNotice')}</Text>
+                </FormPanel>
+            )}
+        </View>
+    );
+
+    const renderStep = () => {
+        switch (STEP_KEYS[step]) {
+            case 'basics': return renderBasics();
+            case 'players': return renderPlayers();
+            case 'format': return renderFormat();
+            case 'matches': return renderMatches();
+            case 'schedule': return renderSchedule();
+        }
+    };
 
     return (
         <Modal
             visible={visible}
             animationType="slide"
             transparent={true}
+            // Edge to edge on Android too, so the safe-area padding below is the only spacing.
+            statusBarTranslucent
+            navigationBarTranslucent
             onRequestClose={onClose}
         >
-            <KeyboardAvoidingView
-                behavior="padding"
-                className="flex-1 bg-black/80 justify-end"
-            >
-                <View
-                    className="bg-background w-full rounded-t-[32px] overflow-hidden"
-                    style={{ maxHeight: '90%' }}
-                >
-                    {/* The tournament's violet and gold along the sheet's top edge */}
-                    <LinearGradient
-                        pointerEvents="none"
-                        colors={TOURNAMENT_EDGE}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={{ height: 1.5 }}
-                    />
-                    <View className="items-center pt-2.5">
-                        <View className="w-10 h-1 rounded-full bg-white/15" />
-                    </View>
-
-                    <View className="flex-row items-center px-5 pt-3 pb-4 border-b border-white/[0.06]" style={{ gap: 12 }}>
-                        <LinearGradient
-                            colors={['#4C1D95', '#312E81']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)' }}
-                        >
-                            <Ionicons name="trophy" size={20} color="#FBBF24" />
-                        </LinearGradient>
-                        <View className="flex-1">
-                            <Text className="text-[19px] leading-[23px] font-black text-white tracking-tight" numberOfLines={1}>
-                                {t('form.editTournament')}
-                            </Text>
-                            <Text className="text-[13px] font-semibold mt-0.5" style={{ color: '#C4B5FD' }} numberOfLines={1}>
-                                {name.trim() || t('form.manageTournament')}
-                            </Text>
+            <KeyboardAvoidingView behavior="padding" className="flex-1 bg-background">
+                {/* The whole screen, like creating one: the same height on every step, so the buttons
+                    stay put while the steps change. */}
+                <View className="flex-1 bg-background w-full">
+                    <View className="px-5 pb-4 border-b border-white/[0.06]" style={{ paddingTop: insets.top + 10 }}>
+                        <View className="flex-row items-center mb-4" style={{ gap: 12 }}>
+                            <LinearGradient
+                                colors={['#4C1D95', '#312E81']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)' }}
+                            >
+                                <Ionicons name="trophy" size={20} color="#FBBF24" />
+                            </LinearGradient>
+                            <View className="flex-1">
+                                <Text className="text-[19px] leading-[23px] font-black text-white tracking-tight" numberOfLines={1}>
+                                    {t('form.editTournament')}
+                                </Text>
+                                <Text className="text-[13px] font-semibold mt-0.5" style={{ color: '#C4B5FD' }} numberOfLines={1}>
+                                    {name.trim() || t('form.manageTournament')}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={onClose}
+                                accessibilityRole="button"
+                                accessibilityLabel={t('common:close')}
+                                className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 items-center justify-center"
+                            >
+                                <Ionicons name="close" size={18} color={COLORS.slate400} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            onPress={onClose}
-                            accessibilityRole="button"
-                            className="w-9 h-9 rounded-xl bg-white/[0.05] border border-white/10 items-center justify-center"
-                        >
-                            <Ionicons name="close" size={18} color={COLORS.slate400} />
-                        </TouchableOpacity>
-                    </View>
-
-                    <ScrollView
-                        keyboardShouldPersistTaps="handled"
-                        className="px-5 py-4"
-                        contentContainerStyle={{ paddingBottom: 40 }}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        <View className="gap-4">
-                            {/* Started tournaments lock structural fields — say so instead of leaving
-                                mysteriously disabled inputs. */}
-                            {!canEditAll && (
-                                <View className="flex-row items-start gap-2.5 bg-amber-500/[0.06] border border-amber-500/20 rounded-2xl p-3.5">
-                                    <Ionicons name="lock-closed" size={14} color={COLORS.warning} style={{ marginTop: 1 }} />
-                                    <Text style={{ color: '#FCD34D' }} className="text-xs flex-1 leading-4">
-                                        {t('form.lockedNotice')}
-                                    </Text>
-                                </View>
-                            )}
-
-                            {/* ── Basics: name, size, format ── */}
-                            <CollapsibleSection icon="trophy" title={t('form.sectionBasicInfo')} defaultOpen summary={basicsSummary}>
-                                <View className="gap-4">
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.name')}</Text>
-                                        <TextInput
-                                            className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                            placeholder={t('form.namePlaceholder')}
-                                            placeholderTextColor={FIELD_PLACEHOLDER}
-                                            value={name}
-                                            onChangeText={setName}
-                                            editable={canEditAll}
-                                        />
-                                    </View>
-
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.visibility')}</Text>
-                                        <SegmentedToggle
-                                            options={[
-                                                { value: 'public', label: t('form.visibilityPublic') },
-                                                { value: 'private', label: t('form.visibilityPrivate') },
-                                            ]}
-                                            value={isPrivate ? 'private' : 'public'}
-                                            onChange={(v) => setIsPrivate(v === 'private')}
-                                        />
-                                        {isPrivate ? (
-                                            <View
-                                                className="flex-row items-start gap-2 mt-2 px-3 py-2.5 rounded-xl"
-                                                style={{ backgroundColor: PRIVATE_COLORS.bg, borderWidth: 1, borderColor: PRIVATE_COLORS.border }}
-                                            >
-                                                <Ionicons name="lock-closed" size={13} color={PRIVATE_COLORS.icon} style={{ marginTop: 1 }} />
-                                                <Text className="flex-1 text-[11px] leading-4" style={{ color: PRIVATE_COLORS.text }}>
-                                                    {t('form.visibilityPrivateEditHint')}
-                                                </Text>
-                                            </View>
-                                        ) : (
-                                            <Text className={FIELD_HINT}>{t('form.visibilityPublicEditHint')}</Text>
-                                        )}
-                                    </View>
-
-                                    <View className="flex-row gap-3">
-                                        <View className="flex-1">
-                                            <Text className={FIELD_LABEL}>{t('form.maxPlayers')}</Text>
-                                            <TextInput
-                                                className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                placeholder="e.g. 16"
-                                                placeholderTextColor={FIELD_PLACEHOLDER}
-                                                keyboardType="numeric"
-                                                value={maxPlayers}
-                                                onChangeText={setMaxPlayers}
-                                                editable={canEditAll}
-                                            />
-                                        </View>
-                                        {renderSelectField(t('form.format'), getFormatLabel(), () => setShowFormatPicker(true), !canEditAll)}
-                                    </View>
-
-                                    {selectedFormat === '5' && (
-                                        <View className="flex-row gap-3">
-                                            <View className="flex-1">
-                                                <Text className={FIELD_LABEL}>{t('form.groupsCount')}</Text>
-                                                <TextInput
-                                                    className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                    placeholder="e.g. 4"
-                                                    placeholderTextColor={FIELD_PLACEHOLDER}
-                                                    keyboardType="numeric"
-                                                    value={groupsCount}
-                                                    onChangeText={setGroupsCount}
-                                                    editable={canEditAll}
-                                                />
-                                            </View>
-                                            <View className="flex-1">
-                                                <Text className={FIELD_LABEL}>{t('form.qualifiersPerGroup')}</Text>
-                                                <TextInput
-                                                    className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                    placeholder="e.g. 2"
-                                                    placeholderTextColor={FIELD_PLACEHOLDER}
-                                                    keyboardType="numeric"
-                                                    value={qualifiersPerGroup}
-                                                    onChangeText={setQualifiersPerGroup}
-                                                    editable={canEditAll}
-                                                />
-                                            </View>
-                                        </View>
-                                    )}
-
-                                    {isSwiss && (
-                                        <View className="gap-4">
-                                            <View className="flex-row gap-3">
-                                                <View className="flex-1">
-                                                    <Text className={FIELD_LABEL}>{t('form.swissRounds')}</Text>
-                                                    <TextInput
-                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                        placeholder={t('form.swissRoundsPlaceholder')}
-                                                        placeholderTextColor={FIELD_PLACEHOLDER}
-                                                        keyboardType="numeric"
-                                                        value={swissRounds}
-                                                        onChangeText={setSwissRounds}
-                                                        editable={canEditAll}
-                                                    />
-                                                </View>
-                                                {renderSelectField(
-                                                    t('form.knockoutStage'),
-                                                    swissKnockoutOptions.find(o => o.value === swissKnockout)?.label || t('form.none'),
-                                                    () => setShowSwissKnockoutPicker(true),
-                                                    !canEditAll
-                                                )}
-                                            </View>
-
-                                            {swissKnockoutSize > 0 && (
-                                                <View>
-                                                    <Text className={FIELD_LABEL}>{t('form.directQualifiers')}</Text>
-                                                    <TextInput
-                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                        placeholder={t('form.directQualifiersPlaceholder', { count: swissKnockoutSize })}
-                                                        placeholderTextColor={FIELD_PLACEHOLDER}
-                                                        keyboardType="numeric"
-                                                        value={swissDirect}
-                                                        onChangeText={setSwissDirect}
-                                                        editable={canEditAll}
-                                                    />
-                                                    <Text className={FIELD_HINT}>
-                                                        {swissPlayInPlayers > 0 && !isNaN(swissDirectCount)
-                                                            ? t('form.swissPlayInHintShort', { direct: swissDirectCount, from: swissDirectCount + 1, to: swissDirectCount + swissPlayInPlayers, spots: swissKnockoutSize - swissDirectCount })
-                                                            : t('form.swissDirectHint', { size: swissKnockoutSize, second: swissKnockoutSize - 1 })}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                    )}
-
-                                    {showKnockoutTypeToggle && (
-                                        <View>
-                                            <Text className={FIELD_LABEL}>{t('form.knockoutBracket')}</Text>
-                                            <SegmentedToggle
-                                                options={[
-                                                    { value: '1', label: t('form.single') },
-                                                    { value: '2', label: t('form.double') },
-                                                ]}
-                                                value={knockoutType === '2' ? '2' : '1'}
-                                                onChange={setKnockoutType}
-                                                disabled={!canEditAll}
-                                            />
-                                            <Text className={FIELD_HINT}>
-                                                Single: one loss and you're out. Double: a losers bracket gives everyone a second chance before elimination.
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </CollapsibleSection>
-
-                            {/* ── Description & Rules (always editable) ── */}
-                            <CollapsibleSection icon="document-text" title={t('form.sectionDescriptionRules')} color="#94A3B8" summary={detailsSummary}>
-                                <View className="gap-4">
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.description')}</Text>
-                                        <TextInput
-                                            multiline
-                                            className={FIELD_MULTILINE}
-                                            placeholder={t('form.descriptionPlaceholder')}
-                                            placeholderTextColor={FIELD_PLACEHOLDER}
-                                            textAlignVertical="top"
-                                            value={description}
-                                            onChangeText={setDescription}
-                                        />
-                                    </View>
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.rules')}</Text>
-                                        <TextInput
-                                            multiline
-                                            className={FIELD_MULTILINE}
-                                            placeholder={t('form.rulesPlaceholderShort')}
-                                            placeholderTextColor={FIELD_PLACEHOLDER}
-                                            textAlignVertical="top"
-                                            value={rules}
-                                            onChangeText={setRules}
-                                        />
-                                    </View>
-                                </View>
-                            </CollapsibleSection>
-
-                            {/* ── Players & Access ── */}
-                            <CollapsibleSection icon="people" title={t('form.sectionPlayersAccess')} color="#818CF8" summary={accessSummary}>
-                                <View className="gap-4">
-                                    {isTeamTournament && (
-                                        <View className="flex-row gap-3">
-                                            <View className="flex-1">
-                                                <Text className={FIELD_LABEL}>{tTeam('teamSizeLabel')} *</Text>
-                                                <TextInput
-                                                    className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                    placeholder={tTeam('teamSizePlaceholder')}
-                                                    placeholderTextColor={FIELD_PLACEHOLDER}
-                                                    keyboardType="numeric"
-                                                    value={teamSize}
-                                                    onChangeText={setTeamSize}
-                                                    editable={canEditAll}
-                                                />
-                                            </View>
-                                            {renderSelectField(
-                                                t('form.winCondition'),
-                                                teamWinConditions.find(c => c.value === teamWinCondition)?.label || t('form.select'),
-                                                () => { if (canEditAll) setShowTeamWinConditionPicker(true); },
-                                                !canEditAll
-                                            )}
-                                        </View>
-                                    )}
-
-                                    {/* Reserves — structural, so locked once the bracket exists (rosters are
-                                        already split into lineup/bench by then). */}
-                                    {isTeamTournament && (
-                                        <View>
-                                            <Text className={FIELD_LABEL}>{t('form.allowReserves')}</Text>
-                                            <SegmentedToggle
-                                                options={yesNoOptions}
-                                                value={allowReserves ? 'yes' : 'no'}
-                                                onChange={(v) => setAllowReserves(v === 'yes')}
-                                                disabled={!canEditAll}
-                                            />
-                                            {allowReserves ? (
-                                                <View className="mt-3">
-                                                    <Text className={FIELD_LABEL}>{t('form.reservesPerTeam')}</Text>
-                                                    <TextInput
-                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                        placeholder="e.g. 2"
-                                                        placeholderTextColor={FIELD_PLACEHOLDER}
-                                                        keyboardType="numeric"
-                                                        value={maxReserves}
-                                                        onChangeText={setMaxReserves}
-                                                        editable={canEditAll}
-                                                    />
-                                                    <Text className={FIELD_HINT}>
-                                                        Extra squad slots on top of the {teamSize || 'lineup'} players who
-                                                        play. Teams fill 0 up to this many, and captains swap a reserve in
-                                                        for a starter between rounds — always into that player's exact game.
-                                                    </Text>
-                                                </View>
-                                            ) : (
-                                                <Text className={FIELD_HINT}>
-                                                    {t('form.reservesHint')}
-                                                </Text>
-                                            )}
-                                        </View>
-                                    )}
-
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.tournamentScope')}</Text>
-                                        <SegmentedToggle
-                                            options={[
-                                                { value: 'region', label: t('form.byRegion') },
-                                                { value: 'country', label: t('form.byCountry') },
-                                            ]}
-                                            value={scopeMode}
-                                            onChange={(v) => setScopeMode(v as 'region' | 'country')}
-                                            disabled={!canEditAll}
-                                        />
-                                        <View className="mt-3">
-                                            {scopeMode === 'region' ? (
-                                                renderSelectField(t('form.region'), getRegionLabel(), () => setShowRegionPicker(true), !canEditAll, true)
-                                            ) : (
-                                                <View pointerEvents={canEditAll ? 'auto' : 'none'} style={{ opacity: canEditAll ? 1 : 0.5 }}>
-                                                    <CountryPicker
-                                                        placeholder={t('form.selectCountries')}
-                                                        multiple
-                                                        values={selectedCountries}
-                                                        onToggle={toggleCountry}
-                                                    />
-                                                </View>
-                                            )}
-                                        </View>
-                                    </View>
-
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.exclusiveOnly')}</Text>
-                                        <SegmentedToggle
-                                            options={yesNoOptions}
-                                            value={isExclusive ? 'yes' : 'no'}
-                                            onChange={(v) => setIsExclusive(v === 'yes')}
-                                            disabled={!canEditAll}
-                                        />
-                                        <Text className={FIELD_HINT}>
-                                            {t('form.exclusiveHint')}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </CollapsibleSection>
-
-                            {/* ── Match Settings ── */}
-                            <CollapsibleSection icon="options" title={t('form.sectionMatchSettings')} color="#38BDF8" summary={matchSettingsSummary}>
-                                <View className="gap-4">
-                                    {/* Editable at any point in the tournament: matches already reported
-                                        keep the format they were played under, so this only reaches
-                                        fixtures still to come. */}
-                                    <MatchFormatPicker
-                                        bestOf={bestOf}
-                                        onBestOfChange={setBestOf}
-                                        winCondition={seriesWinCondition}
-                                        onWinConditionChange={setSeriesWinCondition}
-                                        tiebreakBestOf={tiebreakBestOf}
-                                        onTiebreakBestOfChange={setTiebreakBestOf}
-                                        hasSeparateKnockoutPhase={hasSeparateKnockoutPhase}
-                                        firstPhaseLabel={firstPhaseLabel}
-                                        knockoutBestOf={knockoutBestOf}
-                                        onKnockoutBestOfChange={setKnockoutBestOf}
-                                        hasKnockout={hasKnockoutPhase}
-                                        isTeamTournament={isTeamTournament}
-                                    />
-
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.requireApproval')}</Text>
-                                        {/* Approval can be toggled any time — even mid-tournament — since it only
-                                            affects how future results are confirmed, not the bracket structure. */}
-                                        <SegmentedToggle
-                                            options={yesNoOptions}
-                                            value={requireResultApproval ? 'yes' : 'no'}
-                                            onChange={(v) => setRequireResultApproval(v === 'yes')}
-                                        />
-                                        <Text className={FIELD_HINT}>
-                                            {t('form.requireApprovalHintShort')}
-                                        </Text>
-                                    </View>
-
-                                    {/* "Agreed outside the app" — safe to switch mid-tournament: it only
-                                        gates matches still waiting for a time. */}
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.allowOutsideApp')}</Text>
-                                        <SegmentedToggle
-                                            options={yesNoOptions}
-                                            value={allowScheduleOutsideApp ? 'yes' : 'no'}
-                                            onChange={(v) => setAllowScheduleOutsideApp(v === 'yes')}
-                                        />
-                                        <Text className={FIELD_HINT}>
-                                            {t('form.allowOutsideAppHint')}
-                                        </Text>
-                                    </View>
-
-                                    {/* Ready check — both sides confirm they turned up for the time
-                                        they agreed on; the one who shows up alone takes the match.
-                                        Like approval, safe to toggle mid-tournament: it can only
-                                        reach fixtures that are still to be played. */}
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.readyCheck')}</Text>
-                                        <SegmentedToggle
-                                            options={yesNoOptions}
-                                            value={requireMatchCheckIn ? 'yes' : 'no'}
-                                            onChange={(v) => setRequireMatchCheckIn(v === 'yes')}
-                                        />
-                                        <Text className={FIELD_HINT}>
-                                            {t('form.readyCheckHint')}
-                                        </Text>
-                                    </View>
-
-                                    {requireMatchCheckIn && (
-                                        <View>
-                                            <Text className={FIELD_LABEL}>{t('form.checkInGrace')}</Text>
-                                            <View className="flex-row items-center gap-3">
-                                                <View className="flex-1">
-                                                    <TextInput
-                                                        className={FIELD_INPUT}
-                                                        placeholder="10"
-                                                        placeholderTextColor={FIELD_PLACEHOLDER}
-                                                        keyboardType="numeric"
-                                                        value={checkInGraceMinutes}
-                                                        onChangeText={setCheckInGraceMinutes}
-                                                    />
-                                                </View>
-                                                <Text className="text-slate-400 text-sm font-bold">
-                                                    {t('duration.minutes')}
-                                                </Text>
-                                            </View>
-                                            <Text className={FIELD_HINT}>
-                                                {t('form.checkInGraceHint')}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {/* Result verification — safe to switch mid-tournament like the two
-                                        above: it only gates results still to be reported. */}
-                                    <View>
-                                        <Text className={FIELD_LABEL}>{t('form.resultVerification')}</Text>
-                                        <SegmentedToggle
-                                            options={yesNoOptions}
-                                            value={requireResultVerification ? 'yes' : 'no'}
-                                            onChange={(v) => setRequireResultVerification(v === 'yes')}
-                                        />
-                                        <Text className={FIELD_HINT}>
-                                            {t('form.resultVerificationHint')}
-                                        </Text>
-                                    </View>
-
-                                    {canShowThirdPlace && (
-                                        <View>
-                                            <Text className={FIELD_LABEL}>{t('form.thirdPlaceMatch')}</Text>
-                                            <SegmentedToggle
-                                                options={yesNoOptions}
-                                                value={hasThirdPlaceMatch ? 'yes' : 'no'}
-                                                onChange={(v) => setHasThirdPlaceMatch(v === 'yes')}
-                                                disabled={!canEditAll}
-                                            />
-                                            <Text className={FIELD_HINT}>
-                                                {t('form.thirdPlaceHintEdit')}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {(selectedFormat === '0' || selectedFormat === '5') && (
-                                        <View>
-                                            <Text className={FIELD_LABEL}>{t('form.doubleRoundRobin')}</Text>
-                                            <SegmentedToggle
-                                                options={yesNoOptions}
-                                                value={doubleRoundRobin ? 'yes' : 'no'}
-                                                onChange={(v) => setDoubleRoundRobin(v === 'yes')}
-                                                disabled={!canEditAll}
-                                            />
-                                            <Text className={FIELD_HINT}>
-                                                {t('form.doubleRoundRobinHint')}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    {(selectedFormat === '0' || selectedFormat === '5' || isSwiss) && (
-                                        <View>
-                                            <Text className={FIELD_LABEL}>{t('form.roundDuration')}</Text>
-                                            <View className="flex-row gap-3">
-                                                <View className="flex-1">
-                                                    <TextInput
-                                                        className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                                        placeholder="e.g. 2"
-                                                        placeholderTextColor={FIELD_PLACEHOLDER}
-                                                        keyboardType="numeric"
-                                                        value={roundDurationValue}
-                                                        onChangeText={setRoundDurationValue}
-                                                        editable={canEditAll}
-                                                    />
-                                                </View>
-                                                <TouchableOpacity
-                                                    onPress={() => { if (canEditAll) setShowDurationUnitPicker(true); }}
-                                                    disabled={!canEditAll}
-                                                    className={`flex-1 bg-white/[0.03] px-4 h-12 rounded-2xl border border-white/[0.06] flex-row items-center justify-between ${!canEditAll ? 'opacity-50' : ''}`}
-                                                >
-                                                    <Text className="text-white text-sm">{roundDurationUnit}</Text>
-                                                    <Ionicons name="chevron-down" size={16} color="#64748B" />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    )}
-                                </View>
-                            </CollapsibleSection>
-
-                            {/* ── Schedule ── */}
-                            <CollapsibleSection icon="calendar" title={t('form.sectionSchedule')} defaultOpen summary={scheduleSummary}>
-                                {/* One under the other: side by side each date had ~50pt and was cut to "Oct 27, 2…". */}
-                                <View className="gap-3">
-                                    <ScheduleField
-                                        label={t('form.regDeadlinePlain')}
-                                        value={registrationDeadline}
-                                        placeholder={t('form.select')}
-                                        iconName="time-outline"
-                                        iconColor={COLORS.warning}
-                                        onPress={() => setShowRegDeadlinePicker(true)}
-                                        disabled={!canEditDeadline}
-                                        standalone
-                                    />
-                                    <ScheduleField
-                                        label={t('form.startDatePlain')}
-                                        value={startDate}
-                                        placeholder={t('form.select')}
-                                        iconName="calendar-outline"
-                                        iconColor={COLORS.primary}
-                                        onPress={() => setShowStartDatePicker(true)}
-                                        disabled={!canEditAll}
-                                        standalone
-                                    />
-                                </View>
-                                {isScheduled && (
-                                    <View className="mt-3">
-                                        <ScheduleField
-                                            label={t('form.registrationOpens')}
-                                            value={registrationOpensAt}
-                                            placeholder={t('form.select')}
-                                            iconName="lock-open-outline"
-                                            iconColor={COLORS.info}
-                                            onPress={() => setShowRegOpensPicker(true)}
-                                            standalone
-                                        />
-                                        <Text className="text-[11px] text-slate-500 mt-2 leading-4">
-                                            {t('form.opensClosedNotice')}
-                                        </Text>
-                                    </View>
-                                )}
-                            </CollapsibleSection>
-
-                            {/* ── Prize Pool ── */}
-                            <CollapsibleSection icon="cash" title={t('form.sectionPrizePool')} color={COLORS.warning} summary={prizeSummary}>
-                                <View className="flex-row gap-3">
-                                    <View className="flex-1">
-                                        <Text className={FIELD_LABEL}>{t('form.amount')}</Text>
-                                        <TextInput
-                                            className={`${FIELD_INPUT} ${!canEditAll ? 'opacity-50' : ''}`}
-                                            placeholder={t('form.amountPlaceholder')}
-                                            placeholderTextColor={FIELD_PLACEHOLDER}
-                                            keyboardType="numeric"
-                                            value={prize}
-                                            onChangeText={setPrize}
-                                            editable={canEditAll}
-                                        />
-                                    </View>
-                                    <View className="w-40">
-                                        {renderSelectField(t('form.currency'), getCurrencyLabel(), () => setShowCurrencyPicker(true), !canEditAll)}
-                                    </View>
-                                </View>
-                            </CollapsibleSection>
-                        </View>
-                    </ScrollView>
-
-                    <View className="px-5 pt-3.5 bg-background-deep border-t border-white/[0.06]" style={{ paddingBottom: insets.bottom + 14 }}>
-                        {error && (
-                            <View className="flex-row items-center bg-red-500/10 border border-red-500/25 rounded-2xl px-3 py-2.5 mb-3" style={{ gap: 8 }}>
-                                <Ionicons name="alert-circle" size={16} color="#F87171" />
-                                <Text className="flex-1 text-red-300 text-xs font-bold">{error}</Text>
+                        {/* Every step can be reached directly: an edit usually touches one thing. */}
+                        <StepHeader steps={steps} current={step} onSelect={goToStep} reachable={() => true} />
+                        {/* Started tournaments lock structural fields — said once, instead of leaving
+                            mysteriously disabled inputs. */}
+                        {!canEditAll && (
+                            <View className="flex-row items-start gap-2 mt-3.5 bg-amber-500/[0.06] border border-amber-500/20 rounded-xl px-3 py-2.5">
+                                <Ionicons name="lock-closed" size={13} color={COLORS.warning} style={{ marginTop: 1 }} />
+                                <Text style={{ color: '#FCD34D' }} className="text-[11px] flex-1 leading-4">
+                                    {t('form.lockedNotice')}
+                                </Text>
                             </View>
                         )}
-                        <GradientButton
-                            label={t('form.saveChanges')}
-                            icon="checkmark-circle"
-                            onPress={handleSave}
-                            loading={isSubmitting}
-                        />
                     </View>
-                </View>
 
-                {renderOptionsModal(
-                    showFormatPicker,
-                    () => setShowFormatPicker(false),
-                    formatOptions,
-                    selectedFormat,
-                    setSelectedFormat
-                )}
+                    {/* Keyed by step: each one opens at its top. */}
+                    <FormScrollProvider value={formScroll.reveal}>
+                        <ScrollView
+                            key={step}
+                            ref={formScroll.scrollRef}
+                            onScroll={formScroll.onScroll}
+                            scrollEventThrottle={16}
+                            keyboardShouldPersistTaps="handled"
+                            keyboardDismissMode="on-drag"
+                            className="flex-1 px-5"
+                            contentContainerStyle={{ paddingTop: 18, paddingBottom: 28 }}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            <Pressable onPress={Keyboard.dismiss} accessible={false}>
+                                <Animated.View entering={FadeIn.duration(180)}>
+                                    {renderStep()}
+                                </Animated.View>
+                            </Pressable>
+                        </ScrollView>
+                    </FormScrollProvider>
+
+                    {keyboardUp ? (
+                        // Typing: one way out of the keyboard (a number pad has no return key), not
+                        // Next floating over it.
+                        <View className="flex-row justify-end px-3 py-1.5 bg-card border-t border-white/5">
+                            <Pressable onPress={Keyboard.dismiss} hitSlop={8} accessibilityRole="button" className="px-3 py-2 active:opacity-60">
+                                <Text className="text-[15px] font-black text-primary">{t('common:done')}</Text>
+                            </Pressable>
+                        </View>
+                    ) : (
+                    <View className="px-5 pt-4 bg-background-deep border-t border-white/[0.06]" style={{ paddingBottom: insets.bottom + 20 }}>
+                        <FormError message={error} />
+                        <View className="flex-row items-center" style={{ gap: 10 }}>
+                            <StepArrow direction="back" onPress={() => goToStep(step - 1)} disabled={step === 0} label={t('common:back')} />
+                            <StepArrow direction="forward" onPress={() => goToStep(step + 1)} disabled={step === lastStep} label={t('common:next')} />
+                            <GradientButton
+                                label={t('form.saveChanges')}
+                                icon="checkmark-circle"
+                                onPress={handleSave}
+                                loading={isSubmitting}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
+                    </View>
+                    )}
+                </View>
 
                 {renderOptionsModal(
                     showDurationUnitPicker,
@@ -1326,14 +1272,6 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     prizeCurrencies,
                     prizeCurrency,
                     setPrizeCurrency
-                )}
-
-                {renderOptionsModal(
-                    showTeamWinConditionPicker,
-                    () => setShowTeamWinConditionPicker(false),
-                    teamWinConditions,
-                    teamWinCondition,
-                    setTeamWinCondition
                 )}
 
                 <DateTimePickerModal

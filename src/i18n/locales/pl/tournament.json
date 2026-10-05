@@ -23,6 +23,12 @@
     "groupsBracket": "Grupy + drabinka",
     "swiss": "System szwajcarski"
   },
+  "formatGroupHint": {
+    "league": "Każdy z każdym",
+    "bracket": "Drabinka pucharowa",
+    "groupsBracket": "Grupy, potem drabinka",
+    "swiss": "Pary według wyników w rundzie"
+  },
   "form": {
     "newTournament": "Nowy turniej",
     "createTournament": "Utwórz turniej",

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SegmentedToggle } from '../ui/SegmentedToggle';
+import { FIELD_LABEL, FIELD_HINT } from '../ui/FormField';
 import { BestOfInput } from './BestOfInput';
 import {
     SeriesWinCondition,
@@ -11,8 +12,6 @@ import {
     tiebreakDescription,
 } from '../../lib/series';
 
-const FIELD_LABEL = 'text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2';
-const FIELD_HINT = 'text-[11px] text-slate-500 mt-2 leading-4';
 
 interface MatchFormatPickerProps {
     bestOf: number;
@@ -98,6 +97,7 @@ export function MatchFormatPicker({
                 <View>
                     <Text className={FIELD_LABEL}>{t('formatPicker.seriesDecidedBy')}</Text>
                     <SegmentedToggle
+                        raised
                         options={[
                             { value: String(SeriesWinCondition.MatchWins), label: t('formatPicker.gamesWon') },
                             { value: String(SeriesWinCondition.AggregateScore), label: t('formatPicker.totalScore') },
@@ -120,6 +120,7 @@ export function MatchFormatPicker({
                     <Text className={FIELD_LABEL}>{t('formatPicker.knockoutFormat')}</Text>
 
                     <SegmentedToggle
+                        raised
                         options={[
                             { value: 'same', label: t('formatPicker.sameAsPhase', { phase: phaseLabel }) },
                             { value: 'custom', label: t('formatPicker.different') },
@@ -155,6 +156,7 @@ export function MatchFormatPicker({
 
                     {/* Two mutually exclusive choices, so a toggle fits without crowding. */}
                     <SegmentedToggle
+                        raised
                         options={[
                             { value: 'same', label: t('formatPicker.sameFormat') },
                             { value: 'custom', label: t('formatPicker.different') },
