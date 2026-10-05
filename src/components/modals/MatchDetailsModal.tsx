@@ -882,6 +882,9 @@ export function MatchDetailsModal({
                     MatchId: matchId,
                     TournamentId: tournamentId,
                     Cascade: cascade,
+                    // The bracket is the organizer's screen: here they enter even their own match
+                    // as the organizer, outside result verification. The server checks the rights.
+                    AsOrganizer: isHubOwner || canManage,
                     Games: seriesGames.map(g => ({
                         HomeScore: g.homeScore,
                         AwayScore: g.awayScore,
@@ -893,7 +896,8 @@ export function MatchDetailsModal({
                     HomeScore: parseInt(homeScore, 10),
                     AwayScore: parseInt(awayScore, 10),
                     TournamentId: tournamentId,
-                    Cascade: cascade
+                    Cascade: cascade,
+                    AsOrganizer: isHubOwner || canManage,
                 };
 
             const response = await authenticatedFetch(endpoint, {
@@ -1364,8 +1368,9 @@ export function MatchDetailsModal({
     const checkInBlocksReport = checkInLive && !bothCheckedIn && !isPrivileged;
     // Result verification: the server's gate, run on the score being typed — a proof of every game in
     // it, except a parked tiebreak's level series, which is on record already. The panel says who is
-    // exempt (organizers), which this screen cannot always tell.
-    const verificationBlocks = verificationBlocksReport(
+    // exempt (organizers), which this screen cannot always tell. Here an organizer is exempt in their
+    // own match too: the bracket enters it as the organizer (AsOrganizer), the match sheet as a player.
+    const verificationBlocks = !isPrivileged && verificationBlocksReport(
         verification.panel,
         seriesFormat,
         seriesGames.length > 0 ? seriesGames : proposedGames,
