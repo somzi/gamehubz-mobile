@@ -233,6 +233,8 @@ function MatchScheduleCardBase({
     const [seriesGames, setSeriesGames] = useState<SeriesGame[]>([]);
     const [seriesOutcome, setSeriesOutcome] = useState<SeriesOutcome | null>(null);
     const [isSeriesComplete, setIsSeriesComplete] = useState(false);
+    // False while a just-opened tiebreak is empty: the level series in front of it is already reported.
+    const [seriesHasNewGames, setSeriesHasNewGames] = useState(true);
     // Solo knockout is the only place a level series waits for a tiebreak; everywhere else it is
     // either a draw (league / group / Swiss) or settled by the team tie one level up.
     const [allowsTiebreak, setAllowsTiebreak] = useState(false);
@@ -877,7 +879,9 @@ function MatchScheduleCardBase({
                 setError(t('card.enterAtLeastOneGame'));
                 return;
             }
-            if (!isSeriesComplete) {
+            // A tiebreak opened after a reported level series asks for its games: resending the series
+            // as it stands would change nothing.
+            if (!isSeriesComplete || !seriesHasNewGames) {
                 setError(t('card.enterRemainingGames'));
                 return;
             }
@@ -1770,11 +1774,14 @@ function MatchScheduleCardBase({
                                                         format={seriesFormat}
                                                         allowTiebreak={allowsTiebreak}
                                                         initialGames={seriesDraftToRestore ?? visualEntrySeedGames}
-                                                        openTiebreak
-                                                        onChange={(games, outcome, complete) => {
+                                                        // Only from the result on record — a draft brought back from
+                                                        // a profile still has to be reported as typed.
+                                                        openTiebreak={!seriesDraftToRestore && visualReportedGames.length > 0}
+                                                        onChange={(games, outcome, complete, isNew) => {
                                                             setSeriesGames(games);
                                                             setSeriesOutcome(outcome);
                                                             setIsSeriesComplete(complete);
+                                                            setSeriesHasNewGames(isNew);
                                                             // The form has taken the restored draft in (it reads
                                                             // initialGames once, on mount) — one use only.
                                                             if (seriesDraftToRestore) setSeriesDraftToRestore(null);
@@ -1957,7 +1964,7 @@ function MatchScheduleCardBase({
                                                                                 // tiebreak later — say so on the button rather than letting
                                                                                 // "Submit Result" imply the match is settled.
                                                                                 // Not once it is on record and its tiebreak is open, waiting for games.
-                                                                                : (isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel && isSeriesComplete)
+                                                                                : (isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel && isSeriesComplete && seriesHasNewGames)
                                                                                     ? t('card.reportTiebreakNeeded')
                                                                                     : (requireResultApproval ? t('card.reportResult') : t('card.submitResult'))}
                                                                     </Text>

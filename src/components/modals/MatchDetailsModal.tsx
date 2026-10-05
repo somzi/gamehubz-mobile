@@ -271,6 +271,8 @@ export function MatchDetailsModal({
     const [seriesGames, setSeriesGames] = useState<SeriesGame[]>([]);
     const [seriesOutcome, setSeriesOutcome] = useState<SeriesOutcome | null>(null);
     const [isSeriesComplete, setIsSeriesComplete] = useState(false);
+    // False while a just-opened tiebreak is empty: the level series in front of it is already reported.
+    const [seriesHasNewGames, setSeriesHasNewGames] = useState(true);
     const [error, setError] = useState<string | null>(null);
     // Holds files that are already upload-ready: clips are transcoded at pick time, not at
     // send time, so the pending strip shows what will actually be sent and the upload itself
@@ -860,7 +862,9 @@ export function MatchDetailsModal({
                 setError(t('details.enterAtLeastOneGame'));
                 return;
             }
-            if (!isSeriesComplete) {
+            // A tiebreak opened after a reported level series asks for its games: resending the series
+            // as it stands would change nothing.
+            if (!isSeriesComplete || !seriesHasNewGames) {
                 setError(t('details.enterRemainingGames'));
                 return;
             }
@@ -2019,12 +2023,14 @@ export function MatchDetailsModal({
                             allowTiebreak={!!matchDetails?.allowsTieBreak}
                             initialGames={entrySeedGames}
                             editable={canSubmit}
-                            openTiebreak
+                            // Only from the result on record, never from a pending proposal's games.
+                            openTiebreak={reportedGames.length > 0}
                             onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
-                            onChange={(games, outcome, complete) => {
+                            onChange={(games, outcome, complete, isNew) => {
                                 setSeriesGames(games);
                                 setSeriesOutcome(outcome);
                                 setIsSeriesComplete(complete);
+                                setSeriesHasNewGames(isNew);
                             }}
                         />
                     ) : (
@@ -2236,7 +2242,7 @@ export function MatchDetailsModal({
         setMatchDetails(null); setDetailsSettledFor(null); setIsLoadingDetails(true);
         setHomeScore(''); setAwayScore(''); setSelectedImages([]); setError(null);
         setIsEditMode(false); setIsEditingProposal(false); setCheckInOverride(null);
-        setSeriesGames([]); setSeriesOutcome(null); setIsSeriesComplete(false);
+        setSeriesGames([]); setSeriesOutcome(null); setIsSeriesComplete(false); setSeriesHasNewGames(true);
         setShowResolveHelpPrompt(false); setShowVerifySheet(false);
         setStreams([]); setAdminAvailability(null);
         setMySlots(myAvailability); setOpponentSlots(opponentAvailability);

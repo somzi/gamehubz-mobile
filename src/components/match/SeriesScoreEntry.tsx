@@ -49,8 +49,12 @@ interface SeriesScoreEntryProps {
     allowTiebreak: boolean;
     /** Games already reported, in the same left/right orientation as the labels. */
     initialGames?: SeriesGame[];
-    /** Fires on every edit. `isComplete` means the series is finished and safe to submit. */
-    onChange: (games: SeriesGame[], outcome: SeriesOutcome, isComplete: boolean) => void;
+    /**
+     * Fires on every edit. `isComplete`: the series as typed is played out (verification reads this).
+     * `isNew`: it differs from the level series the form opened a tiebreak after — false while that
+     * tiebreak is still empty, when there is nothing new to report yet (the submit button reads both).
+     */
+    onChange: (games: SeriesGame[], outcome: SeriesOutcome, isComplete: boolean, isNew: boolean) => void;
     /**
      * Called with the focused game row so the host can scroll it clear of the keyboard. The row is
      * handed over rather than a "scroll to bottom" signal, because the games sit above the summary,
@@ -60,8 +64,9 @@ interface SeriesScoreEntryProps {
     /** False for viewers who can't report this match — the games still render, read-only. */
     editable?: boolean;
     /**
-     * Opens the tiebreak right away when the games it starts with are a level series that goes to one
-     * — a parked match, or one just reported level: the replay is all there is left to enter.
+     * Opens the tiebreak right away when the games it starts with are a level series that goes to one —
+     * only for games ON RECORD (a parked match, or one just reported level): the replay is all there is
+     * left to enter. Never for a draft being restored, which still has to be reported as it is.
      */
     openTiebreak?: boolean;
 }
@@ -202,10 +207,12 @@ export function SeriesScoreEntry({
         // Reportable as soon as the current series is played out. A level knockout series counts:
         // the tiebreak is a game still to be played, often days later, so the server records the
         // series and parks the match awaiting it rather than forcing one all-in-one submission. Once
-        // reported, the form comes back with that tiebreak open, and asks for its games.
-        const isComplete = games.length > 0 && outcome.currentSeriesOver && gamesKey(games) !== openedAfter.current;
+        // reported, the form comes back with that tiebreak open: the series is still over, but there is
+        // nothing new to send until the tiebreak's games are in.
+        const isComplete = games.length > 0 && outcome.currentSeriesOver;
+        const isNew = gamesKey(games) !== openedAfter.current;
 
-        onChange(games, outcome, isComplete);
+        onChange(games, outcome, isComplete, isNew);
         // onChange identity is not stable across parent renders; the payload is what matters.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [games, outcome, allowTiebreak]);
