@@ -473,8 +473,8 @@
     "unknown": "Nieznany"
   },
   "swissKnockout": {
-    "none": "Brak (zwycięzca wg tabeli)",
-    "top2": "Top 2 (finał)",
+    "none": "Brak",
+    "top2": "Top 2",
     "top4": "Top 4",
     "top8": "Top 8",
     "top16": "Top 16",

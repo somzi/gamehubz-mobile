@@ -457,8 +457,8 @@
     "unknown": "Desconocido"
   },
   "swissKnockout": {
-    "none": "Ninguna (gana el líder de la clasificación)",
-    "top2": "Top 2 (final)",
+    "none": "Ninguna",
+    "top2": "Top 2",
     "top4": "Top 4",
     "top8": "Top 8",
     "top16": "Top 16",
