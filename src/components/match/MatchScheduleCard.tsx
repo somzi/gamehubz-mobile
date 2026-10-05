@@ -993,6 +993,9 @@ function MatchScheduleCardBase({
                 setAwayScore('');
                 setSelectedImages([]);
                 await fetchDbHomeUserId(true);
+                // The parked match now waits for a tiebreak the panel did not list yet — without
+                // this its games had nothing to verify until the sheet was opened again.
+                void verification.refresh();
             } else {
                 setModalVisible(false);
             }
@@ -1767,6 +1770,7 @@ function MatchScheduleCardBase({
                                                         format={seriesFormat}
                                                         allowTiebreak={allowsTiebreak}
                                                         initialGames={seriesDraftToRestore ?? visualEntrySeedGames}
+                                                        openTiebreak
                                                         onChange={(games, outcome, complete) => {
                                                             setSeriesGames(games);
                                                             setSeriesOutcome(outcome);
@@ -1952,7 +1956,8 @@ function MatchScheduleCardBase({
                                                                                 // A level knockout series is reported now and decided by a
                                                                                 // tiebreak later — say so on the button rather than letting
                                                                                 // "Submit Result" imply the match is settled.
-                                                                                : (isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel)
+                                                                                // Not once it is on record and its tiebreak is open, waiting for games.
+                                                                                : (isSeriesMatch && allowsTiebreak && seriesOutcome?.isLevel && isSeriesComplete)
                                                                                     ? t('card.reportTiebreakNeeded')
                                                                                     : (requireResultApproval ? t('card.reportResult') : t('card.submitResult'))}
                                                                     </Text>

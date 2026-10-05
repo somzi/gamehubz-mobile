@@ -59,6 +59,11 @@ interface SeriesScoreEntryProps {
     onFocusInput?: (row: View | null) => void;
     /** False for viewers who can't report this match — the games still render, read-only. */
     editable?: boolean;
+    /**
+     * Opens the tiebreak right away when the games it starts with are a level series that goes to one
+     * — a parked match, or one just reported level: the replay is all there is left to enter.
+     */
+    openTiebreak?: boolean;
 }
 
 const isFilled = (row: GameRow) => row.left !== '' && row.right !== '';
@@ -112,6 +117,8 @@ function buildRows(initialGames: SeriesGame[] | undefined, format: SeriesFormat)
     return rows;
 }
 
+const gamesKey = (games: SeriesGame[]) => games.map(g => `${g.seriesNumber}:${g.homeScore}-${g.awayScore}`).join(',');
+
 function collectGames(rows: GameRow[]): SeriesGame[] {
     const games: SeriesGame[] = [];
 
@@ -156,10 +163,27 @@ export function SeriesScoreEntry({
     onChange,
     onFocusInput,
     editable = true,
+    openTiebreak = false,
 }: SeriesScoreEntryProps) {
     const { t } = useTranslation('match');
+    // The level series the form opened a tiebreak after: that is on record already, so it is not
+    // something to report again — only the tiebreak games are.
+    const openedAfter = useRef<string | null>(null);
     // The raw `format` prop is fine here: the initializer runs once, so identity churn can't reach it.
-    const [rows, setRows] = useState<GameRow[]>(() => draftRef?.current ?? buildRows(initialGames, format));
+    const [rows, setRows] = useState<GameRow[]>(() => {
+        if (draftRef?.current) return draftRef.current;
+        const built = buildRows(initialGames, format);
+        if (!openTiebreak || !allowTiebreak || !editable) return built;
+        const seeded = collectGames(built);
+        const start = evaluateSeries(seeded, format);
+        if (!start.isLevel || !start.currentSeriesOver) return built;
+        openedAfter.current = gamesKey(seeded);
+        const next = start.currentSeriesNumber + 1;
+        return [
+            ...built,
+            ...Array.from({ length: bestOfForSeries(next, format) }, () => ({ left: '', right: '', seriesNumber: next })),
+        ];
+    });
     if (draftRef) draftRef.current = rows;
 
     // Callers build the format object inline, so a fresh identity arrives on every parent render.
@@ -177,9 +201,9 @@ export function SeriesScoreEntry({
     useEffect(() => {
         // Reportable as soon as the current series is played out. A level knockout series counts:
         // the tiebreak is a game still to be played, often days later, so the server records the
-        // series and parks the match awaiting it rather than forcing one all-in-one submission.
-        // Players who already played the tiebreak add it here first via "Start tiebreak".
-        const isComplete = games.length > 0 && outcome.currentSeriesOver;
+        // series and parks the match awaiting it rather than forcing one all-in-one submission. Once
+        // reported, the form comes back with that tiebreak open, and asks for its games.
+        const isComplete = games.length > 0 && outcome.currentSeriesOver && gamesKey(games) !== openedAfter.current;
 
         onChange(games, outcome, isComplete);
         // onChange identity is not stable across parent renders; the payload is what matters.
@@ -189,17 +213,6 @@ export function SeriesScoreEntry({
     const setCell = (index: number, side: 'left' | 'right', value: string) => {
         const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
         setRows(current => current.map((r, i) => (i === index ? { ...r, [side]: digits } : r)));
-    };
-
-    const startTiebreak = () => {
-        setRows(current => {
-            const next = outcome.currentSeriesNumber + 1;
-            const length = bestOfForSeries(next, stableFormat);
-            return [
-                ...current,
-                ...Array.from({ length }, () => ({ left: '', right: '', seriesNumber: next })),
-            ];
-        });
     };
 
     /** Clears the last recorded game rather than removing its row — the layout stays put. */
@@ -376,23 +389,6 @@ export function SeriesScoreEntry({
                 {!isSingleGame && <SeriesSummary outcome={outcome} format={stableFormat} leftName={leftName} rightName={rightName} />}
             </View>
 
-            {outcome.isLevel && allowTiebreak && editable && (
-                <Pressable
-                    onPress={startTiebreak}
-                    className="rounded-[20px] p-4 flex-row items-center gap-3 bg-warning/[0.08] border border-warning/20 active:opacity-80"
-                >
-                    <View className="w-10 h-10 rounded-2xl bg-warning/15 items-center justify-center">
-                        <Ionicons name="flash" size={18} color="#F59E0B" />
-                    </View>
-                    <View className="flex-1">
-                        <Text className="text-[10px] font-black text-warning uppercase tracking-[2px]">{t('series.matchTied')}</Text>
-                        <Text className="text-[11px] text-slate-400 mt-0.5">
-                            Tap to play a tiebreak — best of {bestOfForSeries(outcome.currentSeriesNumber + 1, stableFormat)}.
-                        </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#F59E0B" />
-                </Pressable>
-            )}
         </View>
     );
 }

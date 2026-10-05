@@ -946,6 +946,8 @@ export function MatchDetailsModal({
                 setSelectedImages([]);
                 setIsEditMode(false);
                 await fetchMatchDetails();
+                // The tiebreak it now waits for is a series the panel did not list yet.
+                void verification.refresh();
             } else {
                 finishAfterSettle(isEditMode ? t('details.resultUpdated') : t('details.resultSaved'));
             }
@@ -2017,6 +2019,7 @@ export function MatchDetailsModal({
                             allowTiebreak={!!matchDetails?.allowsTieBreak}
                             initialGames={entrySeedGames}
                             editable={canSubmit}
+                            openTiebreak
                             onFocusInput={row => scrollRowIntoView(mainScrollViewRef.current, row, mainScrollY.current)}
                             onChange={(games, outcome, complete) => {
                                 setSeriesGames(games);

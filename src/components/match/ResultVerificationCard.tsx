@@ -15,7 +15,6 @@ import { seriesBlockLabel } from '../../lib/series';
 import {
     VerificationSlot,
     gameIsVerified,
-    nextVerificationTarget,
     verificationGameKey,
 } from '../../lib/verificationGames';
 import {
@@ -90,6 +89,42 @@ const FLAG_ICONS: Record<VerificationFlag, keyof typeof Ionicons.glyphMap> = {
     oldRecording: 'time-outline',
     noRecordingTime: 'calendar-outline',
 };
+
+/**
+ * What an organizer has to look at in a proof, carried up to every level of the card so a green time
+ * never hides it: another account was on the phone first ('danger' — maybe someone else played), or
+ * any other flag ('warning'). Only an organizer's panel carries flags and device details.
+ */
+type Concern = 'danger' | 'warning';
+const CONCERN_COLOR: Record<Concern, string> = { danger: COLORS.destructive, warning: COLORS.warning };
+
+function recordConcern(record: VerificationRecord): Concern | null {
+    if (!isVerified(record)) return null;
+    if (record.device?.otherAccounts.some(account => account.cameFirst)) return 'danger';
+    if (record.flags.length > 0 || (record.device?.otherAccountsOnDevice ?? 0) > 0) return 'warning';
+    return null;
+}
+
+function worstConcern(concerns: (Concern | null)[]): Concern | null {
+    return concerns.includes('danger') ? 'danger' : concerns.includes('warning') ? 'warning' : null;
+}
+
+/** The organizer's cue on the card's header: a triangle and "Review", in the worst concern's colour. */
+function ReviewPill({ concern }: { concern: Concern }) {
+    const { t } = useTranslation('match');
+    const color = CONCERN_COLOR[concern];
+    return (
+        <View
+            className="flex-row items-center gap-1 px-2 py-1 rounded-lg border"
+            style={{ backgroundColor: color + '1F', borderColor: color + '59' }}
+        >
+            <Ionicons name="warning" size={12} color={color} />
+            <Text numberOfLines={1} className="text-[10px] font-black uppercase tracking-[1px]" style={{ color }}>
+                {t('verification.review')}
+            </Text>
+        </View>
+    );
+}
 
 /** One ✓ line of the record: what was proven, and the fact behind it. */
 function CheckLine({ ok, label, value }: { ok: boolean; label: string; value?: string | null }) {
@@ -305,7 +340,9 @@ function PlayerRow({
 }) {
     const { t } = useTranslation('match');
     const verified = isVerified(record);
+    const concern = showFlags ? recordConcern(record) : null;
     const [expanded, setExpanded] = useState(false);
+    const tone = concern ? CONCERN_COLOR[concern] : verified ? COLORS.primary : COLORS.slate500;
 
     return (
         <View className="py-2.5">
@@ -321,7 +358,7 @@ function PlayerRow({
                     onPress={verified ? () => setExpanded(open => !open) : onOpenProfile ? () => onOpenProfile(record.userId) : undefined}
                     disabled={!verified && !onOpenProfile}
                     accessibilityRole="button"
-                    accessibilityLabel={`${record.username}, ${t(verified ? 'verification.verifiedPill' : 'verification.notVerified')}`}
+                    accessibilityLabel={`${record.username}, ${t(verified ? 'verification.verifiedPill' : 'verification.notVerified')}${concern ? `, ${t('verification.review')}` : ''}`}
                     accessibilityState={verified ? { expanded } : undefined}
                     className="flex-row items-center gap-2.5 flex-1 active:opacity-70"
                 >
@@ -330,19 +367,20 @@ function PlayerRow({
                     </Text>
 
                     <View
-                        className={cn(
-                            'flex-row items-center gap-1 px-2 py-1 rounded-lg border',
-                            verified ? 'border-primary/30 bg-primary/10' : 'border-white/[0.08] bg-white/[0.03]',
-                        )}
+                        className="flex-row items-center gap-1 px-2 py-1 rounded-lg border"
+                        style={verified
+                            ? { backgroundColor: tone + (concern ? '1F' : '1A'), borderColor: tone + (concern ? '59' : '4D') }
+                            : { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                     >
                         <Ionicons
-                            name={verified ? 'shield-checkmark' : 'shield-outline'}
+                            name={concern ? 'warning' : verified ? 'shield-checkmark' : 'shield-outline'}
                             size={11}
-                            color={verified ? COLORS.primary : COLORS.slate500}
+                            color={tone}
                         />
                         <Text
                             numberOfLines={1}
-                            className={cn('text-[9px] font-black uppercase tracking-[1px]', verified ? 'text-primary' : 'text-slate-500')}
+                            className="text-[9px] font-black uppercase tracking-[1px]"
+                            style={{ color: tone }}
                         >
                             {verified
                                 ? formatVerificationStamp(record.verifiedOn, false)
@@ -381,12 +419,17 @@ interface GameState {
     statusColor: string;
     /** The tile's colour: green once the viewer's part is done, amber while they owe it. */
     tone: string;
+    /** What an organizer should look at in this game's proofs, if anything. */
+    concern: Concern | null;
+    /** That concern in a few words: who may have played, or the flags raised. */
+    concernText: string | null;
 }
 
 function describeGame(
     slot: VerificationSlot,
     byBothPlayers: boolean,
     currentUserId: string | null | undefined,
+    isManager: boolean,
     t: (key: string, options?: any) => string,
 ): GameState {
     const notPlayed = slot.role === 'notPlayed';
@@ -406,7 +449,15 @@ function describeGame(
             : notPlayed || slot.role === 'optional' ? COLORS.slate500
                 : COLORS.slate300;
     const statusColor = everyone ? COLORS.primary : some ? COLORS.slate300 : needsViewer ? COLORS.warning : COLORS.slate500;
-    return { players, notPlayed, everyone, needsViewer, status, statusColor, tone };
+    const concern = isManager ? worstConcern(players.map(recordConcern)) : null;
+    const firstAccount = players.flatMap(player => player.device?.otherAccounts ?? []).find(account => account.cameFirst);
+    const concernText = concern === 'danger' && firstAccount
+        ? t('verification.possiblyPlayedBy', { name: firstAccount.username || t('verification.unknownAccount') })
+        : concern
+            ? [...new Set(players.flatMap(player => recordConcern(player) ? player.flags : []))]
+                .map(flag => t(`verification.flag.${flag}`)).join(', ') || t('verification.flag.sharedDevice')
+            : null;
+    return { players, notPlayed, everyone, needsViewer, status, statusColor, tone, concern, concernText };
 }
 
 /**
@@ -433,7 +484,7 @@ function GameTile({
             onPress={onPress}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            accessibilityLabel={`${slot.seriesNumber > 1 ? `${seriesBlockLabel(slot.seriesNumber)}, ` : ''}${label}, ${state.status}`}
+            accessibilityLabel={`${slot.seriesNumber > 1 ? `${seriesBlockLabel(slot.seriesNumber)}, ` : ''}${label}, ${state.status}${state.concernText ? `, ${state.concernText}` : ''}`}
             hitSlop={3}
             className="active:opacity-70"
         >
@@ -450,6 +501,11 @@ function GameTile({
                     opacity: state.notPlayed && !selected ? 0.45 : 1,
                 }}
             >
+                {state.concern && (
+                    <View pointerEvents="none" style={{ position: 'absolute', top: 3, right: 3 }}>
+                        <Ionicons name="warning" size={11} color={CONCERN_COLOR[state.concern]} />
+                    </View>
+                )}
                 <Text className="text-[15px] font-black" style={{ color: state.tone, fontVariant: ['tabular-nums'] }}>
                     {slot.gameNumber}
                 </Text>
@@ -462,7 +518,9 @@ function GameTile({
                                     width: 5,
                                     height: 5,
                                     borderRadius: 2.5,
-                                    backgroundColor: isVerified(player) ? COLORS.primary : 'rgba(255,255,255,0.18)',
+                                    backgroundColor: !isVerified(player) ? 'rgba(255,255,255,0.18)'
+                                        : state.concern && recordConcern(player) ? CONCERN_COLOR[recordConcern(player)!]
+                                            : COLORS.primary,
                                 }}
                             />
                         ))}
@@ -475,12 +533,13 @@ function GameTile({
 
 /**
  * Result verification inside a match sheet: one proof per game. A series is a strip of game tiles
- * grouped by block, and the game tapped — or the next one the player still owes — opens below it, so
- * a long series with tiebreaks stays one short card. One game to prove (a Bo1, or a server from
+ * grouped by block, and the game tapped opens below it, so a long series with tiebreaks stays one
+ * short card. One game to prove (a Bo1, or a server from
  * before per-game proofs) keeps the single card.
  */
 export function ResultVerificationCard({ slots, ...props }: ResultVerificationCardProps) {
     const { t } = useTranslation('match');
+    const { t: tCommon } = useTranslation('common');
     const { panel } = props;
     const [selection, setSelection] = useState<{ scope: string; key: string | null } | null>(null);
 
@@ -504,12 +563,12 @@ export function ResultVerificationCard({ slots, ...props }: ResultVerificationCa
     const required = slots.filter(slot => slot.role === 'required');
     const verifiedCount = required.filter(slot => gameIsVerified(slot, byBothPlayers)).length;
     const allVerified = required.length > 0 && verifiedCount === required.length;
-    // A new proof moves the card on to the next game, whatever was opened by hand before it.
+    // Everything starts closed — the tiles and the header say what needs a look. A new proof closes
+    // whatever was opened by hand before it.
     const scope = `${panel.matchId}:${props.currentUserId}:${slots.map(slot => `${verificationGameKey(slot)}=${slot.mine?.id ?? ''}`).join(',')}`;
-    const next = nextVerificationTarget(slots);
-    const openKey = selection?.scope === scope ? selection.key : next ? verificationGameKey(next) : null;
-
-    const states = new Map(slots.map(slot => [verificationGameKey(slot), describeGame(slot, byBothPlayers, props.currentUserId, t)]));
+    const states = new Map(slots.map(slot => [verificationGameKey(slot), describeGame(slot, byBothPlayers, props.currentUserId, panel.isManager, t)]));
+    const concern = worstConcern([...states.values()].map(state => state.concern));
+    const openKey = selection?.scope === scope ? selection.key : null;
     const blocks = [...new Set(slots.map(slot => slot.seriesNumber))].map(seriesNumber => ({
         seriesNumber,
         slots: slots.filter(slot => slot.seriesNumber === seriesNumber),
@@ -526,6 +585,7 @@ export function ResultVerificationCard({ slots, ...props }: ResultVerificationCa
                     color={allVerified ? COLORS.primary : required.length > 0 ? COLORS.warning : COLORS.slate500}
                 />
                 <Text className="flex-1 text-[14px] font-black text-white">{t('verification.title')}</Text>
+                {concern && <ReviewPill concern={concern} />}
             </View>
             {required.length > 0 && (
                 <Text
@@ -586,7 +646,14 @@ export function ResultVerificationCard({ slots, ...props }: ResultVerificationCa
                                 : 'border-white/[0.08] bg-white/[0.02]',
                     )}
                 >
-                    <View className="flex-row items-center gap-2.5 px-3 pt-3">
+                    {/* The header closes the game again — tapping its tile a second time does too. */}
+                    <Pressable
+                        onPress={() => setSelection({ scope, key: null })}
+                        accessibilityRole="button"
+                        accessibilityLabel={tCommon('close')}
+                        accessibilityState={{ expanded: true }}
+                        className="flex-row items-center gap-2.5 px-3 pt-3 active:opacity-70"
+                    >
                         <View className="flex-1 min-w-0">
                             {blocks.length > 1 && (
                                 <Text className="text-[10px] text-slate-500 font-bold">{seriesBlockLabel(open.seriesNumber)}</Text>
@@ -595,13 +662,22 @@ export function ResultVerificationCard({ slots, ...props }: ResultVerificationCa
                             <Text numberOfLines={1} className="text-[11px] font-semibold mt-0.5" style={{ color: openState.statusColor }}>
                                 {openState.status}
                             </Text>
+                            {!!openState.concern && !!openState.concernText && (
+                                <View className="flex-row items-center gap-1 mt-1">
+                                    <Ionicons name="warning" size={12} color={CONCERN_COLOR[openState.concern]} />
+                                    <Text numberOfLines={1} className="flex-1 text-[11px] font-black" style={{ color: CONCERN_COLOR[openState.concern] }}>
+                                        {openState.concernText}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
                         {!!open.score && (
                             <Text className="text-sm font-black text-slate-300" style={{ fontVariant: ['tabular-nums'] }}>
                                 {open.score.homeScore} : {open.score.awayScore}
                             </Text>
                         )}
-                    </View>
+                        <Ionicons name="chevron-up" size={16} color={COLORS.slate400} />
+                    </Pressable>
                     <SingleGameVerificationCard
                         {...props}
                         compact
@@ -670,6 +746,7 @@ function SingleGameVerificationCard({
     }
 
     const accent = iVerified ? COLORS.primary : needsAction ? COLORS.warning : COLORS.info;
+    const reviewConcern = panel.isManager ? worstConcern(listedRecords.map(recordConcern)) : null;
 
     return (
         <View
@@ -701,6 +778,7 @@ function SingleGameVerificationCard({
                 <Text numberOfLines={1} className="flex-1 text-[10px] font-black text-white uppercase tracking-[2px]">
                     {t('verification.title')}
                 </Text>
+                {!!reviewConcern && <ReviewPill concern={reviewConcern} />}
                 {allowVerify && panel.required && !iVerified && (
                     <View className="px-2 py-[3px] rounded-md border border-warning/30 bg-warning/10">
                         <Text
