@@ -630,5 +630,18 @@
     "codeApplied": "Kod zaproszenia {{code}} jest aktywny",
     "teamCodeLabel": "Kod turnieju",
     "teamCodeHint": "Ten turniej jest prywatny — wpisz 6-cyfrowy kod od organizatora, aby utworzyć drużynę."
+  },
+  "phoneRequests": {
+    "inboxTitle": "Prośby",
+    "title": "Zatwierdzenie telefonu",
+    "current": "Powiązany telefon",
+    "requested": "Nowy telefon",
+    "noPhone": "Brak powiązanego telefonu",
+    "possiblePlayers": "Może grać",
+    "approve": "Zatwierdź",
+    "reject": "Odrzuć",
+    "failed": "Nie udało się zaktualizować prośby. Spróbuj ponownie.",
+    "refresh": "Odśwież prośby",
+    "empty": "Brak oczekujących próśb"
   }
 }

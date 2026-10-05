@@ -612,5 +612,18 @@
     "codeApplied": "Kod za poziv {{code}} je primenjen",
     "teamCodeLabel": "Kod turnira",
     "teamCodeHint": "Ovaj turnir je privatan — unesi šestocifreni kod od organizatora da napraviš tim."
+  },
+  "phoneRequests": {
+    "inboxTitle": "Zahtevi",
+    "title": "Odobrenje telefona",
+    "current": "Vezani telefon",
+    "requested": "Novi telefon",
+    "noPhone": "Nema vezanog telefona",
+    "possiblePlayers": "Moguće da igra",
+    "approve": "Odobri",
+    "reject": "Odbij",
+    "failed": "Zahtev za telefon nije ažuriran. Pokušaj ponovo.",
+    "refresh": "Osveži zahteve",
+    "empty": "Nema zahteva na čekanju"
   }
 }

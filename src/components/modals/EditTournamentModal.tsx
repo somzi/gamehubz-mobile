@@ -1208,7 +1208,8 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
 
                             {/* ── Schedule ── */}
                             <CollapsibleSection icon="calendar" title={t('form.sectionSchedule')} defaultOpen summary={scheduleSummary}>
-                                <View className="flex-row gap-3">
+                                {/* One under the other: side by side each date had ~50pt and was cut to "Oct 27, 2…". */}
+                                <View className="gap-3">
                                     <ScheduleField
                                         label={t('form.regDeadlinePlain')}
                                         value={registrationDeadline}
@@ -1217,6 +1218,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         iconColor={COLORS.warning}
                                         onPress={() => setShowRegDeadlinePicker(true)}
                                         disabled={!canEditDeadline}
+                                        standalone
                                     />
                                     <ScheduleField
                                         label={t('form.startDatePlain')}
@@ -1226,6 +1228,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                         iconColor={COLORS.primary}
                                         onPress={() => setShowStartDatePicker(true)}
                                         disabled={!canEditAll}
+                                        standalone
                                     />
                                 </View>
                                 {isScheduled && (

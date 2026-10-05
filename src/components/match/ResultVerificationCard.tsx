@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Platform, ScrollView } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,13 @@ import { COLORS } from '../../lib/theme';
 import { cn, parseUtcDate, sameId } from '../../lib/utils';
 import { dateLocale } from '../../i18n';
 import { EvidenceItem } from '../../lib/evidence';
+import { seriesBlockLabel } from '../../lib/series';
+import {
+    VerificationSlot,
+    gameIsVerified,
+    nextVerificationTarget,
+    verificationGameKey,
+} from '../../lib/verificationGames';
 import {
     VerificationPanel,
     VerificationRecord,
@@ -17,6 +25,7 @@ import {
     VerificationFlag,
     VERIFICATION_FAILED,
     isVerified,
+    VerificationTarget,
 } from '../../lib/resultVerification';
 
 interface ResultVerificationCardProps {
@@ -25,7 +34,9 @@ interface ResultVerificationCardProps {
     currentUserId?: string | null;
     /** The match must be scheduled and open; the server's canVerify still decides permission. */
     allowVerify: boolean;
-    onVerify: () => void;
+    /** The panel's games read against the result in view (buildVerificationSlots); null until it loads. */
+    slots: VerificationSlot[] | null;
+    onVerify: (game: VerificationTarget) => void;
     onOpenEvidence: (item: EvidenceItem) => void;
     onOpenProfile?: (userId: string) => void;
     className?: string;
@@ -77,6 +88,7 @@ const FLAG_ICONS: Record<VerificationFlag, keyof typeof Ionicons.glyphMap> = {
     sharedDevice: 'people-outline',
     emulator: 'bug-outline',
     oldRecording: 'time-outline',
+    noRecordingTime: 'calendar-outline',
 };
 
 /** One ✓ line of the record: what was proven, and the fact behind it. */
@@ -348,8 +360,264 @@ function PlayerRow({
     );
 }
 
+/** The players of a game, with the viewer's own record — which can say more — in place of their row. */
+function gamePlayers(slot: VerificationSlot, currentUserId?: string | null): VerificationRecord[] {
+    const players = slot.records
+        .filter(record => record.status !== VERIFICATION_FAILED)
+        .map(record => slot.mine && sameId(record.userId, currentUserId) ? slot.mine : record);
+    if (isVerified(slot.mine) && !players.some(record => sameId(record.userId, slot.mine!.userId))) players.push(slot.mine!);
+    return players;
+}
+
+/** What one game says to the viewer: who has proven it, and whether anything is left for them. */
+interface GameState {
+    players: VerificationRecord[];
+    notPlayed: boolean;
+    /** Every player has proven it — the only state that reads as "verified". */
+    everyone: boolean;
+    /** A game the result needs that the viewer still owes: their own proof, or as an organizer anyone's. */
+    needsViewer: boolean;
+    status: string;
+    statusColor: string;
+    /** The tile's colour: green once the viewer's part is done, amber while they owe it. */
+    tone: string;
+}
+
+function describeGame(
+    slot: VerificationSlot,
+    byBothPlayers: boolean,
+    currentUserId: string | null | undefined,
+    t: (key: string, options?: any) => string,
+): GameState {
+    const notPlayed = slot.role === 'notPlayed';
+    const players = gamePlayers(slot, currentUserId);
+    const verifiedPlayers = players.filter(isVerified);
+    const everyone = !notPlayed && players.length > 0 && verifiedPlayers.length === players.length;
+    const some = !notPlayed && !everyone && verifiedPlayers.length > 0;
+    const viewerDone = byBothPlayers ? everyone : isVerified(slot.mine);
+    const needsViewer = !notPlayed && !viewerDone && slot.role === 'required';
+    const status = notPlayed ? t('verification.notPlayed')
+        : everyone ? t(players.length > 1 ? 'verification.gameVerifiedByBoth' : 'verification.gameVerified')
+            : some ? t('verification.gameVerifiedBy', { name: verifiedPlayers.map(player => player.username).join(', ') })
+                : slot.role === 'optional' ? t('verification.ifPlayed')
+                    : t('verification.gameNotVerified');
+    const tone = everyone || (some && viewerDone) ? COLORS.primary
+        : needsViewer ? COLORS.warning
+            : notPlayed || slot.role === 'optional' ? COLORS.slate500
+                : COLORS.slate300;
+    const statusColor = everyone ? COLORS.primary : some ? COLORS.slate300 : needsViewer ? COLORS.warning : COLORS.slate500;
+    return { players, notPlayed, everyone, needsViewer, status, statusColor, tone };
+}
+
 /**
- * Result verification inside a match sheet.
+ * One game in the strip: its number, a dot per player (green once they have proven it), and its state
+ * in the tile's colour. Tapping it opens the game below the strip.
+ */
+function GameTile({
+    slot,
+    state,
+    selected,
+    onPress,
+}: {
+    slot: VerificationSlot;
+    state: GameState;
+    selected: boolean;
+    onPress: () => void;
+}) {
+    const { t } = useTranslation('match');
+    const label = t('series.gameN', { n: slot.gameNumber });
+    const loud = state.everyone || state.needsViewer;
+
+    return (
+        <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={`${slot.seriesNumber > 1 ? `${seriesBlockLabel(slot.seriesNumber)}, ` : ''}${label}, ${state.status}`}
+            hitSlop={3}
+            className="active:opacity-70"
+        >
+            <View
+                className="items-center justify-center rounded-xl"
+                style={{
+                    width: 44,
+                    height: 50,
+                    borderWidth: selected ? 1.5 : 1,
+                    // A game that may never be played is drawn as a placeholder.
+                    borderStyle: slot.role === 'optional' && !selected ? 'dashed' : 'solid',
+                    borderColor: selected ? 'rgba(255,255,255,0.8)' : state.tone + (loud ? '66' : '33'),
+                    backgroundColor: selected ? 'rgba(255,255,255,0.08)' : state.tone + (loud ? '1A' : '0A'),
+                    opacity: state.notPlayed && !selected ? 0.45 : 1,
+                }}
+            >
+                <Text className="text-[15px] font-black" style={{ color: state.tone, fontVariant: ['tabular-nums'] }}>
+                    {slot.gameNumber}
+                </Text>
+                {!state.notPlayed && state.players.length > 0 && (
+                    <View className="flex-row mt-1" style={{ gap: 3 }}>
+                        {state.players.map(player => (
+                            <View
+                                key={player.userId}
+                                style={{
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: 2.5,
+                                    backgroundColor: isVerified(player) ? COLORS.primary : 'rgba(255,255,255,0.18)',
+                                }}
+                            />
+                        ))}
+                    </View>
+                )}
+            </View>
+        </Pressable>
+    );
+}
+
+/**
+ * Result verification inside a match sheet: one proof per game. A series is a strip of game tiles
+ * grouped by block, and the game tapped — or the next one the player still owes — opens below it, so
+ * a long series with tiebreaks stays one short card. One game to prove (a Bo1, or a server from
+ * before per-game proofs) keeps the single card.
+ */
+export function ResultVerificationCard({ slots, ...props }: ResultVerificationCardProps) {
+    const { t } = useTranslation('match');
+    const { panel } = props;
+    const [selection, setSelection] = useState<{ scope: string; key: string | null } | null>(null);
+
+    if (!panel || !slots || panel.games.length === 0 || slots.length <= 1) {
+        const only = panel && panel.games.length > 0 ? slots?.[0] ?? null : null;
+        return (
+            <SingleGameVerificationCard
+                {...props}
+                panel={panel && only ? { ...panel, mine: only.mine, records: only.records, canVerify: only.canVerify } : panel}
+                onVerify={() => props.onVerify(only ?? { seriesNumber: 1, gameNumber: 1 })}
+            />
+        );
+    }
+
+    // A tournament that no longer requires verification still shows what was verified while it did.
+    if (!panel.required && !slots.some(slot => slot.records.some(record => record.id))) return null;
+
+    // The player counts their own proofs — an organizer who plays the match too; anyone else watching, both players'.
+    const viewerPlays = panel.isParticipant ?? (!panel.isManager && slots.some(slot => slot.records.some(record => sameId(record.userId, props.currentUserId))));
+    const byBothPlayers = !viewerPlays;
+    const required = slots.filter(slot => slot.role === 'required');
+    const verifiedCount = required.filter(slot => gameIsVerified(slot, byBothPlayers)).length;
+    const allVerified = required.length > 0 && verifiedCount === required.length;
+    // A new proof moves the card on to the next game, whatever was opened by hand before it.
+    const scope = `${panel.matchId}:${props.currentUserId}:${slots.map(slot => `${verificationGameKey(slot)}=${slot.mine?.id ?? ''}`).join(',')}`;
+    const next = nextVerificationTarget(slots);
+    const openKey = selection?.scope === scope ? selection.key : next ? verificationGameKey(next) : null;
+
+    const states = new Map(slots.map(slot => [verificationGameKey(slot), describeGame(slot, byBothPlayers, props.currentUserId, t)]));
+    const blocks = [...new Set(slots.map(slot => slot.seriesNumber))].map(seriesNumber => ({
+        seriesNumber,
+        slots: slots.filter(slot => slot.seriesNumber === seriesNumber),
+    }));
+    const open = openKey ? slots.find(slot => verificationGameKey(slot) === openKey) ?? null : null;
+    const openState = open ? states.get(verificationGameKey(open)) ?? null : null;
+
+    return (
+        <View className={cn('rounded-[24px] border border-white/10 bg-white/[0.03] p-4', props.className)}>
+            <View className="flex-row items-center gap-2">
+                <Ionicons
+                    name={allVerified ? 'shield-checkmark' : 'shield-half-outline'}
+                    size={20}
+                    color={allVerified ? COLORS.primary : required.length > 0 ? COLORS.warning : COLORS.slate500}
+                />
+                <Text className="flex-1 text-[14px] font-black text-white">{t('verification.title')}</Text>
+            </View>
+            {required.length > 0 && (
+                <Text
+                    accessibilityLiveRegion="polite"
+                    className={cn('text-xs font-bold mt-2', allVerified ? 'text-primary' : 'text-slate-300')}
+                >
+                    {t(byBothPlayers ? 'verification.gamesProgressManager' : 'verification.gamesProgress', {
+                        verified: verifiedCount,
+                        total: required.length,
+                    })}
+                </Text>
+            )}
+
+            {/* The games, by block. Sideways when a long series with tiebreaks outgrows the card. */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mt-3"
+                style={{ flexGrow: 0, flexShrink: 0 }}
+                contentContainerStyle={{ gap: 16 }}
+            >
+                {blocks.map(block => (
+                    <View key={block.seriesNumber}>
+                        {/* Block names only matter once there is more than one block. */}
+                        {blocks.length > 1 && (
+                            <Text numberOfLines={1} className="text-[10px] font-bold text-slate-500 mb-1.5">
+                                {seriesBlockLabel(block.seriesNumber)}
+                            </Text>
+                        )}
+                        <View className="flex-row" style={{ gap: 6 }}>
+                            {block.slots.map(slot => {
+                                const key = verificationGameKey(slot);
+                                const selected = key === openKey;
+                                return (
+                                    <GameTile
+                                        key={key}
+                                        slot={slot}
+                                        state={states.get(key)!}
+                                        selected={selected}
+                                        onPress={() => setSelection({ scope, key: selected ? null : key })}
+                                    />
+                                );
+                            })}
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
+
+            {/* The open game: its state and score, then its players and the Verify call. */}
+            {open && openState && (
+                <Animated.View
+                    key={openKey}
+                    entering={FadeIn.duration(160)}
+                    className={cn(
+                        'mt-3 rounded-2xl border overflow-hidden',
+                        openState.everyone ? 'border-primary/25 bg-primary/[0.04]'
+                            : openState.needsViewer ? 'border-warning/30 bg-warning/[0.04]'
+                                : 'border-white/[0.08] bg-white/[0.02]',
+                    )}
+                >
+                    <View className="flex-row items-center gap-2.5 px-3 pt-3">
+                        <View className="flex-1 min-w-0">
+                            {blocks.length > 1 && (
+                                <Text className="text-[10px] text-slate-500 font-bold">{seriesBlockLabel(open.seriesNumber)}</Text>
+                            )}
+                            <Text className="text-[13px] font-bold text-white">{t('series.gameN', { n: open.gameNumber })}</Text>
+                            <Text numberOfLines={1} className="text-[11px] font-semibold mt-0.5" style={{ color: openState.statusColor }}>
+                                {openState.status}
+                            </Text>
+                        </View>
+                        {!!open.score && (
+                            <Text className="text-sm font-black text-slate-300" style={{ fontVariant: ['tabular-nums'] }}>
+                                {open.score.homeScore} : {open.score.awayScore}
+                            </Text>
+                        )}
+                    </View>
+                    <SingleGameVerificationCard
+                        {...props}
+                        compact
+                        className={undefined}
+                        // A game the series ended before is shown, never offered.
+                        panel={{ ...panel, mine: open.mine, records: open.records, canVerify: open.role !== 'notPlayed' && open.canVerify }}
+                        onVerify={() => props.onVerify({ seriesNumber: open.seriesNumber, gameNumber: open.gameNumber })}
+                    />
+                </Animated.View>
+            )}
+        </View>
+    );
+}
+
+/**
+ * The verification of one game — the whole card for a Bo1, the body of an opened row in a series.
  *
  * For the player who still has to verify it is a call to action — the three steps and the button.
  * Once they have, their green player row can expand to show the proof. An organizer
@@ -357,7 +625,7 @@ function PlayerRow({
  * that failed. The panel shape is decided by the server (see MatchVerificationPanelDto), so a player
  * never receives the device details this card would otherwise have to hide.
  */
-export function ResultVerificationCard({
+function SingleGameVerificationCard({
     panel,
     isLoading,
     currentUserId,
@@ -366,7 +634,8 @@ export function ResultVerificationCard({
     onOpenEvidence,
     onOpenProfile,
     className,
-}: ResultVerificationCardProps) {
+    compact,
+}: Omit<ResultVerificationCardProps, 'slots' | 'onVerify'> & { onVerify: () => void; compact?: boolean }) {
     const { t } = useTranslation('match');
 
     if (!panel) {
@@ -390,7 +659,8 @@ export function ResultVerificationCard({
 
     const mine = panel.mine;
     const iVerified = isVerified(mine);
-    const needsAction = allowVerify && panel.canVerify && !iVerified;
+    const phonePending = allowVerify && panel.required && panel.phoneApprovalPending && !iVerified;
+    const needsAction = allowVerify && panel.canVerify && !iVerified && !phonePending;
     // The viewer's own record may contain more detail than the row in records.
     const listedRecords = playerRecords
         .filter(r => panel.isManager || !needsAction || !sameId(r.userId, currentUserId))
@@ -404,24 +674,24 @@ export function ResultVerificationCard({
     return (
         <View
             className={cn(
-                'rounded-[24px] border p-4 overflow-hidden',
-                iVerified
+                compact ? 'px-3 pb-3 overflow-hidden' : 'rounded-[24px] border p-4 overflow-hidden',
+                !compact && (iVerified
                     ? 'bg-primary/[0.05] border-primary/25'
                     : needsAction
                         ? 'bg-warning/[0.06] border-warning/30'
-                        : 'bg-white/[0.03] border-white/[0.08]',
+                        : 'bg-white/[0.03] border-white/[0.08]'),
                 className,
             )}
         >
-            <LinearGradient
+            {!compact && <LinearGradient
                 colors={[accent + '1A', 'transparent']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0.9, y: 1 }}
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            />
+            />}
 
             {/* Header */}
-            <View className="flex-row items-center gap-2">
+            {!compact && <View className="flex-row items-center gap-2">
                 <View
                     className="w-7 h-7 rounded-xl items-center justify-center"
                     style={{ backgroundColor: accent + '26' }}
@@ -441,15 +711,19 @@ export function ResultVerificationCard({
                         </Text>
                     </View>
                 )}
-            </View>
+            </View>}
 
             {/* The player who still has to verify: what to do, in the order they will do it. */}
+            {phonePending && (
+                <View className="flex-row items-center gap-2 mt-3" accessibilityLiveRegion="polite">
+                    <Ionicons name="hourglass-outline" size={17} color={COLORS.warning} />
+                    <Text className="flex-1 text-[13px] font-semibold text-warning">
+                        {t('verification.phoneApprovalPending')}
+                    </Text>
+                </View>
+            )}
             {needsAction && (
                 <>
-                    <Text className="text-[12px] font-medium text-slate-300 mt-3 leading-[18px]">
-                        {t('verification.intro')}
-                    </Text>
-
                     <View className="gap-2 mt-3">
                         {[
                             { icon: 'videocam-outline' as const, label: t('verification.stepRecord') },
@@ -461,7 +735,7 @@ export function ResultVerificationCard({
                                     <Text className="text-[9px] font-black text-slate-300">{index + 1}</Text>
                                 </View>
                                 <Ionicons name={step.icon} size={14} color={COLORS.slate400} />
-                                <Text numberOfLines={1} className="flex-1 text-[12px] font-bold text-slate-300">
+                                <Text className="flex-1 text-[12px] font-bold text-slate-300">
                                     {step.label}
                                 </Text>
                             </View>

@@ -1263,7 +1263,8 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
 
                             {/* ── Schedule ── */}
                             <CollapsibleSection icon="calendar" title={t('form.sectionSchedule')} defaultOpen summary={scheduleSummary}>
-                                <View className="flex-row gap-3">
+                                {/* One under the other: side by side each date had ~50pt and was cut to "Oct 27, 2…". */}
+                                <View className="gap-3">
                                     <ScheduleField
                                         label={t('form.regDeadline')}
                                         value={registrationDeadline}
@@ -1271,6 +1272,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         iconName="time-outline"
                                         iconColor={COLORS.warning}
                                         onPress={() => setShowRegDeadlinePicker(true)}
+                                        standalone
                                     />
                                     <ScheduleField
                                         label={t('form.startDate')}
@@ -1279,6 +1281,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                                         iconName="calendar-outline"
                                         iconColor={COLORS.primary}
                                         onPress={() => setShowStartDatePicker(true)}
+                                        standalone
                                     />
                                 </View>
                                 <View className="mt-3">

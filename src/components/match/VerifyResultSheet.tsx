@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Linking, Platform, ScrollView } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,11 +17,14 @@ import {
     getDeviceDescription,
     isBiometricAvailable,
     reRegisterDevice,
-    signWithDeviceKey,
+    unlockDeviceKey,
 } from '../../lib/deviceIdentity';
+import { signHex } from '../../lib/hmacSha256';
+import { getServerClockOffset } from '../../lib/serverClock';
 import {
     PreparedRecording,
     VerificationRecord,
+    VerificationTarget,
     VerificationRequestError,
     pickVerificationRecording,
     startVerification,
@@ -29,6 +32,8 @@ import {
     uploadVerificationRecording,
 } from '../../lib/resultVerification';
 import { biometricLabel, formatClipDuration, formatVerificationStamp } from './ResultVerificationCard';
+import { seriesBlockLabel } from '../../lib/series';
+import { verificationGameKey } from '../../lib/verificationGames';
 
 interface VerifyResultSheetProps {
     visible: boolean;
@@ -36,6 +41,14 @@ interface VerifyResultSheetProps {
     matchId: string;
     userId: string;
     opponentName?: string | null;
+    /** The game this attempt proves. */
+    target: VerificationTarget;
+    /** Games in the target's series; 1 shows no game at all, as there is only the one. */
+    bestOf: number;
+    /** The next game the player still has to prove, once this one is in — offered right away. */
+    nextTarget?: VerificationTarget | null;
+    /** Moves the sheet on to `nextTarget`: the host makes it the target, and a new attempt starts. */
+    onContinue?: (target: VerificationTarget) => void;
     /** The finished record, so the host can refresh its panel and unlock the report. */
     onVerified: (record: VerificationRecord) => void;
 }
@@ -47,6 +60,7 @@ interface VerifyResultSheetProps {
  */
 type Phase =
     | 'unavailable'
+    | 'recordingInstructions'
     | 'authenticating'
     | 'authFailed'
     | 'readyForRecording'
@@ -108,7 +122,6 @@ function StepRow({
 
             <View className={cn('flex-1', !isLast && 'pb-5')}>
                 <Text
-                    numberOfLines={1}
                     className={cn(
                         'text-[11px] font-black uppercase tracking-[1.5px] mt-1.5',
                         state === 'pending' ? 'text-slate-600' : 'text-slate-300',
@@ -155,11 +168,26 @@ export function VerifyResultSheet({
     matchId,
     userId,
     opponentName,
+    target,
+    bestOf,
+    nextTarget,
+    onContinue,
     onVerified,
 }: VerifyResultSheetProps) {
     const { t } = useTranslation('match');
     const { t: tCommon } = useTranslation('common');
     const insets = useSafeAreaInsets();
+
+    // "Tiebreak · Game 2 of 3"; nothing at all for a single game of the main series.
+    const gameContext = [
+        target.seriesNumber > 1 ? seriesBlockLabel(target.seriesNumber) : null,
+        bestOf > 1 ? t('verification.gameContext', { n: target.gameNumber, total: bestOf }) : null,
+    ].filter(Boolean).join(' · ');
+    // The host's next game is this one until its own panel has taken the new proof in.
+    const upcoming = nextTarget && onContinue && verificationGameKey(nextTarget) !== verificationGameKey(target) ? nextTarget : null;
+    const upcomingLabel = upcoming
+        ? `${upcoming.seriesNumber > 1 ? `${seriesBlockLabel(upcoming.seriesNumber)} · ` : ''}${t('series.gameN', { n: upcoming.gameNumber })}`
+        : null;
 
     const [phase, setPhase] = useState<Phase>('authenticating');
     const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -170,10 +198,13 @@ export function VerifyResultSheet({
 
     const verificationIdRef = useRef<string | null>(null);
     const recordingRef = useRef<PreparedRecording | null>(null);
+    const unlockedKeyRef = useRef<string | null>(null);
+    const evidenceMessageRef = useRef<string | null>(null);
     // One attempt at a time: a double tap on "Try again" must not start two challenges.
     const busyRef = useRef(false);
     // The sheet can be closed mid-request; a late answer must not write into the next opening.
     const sessionRef = useRef(0);
+    const nextGameNeedsRecordingRef = useRef(false);
 
     const biometric = biometricLabel(t);
 
@@ -193,6 +224,8 @@ export function VerifyResultSheet({
         setRecordingMessage(null);
         verificationIdRef.current = null;
         recordingRef.current = null;
+        unlockedKeyRef.current = null;
+        evidenceMessageRef.current = null;
 
         try {
             let registration = await ensureDeviceRegistered(userId, prompts);
@@ -200,19 +233,25 @@ export function VerifyResultSheet({
 
             let challenge;
             try {
-                challenge = await startVerification(matchId, registration.deviceId, description);
+                if (session !== sessionRef.current) return;
+                challenge = await startVerification(matchId, registration.deviceId, description, target);
             } catch (error) {
                 // 409: the server holds no key for this installation — the phone's registration
                 // outlived the server's record of it. Registering again fixes that; once, not in a loop.
                 if (!(error instanceof VerificationRequestError) || error.status !== 409) throw error;
                 registration = await reRegisterDevice(userId, prompts);
-                challenge = await startVerification(matchId, registration.deviceId, description);
+                if (session !== sessionRef.current) return;
+                challenge = await startVerification(matchId, registration.deviceId, description, target);
             }
 
-            const signature = await signWithDeviceKey(userId, challenge.message, prompts, registration.unlockedSecret);
-            await submitBiometricProof(challenge.verificationId, signature);
+            if (session !== sessionRef.current) return;
+            const secret = await unlockDeviceKey(userId, prompts, registration.unlockedSecret);
+            if (session !== sessionRef.current) return;
+            const biometricProof = await submitBiometricProof(challenge.verificationId, signHex(secret, challenge.message));
 
             if (session !== sessionRef.current) return;
+            unlockedKeyRef.current = secret;
+            evidenceMessageRef.current = biometricProof.evidenceMessage;
             verificationIdRef.current = challenge.verificationId;
             // No buzz here: the OS already acknowledged the unlock, and the flow's one success haptic
             // belongs to the moment the result is actually verified.
@@ -235,14 +274,15 @@ export function VerifyResultSheet({
             }
             setPhase('authFailed');
         } finally {
-            busyRef.current = false;
+            if (session === sessionRef.current) busyRef.current = false;
         }
-    }, [matchId, userId, t]);
+    }, [matchId, userId, target.seriesNumber, target.gameNumber, t]);
 
     const upload = useCallback(async () => {
         const verificationId = verificationIdRef.current;
         const recording = recordingRef.current;
-        if (!verificationId || !recording || busyRef.current) return;
+        const key = unlockedKeyRef.current;
+        if (!verificationId || !recording || !key || busyRef.current) return;
         busyRef.current = true;
         const session = sessionRef.current;
 
@@ -250,9 +290,16 @@ export function VerifyResultSheet({
         setUploadMessage(null);
 
         try {
-            const verified = await uploadVerificationRecording(verificationId, recording);
+            const verified = await uploadVerificationRecording(verificationId, recording, {
+                // Older servers do not issue an evidence message and ignore these extra fields.
+                signature: evidenceMessageRef.current ? signHex(key, evidenceMessageRef.current) : '',
+                clockOffsetMs: getServerClockOffset(),
+                timeZoneOffsetMinutes: -new Date().getTimezoneOffset(),
+            });
 
             if (session === sessionRef.current) {
+                unlockedKeyRef.current = null;
+                evidenceMessageRef.current = null;
                 setRecord(verified);
                 hapticSuccess();
                 setPhase('verified');
@@ -264,12 +311,20 @@ export function VerifyResultSheet({
         } catch (error) {
             if (session !== sessionRef.current) return;
             hapticError();
+            // 409: this clip already proves another game, or was not running during this Face ID. The
+            // attempt still stands — it needs another clip, not another try with the same one.
+            if (error instanceof VerificationRequestError && error.status === 409) {
+                recordingRef.current = null;
+                setRecordingMessage(error.message || t('verification.videoFailed'));
+                setPhase('readyForRecording');
+                return;
+            }
             setUploadMessage(error instanceof VerificationRequestError && error.message
                 ? error.message
                 : t('verification.uploadFailedBody'));
             setPhase('uploadFailed');
         } finally {
-            busyRef.current = false;
+            if (session === sessionRef.current) busyRef.current = false;
         }
     }, [onVerified, t]);
 
@@ -283,10 +338,11 @@ export function VerifyResultSheet({
         try {
             const result = await pickVerificationRecording(
                 () => {
+                    if (session !== sessionRef.current) return;
                     setCompressionProgress(0);
                     setPhase('preparing');
                 },
-                progress => setCompressionProgress(progress),
+                progress => { if (session === sessionRef.current) setCompressionProgress(progress); },
             );
             if (session !== sessionRef.current) return;
 
@@ -309,15 +365,31 @@ export function VerifyResultSheet({
             setPhase('readyForRecording');
             setRecordingMessage(t('verification.videoFailed'));
         } finally {
-            busyRef.current = false;
+            if (session === sessionRef.current) busyRef.current = false;
         }
 
         if (picked) await upload();
     }, [upload, t]);
 
+    const restartRecording = useCallback(() => {
+        if (busyRef.current) return;
+        sessionRef.current += 1;
+        verificationIdRef.current = null;
+        recordingRef.current = null;
+        unlockedKeyRef.current = null;
+        evidenceMessageRef.current = null;
+        setRecord(null);
+        setRecordingMessage(null);
+        setUploadMessage(null);
+        setPhase('recordingInstructions');
+    }, []);
+
     // Every opening is a fresh attempt: a new challenge, a new proof, nothing carried over.
     useEffect(() => {
+        unlockedKeyRef.current = null;
+        evidenceMessageRef.current = null;
         if (!visible) {
+            nextGameNeedsRecordingRef.current = false;
             sessionRef.current += 1;
             busyRef.current = false;
             return;
@@ -334,10 +406,18 @@ export function VerifyResultSheet({
 
         // A beat after the slide-in: raising the Face ID sheet while this one is still animating up
         // reads as two things happening at once.
-        setPhase('authenticating');
-        const timer = setTimeout(() => { authenticate(); }, 450);
-        return () => clearTimeout(timer);
-    }, [visible, matchId]);
+        const needsRecording = nextGameNeedsRecordingRef.current;
+        nextGameNeedsRecordingRef.current = false;
+        setPhase(needsRecording ? 'recordingInstructions' : 'authenticating');
+        const timer = needsRecording ? undefined : setTimeout(() => { authenticate(); }, 450);
+        return () => {
+            clearTimeout(timer);
+            sessionRef.current += 1;
+            busyRef.current = false;
+            unlockedKeyRef.current = null;
+            evidenceMessageRef.current = null;
+        };
+    }, [visible, matchId, userId, target.seriesNumber, target.gameNumber]);
 
     const biometricState: StepState = phase === 'authenticating' ? 'active'
         : phase === 'authFailed' || phase === 'unavailable' ? 'error'
@@ -372,6 +452,8 @@ export function VerifyResultSheet({
 
     const primary = (() => {
         switch (phase) {
+            case 'recordingInstructions':
+                return { label: t('verification.recordingStarted'), icon: 'finger-print-outline' as const, onPress: authenticate };
             case 'unavailable':
                 return { label: t('verification.openSettings'), icon: 'settings-outline' as const, onPress: () => Linking.openSettings().catch(() => { }) };
             case 'authFailed':
@@ -381,7 +463,13 @@ export function VerifyResultSheet({
             case 'uploadFailed':
                 return { label: t('verification.retryUpload'), icon: 'cloud-upload-outline' as const, onPress: upload };
             case 'verified':
-                return { label: t('verification.done'), icon: 'checkmark' as const, onPress: onClose };
+                // The next game straight away: a series is proven game by game, in one sitting.
+                return upcoming && upcomingLabel
+                    ? { label: t('verification.nextGame', { game: upcomingLabel }), icon: 'arrow-forward' as const, onPress: () => {
+                        nextGameNeedsRecordingRef.current = true;
+                        onContinue!(upcoming);
+                    } }
+                    : { label: t('verification.done'), icon: 'checkmark' as const, onPress: onClose };
             default:
                 return null;
         }
@@ -401,161 +489,181 @@ export function VerifyResultSheet({
             <Animated.View
                 entering={SlideInDown.duration(280)}
                 className="bg-card border-t border-white/[0.08] rounded-t-[32px] px-5 pt-3 overflow-hidden"
-                style={{ paddingBottom: Math.max(insets.bottom, 16) + 8 }}
+                style={{ paddingBottom: Math.max(insets.bottom, 16) + 8, maxHeight: '92%' }}
             >
-                <LinearGradient
-                    colors={[(phase === 'verified' ? COLORS.primary : COLORS.info) + '22', 'transparent']}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 0.45 }}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                />
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
+                    <LinearGradient
+                        colors={[(phase === 'verified' ? COLORS.primary : COLORS.info) + '22', 'transparent']}
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 0.45 }}
+                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    />
 
-                <View className="self-center w-10 h-1 rounded-full bg-white/15 mb-4" />
+                    <View className="self-center w-10 h-1 rounded-full bg-white/15 mb-4" />
+                    {!!gameContext && (
+                        <View className="self-start rounded-lg bg-white/[0.06] px-3 py-1.5 mb-3">
+                            <Text className="text-xs font-bold text-slate-200">{gameContext}</Text>
+                        </View>
+                    )}
 
-                {/* Header: the emblem, what this is, and which match it is for. */}
-                <View className="flex-row items-center gap-3 mb-6">
-                    <View
-                        className="w-12 h-12 rounded-2xl items-center justify-center border"
-                        style={{
-                            backgroundColor: (phase === 'verified' ? COLORS.primary : COLORS.info) + '1F',
-                            borderColor: (phase === 'verified' ? COLORS.primary : COLORS.info) + '55',
-                            shadowColor: phase === 'verified' ? COLORS.primary : COLORS.info,
-                            shadowOpacity: 0.45,
-                            shadowRadius: 14,
-                            shadowOffset: { width: 0, height: 0 },
-                        }}
-                    >
-                        <Ionicons
-                            name={phase === 'verified' ? 'shield-checkmark' : 'finger-print'}
-                            size={24}
-                            color={phase === 'verified' ? COLORS.primary : COLORS.info}
+                    {/* Header: the emblem, what this is, and which match it is for. */}
+                    <View className="flex-row items-center gap-3 mb-6">
+                        <View
+                            className="w-12 h-12 rounded-2xl items-center justify-center border"
+                            style={{
+                                backgroundColor: (phase === 'verified' ? COLORS.primary : COLORS.info) + '1F',
+                                borderColor: (phase === 'verified' ? COLORS.primary : COLORS.info) + '55',
+                                shadowColor: phase === 'verified' ? COLORS.primary : COLORS.info,
+                                shadowOpacity: 0.45,
+                                shadowRadius: 14,
+                                shadowOffset: { width: 0, height: 0 },
+                            }}
+                        >
+                            <Ionicons
+                                name={phase === 'verified' ? 'shield-checkmark' : 'finger-print'}
+                                size={24}
+                                color={phase === 'verified' ? COLORS.primary : COLORS.info}
+                            />
+                        </View>
+                        <View className="flex-1">
+                            <Text numberOfLines={1} className="text-white text-[17px] font-black uppercase tracking-[2px]">
+                                {phase === 'verified' ? t('verification.verifiedTitle') : t('verification.sheetTitle')}
+                            </Text>
+                            <Text numberOfLines={1} className="text-slate-500 text-xs font-bold mt-0.5">
+                                {opponentName ? t('verification.sheetSubtitle', { name: opponentName }) : t('verification.sheetSubtitleNoName')}
+                            </Text>
+                        </View>
+                        {!isWorking && (
+                            <Pressable onPress={onClose} hitSlop={10} className="w-9 h-9 rounded-full bg-white/5 items-center justify-center active:bg-white/10">
+                                <Ionicons name="close" size={18} color={COLORS.slate400} />
+                            </Pressable>
+                        )}
+                    </View>
+
+                    {/* The stepper */}
+                    {phase === 'recordingInstructions' ? (
+                        <View className="px-1">
+                            <StepRow index={1} title={t('verification.stepRecord')} state="active" />
+                            <StepRow index={2} title={t('verification.stepBiometric', { biometric })} state="pending" />
+                            <StepRow index={3} title={t('verification.stepAttach')} state="pending" isLast />
+                        </View>
+                    ) : <View className="px-1">
+                        <StepRow
+                            index={1}
+                            title={t('verification.stepBiometricTitle', { biometric })}
+                            detail={biometricDetail}
+                            state={biometricState}
+                        >
+                            {phase === 'authenticating' && (
+                                <ActivityIndicator size="small" color={COLORS.slate300} style={{ alignSelf: 'flex-start', marginTop: 8 }} />
+                            )}
+                        </StepRow>
+
+                        <StepRow
+                            index={2}
+                            title={t('verification.stepRecordingTitle')}
+                            detail={recordingDetail}
+                            state={recordingState}
+                        >
+                            {(phase === 'preparing' || phase === 'uploading') && (
+                                <View className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
+                                    <View
+                                        className="h-full rounded-full bg-info"
+                                        style={{ width: phase === 'uploading' ? '100%' : `${Math.max(4, Math.round(compressionProgress * 100))}%`, opacity: phase === 'uploading' ? 0.55 : 1 }}
+                                    />
+                                </View>
+                            )}
+                            {!!recordingMessage && (
+                                <Text className="text-[11px] font-bold text-warning mt-1.5">{recordingMessage}</Text>
+                            )}
+                        </StepRow>
+
+                        <StepRow
+                            index={3}
+                            title={t('verification.stepVerifiedTitle')}
+                            detail={phase === 'verified' && record
+                                ? t('verification.verifiedDetail', {
+                                    time: formatVerificationStamp(record.verifiedOn),
+                                    device: record.device?.deviceModel || Device.modelName || (Platform.OS === 'ios' ? 'iPhone' : 'Android'),
+                                })
+                                : null}
+                            state={verifiedState}
+                            isLast
                         />
-                    </View>
-                    <View className="flex-1">
-                        <Text numberOfLines={1} className="text-white text-[17px] font-black uppercase tracking-[2px]">
-                            {phase === 'verified' ? t('verification.verifiedTitle') : t('verification.sheetTitle')}
+                    </View>}
+
+                    {/* The last game to prove: the report is what comes next. With games left, the
+                        button to the next one says it. */}
+                    {phase === 'verified' && !upcoming && (
+                        <Text className="text-[12px] font-semibold text-slate-400 mt-4 leading-[18px]">
+                            {t('verification.verifiedBody')}
                         </Text>
-                        <Text numberOfLines={1} className="text-slate-500 text-xs font-bold mt-0.5">
-                            {opponentName ? t('verification.sheetSubtitle', { name: opponentName }) : t('verification.sheetSubtitleNoName')}
+                    )}
+
+                    {phase === 'unavailable' && (
+                        <Text className="text-[12px] font-semibold text-slate-400 mt-4 leading-[18px]">
+                            {Platform.OS === 'ios' ? t('verification.unavailableIos') : t('verification.unavailableAndroid')}
                         </Text>
-                    </View>
-                    {!isWorking && (
-                        <Pressable onPress={onClose} hitSlop={10} className="w-9 h-9 rounded-full bg-white/5 items-center justify-center active:bg-white/10">
-                            <Ionicons name="close" size={18} color={COLORS.slate400} />
+                    )}
+
+                    {primary && (
+                        <PressableScale
+                            onPress={primary.onPress}
+                            accessibilityRole="button"
+                            accessibilityLabel={primary.label}
+                            className="h-[52px] rounded-2xl overflow-hidden mt-6"
+                            style={{
+                                shadowColor: COLORS.primary,
+                                shadowOpacity: 0.32,
+                                shadowRadius: 16,
+                                shadowOffset: { width: 0, height: 7 },
+                                elevation: 8,
+                            }}
+                        >
+                            <LinearGradient
+                                colors={['#10B981', '#059669']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+                            >
+                                <View className="flex-row items-center gap-2">
+                                    <Ionicons name={primary.icon} size={17} color="#022C22" />
+                                    <Text numberOfLines={1} className="text-[13px] font-black text-emerald-950 uppercase tracking-[1.5px]">
+                                        {primary.label}
+                                    </Text>
+                                </View>
+                            </LinearGradient>
+                        </PressableScale>
+                    )}
+
+                    {/* Choose another existing clip or start a fresh recording and biometric attempt. */}
+                    {(phase === 'uploadFailed' || phase === 'readyForRecording') && (
+                        <Pressable onPress={restartRecording} accessibilityRole="button" className="h-11 items-center justify-center mt-1 active:opacity-60">
+                            <Text className="text-[13px] font-bold text-slate-300">{t('verification.startOver')}</Text>
                         </Pressable>
                     )}
-                </View>
 
-                {/* The stepper */}
-                <View className="px-1">
-                    <StepRow
-                        index={1}
-                        title={t('verification.stepBiometricTitle', { biometric })}
-                        detail={biometricDetail}
-                        state={biometricState}
-                    >
-                        {phase === 'authenticating' && (
-                            <ActivityIndicator size="small" color={COLORS.slate300} style={{ alignSelf: 'flex-start', marginTop: 8 }} />
-                        )}
-                    </StepRow>
+                    {phase !== 'verified' && !isWorking && (
+                        <Pressable onPress={onClose} className="h-12 items-center justify-center mt-1 active:opacity-60">
+                            <Text className="text-[13px] font-bold text-slate-400">{tCommon('cancel')}</Text>
+                        </Pressable>
+                    )}
 
-                    <StepRow
-                        index={2}
-                        title={t('verification.stepRecordingTitle')}
-                        detail={recordingDetail}
-                        state={recordingState}
-                    >
-                        {(phase === 'preparing' || phase === 'uploading') && (
-                            <View className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden mt-2.5">
-                                <View
-                                    className="h-full rounded-full bg-info"
-                                    style={{ width: phase === 'uploading' ? '100%' : `${Math.max(4, Math.round(compressionProgress * 100))}%`, opacity: phase === 'uploading' ? 0.55 : 1 }}
-                                />
-                            </View>
-                        )}
-                        {!!recordingMessage && (
-                            <Text className="text-[11px] font-bold text-warning mt-1.5">{recordingMessage}</Text>
-                        )}
-                    </StepRow>
+                    {/* The next game can wait: back to the match. */}
+                    {phase === 'verified' && !!upcoming && (
+                        <Pressable onPress={onClose} className="h-12 items-center justify-center mt-1 active:opacity-60">
+                            <Text className="text-[13px] font-bold text-slate-400">{t('verification.done')}</Text>
+                        </Pressable>
+                    )}
 
-                    <StepRow
-                        index={3}
-                        title={t('verification.stepVerifiedTitle')}
-                        detail={phase === 'verified' && record
-                            ? t('verification.verifiedDetail', {
-                                time: formatVerificationStamp(record.verifiedOn),
-                                device: record.device?.deviceModel || Device.modelName || (Platform.OS === 'ios' ? 'iPhone' : 'Android'),
-                            })
-                            : null}
-                        state={verifiedState}
-                        isLast
-                    />
-                </View>
-
-                {phase === 'verified' && (
-                    <Text className="text-[12px] font-semibold text-slate-400 mt-4 leading-[18px]">
-                        {t('verification.verifiedBody')}
-                    </Text>
-                )}
-
-                {phase === 'unavailable' && (
-                    <Text className="text-[12px] font-semibold text-slate-400 mt-4 leading-[18px]">
-                        {Platform.OS === 'ios' ? t('verification.unavailableIos') : t('verification.unavailableAndroid')}
-                    </Text>
-                )}
-
-                {primary && (
-                    <PressableScale
-                        onPress={primary.onPress}
-                        accessibilityRole="button"
-                        accessibilityLabel={primary.label}
-                        className="h-[52px] rounded-2xl overflow-hidden mt-6"
-                        style={{
-                            shadowColor: COLORS.primary,
-                            shadowOpacity: 0.32,
-                            shadowRadius: 16,
-                            shadowOffset: { width: 0, height: 7 },
-                            elevation: 8,
-                        }}
-                    >
-                        <LinearGradient
-                            colors={['#10B981', '#059669']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
-                        >
-                            <View className="flex-row items-center gap-2">
-                                <Ionicons name={primary.icon} size={17} color="#022C22" />
-                                <Text numberOfLines={1} className="text-[13px] font-black text-emerald-950 uppercase tracking-[1.5px]">
-                                    {primary.label}
-                                </Text>
-                            </View>
-                        </LinearGradient>
-                    </PressableScale>
-                )}
-
-                {/* A failed upload is usually the connection, and "Retry upload" keeps the same
-                    attempt. When the attempt itself is gone — its 30 minutes ran out — only a new
-                    one helps, and the server's message will have said so. */}
-                {phase === 'uploadFailed' && (
-                    <Pressable onPress={authenticate} className="h-11 items-center justify-center mt-1 active:opacity-60">
-                        <Text className="text-[13px] font-bold text-slate-300">{t('verification.startOver')}</Text>
-                    </Pressable>
-                )}
-
-                {phase !== 'verified' && !isWorking && (
-                    <Pressable onPress={onClose} className="h-12 items-center justify-center mt-1 active:opacity-60">
-                        <Text className="text-[13px] font-bold text-slate-400">{tCommon('cancel')}</Text>
-                    </Pressable>
-                )}
-
-                {/* What the biometric step actually shares — said where the player is about to use it. */}
-                <View className="flex-row items-start gap-2 mt-4 px-1">
-                    <Ionicons name="lock-closed" size={12} color={COLORS.slate500} style={{ marginTop: 2 }} />
-                    <Text className="flex-1 text-[10px] font-medium text-slate-500 leading-4">
-                        {t('verification.privacy', { biometric })}
-                    </Text>
-                </View>
+                    {/* What the biometric step actually shares — said where the player is about to use it. */}
+                    <View className="flex-row items-start gap-2 mt-4 px-1">
+                        <Ionicons name="lock-closed" size={12} color={COLORS.slate500} style={{ marginTop: 2 }} />
+                        <Text className="flex-1 text-[10px] font-medium text-slate-500 leading-4">
+                            {t('verification.privacy', { biometric })}
+                        </Text>
+                    </View>
+                </ScrollView>
             </Animated.View>
         </View>
     );

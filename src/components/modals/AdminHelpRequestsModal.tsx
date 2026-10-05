@@ -4,6 +4,8 @@ import { View, Text, Pressable, Modal, ScrollView, ActivityIndicator } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { AdminInboxMatchCard } from './AdminInboxMatchCard';
 import { formatLocalDateTime } from '../../lib/utils';
+import { TournamentPhoneRequest } from '../../lib/tournamentVerificationPhones';
+import { VerificationPhoneRequestCard } from './VerificationPhoneRequestCard';
 
 export interface AdminHelpRequestItem {
     matchId: string;
@@ -35,6 +37,11 @@ interface AdminHelpRequestsModalProps {
     requests: AdminHelpRequestItem[];
     isLoading: boolean;
     onSelect: (item: AdminHelpRequestItem) => void;
+    phoneRequests: TournamentPhoneRequest[];
+    onPhoneDecision: (request: TournamentPhoneRequest, approve: boolean) => Promise<void>;
+    onOpenProfile?: (userId: string) => void;
+    error?: string | null;
+    onRefresh: () => void;
 }
 
 
@@ -49,8 +56,14 @@ export function AdminHelpRequestsModal({
     requests,
     isLoading,
     onSelect,
+    phoneRequests,
+    onPhoneDecision,
+    onOpenProfile,
+    error,
+    onRefresh,
 }: AdminHelpRequestsModalProps) {
     const { t } = useTranslation('tournament');
+    const count = requests.length + phoneRequests.length;
     return (
         <Modal
             visible={visible}
@@ -71,19 +84,23 @@ export function AdminHelpRequestsModal({
 
                     {/* Header */}
                     <View className="flex-row items-center justify-between px-6 py-4">
-                        <View className="flex-row items-center gap-3">
+                        <View className="flex-1 flex-row items-center gap-3">
                             <View className="w-10 h-10 rounded-2xl bg-warning/15 items-center justify-center">
                                 <Ionicons name="hand-left" size={18} color="#F59E0B" />
                             </View>
-                            <View>
-                                <Text className="text-base font-black text-white tracking-tight">{t('inbox.helpRequests')}</Text>
+                            <View className="flex-1">
+                                <Text className="text-base font-black text-white tracking-tight">{t('phoneRequests.inboxTitle')}</Text>
                                 <Text className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-                                    {requests.length === 0
+                                    {count === 0
                                         ? t('inbox.allClear')
-                                        : t('inbox.needsAttention', { count: requests.length })}
+                                        : t('inbox.needsAttention', { count })}
                                 </Text>
                             </View>
                         </View>
+                        <Pressable onPress={onRefresh} disabled={isLoading} accessibilityRole="button" accessibilityLabel={t('phoneRequests.refresh')}
+                            className="w-11 h-11 items-center justify-center">
+                            <Ionicons name="refresh" size={19} color="#94A3B8" />
+                        </Pressable>
                         <Pressable
                             onPress={onClose}
                             className="w-9 h-9 rounded-full bg-white/5 items-center justify-center border border-white/10 active:opacity-60"
@@ -97,21 +114,25 @@ export function AdminHelpRequestsModal({
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 36 }}
                     >
+                        {!!error && <Text accessibilityRole="alert" className="text-destructive text-sm mb-3">{error}</Text>}
                         {isLoading ? (
                             <View className="py-16 items-center">
                                 <ActivityIndicator size="small" color="#F59E0B" />
                             </View>
-                        ) : requests.length === 0 ? (
+                        ) : count === 0 && !error ? (
                             <View className="py-12 items-center">
                                 <View className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 items-center justify-center mb-4">
                                     <Ionicons name="checkmark-done" size={26} color="#10B981" />
                                 </View>
-                                <Text className="text-sm font-black text-white uppercase tracking-widest">{t('inbox.noHelpRequests')}</Text>
-                                <Text className="text-xs text-slate-500 mt-2 text-center px-8">
-                                    {t('inbox.noHelpRequestsHint')}
-                                </Text>
+                                <Text className="text-sm font-black text-white uppercase tracking-widest">{t('phoneRequests.empty')}</Text>
                             </View>
                         ) : (
+                            <>
+                            {phoneRequests.map(request => (
+                                <VerificationPhoneRequestCard key={`${request.id}:${request.requestedPhone.userDeviceId}`}
+                                    request={request} onDecide={onPhoneDecision} onOpenProfile={onOpenProfile} />
+                            ))}
+                            {
                             requests.map((item) => (
                                 <AdminInboxMatchCard
                                     key={item.matchId}
@@ -136,7 +157,8 @@ export function AdminHelpRequestsModal({
                                     ctaLabel={t('inbox.open')}
                                     onPress={() => onSelect(item)}
                                 />
-                            ))
+                            ))}
+                            </>
                         )}
                     </ScrollView>
                 </View>

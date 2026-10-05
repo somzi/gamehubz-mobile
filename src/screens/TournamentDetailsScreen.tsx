@@ -41,6 +41,7 @@ import {
 } from '../components/ui/Panel';
 import { MatchDetailsModal, type MatchModalTab } from '../components/modals/MatchDetailsModal';
 import { AdminHelpRequestsModal, AdminHelpRequestItem } from '../components/modals/AdminHelpRequestsModal';
+import { decideVerificationPhone, enrollVerificationPhone, fetchPendingVerificationPhones, TournamentPhoneRequest } from '../lib/tournamentVerificationPhones';
 import { PendingApprovalsModal, PendingApprovalItem } from '../components/modals/PendingApprovalsModal';
 import {
     getTournamentFormatLabel,
@@ -340,6 +341,7 @@ export default function TournamentDetailsScreen() {
     const pendingRegCount = tournamentApprovals(id)?.registrations ?? 0;
     // Open admin-help requests live in the bracket → badge the Bracket tab with them.
     const adminHelpCount = tournamentApprovals(id)?.adminHelp ?? 0;
+    const phoneRequestCount = tournamentApprovals(id)?.verificationPhones ?? 0;
     // Matches with a proposed result awaiting the organizer's approval. Sourced from the
     // BadgesContext cascade so the Bracket tab pill can render without firing GET_PENDING_APPROVALS
     // on every screen focus — the full list is still fetched on demand when the modal opens.
@@ -510,6 +512,8 @@ export default function TournamentDetailsScreen() {
     const [adminHelpRequests, setAdminHelpRequests] = useState<AdminHelpRequestItem[]>([]);
     const [showAdminHelpModal, setShowAdminHelpModal] = useState(false);
     const [isLoadingAdminHelp, setIsLoadingAdminHelp] = useState(false);
+    const [phoneRequests, setPhoneRequests] = useState<TournamentPhoneRequest[]>([]);
+    const [adminHelpError, setAdminHelpError] = useState<string | null>(null);
 
     // Matches with a reported result awaiting approval — admins only
     const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([]);
@@ -558,6 +562,12 @@ export default function TournamentDetailsScreen() {
 
     // `codeOverride` is the code the prompt just verified — state set in the same tick isn't visible
     // to this closure yet. A press event is not a code, hence the typeof guard.
+    // Records the phone that joined, without a biometric prompt (see enrollVerificationPhone).
+    const enrollPhoneAfterJoin = async () => {
+        if (!id || !(tournament?.requireResultVerification ?? tournament?.RequireResultVerification)) return null;
+        return enrollVerificationPhone(id);
+    };
+
     const handleJoin = async (codeOverride?: string | null) => {
         if (!id || !user?.id) return;
 
@@ -586,11 +596,14 @@ export default function TournamentDetailsScreen() {
                 throw new Error(errorData.message || errorData.Message || t('details.joinFailed'));
             }
 
+            const phoneStatus = await enrollPhoneAfterJoin();
             await invalidateTournamentLists(queryClient);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.congratulations'),
-                message: t('details.registeredSuccess')
+                message: phoneStatus === 'pending'
+                    ? `${t('details.registeredSuccess')}\n${t('match:verification.phoneApprovalPending')}`
+                    : t('details.registeredSuccess')
             });
             setShowStatusModal(true);
             fetchTournamentDetails(true); // Refresh details
@@ -636,10 +649,13 @@ export default function TournamentDetailsScreen() {
                 });
             } else {
                 await joinTeam(teamId, tournament?.isPrivate ? joinCode : null);
+                const phoneStatus = await enrollPhoneAfterJoin();
                 setStatusModalConfig({
                     type: 'success',
                     title: t('details.successExclaim'),
-                    message: t('details.joinedTeam')
+                    message: phoneStatus === 'pending'
+                        ? `${t('details.joinedTeam')}\n${t('match:verification.phoneApprovalPending')}`
+                        : t('details.joinedTeam')
                 });
             }
             setShowStatusModal(true);
@@ -935,13 +951,12 @@ export default function TournamentDetailsScreen() {
         const isCurrent = requests.begin('fetchAdminHelpRequests');
         if (!id) return;
         setIsLoadingAdminHelp(true);
-        try {
+        setAdminHelpError(null);
+        const loadHelpRequests = async (): Promise<AdminHelpRequestItem[]> => {
             const response = await authenticatedFetch(ENDPOINTS.GET_ADMIN_HELP_REQUESTS(id));
-            if (!isCurrent()) return;
-            if (!response.ok) return;
+            if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
-            if (!isCurrent()) return;
-            const normalized: AdminHelpRequestItem[] = (Array.isArray(data) ? data : []).map((it: any) => ({
+            return (Array.isArray(data) ? data : []).map((it: any) => ({
                 matchId: it.matchId || it.MatchId,
                 teamMatchId: it.teamMatchId ?? it.TeamMatchId ?? null,
                 roundNumber: it.roundNumber ?? it.RoundNumber ?? null,
@@ -960,13 +975,31 @@ export default function TournamentDetailsScreen() {
                 awayUsername: it.awayUsername ?? it.AwayUsername ?? null,
                 awayAvatarUrl: it.awayAvatarUrl ?? it.AwayAvatarUrl ?? null,
             }));
-            setAdminHelpRequests(normalized);
-        } catch (err) {
+        };
+
+        // Two lists that stand on their own: one failing must not hide the other.
+        const [help, phones] = await Promise.allSettled([loadHelpRequests(), fetchPendingVerificationPhones(id)]);
+        if (!isCurrent()) return;
+        if (help.status === 'fulfilled') setAdminHelpRequests(help.value);
+        if (phones.status === 'fulfilled') setPhoneRequests(phones.value);
+        const failure = help.status === 'rejected' ? help.reason : phones.status === 'rejected' ? phones.reason : null;
+        if (failure) setAdminHelpError(getErrorMessage(failure) || t('phoneRequests.failed'));
+        setIsLoadingAdminHelp(false);
+    };
+
+    const handlePhoneDecision = async (request: TournamentPhoneRequest, approve: boolean) => {
+        const isCurrent = requests.begin(`phoneDecision:${request.id}`);
+        try {
+            await decideVerificationPhone(id, request, approve);
             if (!isCurrent()) return;
-            console.error('Admin help requests fetch error:', err);
-        } finally {
-            if (!isCurrent()) return;
-            setIsLoadingAdminHelp(false);
+            setPhoneRequests(items => items.filter(item => item.id !== request.id || item.requestedPhone.userDeviceId !== request.requestedPhone.userDeviceId));
+            refreshBadges();
+        } catch (error) {
+            if (isCurrent()) {
+                await fetchAdminHelpRequests();
+                if (isCurrent()) setAdminHelpError(getErrorMessage(error) || t('phoneRequests.failed'));
+            }
+            throw error;
         }
     };
 
@@ -2211,6 +2244,7 @@ export default function TournamentDetailsScreen() {
             badge: (
                 (canManage && requiresApproval ? pendingApprovalsBadgeCount : 0)
                 + adminHelpCount
+                + phoneRequestCount
             ) || undefined,
             badgeTone: 'alert',
         },
@@ -2289,10 +2323,10 @@ export default function TournamentDetailsScreen() {
 
         items.push({
             key: 'help',
-            icon: adminHelpRequests.length > 0 ? 'hand-left' : 'hand-left-outline',
-            value: String(adminHelpRequests.length),
-            label: t('details.help'),
-            tone: adminHelpRequests.length > 0 ? 'warning' : 'muted',
+            icon: adminHelpCount + phoneRequestCount > 0 ? 'hand-left' : 'hand-left-outline',
+            value: String(adminHelpCount + phoneRequestCount),
+            label: t('phoneRequests.inboxTitle'),
+            tone: adminHelpCount + phoneRequestCount > 0 ? 'warning' : 'muted',
             onPress: () => {
                 setShowAdminHelpModal(true);
                 fetchAdminHelpRequests();
@@ -4005,6 +4039,11 @@ export default function TournamentDetailsScreen() {
                 requests={adminHelpRequests}
                 isLoading={isLoadingAdminHelp}
                 onSelect={handleHelpRequestSelect}
+                phoneRequests={phoneRequests}
+                onPhoneDecision={handlePhoneDecision}
+                error={adminHelpError}
+                onRefresh={fetchAdminHelpRequests}
+                onOpenProfile={userId => { setShowAdminHelpModal(false); openPlayerProfile(userId); }}
             />
 
             <PendingApprovalsModal

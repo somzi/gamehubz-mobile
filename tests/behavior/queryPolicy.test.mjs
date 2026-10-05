@@ -336,6 +336,7 @@ test('the actual successful registration invalidates tournament filters; a rejec
         const join = loadFetcher('src/screens/TournamentDetailsScreen.tsx', 'handleJoin', {
             queryClient: client, invalidateTournamentLists: policy.invalidateTournamentLists,
             id: 'A', user: { id: 'viewer' }, inviteCode: null, tournament: {},
+            enrollPhoneAfterJoin: async () => null,
             ENDPOINTS: { REGISTER_TOURNAMENT: 'join' }, authenticatedFetch: async () => ({ ok, json: async () => ({ message: 'rejected' }) }),
             setIsRegistering() {}, setStatusModalConfig() {}, setShowStatusModal() {}, t: key => key,
             fetchTournamentDetails() {}, fetchParticipants() {}, getErrorMessage: String, isRejectedTournamentJoinCode: () => false,

@@ -25,7 +25,10 @@ export function loadApi({ get, set, remove, refresh } = {}) {
     let refreshCalls = 0;
     const client = axios.create();
     const imports = {
+        // isAxiosError is real: without it getErrorMessage throws on every JSON error body and hands the
+        // raw body back, which no device ever shows.
         axios: { create: options => { Object.assign(client.defaults, options); return client; },
+            isAxiosError: axios.isAxiosError,
             post: async (...args) => { refreshCalls++; return refresh?.(...args) ?? { data: { accessToken: 'access-A2', refreshToken: 'refresh-A2' }, headers: {} }; } },
         'expo-secure-store': native,
         'react-native': { Platform: { OS: 'test' } },

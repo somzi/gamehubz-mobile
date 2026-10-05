@@ -3,7 +3,6 @@ import * as SecureStore from 'expo-secure-store';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { authenticatedFetch, ENDPOINTS } from './api';
-import { signHex } from './hmacSha256';
 
 /**
  * The phone's identity for result verification, and the biometric-locked key that proves it.
@@ -15,7 +14,8 @@ import { signHex } from './hmacSha256';
  * never sees a face or a fingerprint — it asks the OS for the key, and the OS decides.
  *
  * Every verification then signs a fresh server challenge with that key (lib/hmacSha256), which is what
- * lets the server tell "this phone's owner just unlocked it" apart from a client that merely claims so.
+ * proves possession of the installation key for that attempt. The server cannot independently attest
+ * the OS biometric prompt with this HMAC protocol.
  *
  * Only native modules already in the shipped build are used here (expo-secure-store, expo-device,
  * expo-constants, and expo-application — linked through expo-notifications), so this ships over the air.
@@ -144,6 +144,32 @@ export async function getStoredDeviceId(): Promise<string | null> {
     }
 }
 
+/**
+ * What the phone tells the server when it registers: its own description and the installation id it
+ * already holds (null on a phone that never registered). Reading it raises no biometric prompt.
+ */
+export async function getDeviceRegistrationBody() {
+    const snapshot = await getDeviceSnapshot();
+    return {
+        deviceId: await getStoredDeviceId(),
+        platform: snapshot.platform,
+        deviceModel: snapshot.deviceModel,
+        deviceBrand: snapshot.deviceBrand,
+        osVersion: snapshot.osVersion,
+        appVersion: snapshot.appVersion,
+        isPhysicalDevice: snapshot.isPhysicalDevice,
+        platformDeviceId: snapshot.platformDeviceId,
+        appInstalledOn: snapshot.appInstalledOn,
+    };
+}
+
+/** Keeps the installation id the server issued. This device only: a restored backup starts fresh. */
+export async function rememberDeviceId(deviceId: string): Promise<void> {
+    await SecureStore.setItemAsync(DEVICE_ID_KEY, deviceId, {
+        keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+}
+
 /** Maps what the two platforms throw from a biometric-locked read or write onto what the UI can say. */
 function toBiometricError(error: unknown): BiometricError {
     const message = String((error as any)?.message ?? error ?? '');
@@ -168,22 +194,9 @@ function toBiometricError(error: unknown): BiometricError {
  * there the caller still has to read the key back through Face ID.
  */
 async function registerDevice(userId: string, prompts: DevicePrompts): Promise<{ deviceId: string; unlockedSecret: string | null }> {
-    const snapshot = await getDeviceSnapshot();
-    const storedDeviceId = await getStoredDeviceId();
-
     const response = await authenticatedFetch(ENDPOINTS.VERIFICATION_REGISTER_DEVICE, {
         method: 'POST',
-        body: JSON.stringify({
-            deviceId: storedDeviceId,
-            platform: snapshot.platform,
-            deviceModel: snapshot.deviceModel,
-            deviceBrand: snapshot.deviceBrand,
-            osVersion: snapshot.osVersion,
-            appVersion: snapshot.appVersion,
-            isPhysicalDevice: snapshot.isPhysicalDevice,
-            platformDeviceId: snapshot.platformDeviceId,
-            appInstalledOn: snapshot.appInstalledOn,
-        }),
+        body: JSON.stringify(await getDeviceRegistrationBody()),
     });
 
     if (!response.ok) {
@@ -195,9 +208,7 @@ async function registerDevice(userId: string, prompts: DevicePrompts): Promise<{
     const secret: string = data?.secret ?? data?.Secret;
     if (!deviceId || !secret) throw new Error('Invalid registration response');
 
-    await SecureStore.setItemAsync(DEVICE_ID_KEY, deviceId, {
-        keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
+    await rememberDeviceId(deviceId);
 
     // Cleared first: on iOS, writing over an existing biometric item is an update, and an update asks
     // for Face ID — a prompt nobody would understand in the middle of a registration.
@@ -255,29 +266,28 @@ export async function ensureDeviceRegistered(
 }
 
 /**
- * Unlocks the key with biometrics and signs `message` with it.
+ * Unlocks the key with biometrics for one verification attempt.
  *
  * A key that reads back empty was invalidated by the OS — faces or fingers changed since it was
  * locked in, which is exactly what `biometryCurrentSet` and Android's enrolment binding are for. The
  * phone then registers again (the server re-issues the key on the same device row, and the organizer
- * sees the fresh key) and the signature is made with the new one.
+ * sees the fresh key). The sheet uses it for the biometric proof and the recording upload.
  */
-export async function signWithDeviceKey(
+export async function unlockDeviceKey(
     userId: string,
-    message: string,
     prompts: DevicePrompts,
-    unlockedSecret: string | null,
+    unlockedSecret: string | null = null,
 ): Promise<string> {
-    if (unlockedSecret) return signHex(unlockedSecret, message);
+    if (unlockedSecret) return unlockedSecret;
 
     const secret = await readSecret(userId, prompts.unlock);
-    if (secret) return signHex(secret, message);
+    if (secret) return secret;
 
     const reissued = await registerDevice(userId, prompts);
     const fresh = reissued.unlockedSecret ?? (await readSecret(userId, prompts.unlock));
     if (!fresh) throw new BiometricError('failed');
 
-    return signHex(fresh, message);
+    return fresh;
 }
 
 async function readSecret(userId: string, prompt: string): Promise<string | null> {

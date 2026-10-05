@@ -201,6 +201,7 @@ export function BadgesProvider({ children }: { children: React.ReactNode }) {
                 previous.hubJoinRequests !== dto.hubJoinRequests ||
                 previous.pendingRegistrations !== dto.pendingRegistrations ||
                 previous.pendingResultApprovals !== dto.pendingResultApprovals ||
+                previous.pendingVerificationPhones !== dto.pendingVerificationPhones ||
                 previous.adminHelpRequests !== dto.adminHelpRequests;
             if (approvalRelevant) {
                 queryClient.invalidateQueries({ queryKey: APPROVALS_QUERY_KEY });

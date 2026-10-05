@@ -7,12 +7,16 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire(join(root, 'package.json'));
 const ts = require('typescript');
 const dir = mkdtempSync(join(tmpdir(), 'gamehubz-behavior-'));
-for (const name of ['mergeMessages', 'chatHistory', 'chatOutbox', 'chatWorkspace', 'chatReadReceipts', 'singleFlight', 'modalReturn', 'matchPresentation', 'queryPolicy', 'requestGate', 'fetchWithTimeout', 'signalR', 'refreshFailures', 'coalesce', 'delayedNotice']) {
+// series.ts only needs i18n for its labels; the rules under test never call it.
+const i18nStub = 'data:text/javascript,' + encodeURIComponent('export default { t: key => key };');
+for (const name of ['mergeMessages', 'chatHistory', 'chatOutbox', 'chatWorkspace', 'chatReadReceipts', 'singleFlight', 'modalReturn', 'matchPresentation', 'queryPolicy', 'requestGate', 'fetchWithTimeout', 'signalR', 'refreshFailures', 'coalesce', 'delayedNotice', 'series', 'verificationGames']) {
     let { outputText } = ts.transpileModule(readFileSync(join(root, `src/lib/${name}.ts`), 'utf8'), {
         compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
     });
     outputText = outputText.replaceAll("'./mergeMessages'", "'./mergeMessages.mjs'")
         .replaceAll("'./chatOutbox'", "'./chatOutbox.mjs'")
+        .replaceAll("'./series'", "'./series.mjs'")
+        .replaceAll("'../i18n'", JSON.stringify(i18nStub))
         .replaceAll("'@microsoft/signalr'", JSON.stringify(pathToFileURL(require.resolve('@microsoft/signalr')).href));
     writeFileSync(join(dir, `${name}.mjs`), outputText);
 }

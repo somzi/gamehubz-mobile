@@ -100,9 +100,14 @@ export async function routeFromNotification(
         // tournament and pop the help-requests inbox so every pending request is one
         // tap away (and the requesting match's chat from there).
         case 'adminhelp':
+        case 'verificationphonerequested':
             if (tournamentId) {
                 return go('TournamentDetails', { id: tournamentId, openAdminHelp: true });
             }
+            break;
+        case 'verificationphoneapproved':
+        case 'verificationphonerejected':
+            if (tournamentId) return go('TournamentDetails', { id: tournamentId });
             break;
         // The organizer marked this player's help request resolved — back into that match's chat,
         // where the conversation with the organizer happened.
@@ -251,6 +256,9 @@ const META_BY_TYPE: Record<string, MetaEntry> = {
     teamtiebreak: { icon: 'people', accent: COLORS.team },
     lineupmissing: { icon: 'people', accent: COLORS.warning },
     adminhelp: { icon: 'help-buoy', accent: COLORS.live },
+    verificationphonerequested: { icon: 'phone-portrait', accent: COLORS.warning },
+    verificationphoneapproved: { icon: 'shield-checkmark', accent: COLORS.primary },
+    verificationphonerejected: { icon: 'phone-portrait-outline', accent: COLORS.slate400 },
     hubjoinrequest: { icon: 'person-add', accent: COLORS.info },
     teamjoinrequest: { icon: 'person-add', accent: COLORS.team },
     friend_request: { icon: 'person-add', accent: COLORS.primary },

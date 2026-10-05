@@ -91,6 +91,7 @@ export interface BadgeCounts {
     hubJoinRequests: number;
     /** Open match "admin help" requests in tournaments the user manages. */
     adminHelpRequests: number;
+    pendingVerificationPhones?: number;
     /** Pending tournament registrations awaiting approval in the user's hubs. */
     pendingRegistrations: number;
     /** Matches with a proposed result awaiting the organizer's approval in the user's hubs. */
@@ -121,6 +122,7 @@ export interface TournamentApprovalCount {
     status: number;
     registrations: number;
     adminHelp: number;
+    verificationPhones?: number;
     /** Matches with a proposed result awaiting the organizer's approval (approval-mode tournaments). */
     resultApprovals: number;
     /** registrations + adminHelp + resultApprovals — the tournament's full pending-approval count. */

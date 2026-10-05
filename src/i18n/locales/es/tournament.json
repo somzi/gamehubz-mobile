@@ -594,5 +594,18 @@
     "codeApplied": "Código de invitación {{code}} aplicado",
     "teamCodeLabel": "Código del torneo",
     "teamCodeHint": "Este torneo es privado: ingresa el código de 6 dígitos del organizador para crear un equipo."
+  },
+  "phoneRequests": {
+    "inboxTitle": "Solicitudes",
+    "title": "Aprobación de teléfono",
+    "current": "Teléfono vinculado",
+    "requested": "Teléfono solicitado",
+    "noPhone": "Sin teléfono vinculado",
+    "possiblePlayers": "Podría estar jugando",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "failed": "No se pudo actualizar la solicitud. Inténtalo de nuevo.",
+    "refresh": "Actualizar solicitudes",
+    "empty": "No hay solicitudes pendientes"
   }
 }

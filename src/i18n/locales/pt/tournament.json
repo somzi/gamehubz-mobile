@@ -594,5 +594,18 @@
     "codeApplied": "Código de convite {{code}} aplicado",
     "teamCodeLabel": "Código do torneio",
     "teamCodeHint": "Este torneio é privado: digite o código de 6 dígitos do organizador para criar um time."
+  },
+  "phoneRequests": {
+    "inboxTitle": "Solicitações",
+    "title": "Aprovação de telefone",
+    "current": "Telefone vinculado",
+    "requested": "Novo telefone",
+    "noPhone": "Nenhum telefone vinculado",
+    "possiblePlayers": "Pode estar jogando",
+    "approve": "Aprovar",
+    "reject": "Rejeitar",
+    "failed": "Não foi possível atualizar a solicitação. Tente novamente.",
+    "refresh": "Atualizar solicitações",
+    "empty": "Nenhuma solicitação pendente"
   }
 }

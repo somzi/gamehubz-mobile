@@ -11,6 +11,16 @@ import {
     prepareEvidenceForUpload,
 } from './evidence';
 import { readVideoRecordedAt } from './videoMetadata';
+import { VERIFICATION_STARTED } from './verificationGames';
+import { getStoredDeviceId } from './deviceIdentity';
+
+export {
+    VERIFICATION_STARTED,
+    VERIFICATION_BIOMETRIC_OK,
+    VERIFICATION_VERIFIED,
+    VERIFICATION_FAILED,
+    isVerified,
+} from './verificationGames';
 
 /**
  * "Verify Result" — the client half of the server's MatchVerificationService.
@@ -22,13 +32,7 @@ import { readVideoRecordedAt } from './videoMetadata';
  * same attempt, in that order.
  */
 
-/** Mirrors the server's MatchVerificationStatus. */
-export const VERIFICATION_STARTED = 0;
-export const VERIFICATION_BIOMETRIC_OK = 1;
-export const VERIFICATION_VERIFIED = 2;
-export const VERIFICATION_FAILED = 3;
-
-export type VerificationFlag = 'newDevice' | 'freshKey' | 'sharedDevice' | 'emulator' | 'oldRecording';
+export type VerificationFlag = 'newDevice' | 'freshKey' | 'sharedDevice' | 'emulator' | 'oldRecording' | 'noRecordingTime';
 
 /** Another account registered on the phone a verification came from. Organizer view only. */
 export interface VerificationDeviceAccount {
@@ -57,6 +61,9 @@ export interface VerificationDevice {
 }
 
 export interface VerificationRecord {
+    /** The proven game; WHOLE_MATCH (0) for both on a proof of the whole match. */
+    seriesNumber: number;
+    gameNumber: number;
     /** Null for a player who has not verified — the row is still drawn, with their name. */
     id: string | null;
     userId: string;
@@ -64,6 +71,8 @@ export interface VerificationRecord {
     avatarUrl: string | null;
     status: number;
     biometricVerified: boolean;
+    /** Present only on the biometric response; absent on older servers. */
+    evidenceMessage: string | null;
     startedOn: string | null;
     biometricVerifiedOn: string | null;
     verifiedOn: string | null;
@@ -82,9 +91,30 @@ export interface VerificationPanel {
     matchId: string;
     required: boolean;
     canVerify: boolean;
-    /** The server would refuse this viewer's report right now. Never re-derived on the client. */
+    /**
+     * The server would refuse this viewer's next report, judged before the score is known. Only read on a
+     * server from before per-game verification; otherwise verificationBlocksReport runs the same gate on
+     * the score being typed.
+     */
     reportBlocked: boolean;
     isManager: boolean;
+    /** The viewer plays this match — an organizer who does reports it with proofs. Null from an older server. */
+    isParticipant: boolean | null;
+    phoneApprovalPending: boolean;
+    /** The first game's proof and records — what a server from before per-game verification sends. */
+    mine: VerificationRecord | null;
+    records: VerificationRecord[];
+    /** Every game of the format, with its proofs. Empty from a server predating per-game verification. */
+    games: VerificationGame[];
+}
+
+export interface VerificationTarget {
+    seriesNumber: number;
+    gameNumber: number;
+}
+
+export interface VerificationGame extends VerificationTarget {
+    canVerify: boolean;
     mine: VerificationRecord | null;
     records: VerificationRecord[];
 }
@@ -126,12 +156,15 @@ function normalizeDevice(raw: any): VerificationDevice | null {
 export function normalizeRecord(raw: any): VerificationRecord {
     const evidence = pick(raw, 'evidence');
     return {
+        seriesNumber: Number(pick(raw, 'seriesNumber') ?? 1),
+        gameNumber: Number(pick(raw, 'gameNumber') ?? 1),
         id: pick(raw, 'id') ?? null,
         userId: pick(raw, 'userId') ?? '',
         username: pick(raw, 'username') ?? '',
         avatarUrl: pick(raw, 'avatarUrl') ?? null,
         status: Number(pick(raw, 'status') ?? VERIFICATION_STARTED),
         biometricVerified: Boolean(pick(raw, 'biometricVerified')),
+        evidenceMessage: pick(raw, 'evidenceMessage') ?? null,
         startedOn: pick(raw, 'startedOn') ?? null,
         biometricVerifiedOn: pick(raw, 'biometricVerifiedOn') ?? null,
         verifiedOn: pick(raw, 'verifiedOn') ?? null,
@@ -158,13 +191,19 @@ export function normalizePanel(raw: any): VerificationPanel {
         canVerify: Boolean(pick(raw, 'canVerify')),
         reportBlocked: Boolean(pick(raw, 'reportBlocked')),
         isManager: Boolean(pick(raw, 'isManager')),
+        isParticipant: pick(raw, 'isParticipant') == null ? null : Boolean(pick(raw, 'isParticipant')),
+        phoneApprovalPending: Boolean(pick(raw, 'phoneApprovalPending')),
         mine: mine ? normalizeRecord(mine) : null,
         records: (pick(raw, 'records') ?? []).map(normalizeRecord),
+        games: (pick(raw, 'games') ?? []).map((game: any) => ({
+            seriesNumber: Number(pick(game, 'seriesNumber') ?? 1),
+            gameNumber: Number(pick(game, 'gameNumber') ?? 1),
+            canVerify: Boolean(pick(game, 'canVerify')),
+            mine: pick(game, 'mine') ? normalizeRecord(pick(game, 'mine')) : null,
+            records: (pick(game, 'records') ?? []).map(normalizeRecord),
+        })),
     };
 }
-
-export const isVerified = (record: VerificationRecord | null | undefined) =>
-    !!record && record.status === VERIFICATION_VERIFIED;
 
 async function failWith(response: Response): Promise<never> {
     const text = await response.text().catch(() => '');
@@ -172,7 +211,9 @@ async function failWith(response: Response): Promise<never> {
 }
 
 export async function fetchVerificationPanel(matchId: string): Promise<VerificationPanel | null> {
-    const response = await authenticatedFetch(ENDPOINTS.VERIFICATION_PANEL(matchId));
+    const deviceId = await getStoredDeviceId();
+    const url = ENDPOINTS.VERIFICATION_PANEL(matchId);
+    const response = await authenticatedFetch(deviceId ? `${url}?deviceId=${encodeURIComponent(deviceId)}` : url);
     if (!response.ok) return null;
     return normalizePanel(await response.json());
 }
@@ -188,12 +229,13 @@ export async function startVerification(
     matchId: string,
     deviceId: string,
     device: { deviceModel: string | null; osVersion: string | null; appVersion: string | null },
+    target: VerificationTarget = { seriesNumber: 1, gameNumber: 1 },
 ): Promise<VerificationChallenge> {
     const response = await authenticatedFetch(ENDPOINTS.VERIFICATION_START(matchId), {
         method: 'POST',
         // The phone's current description rides along, so the record says what it is today rather than
         // what it was when it registered.
-        body: JSON.stringify({ deviceId, ...device }),
+        body: JSON.stringify({ deviceId, ...device, seriesNumber: target.seriesNumber, gameNumber: target.gameNumber }),
     });
     if (!response.ok) return failWith(response);
 
@@ -277,6 +319,7 @@ export async function pickVerificationRecording(
 export async function uploadVerificationRecording(
     verificationId: string,
     recording: PreparedRecording,
+    proof: { signature: string; clockOffsetMs: number; timeZoneOffsetMinutes: number },
 ): Promise<VerificationRecord> {
     const form = new FormData();
     // @ts-ignore React Native's FormData takes a { uri, name, type } file descriptor.
@@ -284,6 +327,9 @@ export async function uploadVerificationRecording(
     if (recording.durationMs != null) form.append('DurationMs', String(recording.durationMs));
     if (recording.recordedOn) form.append('RecordedOn', recording.recordedOn);
     if (recording.fileName) form.append('FileName', recording.fileName);
+    form.append('Signature', proof.signature);
+    form.append('ClockOffsetMs', String(Math.round(proof.clockOffsetMs)));
+    form.append('TimeZoneOffsetMinutes', String(proof.timeZoneOffsetMinutes));
 
     const response = await authenticatedFetch(ENDPOINTS.VERIFICATION_EVIDENCE(verificationId), {
         method: 'POST',

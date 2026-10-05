@@ -1,3 +1,5 @@
+import { VerificationTarget } from '../../lib/resultVerification';
+import { buildVerificationSlots, nextVerificationTarget, verificationBlocksReport } from '../../lib/verificationGames';
 import { useRequestGate } from '../../hooks/useRequestGate';
 import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
@@ -56,6 +58,7 @@ import {
     SeriesFormat,
     SeriesGame,
     SeriesOutcome,
+    bestOfForSeries,
     normalizeBestOf,
     normalizeCondition,
     seriesGamesFrom,
@@ -262,6 +265,7 @@ function MatchScheduleCardBase({
     const showVerification = verificationPresentation.show;
     const verification = useResultVerification(matchId, modalVisible && showVerification);
     const [showVerifySheet, setShowVerifySheet] = useState(false);
+    const [verificationTarget, setVerificationTarget] = useState<VerificationTarget>({ seriesNumber: 1, gameNumber: 1 });
 
     useEffect(() => {
         if (!verificationPresentation.canStart) setShowVerifySheet(false);
@@ -308,6 +312,16 @@ function MatchScheduleCardBase({
     // What the entry form opens with. Editing a pending proposal has nothing in `reportedGames`
     // yet — it used to open blank and silently drop every game the reporter had entered.
     const visualEntrySeedGames = visualReportedGames.length > 0 ? visualReportedGames : visualProposedGames;
+
+    // Verification reads the result in view — the score being typed, else a pending proposal, else
+    // what is on record (on an open match only a parked tiebreak's level series, which a new report
+    // repeats and so does not prove again). All in visual order, like the form.
+    const verificationPlayed = seriesGames.length > 0 ? seriesGames
+        : visualProposedGames.length > 0 ? visualProposedGames : visualReportedGames;
+    const verificationComplete = seriesGames.length > 0 ? isSeriesComplete : reportedGames.length > 0 || proposedGames.length > 0;
+    const verificationSlots = verification.panel
+        ? buildVerificationSlots(verification.panel, seriesFormat, verificationPlayed, verificationComplete, visualReportedGames)
+        : null;
     // Upload-ready files, not raw picks: clips are transcoded when chosen so the send is a
     // plain POST. Mirrors MatchDetailsModal, which feeds the same endpoint.
     const [selectedImages, setSelectedImages] = useState<PreparedEvidence[]>([]);
@@ -1493,11 +1507,16 @@ function MatchScheduleCardBase({
                                                 && !!checkInState.checkInDeadline
                                                 && !(checkInState.homeCheckedInOn && checkInState.awayCheckedInOn)
                                                 && !isPrivileged;
-                                            // Verification: the server says whether this viewer's report
-                                            // would be refused right now — hub admins are exempt, and this
-                                            // card cannot see who is one.
-                                            const verificationBlocksReport = !!verification.panel?.reportBlocked;
-                                            const reportBlocked = checkInBlocksReport || verificationBlocksReport;
+                                            // Verification: the server's gate, run on the score being typed —
+                                            // a proof of every game in it. The panel says who is exempt (hub
+                                            // admins), which this card cannot see.
+                                            const verificationBlocks = verificationBlocksReport(
+                                                verification.panel,
+                                                seriesFormat,
+                                                seriesGames.length > 0 ? seriesGames : visualProposedGames,
+                                                visualReportedGames,
+                                            );
+                                            const reportBlocked = checkInBlocksReport || verificationBlocks;
                                             const visualLeftScore = isUserDbHome ? proposedHomeScore : proposedAwayScore;
                                             const visualRightScore = isUserDbHome ? proposedAwayScore : proposedHomeScore;
                                             const proposerName = !!proposedByUserId && dbHomeUserId && proposedByUserId.toLowerCase() === dbHomeUserId.toLowerCase()
@@ -1543,7 +1562,8 @@ function MatchScheduleCardBase({
                                                         isLoading={verification.isLoading}
                                                         currentUserId={user?.id}
                                                         allowVerify={verificationPresentation.canStart}
-                                                        onVerify={() => setShowVerifySheet(true)}
+                                                        slots={verificationSlots}
+                                                        onVerify={target => { setVerificationTarget(target); setShowVerifySheet(true); }}
                                                         onOpenEvidence={setPreviewItem}
                                                         onOpenProfile={userId => openPlayerProfile(userId)}
                                                     />
@@ -1925,7 +1945,7 @@ function MatchScheduleCardBase({
                                                                             ? t('card.roundNotOpen')
                                                                             : checkInBlocksReport
                                                                             ? t('checkIn.blockedShort')
-                                                                            : verificationBlocksReport
+                                                                            : verificationBlocks
                                                                             ? t('verification.blockedShort')
                                                                             : isEditingProposal
                                                                                 ? t('card.updateReport')
@@ -2126,11 +2146,17 @@ function MatchScheduleCardBase({
                 {!!user?.id && requireResultVerification && (
                     <VerifyResultSheet
                         visible={showVerifySheet && verificationPresentation.canStart}
-                        onClose={() => setShowVerifySheet(false)}
+                        target={verificationTarget}
+                        // A server from before per-game proofs takes one for the whole match: no game to name.
+                        bestOf={verification.panel?.games.length ? bestOfForSeries(verificationTarget.seriesNumber, seriesFormat) : 1}
+                        nextTarget={nextVerificationTarget(verificationSlots)}
+                        onContinue={setVerificationTarget}
+                        onClose={() => { setShowVerifySheet(false); verification.refresh(); }}
                         matchId={matchId}
                         userId={user.id}
                         opponentName={opponentName}
-                        onVerified={() => {
+                        onVerified={record => {
+                            verification.recordVerified(record);
                             verification.refresh();
                             // The clip is ordinary evidence too; the gallery row counts it.
                             fetchDbHomeUserId(true);

@@ -1,4 +1,6 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import { VerificationTarget } from '../../lib/resultVerification';
+import { buildVerificationSlots, nextVerificationTarget, verificationBlocksReport } from '../../lib/verificationGames';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Pressable, Modal, ScrollView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,6 +62,7 @@ import {
     SeriesFormat,
     SeriesGame,
     SeriesOutcome,
+    bestOfForSeries,
     normalizeBestOf,
     normalizeCondition,
     seriesGamesFrom,
@@ -339,6 +342,7 @@ export function MatchDetailsModal({
     const showVerification = verificationPresentation.show;
     const verification = useResultVerification(matchId, visible && showVerification);
     const [showVerifySheet, setShowVerifySheet] = useState(false);
+    const [verificationTarget, setVerificationTarget] = useState<VerificationTarget>({ seriesNumber: 1, gameNumber: 1 });
 
     // Edit mode state
     const [isEditMode, setIsEditMode] = useState(false);
@@ -1358,9 +1362,28 @@ export function MatchDetailsModal({
     // the pair played anyway. Mirrors the server-side refusal, so the button never promises
     // something the API will reject.
     const checkInBlocksReport = checkInLive && !bothCheckedIn && !isPrivileged;
-    // Result verification: the server says whether THIS viewer's report would be refused right now
-    // (it knows who is an organizer better than this screen can), so the button follows its word.
-    const verificationBlocksReport = !!verification.panel?.reportBlocked;
+    // Result verification: the server's gate, run on the score being typed — a proof of every game in
+    // it, except a parked tiebreak's level series, which is on record already. The panel says who is
+    // exempt (organizers), which this screen cannot always tell.
+    const verificationBlocks = verificationBlocksReport(
+        verification.panel,
+        seriesFormat,
+        seriesGames.length > 0 ? seriesGames : proposedGames,
+        reportedGames,
+    );
+    // What the card shows each game as: the completed view reviews the result on record; the open one
+    // reads the score being typed, else a pending proposal, else the parked tiebreak's level series.
+    const verificationReview = effectiveStatus === 'completed';
+    const verificationSlots = verification.panel
+        ? buildVerificationSlots(
+            verification.panel,
+            seriesFormat,
+            verificationReview ? reportedGames
+                : seriesGames.length > 0 ? seriesGames : proposedGames.length > 0 ? proposedGames : reportedGames,
+            verificationReview || (seriesGames.length > 0 ? isSeriesComplete : reportedGames.length > 0 || proposedGames.length > 0),
+            verificationReview ? [] : reportedGames,
+        )
+        : null;
     // Opponent (or any privileged user) can confirm; the proposer cannot self-approve.
     const canDecideOnProposal = hasPendingProposal && !isProposer && (isParticipant || isPrivileged);
 
@@ -1539,7 +1562,8 @@ export function MatchDetailsModal({
                         isLoading={verification.isLoading}
                         currentUserId={user?.id}
                         allowVerify={verificationPresentation.canStart}
-                        onVerify={() => setShowVerifySheet(true)}
+                        slots={verificationSlots}
+                        onVerify={target => { setVerificationTarget(target); setShowVerifySheet(true); }}
                         onOpenEvidence={setPreviewItem}
                         onOpenProfile={navigateToProfile}
                     />
@@ -1912,7 +1936,8 @@ export function MatchDetailsModal({
                         isLoading={verification.isLoading}
                         currentUserId={user?.id}
                         allowVerify={verificationPresentation.canStart}
-                        onVerify={() => setShowVerifySheet(true)}
+                        slots={verificationSlots}
+                        onVerify={target => { setVerificationTarget(target); setShowVerifySheet(true); }}
                         onOpenEvidence={setPreviewItem}
                         onOpenProfile={navigateToProfile}
                     />
@@ -2067,10 +2092,10 @@ export function MatchDetailsModal({
                     )}
                     <Pressable
                         onPress={async () => { await handleSubmitResult(); setIsEditingProposal(false); }}
-                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocksReport}
+                        disabled={(isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocks}
                         className={cn(
                             "flex-1 rounded-2xl py-4 items-center active:opacity-80",
-                            ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocksReport) ? "bg-white/5 border border-white/[0.06]" : "bg-primary"
+                            ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocks) ? "bg-white/5 border border-white/[0.06]" : "bg-primary"
                         )}
                     >
                         {isSubmitting ? (
@@ -2078,7 +2103,7 @@ export function MatchDetailsModal({
                         ) : (
                             <Text numberOfLines={1} className={cn(
                                 "text-sm font-black uppercase tracking-wider w-full text-center",
-                                ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocksReport) ? "text-slate-500" : "text-primary-foreground"
+                                ((isRoundLocked && !isHubOwner) || !canSubmit || checkInBlocksReport || verificationBlocks) ? "text-slate-500" : "text-primary-foreground"
                             )}>
                                 {(isRoundLocked && !isHubOwner)
                                     ? t('details.locked')
@@ -2086,7 +2111,7 @@ export function MatchDetailsModal({
                                         ? t('details.viewOnly')
                                         : checkInBlocksReport
                                             ? t('checkIn.blockedShort')
-                                            : verificationBlocksReport
+                                            : verificationBlocks
                                             ? t('verification.blockedShort')
                                             : isEditingProposal
                                                 ? t('details.updateReport')
@@ -2583,11 +2608,17 @@ export function MatchDetailsModal({
             {!!user?.id && (
                 <VerifyResultSheet
                     visible={showVerifySheet && verificationPresentation.canStart}
-                    onClose={() => setShowVerifySheet(false)}
+                    target={verificationTarget}
+                    // A server from before per-game proofs takes one for the whole match: no game to name.
+                    bestOf={verification.panel?.games.length ? bestOfForSeries(verificationTarget.seriesNumber, seriesFormat) : 1}
+                    nextTarget={nextVerificationTarget(verificationSlots)}
+                    onContinue={setVerificationTarget}
+                    onClose={() => { setShowVerifySheet(false); verification.refresh(); }}
                     matchId={matchId}
                     userId={user.id}
                     opponentName={isAway ? homeIdentity.username : awayIdentity.username}
-                    onVerified={() => {
+                    onVerified={record => {
+                        verification.recordVerified(record);
                         verification.refresh();
                         // The clip is ordinary evidence as well, so the gallery count moves with it.
                         fetchMatchDetails(true);

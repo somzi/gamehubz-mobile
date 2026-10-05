@@ -196,6 +196,10 @@ export const ENDPOINTS = {
     VERIFICATION_START: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/verification/start`,
     VERIFICATION_BIOMETRIC: (verificationId: string) => `${API_BASE_URL}/api/match/verification/${verificationId}/biometric`,
     VERIFICATION_EVIDENCE: (verificationId: string) => `${API_BASE_URL}/api/match/verification/${verificationId}/evidence`,
+    VERIFICATION_PHONE: (tournamentId: string) => `${API_BASE_URL}/api/tournament/${tournamentId}/verification-phone`,
+    VERIFICATION_PHONES_PENDING: (tournamentId: string) => `${API_BASE_URL}/api/tournament/${tournamentId}/verification-phones/pending`,
+    VERIFICATION_PHONE_DECISION: (tournamentId: string, requestId: string, decision: 'approve' | 'reject') =>
+        `${API_BASE_URL}/api/tournament/${tournamentId}/verification-phones/${requestId}/${decision}`,
 
     // ─── Match streaming ────────────────────────────────────────────────
     GET_MATCH_STREAM: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/stream`,

@@ -594,5 +594,18 @@
     "codeApplied": "Invite code {{code}} applied",
     "teamCodeLabel": "Tournament code",
     "teamCodeHint": "This tournament is private — enter the organizer's 6-digit code to create a team."
+  },
+  "phoneRequests": {
+    "inboxTitle": "Requests",
+    "title": "Phone approval",
+    "current": "Current phone",
+    "requested": "Requested phone",
+    "noPhone": "No phone linked",
+    "possiblePlayers": "May be playing",
+    "approve": "Approve",
+    "reject": "Reject",
+    "failed": "Could not update the phone request. Try again.",
+    "refresh": "Refresh requests",
+    "empty": "No pending requests"
   }
 }

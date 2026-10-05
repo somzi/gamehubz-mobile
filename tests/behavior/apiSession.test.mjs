@@ -116,6 +116,20 @@ test('logout and a new login follow any token write already in progress', async 
     assert.equal(stored.get('access_token'), 'access-B'); assert.equal(stored.get('refresh_token'), 'refresh-B');
 });
 
+test('a refused upload hands the caller the server message, not its JSON body', async () => {
+    // The verification sheet shows this text as is — e.g. the 409 for a clip that already proves another game.
+    const original = globalThis.fetch, api = loadApi();
+    api.setAuthToken('access-A');
+    globalThis.fetch = async () => new Response(JSON.stringify({ message: 'This recording already verifies another game.' }), {
+        status: 409, headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    });
+    try {
+        const response = await api.authenticatedFetch('https://test.invalid/verification/v/evidence', { method: 'POST', body: new FormData() });
+        assert.equal(response.status, 409);
+        assert.equal(await response.text(), 'This recording already verifies another game.');
+    } finally { globalThis.fetch = original; }
+});
+
 test('an upload cannot retry with another account after a late 401', async () => {
     const original = globalThis.fetch, waiting = deferred(), api = loadApi(); let uploads = 0;
     api.setAuthToken('access-A');
