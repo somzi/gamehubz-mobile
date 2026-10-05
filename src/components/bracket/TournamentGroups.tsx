@@ -161,7 +161,9 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                 const deadlineColor = activeRoundDone
                     ? COLORS.slate500
                     : msLeft < 0 ? '#F87171' : msLeft < DAY_MS ? '#FBBF24' : COLORS.slate300;
-                const canEditSchedule = !!isAdmin && tournamentStatus !== 4 && currentRoundMatches.length > 0 && !activeRoundDone;
+                // Not tied to this group being done with the round: the schedule is the whole round's,
+                // across every group, and one group finishing early must not hide it from the organizer.
+                const canEditSchedule = !!isAdmin && tournamentStatus !== 4 && currentRoundMatches.length > 0;
 
                 const renderRoundTab = (roundNum: number, stretch: boolean) => {
                     const rMatches = groupedMatches[roundNum];
@@ -350,20 +352,21 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                 {(hasDeadline || roundFormat || canEditSchedule) && (
                                     <View className="flex-row items-center mt-3.5 px-0.5" style={{ gap: 12 }}>
                                         <View className="flex-1" style={{ gap: 6 }}>
+                                            {/* The state on one line, the date under it: side by side with the
+                                                Edit Schedule button, "Deadline passed" left the time cut off. */}
                                             {hasDeadline && (
-                                                <View className="flex-row items-center" style={{ gap: 6 }}>
-                                                    <Ionicons name="time-outline" size={14} color={deadlineColor} />
-                                                    <Text className="shrink text-[12.5px]" numberOfLines={1}>
-                                                        <Text className="font-semibold" style={{ color: deadlineColor }}>
+                                                <View className="flex-row items-start" style={{ gap: 6 }}>
+                                                    <Ionicons name="time-outline" size={14} color={deadlineColor} style={{ marginTop: 1 }} />
+                                                    <View className="shrink">
+                                                        <Text className="text-[11.5px] font-semibold" style={{ color: deadlineColor }} numberOfLines={1}>
                                                             {msLeft < 0 && !activeRoundDone ? t('tournament:progress.deadlinePassed') : t('tournament:progress.deadline')}
                                                         </Text>
-                                                        <Text className="font-bold text-white" style={TABULAR}>
-                                                            {'  '}
+                                                        <Text className="text-[13px] font-bold text-white" style={TABULAR} numberOfLines={1}>
                                                             {deadline!.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })}
                                                             {', '}
                                                             {deadline!.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}
                                                         </Text>
-                                                    </Text>
+                                                    </View>
                                                 </View>
                                             )}
                                             {roundFormat && (
