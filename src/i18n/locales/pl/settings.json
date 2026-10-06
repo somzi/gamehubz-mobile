@@ -61,6 +61,8 @@
     "receiving": "Powiadomienia włączone",
     "muted": "Powiadomienia wyłączone",
     "mutedByHub": "Wyłączone — najpierw włącz powiadomienia huba",
+    "mutedWithHub": "Wyłączone dla całego huba",
+    "turnOnForHub": "Włącz dla całego huba",
     "sourceLabel": "Powiadomienia z {{name}}",
     "loadFailed": "Nie udało się wczytać ustawień powiadomień.",
     "retry": "Spróbuj ponownie",

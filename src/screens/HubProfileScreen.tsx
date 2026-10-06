@@ -24,6 +24,7 @@ import { SocialType } from '../types/auth';
 import { getSocialUrl } from '../lib/social';
 import { ShareHubCardModal } from '../components/modals/ShareHubCardModal';
 import { ConfirmationModal } from '../components/modals/ConfirmationModal';
+import { SourceNotificationsButton } from '../components/ui/SourceNotificationsButton';
 import { PremiumTabs, type PremiumTabItem } from '../components/ui/PremiumTabs';
 import { HeroCard, CoverPill, EmblemImage, COMPACT_EMBLEM_IMAGE } from '../components/ui/HeroCard';
 import { Panel, PanelTitle, StatCell, StatDivider, ExpandableText } from '../components/ui/Panel';
@@ -554,6 +555,13 @@ export default function HubProfileScreen() {
                 </Pressable>
                 <Text className="text-lg font-black text-white tracking-tight">{t('profile.headerHub')}</Text>
                 <View className="flex-row items-center gap-2">
+                    <SourceNotificationsButton
+                        kind="hubs"
+                        id={id}
+                        name={hubData.name}
+                        avatarUrl={hubData.avatarUrl || hubData.logoUrl}
+                        involved={isFollowing || isOwner || isAdmin}
+                    />
                     <Pressable
                         onPress={handleShare}
                         className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 border border-white/10 active:opacity-60"

@@ -25,7 +25,8 @@ export function PageHeader({ title, showBack, rightElement, className }: PageHea
     return (
         <View className={cn("bg-transparent", className)}>
             <View className="flex-row items-center justify-between h-16 px-6">
-                <View className="flex-row items-center gap-4">
+                {/* The title gives way (one line, ellipsis) when the buttons on the right need the room. */}
+                <View className="flex-1 flex-row items-center gap-4 mr-3">
                     {showBack && canGoBack && (
                         <Pressable
                             onPress={handleGoBack}
@@ -34,7 +35,7 @@ export function PageHeader({ title, showBack, rightElement, className }: PageHea
                             <Ionicons name="arrow-back" size={20} color="#FAFAFA" />
                         </Pressable>
                     )}
-                    <Text className="text-xl font-bold text-white tracking-tight">{title}</Text>
+                    <Text className="shrink text-xl font-bold text-white tracking-tight" numberOfLines={1}>{title}</Text>
                 </View>
                 <View className="flex-row items-center gap-3">
                     {rightElement}

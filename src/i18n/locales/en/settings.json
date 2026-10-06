@@ -61,6 +61,8 @@
     "receiving": "Notifications on",
     "muted": "Notifications off",
     "mutedByHub": "Off — enable notifications for the hub first",
+    "mutedWithHub": "Off for the whole hub",
+    "turnOnForHub": "Turn on for the whole hub",
     "sourceLabel": "Notifications for {{name}}",
     "loadFailed": "Could not load notification preferences.",
     "retry": "Try again",

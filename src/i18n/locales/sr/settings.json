@@ -61,6 +61,8 @@
     "receiving": "Obaveštenja uključena",
     "muted": "Obaveštenja isključena",
     "mutedByHub": "Isključeno — prvo uključi obaveštenja za hub",
+    "mutedWithHub": "Isključeno za ceo hub",
+    "turnOnForHub": "Uključi za ceo hub",
     "sourceLabel": "Obaveštenja za {{name}}",
     "loadFailed": "Učitavanje podešavanja obaveštenja nije uspelo.",
     "retry": "Pokušaj ponovo",

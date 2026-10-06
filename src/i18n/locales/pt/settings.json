@@ -61,6 +61,8 @@
     "receiving": "Notificações ativadas",
     "muted": "Notificações desativadas",
     "mutedByHub": "Desativadas — ative primeiro as do hub",
+    "mutedWithHub": "Desativadas para todo o hub",
+    "turnOnForHub": "Ativar para todo o hub",
     "sourceLabel": "Notificações de {{name}}",
     "loadFailed": "Não foi possível carregar as preferências de notificações.",
     "retry": "Tentar novamente",

@@ -24,6 +24,7 @@ import { cn, getCurrencyLabel, parseUtcDate, formatDateTimeShort } from '../lib/
 import { normalizeBestOf } from '../lib/series';
 import { compareGroupNames, groupName } from '../lib/groups';
 import { ShareTournamentCardModal } from '../components/modals/ShareTournamentCardModal';
+import { SourceNotificationsButton } from '../components/ui/SourceNotificationsButton';
 import { useAuth } from '../context/AuthContext';
 import { useBadges } from '../context/BadgesContext';
 import { ENDPOINTS, authenticatedFetch, getErrorMessage } from '../lib/api';
@@ -3052,6 +3053,20 @@ export default function TournamentDetailsScreen() {
                                     <Ionicons name="document-outline" size={20} color="#FAFAFA" />
                                 )}
                             </Pressable>
+                        )}
+                        {/* Nothing more is sent about a finished or cancelled tournament, so nothing to mute. */}
+                        {Number(tournament.status) < 4 && (
+                            <SourceNotificationsButton
+                                kind="tournaments"
+                                id={id}
+                                name={tournament.name || t('details.headerTournament')}
+                                avatarUrl={(tournament as any).hubAvatarUrl ?? (tournament as any).HubAvatarUrl}
+                                hubId={tournament.hubId}
+                                hubName={tournament.hubName}
+                                // Same "your tournaments" as Settings → Notifications: organising, playing or signed up.
+                                involved={canManage || isUserRegistered || !!userTeam || (!!user?.username && participants.some(p =>
+                                    (p.username || p.Username)?.toLowerCase() === user.username.toLowerCase()))}
+                            />
                         )}
                         <Pressable
                             onPress={handleShare}
