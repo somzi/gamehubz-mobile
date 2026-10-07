@@ -289,28 +289,26 @@ function ProgressBar({ done, total, height = 6 }: { done: number; total: number;
     );
 }
 
-/**
- * Each name gets roughly 80pt beside its avatar — about eleven characters at the base size.
- * Rather than cutting "ardakaygusuz" off, the pair steps down a point at a time until it
- * fits. Both sides take the size the LONGER name needs, so the matchup stays symmetric
- * instead of pairing a 13pt name with a 10pt one; past ~16 characters the ellipsis takes
- * over again, since anything smaller stops being readable on a phone.
- */
-function nameFontSize(home: string, away: string): number {
-    const longest = Math.max(home.length, away.length);
-    if (longest <= 11) return 13;
-    if (longest <= 12) return 12;
-    if (longest <= 14) return 11;
-    if (longest <= 16) return 10;
-    return 9;
+/** One side of the pairing: a small avatar and the name, which has the card's full width. */
+function FixtureSide({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
+    return (
+        <View className="flex-row items-center">
+            <PlayerAvatar src={avatarUrl || undefined} name={name} size="xs" className="border" />
+            <Text className="flex-1 ml-2.5 text-[14px] leading-[18px] font-bold text-white" numberOfLines={2}>
+                {name}
+            </Text>
+        </View>
+    );
 }
 
 /**
- * One outstanding fixture. The two sides are mirrored around the "vs" chip so each avatar
- * sits against the name it belongs to, the group and the state ride in the eyebrow, and a
- * tinted rail down the left edge carries the state colour at a glance. The whole card opens
- * the match — chat lives one tap deeper, inside the match modal, where the organizer can
- * also see the score, the deadline and the evidence before writing anything.
+ * One outstanding fixture. The two sides are stacked rather than mirrored side by side:
+ * half the card left a name about 90pt, so anything past eleven characters was cut or shrunk
+ * to unreadable, while a full row fits ~30 — a longer team name wraps to a second line instead
+ * of losing its end. The group and the state ride in the eyebrow, and a tinted rail down the
+ * left edge carries the state colour at a glance. The whole card opens the match — chat lives
+ * one tap deeper, inside the match modal, where the organizer can also see the score, the
+ * deadline and the evidence before writing anything.
  */
 function FixtureRow({ fixture, onOpen }: { fixture: Fixture; onOpen: () => void }) {
     const { t } = useTranslation('tournament');
@@ -320,7 +318,6 @@ function FixtureRow({ fixture, onOpen }: { fixture: Fixture; onOpen: () => void 
     // Overdue outranks "not played": it is the reason the organizer opened this list.
     const late = fixture.overdue && fixture.state === 'awaiting';
     const accent = late ? COLORS.destructive : meta.color;
-    const fontSize = nameFontSize(fixture.homeName, fixture.awayName);
 
     return (
         <PressableScale
@@ -367,33 +364,10 @@ function FixtureRow({ fixture, onOpen }: { fixture: Fixture; onOpen: () => void 
                     </View>
                 </View>
 
-                {/* Matchup — mirrored columns, avatar always beside its own name. */}
-                <View className="flex-row items-center">
-                    <View className="flex-1 flex-row items-center">
-                        <PlayerAvatar src={fixture.homeAvatarUrl || undefined} name={fixture.homeName} size="sm" />
-                        <Text
-                            className="flex-1 ml-2 font-bold text-white"
-                            style={{ fontSize }}
-                            numberOfLines={1}
-                        >
-                            {fixture.homeName}
-                        </Text>
-                    </View>
-
-                    <View className="px-2 py-1 mx-1 rounded-lg bg-white/[0.04]">
-                        <Text className="text-[9px] font-black text-slate-500 uppercase tracking-wider">vs</Text>
-                    </View>
-
-                    <View className="flex-1 flex-row items-center justify-end">
-                        <Text
-                            className="flex-1 mr-2 font-bold text-white text-right"
-                            style={{ fontSize }}
-                            numberOfLines={1}
-                        >
-                            {fixture.awayName}
-                        </Text>
-                        <PlayerAvatar src={fixture.awayAvatarUrl || undefined} name={fixture.awayName} size="sm" />
-                    </View>
+                {/* Matchup — home over away, each name on a full-width row. */}
+                <View className="gap-1.5">
+                    <FixtureSide name={fixture.homeName} avatarUrl={fixture.homeAvatarUrl} />
+                    <FixtureSide name={fixture.awayName} avatarUrl={fixture.awayAvatarUrl} />
                 </View>
             </View>
         </PressableScale>

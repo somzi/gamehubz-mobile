@@ -41,6 +41,10 @@ interface PlayerIdentityProps {
  * The flag sits next to the username rather than on a line of its own: it answers one question
  * ("how far away is this person, roughly") that matters while two players are agreeing a time,
  * and it is not worth a row of vertical space in a block that already carries two.
+ *
+ * Every caller sets this under an avatar in half the width, often less (the score entry gives it
+ * ~110pt), so a long name shrinks to fit its line instead of ending in "…". Wrapping to a second
+ * line would push that side's nickname out of line with the other side's.
  */
 export function PlayerIdentity({
     username,
@@ -58,7 +62,7 @@ export function PlayerIdentity({
 
     return (
         <View className={cn('items-center w-full', className)}>
-            <View className="flex-row items-center justify-center gap-1 px-1">
+            <View className="w-full flex-row items-center justify-center gap-1 px-1">
                 {!!flag && (
                     <Text
                         className="text-[13px]"
@@ -68,18 +72,28 @@ export function PlayerIdentity({
                         {flag}
                     </Text>
                 )}
-                <Text className="text-xs font-bold text-slate-300 text-center shrink" numberOfLines={1}>
+                <Text
+                    className="text-xs font-bold text-slate-300 text-center shrink"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                >
                     {name}
                 </Text>
             </View>
             {showNickname ? (
-                <View className="flex-row items-center justify-center gap-1 mt-1 px-1">
+                <View className="w-full flex-row items-center justify-center gap-1 mt-1 px-1">
                     <Ionicons
                         name="game-controller"
                         size={12}
                         color={tone === 'away' ? COLORS.info : COLORS.primary}
                     />
-                    <Text className="text-[11px] font-semibold text-slate-500 shrink" numberOfLines={1}>
+                    <Text
+                        className="text-[11px] font-semibold text-slate-500 shrink"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
+                    >
                         {nick}
                     </Text>
                 </View>

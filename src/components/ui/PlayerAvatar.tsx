@@ -7,11 +7,12 @@ import { getOptimizedCloudinaryUrl } from '../../lib/image';
 interface PlayerAvatarProps {
     src?: string;
     name: string;
-    size?: "sm" | "md" | "lg" | "xl";
+    size?: "xs" | "sm" | "md" | "lg" | "xl";
     className?: string;
 }
 
 const sizes = {
+    xs: 24,
     sm: 32,
     md: 40,
     lg: 56,
@@ -19,6 +20,7 @@ const sizes = {
 };
 
 const textSizes = {
+    xs: "text-[9px]",
     sm: "text-[10px]",
     md: "text-xs",
     lg: "text-base",
