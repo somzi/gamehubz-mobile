@@ -72,6 +72,7 @@
     "scheduled": "Programado",
     "completed": "Finalizado",
     "doubleWalkover": "Doble incomparecencia",
+    "noEvidence": "Sin evidencia",
     "noShow": "No presentado",
     "tiebreakNeeded": "Se necesita desempate",
     "player": "Jugador",

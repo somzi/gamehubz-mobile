@@ -5,7 +5,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
-import { teamProgressFrom, checkInFrom } from './BracketMatch';
+import { teamProgressFrom, checkInFrom, missingEvidenceFrom } from './BracketMatch';
 import { GroupFixtureCard } from './GroupFixtureCard';
 import { SeriesFormatChip, roundSeriesFormat } from './SeriesFormatChip';
 import { Panel } from '../ui/Panel';
@@ -406,6 +406,7 @@ export function TournamentGroups({ groups, onMatchPress, currentUserId, currentU
                                             proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                             teamProgress={teamProgressFrom(match)}
                                             checkIn={checkInFrom(match)}
+                                            noEvidence={missingEvidenceFrom(match, tournamentStatus)}
                                         />
                                     ))}
                                 </View>

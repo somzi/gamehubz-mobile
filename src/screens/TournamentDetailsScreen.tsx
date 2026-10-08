@@ -12,7 +12,7 @@ import { PageHeader } from '../components/layout/PageHeader';
 import { TournamentBracket } from '../components/bracket/TournamentBracket';
 import { LosersBracket } from '../components/bracket/LosersBracket';
 import { TournamentGroups } from '../components/bracket/TournamentGroups';
-import { BracketMatch, teamProgressFrom, checkInFrom } from '../components/bracket/BracketMatch';
+import { BracketMatch, teamProgressFrom, checkInFrom, missingEvidenceFrom } from '../components/bracket/BracketMatch';
 import { matchSeriesFormat } from '../components/bracket/SeriesFormatChip';
 import { BracketSectionTitle, ChampionPlate } from '../components/bracket/BracketChrome';
 
@@ -2631,6 +2631,7 @@ export default function TournamentDetailsScreen() {
                 proposedByUserId={match.proposedByUserId ?? match.ProposedByUserId ?? null}
                 teamProgress={teamProgressFrom(match)}
                 checkIn={checkInFrom(match)}
+                noEvidence={missingEvidenceFrom(match, tournament?.status)}
             />
         );
 

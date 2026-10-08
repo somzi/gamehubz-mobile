@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, ScrollView } from 'react-native';
-import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom, checkInFrom, missingEvidenceFrom } from './BracketMatch';
 import { roundSeriesFormat } from './SeriesFormatChip';
 import {
     RoundHeader, ZoomControls, ChampionPlate, roundStatusOf, isSettled,
@@ -205,6 +205,7 @@ export function TournamentBracket({
                                                     proposedByUserId={(match as any).proposedByUserId ?? (match as any).ProposedByUserId ?? null}
                                                     teamProgress={teamProgressFrom(match)}
                                                     checkIn={checkInFrom(match)}
+                                                    noEvidence={missingEvidenceFrom(match, tournamentStatus)}
                                                     onMyPath={myPathIds.has(match.id)}
                                                 />
                                             </View>

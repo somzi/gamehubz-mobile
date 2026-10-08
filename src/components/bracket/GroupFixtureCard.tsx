@@ -31,6 +31,7 @@ interface GroupFixtureCardProps {
     proposedByUserId?: string | null;
     teamProgress?: TeamProgress | null;
     checkIn?: CardCheckIn | null;
+    noEvidence?: boolean;
 }
 
 /**
@@ -119,9 +120,10 @@ export const GroupFixtureCard = React.memo(function GroupFixtureCard({
     proposedByUserId,
     teamProgress,
     checkIn,
+    noEvidence,
 }: GroupFixtureCardProps) {
     const { t } = useTranslation('bracket');
-    const s = matchCardState({ home, away, startTime, status, hasOnPress: !!onPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn });
+    const s = matchCardState({ home, away, startTime, status, hasOnPress: !!onPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn, noEvidence });
 
     // What the match is waiting on — same wording as the bracket card, minus "Report result",
     // which this card has a button for. The running team score sits under the score instead.
@@ -132,7 +134,8 @@ export const GroupFixtureCard = React.memo(function GroupFixtureCard({
     const labelAccent: Accent | null = cardLabel?.accent ?? null;
 
     const actionAccent = s.isTieBreakNeeded ? ACCENT.wait : ACCENT.go;
-    const lineAccent: Accent | null = s.canReport ? actionAccent : labelAccent;
+    // A result with no evidence keeps its "Completed" label; the line and a note under the score flag it.
+    const lineAccent: Accent | null = s.canReport ? actionAccent : labelAccent ?? (s.isMissingEvidence ? ACCENT.wait : null);
 
     const homeScore = home?.score ?? null;
     const awayScore = away?.score ?? null;
@@ -202,6 +205,7 @@ export const GroupFixtureCard = React.memo(function GroupFixtureCard({
                 `${homeName} vs ${awayName}`,
                 hasScore ? `${homeScore ?? 0}:${awayScore ?? 0}` : null,
                 label,
+                s.isMissingEvidence ? t('card.noEvidence') : null,
                 s.canReport ? (s.isTieBreakNeeded ? t('card.reportTiebreak') : t('card.reportResult')) : null,
             ].filter(Boolean).join('. ')}
         >
@@ -245,6 +249,17 @@ export const GroupFixtureCard = React.memo(function GroupFixtureCard({
                                 </Text>
                             )}
                             {renderCenter()}
+                            {s.isMissingEvidence && (
+                                <Text
+                                    className="w-full text-center text-[11px] leading-[14px] font-bold"
+                                    style={{ color: ACCENT.wait.text, marginTop: 2 }}
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.8}
+                                >
+                                    {t('card.noEvidence')}
+                                </Text>
+                            )}
                         </View>
 
                         <Side

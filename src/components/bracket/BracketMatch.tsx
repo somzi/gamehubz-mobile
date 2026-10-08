@@ -65,6 +65,25 @@ export function teamProgressFrom(match: any): TeamProgress | null {
     };
 }
 
+/**
+ * Whether a match payload says its result stands on nothing: no screenshot, no clip, no
+ * verification recording. Unknown reads as "not missing" — team ties never carry their games'
+ * evidence and older backends send no list — and so does a ready-check forfeit (one side turned
+ * up, nobody played). Only while the tournament runs: clips are purged a few days after it ends,
+ * which would flag every result that was proven by video alone.
+ */
+export function missingEvidenceFrom(match: any, tournamentStatus?: number): boolean {
+    if (Number(tournamentStatus) !== 3) return false;
+    if (match?.teamMatchId ?? match?.TeamMatchId) return false;
+
+    const homeIn = !!(match?.homeCheckedInOn ?? match?.HomeCheckedInOn);
+    const awayIn = !!(match?.awayCheckedInOn ?? match?.AwayCheckedInOn);
+    if (homeIn !== awayIn) return false;
+
+    const items = match?.evidenceItems ?? match?.EvidenceItems ?? match?.evidences ?? match?.Evidences;
+    return Array.isArray(items) && items.length === 0;
+}
+
 interface BracketMatchProps {
     home: Participant | null;
     away: Participant | null;
@@ -84,6 +103,8 @@ interface BracketMatchProps {
     teamProgress?: TeamProgress | null;
     // Ready check — set only while this match is waiting on one.
     checkIn?: CardCheckIn | null;
+    // See missingEvidenceFrom. Only an organizer is told.
+    noEvidence?: boolean;
 }
 
 interface MatchCardStateInput {
@@ -99,6 +120,7 @@ interface MatchCardStateInput {
     proposedByUserId?: string | null;
     teamProgress?: TeamProgress | null;
     checkIn?: CardCheckIn | null;
+    noEvidence?: boolean;
 }
 
 /**
@@ -107,7 +129,7 @@ interface MatchCardStateInput {
  * in the same states.
  */
 export function matchCardState({
-    home, away, startTime, status, hasOnPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn,
+    home, away, startTime, status, hasOnPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn, noEvidence,
 }: MatchCardStateInput) {
     // A team fixture with at least one game decided but no settled result yet. The final Score
     // stays null until the fixture settles, so this is the only way the card knows it is under way.
@@ -196,10 +218,15 @@ export function matchCardState({
     // scheduled state as before.
     const showCheckIn = checkInPending && isParticipant && !isCompleted && !isNoShow;
 
+    // A played result with nothing behind it. For the organizer only: the two players already
+    // know, and to everyone else it would read as an accusation against a result both sides accepted.
+    const isMissingEvidence = !!isAdmin && !!noEvidence && isCompleted && !!home && !!away
+        && !isDoubleWalkover && isAlreadyReported;
+
     return {
         isTeamInProgress, isCompletedBye, isHome, isAway, isParticipant, isCompleted, isNoShow,
         isDoubleWalkover, isScheduled, isTieBreakNeeded, isAwaitingApproval, canShowDetails,
-        checkedInCount, canReport, showCheckIn,
+        checkedInCount, canReport, showCheckIn, isMissingEvidence,
     };
 }
 
@@ -267,11 +294,13 @@ const TABULAR = { fontVariant: ['tabular-nums' as const] };
  * the same colour down the left edge. Kept under the bracket's 130px slot; the bracket centres it there, so the connector
  * lines meet it in the middle whatever its height.
  */
-export const BracketMatch = React.memo(function BracketMatch({ home, away, startTime, status, className, onMyPath, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, checkIn }: BracketMatchProps) {
+export const BracketMatch = React.memo(function BracketMatch({ home, away, startTime, status, className, onMyPath, onPress, currentUserId, currentUsername, isAdmin, isTeamTournament, proposedByUserId, teamProgress, checkIn, noEvidence }: BracketMatchProps) {
     const { t } = useTranslation('bracket');
-    const s = matchCardState({ home, away, startTime, status, hasOnPress: !!onPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn });
+    const s = matchCardState({ home, away, startTime, status, hasOnPress: !!onPress, currentUserId, currentUsername, isAdmin, proposedByUserId, teamProgress, checkIn, noEvidence });
     const label = matchCardLabel(s, t, teamProgress, true);
     const accent = label?.accent ?? null;
+    // A result with no evidence stays "Completed"; the rail and a note beside it are what flag it.
+    const railAccent = accent ?? (s.isMissingEvidence ? CARD_ACCENT.wait : null);
 
     const emptyLabel = s.isCompletedBye ? t('bye') : t('common:app.tbd');
     // A winner exists: the other score steps back to grey. A level series still owing a tiebreak
@@ -353,6 +382,7 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
             accessibilityLabel={[
                 `${home?.username ?? emptyLabel} vs ${away?.username ?? emptyLabel}`,
                 label?.text,
+                s.isMissingEvidence ? t('card.noEvidence') : null,
             ].filter(Boolean).join('. ')}
         >
             <RaisedCard
@@ -366,13 +396,13 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
                 ]}
             >
                 {/* The state's rail down the left edge */}
-                {accent && (
+                {railAccent && (
                     <View
                         pointerEvents="none"
                         style={[
                             styles.rail,
-                            { backgroundColor: accent.main },
-                            Platform.OS === 'ios' && { shadowColor: accent.main, shadowOpacity: 0.7, shadowRadius: 5, shadowOffset: { width: 0, height: 0 } },
+                            { backgroundColor: railAccent.main },
+                            Platform.OS === 'ios' && { shadowColor: railAccent.main, shadowOpacity: 0.7, shadowRadius: 5, shadowOffset: { width: 0, height: 0 } },
                         ]}
                     />
                 )}
@@ -386,6 +416,11 @@ export const BracketMatch = React.memo(function BracketMatch({ home, away, start
                         >
                             {label.text}
                         </Text>
+                        {s.isMissingEvidence && (
+                            <Text className="ml-2 text-[10.5px] font-bold" style={{ color: CARD_ACCENT.wait.text }} numberOfLines={1}>
+                                {t('card.noEvidence')}
+                            </Text>
+                        )}
                         {!!label.trailing && (
                             <Text style={[TABULAR, { color: accent?.text ?? COLORS.slate500, opacity: 0.75 }]} className="text-[10.5px] font-black ml-2">
                                 {label.trailing}

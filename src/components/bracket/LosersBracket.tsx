@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import React, { useMemo, useState } from 'react';
 import { View, ScrollView } from 'react-native';
-import { BracketMatch, teamProgressFrom, checkInFrom } from './BracketMatch';
+import { BracketMatch, teamProgressFrom, checkInFrom, missingEvidenceFrom } from './BracketMatch';
 import { roundSeriesFormat } from './SeriesFormatChip';
 import {
     RoundHeader, ZoomControls, roundStatusOf, isSettled,
@@ -295,6 +295,7 @@ export function LosersBracket({
                                                 }
                                                 teamProgress={teamProgressFrom(match)}
                                                 checkIn={checkInFrom(match)}
+                                                noEvidence={missingEvidenceFrom(match, tournamentStatus)}
                                                 onMyPath={myPathIds.has(match.id)}
                                             />
                                         </View>
