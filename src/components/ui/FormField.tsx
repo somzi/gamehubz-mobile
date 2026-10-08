@@ -89,6 +89,7 @@ export function GradientButton({
     onPress,
     loading = false,
     disabled = false,
+    compact = false,
     style,
 }: {
     label: string;
@@ -96,6 +97,8 @@ export function GradientButton({
     onPress: () => void;
     loading?: boolean;
     disabled?: boolean;
+    /** A lower button, for a footer that shares its row with other controls. */
+    compact?: boolean;
     style?: StyleProp<ViewStyle>;
 }) {
     const inactive = disabled || loading;
@@ -108,14 +111,14 @@ export function GradientButton({
             accessibilityState={{ disabled: inactive, busy: loading }}
             containerStyle={style}
         >
-            <View style={[styles.button, inactive && !loading && { opacity: 0.5 }]}>
+            <View style={[styles.button, compact && styles.buttonCompact, inactive && !loading && { opacity: 0.5 }]}>
                 <LinearGradient colors={SAVE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
                 {loading ? (
                     <ActivityIndicator color={COLORS.primaryForeground} />
                 ) : (
                     <>
-                        {icon ? <Ionicons name={icon} size={18} color={SAVE_INK} /> : null}
-                        <Text style={styles.buttonText} numberOfLines={1}>{label}</Text>
+                        {icon ? <Ionicons name={icon} size={compact ? 16 : 18} color={SAVE_INK} /> : null}
+                        <Text style={[styles.buttonText, compact && styles.buttonTextCompact]} numberOfLines={1}>{label}</Text>
                     </>
                 )}
             </View>
@@ -128,17 +131,20 @@ export function GhostButton({
     label,
     onPress,
     disabled = false,
+    compact = false,
     style,
 }: {
     label: string;
     onPress: () => void;
     disabled?: boolean;
+    /** Matches a compact GradientButton beside it. */
+    compact?: boolean;
     style?: StyleProp<ViewStyle>;
 }) {
     return (
         <PressableScale onPress={onPress} disabled={disabled} pressedScale={0.98} accessibilityRole="button" containerStyle={style}>
-            <View style={[styles.button, styles.ghost, disabled && { opacity: 0.5 }]}>
-                <Text style={styles.ghostText} numberOfLines={1}>{label}</Text>
+            <View style={[styles.button, compact && styles.buttonCompact, styles.ghost, disabled && { opacity: 0.5 }]}>
+                <Text style={[styles.ghostText, compact && styles.ghostTextCompact]} numberOfLines={1}>{label}</Text>
             </View>
         </PressableScale>
     );
@@ -195,10 +201,17 @@ const styles = StyleSheet.create({
         gap: 8,
         paddingHorizontal: 18,
     },
+    buttonCompact: {
+        height: 46,
+        borderRadius: 14,
+    },
     buttonText: {
         color: SAVE_INK,
         fontSize: 16,
         fontWeight: '900',
+    },
+    buttonTextCompact: {
+        fontSize: 15,
     },
     ghost: {
         backgroundColor: 'rgba(255,255,255,0.05)',
@@ -209,5 +222,8 @@ const styles = StyleSheet.create({
         color: COLORS.slate200,
         fontSize: 15,
         fontWeight: '800',
+    },
+    ghostTextCompact: {
+        fontSize: 14,
     },
 });

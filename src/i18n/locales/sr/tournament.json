@@ -131,7 +131,6 @@
     "swissDirectHint": "Top {{size}} sa tabele postavlja se u žreb (1 protiv {{size}}, 2 protiv {{second}}, …).",
     "groupStage": "Grupna faza",
     "manageTournament": "Upravljanje turnirom",
-    "lockedNotice": "Turnir je počeo — još se mogu menjati samo opis, pravila i potvrda rezultata.",
     "rulesPlaceholderShort": "Pravila turnira...",
     "requireApprovalHintShort": "Protivnik mora da potvrdi prijavljeni rezultat. Vlasnik / admin može da preskoči.",
     "regDeadlinePlain": "Rok za prijave",

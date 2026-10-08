@@ -306,7 +306,6 @@
     "aggregateHint": "Every game is played and the scores are added up — the higher total wins. Useful for two-legged ties.",
     "matchWinsHint": "Whoever wins more games wins the series, and it ends as soon as the lead is out of reach.",
     "knockoutFormat": "Knockout Format",
-    "sameAsPhase": "Same as {{phase}}",
     "different": "Different",
     "knockoutSameHint": "Knockout matches are played over the same length as the {{phase}}.",
     "perRoundOverride": "Each round can still be changed on its own once the bracket exists.",
@@ -407,7 +406,7 @@
     "bothReadyTail": "Play and report the result",
     "youAreIn": "You're in",
     "ctaShort": "Ready",
-    "a11yHint": "Confirms you are at the keyboard for this match. Without it you can lose the match by forfeit."
+    "a11yHint": "Confirms you're ready to play this match. Without it you can lose the match by forfeit."
   },
   "series": {
     "aggregateScore": "Aggregate score",

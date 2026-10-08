@@ -306,7 +306,6 @@
     "aggregateHint": "Se juegan todos los partidos y se suman los marcadores — gana el total más alto. Útil para series de ida y vuelta.",
     "matchWinsHint": "Gana la serie quien gane más partidos, y termina en cuanto la ventaja es inalcanzable.",
     "knockoutFormat": "Formato de la eliminatoria",
-    "sameAsPhase": "Igual que {{phase}}",
     "different": "Diferente",
     "knockoutSameHint": "Los partidos eliminatorios se juegan con la misma extensión que {{phase}}.",
     "perRoundOverride": "Cada ronda se puede seguir cambiando por separado una vez creado el cuadro.",

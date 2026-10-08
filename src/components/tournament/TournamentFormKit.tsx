@@ -326,7 +326,7 @@ export function StepArrow({ direction, onPress, disabled, label }: {
     return (
         <PressableScale onPress={onPress} disabled={disabled} pressedScale={0.95} accessibilityRole="button" accessibilityLabel={label}>
             <View style={[styles.arrow, disabled && { opacity: 0.35 }]}>
-                <Ionicons name={direction === 'back' ? 'chevron-back' : 'chevron-forward'} size={20} color={COLORS.slate300} />
+                <Ionicons name={direction === 'back' ? 'chevron-back' : 'chevron-forward'} size={18} color={COLORS.slate300} />
             </View>
         </PressableScale>
     );
@@ -405,9 +405,9 @@ const styles = StyleSheet.create({
         ...RAISED_FIELD,
     },
     arrow: {
-        width: 54,
-        height: 54,
-        borderRadius: 16,
+        width: 46,
+        height: 46,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.10)',
         backgroundColor: 'rgba(255,255,255,0.04)',

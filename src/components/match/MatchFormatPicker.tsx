@@ -122,7 +122,7 @@ export function MatchFormatPicker({
                     <SegmentedToggle
                         raised
                         options={[
-                            { value: 'same', label: t('formatPicker.sameAsPhase', { phase: phaseLabel }) },
+                            { value: 'same', label: t('formatPicker.sameFormat') },
                             { value: 'custom', label: t('formatPicker.different') },
                         ]}
                         value={knockoutBestOf == null ? 'same' : 'custom'}

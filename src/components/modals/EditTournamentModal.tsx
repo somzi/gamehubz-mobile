@@ -1198,16 +1198,6 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                         </View>
                         {/* Every step can be reached directly: an edit usually touches one thing. */}
                         <StepHeader steps={steps} current={step} onSelect={goToStep} reachable={() => true} />
-                        {/* Started tournaments lock structural fields — said once, instead of leaving
-                            mysteriously disabled inputs. */}
-                        {!canEditAll && (
-                            <View className="flex-row items-start gap-2 mt-3.5 bg-amber-500/[0.06] border border-amber-500/20 rounded-xl px-3 py-2.5">
-                                <Ionicons name="lock-closed" size={13} color={COLORS.warning} style={{ marginTop: 1 }} />
-                                <Text style={{ color: '#FCD34D' }} className="text-[11px] flex-1 leading-4">
-                                    {t('form.lockedNotice')}
-                                </Text>
-                            </View>
-                        )}
                     </View>
 
                     {/* Keyed by step: each one opens at its top. */}
@@ -1250,6 +1240,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                                 icon="checkmark-circle"
                                 onPress={handleSave}
                                 loading={isSubmitting}
+                                compact
                                 style={{ flex: 1 }}
                             />
                         </View>

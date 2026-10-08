@@ -1243,13 +1243,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         <FormError message={error} />
                         <View className="flex-row" style={{ gap: 10 }}>
                             {step > 0 && (
-                                <GhostButton label={t('common:back')} onPress={() => goToStep(step - 1)} style={{ flex: 1 }} />
+                                <GhostButton label={t('common:back')} onPress={() => goToStep(step - 1)} compact style={{ flex: 1 }} />
                             )}
                             <GradientButton
                                 label={isLastStep ? t('form.createTournament') : t('common:next')}
                                 icon={isLastStep ? 'checkmark-circle' : undefined}
                                 onPress={isLastStep ? handleSubmit : goNext}
                                 loading={isSubmitting}
+                                compact
                                 style={{ flex: 2 }}
                             />
                         </View>

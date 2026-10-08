@@ -312,7 +312,6 @@
     "aggregateHint": "Rozgrywane są wszystkie gry, a wyniki się sumuje — wygrywa wyższa suma. Przydatne w dwumeczach.",
     "matchWinsHint": "Serię wygrywa ten, kto wygra więcej gier; kończy się, gdy przewagi nie da się już odrobić.",
     "knockoutFormat": "Format fazy pucharowej",
-    "sameAsPhase": "Jak {{phase}}",
     "different": "Inny",
     "knockoutSameHint": "Mecze pucharowe mają tę samą długość co {{phase}}.",
     "perRoundOverride": "Po utworzeniu drabinki każdą rundę nadal można zmienić osobno.",

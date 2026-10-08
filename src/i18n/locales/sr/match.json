@@ -309,7 +309,6 @@
     "aggregateHint": "Igraju se sve partije i rezultati se sabiraju — pobeđuje veći zbir. Korisno za dvomeče.",
     "matchWinsHint": "Ko dobije više partija, dobija seriju, a ona se završava čim prednost više ne može da se stigne.",
     "knockoutFormat": "Format nokaut faze",
-    "sameAsPhase": "Isto kao {{phase}}",
     "different": "Drugačiji",
     "knockoutSameHint": "Nokaut mečevi se igraju u istoj dužini kao {{phase}}.",
     "perRoundOverride": "Svaka runda i dalje može zasebno da se promeni kad žreb bude napravljen.",

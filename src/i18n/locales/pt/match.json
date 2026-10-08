@@ -306,7 +306,6 @@
     "aggregateHint": "Todos os jogos são disputados e os placares são somados — vence o maior total. Útil para confrontos de ida e volta.",
     "matchWinsHint": "Quem vencer mais jogos vence a série, e ela acaba assim que a vantagem fica inalcançável.",
     "knockoutFormat": "Formato do mata-mata",
-    "sameAsPhase": "Igual a {{phase}}",
     "different": "Diferente",
     "knockoutSameHint": "As partidas de mata-mata têm a mesma duração de {{phase}}.",
     "perRoundOverride": "Cada rodada ainda pode ser alterada individualmente depois que o chaveamento for criado.",
@@ -407,7 +406,7 @@
     "bothReadyTail": "Joguem e reportem o resultado",
     "youAreIn": "Você está dentro",
     "ctaShort": "Pronto",
-    "a11yHint": "Confirma que você está no teclado para esta partida. Sem isso, você pode perder a partida por W.O."
+    "a11yHint": "Confirma que você está pronto para esta partida. Sem isso, você pode perder a partida por W.O."
   },
   "series": {
     "aggregateScore": "Placar agregado",

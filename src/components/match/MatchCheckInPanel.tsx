@@ -108,7 +108,7 @@ function SideRow({ label, at, isYou }: { label: string; at: Date | null; isYou: 
 }
 
 /**
- * The ready check on a scheduled match: both sides confirm they are at the keyboard, and the one
+ * The ready check on a scheduled match: both sides confirm they are ready to play, and the one
  * who turns up alone takes the match when the grace period runs out.
  *
  * Everything here is a view of server state — the panel never decides an outcome, it only shows

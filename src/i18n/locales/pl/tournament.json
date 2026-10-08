@@ -132,7 +132,6 @@
     "swissDirectHint": "Top {{size}} z tabeli trafia do drabinki z rozstawieniem (1 vs {{size}}, 2 vs {{second}}, …).",
     "groupStage": "Faza grupowa",
     "manageTournament": "Zarządzaj turniejem",
-    "lockedNotice": "Turniej już się rozpoczął — można zmienić tylko opis, zasady i zatwierdzanie wyników.",
     "rulesPlaceholderShort": "Zasady turnieju...",
     "requireApprovalHintShort": "Przeciwnik musi potwierdzić zgłoszony wynik. Właściciel / admin może to obejść.",
     "regDeadlinePlain": "Koniec zapisów",
