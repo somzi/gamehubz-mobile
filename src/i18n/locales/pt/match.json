@@ -365,7 +365,10 @@
     "admin": "Admin",
     "you": "Você",
     "readOnly": "Partida concluída — o chat é somente leitura",
-    "typeAMessage": "Escreva uma mensagem..."
+    "typeAMessage": "Escreva uma mensagem...",
+    "lockedTitle": "Informe sua disponibilidade para conversar",
+    "lockedBody": "Neste torneio o chat da partida abre quando você marca no calendário os horários em que pode jogar. Escolha seus horários e já pode falar com seu adversário.",
+    "lockedAction": "Abrir calendário"
   },
   "timing": {
     "overdue": "Vencido",

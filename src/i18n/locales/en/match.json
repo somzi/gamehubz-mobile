@@ -365,7 +365,10 @@
     "admin": "Admin",
     "you": "You",
     "readOnly": "Match completed — chat is read-only",
-    "typeAMessage": "Type a message..."
+    "typeAMessage": "Type a message...",
+    "lockedTitle": "Set your availability to chat",
+    "lockedBody": "In this tournament the match chat opens once you've marked the hours you're free in the calendar. Pick your times and you can message your opponent right away.",
+    "lockedAction": "Open calendar"
   },
   "timing": {
     "overdue": "Overdue",

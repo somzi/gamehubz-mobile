@@ -153,6 +153,8 @@
     "summaryResultVerification": "Verified results",
     "allowOutsideApp": "Agreed outside the app",
     "allowOutsideAppHint": "Players can mark a match time they agreed elsewhere. Off: times come only from the in-app calendar.",
+    "chatAfterAvailability": "Chat after availability",
+    "chatAfterAvailabilityHint": "A player's match chat opens only once they've set their availability in the calendar, so times get agreed there first.",
     "summaryCalendarOnly": "Calendar only",
     "visibility": "Visibility",
     "visibilityPublic": "Public",

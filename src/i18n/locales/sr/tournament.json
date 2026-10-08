@@ -154,6 +154,8 @@
     "summaryResultVerification": "Verifikovani rezultati",
     "allowOutsideApp": "Dogovor van aplikacije",
     "allowOutsideAppHint": "Igrači mogu da označe termin dogovoren negde drugde. Isključeno: termin se zakazuje samo kroz kalendar u aplikaciji.",
+    "chatAfterAvailability": "Čet tek posle dostupnosti",
+    "chatAfterAvailabilityHint": "Čet meča se igraču otvara tek kad u kalendaru označi slobodne sate, pa se termini prvo dogovaraju tamo.",
     "summaryCalendarOnly": "Samo kalendar",
     "visibility": "Vidljivost",
     "visibilityPublic": "Javni",

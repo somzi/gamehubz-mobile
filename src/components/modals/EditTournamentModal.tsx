@@ -170,6 +170,11 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [allowScheduleOutsideApp, setAllowScheduleOutsideApp] = useState(
         (tournament?.allowScheduleOutsideApp ?? tournament?.AllowScheduleOutsideApp) !== false,
     );
+    // Chat after availability, editable for the whole tournament: it only gates matches still
+    // waiting for a time.
+    const [requireAvailabilityForChat, setRequireAvailabilityForChat] = useState(
+        Boolean(tournament?.requireAvailabilityForChat ?? tournament?.RequireAvailabilityForChat),
+    );
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
     // Invite-only. Editable for the whole life of the tournament — it only changes who can find it.
     const [isPrivate, setIsPrivate] = useState(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
@@ -378,6 +383,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setCheckInGraceMinutes(String(tournament?.checkInGraceMinutes ?? tournament?.CheckInGraceMinutes ?? 10));
         setRequireResultVerification(Boolean(tournament?.requireResultVerification ?? tournament?.RequireResultVerification));
         setAllowScheduleOutsideApp((tournament?.allowScheduleOutsideApp ?? tournament?.AllowScheduleOutsideApp) !== false);
+        setRequireAvailabilityForChat(Boolean(tournament?.requireAvailabilityForChat ?? tournament?.RequireAvailabilityForChat));
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
         setIsPrivate(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
@@ -572,6 +578,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 // Always sent: the server reads its absence as "an older app, keep what is stored".
                 RequireResultVerification: requireResultVerification,
                 AllowScheduleOutsideApp: allowScheduleOutsideApp,
+                RequireAvailabilityForChat: requireAvailabilityForChat,
                 // Series format — applied whenever AllowStructuralEdits is set, with no start-date
                 // gate: already-played matches carry their own frozen format, so this can only
                 // change fixtures that have yet to be reported.
@@ -1043,6 +1050,14 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 hint={t('form.allowOutsideAppHint')}
                 value={allowScheduleOutsideApp}
                 onChange={setAllowScheduleOutsideApp}
+            />
+            <ToggleCard
+                icon="calendar"
+                color="#FB923C"
+                title={t('form.chatAfterAvailability')}
+                hint={t('form.chatAfterAvailabilityHint')}
+                value={requireAvailabilityForChat}
+                onChange={setRequireAvailabilityForChat}
             />
             <ToggleCard
                 icon="hand-left"

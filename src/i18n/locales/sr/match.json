@@ -370,7 +370,10 @@
     "admin": "Admin",
     "you": "Ti",
     "readOnly": "Meč je završen — čet je samo za čitanje",
-    "typeAMessage": "Napiši poruku..."
+    "typeAMessage": "Napiši poruku...",
+    "lockedTitle": "Čet se otvara kad postaviš dostupnost",
+    "lockedBody": "U ovom turniru čet meča se otvara tek kad u kalendaru označiš sate kada možeš da igraš. Izaberi termine i odmah možeš da pišeš protivniku.",
+    "lockedAction": "Otvori kalendar"
   },
   "timing": {
     "overdue": "Rok je prošao",

@@ -189,6 +189,10 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // availability calendar.
     const [allowScheduleOutsideApp, setAllowScheduleOutsideApp] = useState(true);
 
+    // Chat after availability — when on, a player's match chat opens only once their side has
+    // marked its free hours in the calendar.
+    const [requireAvailabilityForChat, setRequireAvailabilityForChat] = useState(false);
+
     // Series format: how many games a single match is played over, how those games decide the
     // match, and what settles a level knockout series. 1 = one game, the pre-series default.
     const [bestOf, setBestOf] = useState(1);
@@ -599,6 +603,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 CheckInGraceMinutes: requireMatchCheckIn ? (parseInt(checkInGraceMinutes, 10) || null) : null,
                 RequireResultVerification: requireResultVerification,
                 AllowScheduleOutsideApp: allowScheduleOutsideApp,
+                RequireAvailabilityForChat: requireAvailabilityForChat,
                 IsExclusive: isExclusive,
                 IsPrivate: isPrivate,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
@@ -1077,6 +1082,16 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 hint={t('form.allowOutsideAppHint')}
                 value={allowScheduleOutsideApp}
                 onChange={setAllowScheduleOutsideApp}
+            />
+            {/* Chat after availability — a player's match chat stays shut until their side has marked
+                its free hours in the calendar, so times get arranged there first. */}
+            <ToggleCard
+                icon="calendar"
+                color="#FB923C"
+                title={t('form.chatAfterAvailability')}
+                hint={t('form.chatAfterAvailabilityHint')}
+                value={requireAvailabilityForChat}
+                onChange={setRequireAvailabilityForChat}
             />
             {/* Ready check — both sides confirm they turned up for the time they agreed on; the one
                 who shows up alone takes the match. The grace only matters with it on. */}

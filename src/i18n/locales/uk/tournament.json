@@ -343,6 +343,8 @@
     "summaryResultVerification": "Верифіковані результати",
     "allowOutsideApp": "Домовленість поза застосунком",
     "allowOutsideAppHint": "Гравці можуть позначити час, про який домовилися деінде. Вимкнено: лише календар у застосунку.",
+    "chatAfterAvailability": "Чат після доступності",
+    "chatAfterAvailabilityHint": "Чат матчу відкривається гравцю лише після позначення вільних годин у календарі — так час спершу погоджують там.",
     "summaryCalendarOnly": "Лише календар",
     "visibility": "Видимість",
     "visibilityPublic": "Відкритий",

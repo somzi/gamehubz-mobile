@@ -1,12 +1,12 @@
 import { useChatConversation } from '../../hooks/useChatConversation';
 import { useChatScroll } from '../../hooks/useChatScroll';
 import { ChatConnectionStatus, ChatOutbox, ChatNewMessages } from '../chat/ChatFeedback';
-import { LoadFailedState } from '../ui/EmptyState';
+import { EmptyState, LoadFailedState } from '../ui/EmptyState';
 import { RefreshFailedBanner } from '../ui/RefreshFailedBanner';
 import { useQueryClient } from '@tanstack/react-query';
 import type { MatchOverviewDto } from '../../lib/homeMatches';
 import { useTranslation } from 'react-i18next';
-import React, { useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, FlatList, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS } from '../../lib/api';
@@ -30,13 +30,21 @@ interface MatchChatPanelProps {
     /** Completed matches keep the history visible but hide the composer. */
     readOnly?: boolean;
     workspace?: ChatWorkspace;
+    /** The tournament keeps a player's chat shut until their side has set availability. Only then
+     *  does the panel ask the server whether that applies to this viewer. Null = the setting is not
+     *  known yet, so the panel waits instead of showing a chat it may have to take away. */
+    requireAvailability?: boolean | null;
+    /** Takes the viewer to the availability calendar from the locked chat. */
+    onOpenAvailability?: () => void;
 }
+
+type ChatAccess = 'checking' | 'open' | 'locked' | 'failed';
 
 /**
  * Self-contained match chat: history via REST, live updates via the /hubs/chat
  * SignalR group, and a send box. Shared by match cards and match details.
  */
-export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false, workspace: suppliedWorkspace }: MatchChatPanelProps) {
+export function MatchChatPanel({ matchId, active, participantIds = [], avatarsByUserId = {}, readOnly = false, workspace: suppliedWorkspace, requireAvailability = false, onOpenAvailability }: MatchChatPanelProps) {
     const { t } = useTranslation('match');
     const { user } = useAuth();
     const { refreshCounts, scheduleMatchesRefresh } = useBadges();
@@ -49,8 +57,37 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
     const sendingRef = useRef(false);
     const [isSending, setIsSending] = useState(false);
     const normalizedParticipantIds = participantIds.filter(Boolean).map(id => id!.toLowerCase());
+
+    // Asked again every time the panel comes into view: the way out of a locked chat is the calendar
+    // on the other tab, so returning from it is exactly when the answer changes. A lock is re-checked
+    // behind a spinner rather than shown stale; an open chat stays open while it is re-checked.
+    // A failed check offers a retry, not the chat: the server would refuse every message from a
+    // locked side, and the way to the calendar would be gone.
+    const [access, setAccess] = useState<ChatAccess>(requireAvailability === false ? 'open' : 'checking');
+    const [accessAttempt, setAccessAttempt] = useState(0);
+    useEffect(() => {
+        if (requireAvailability === false) { setAccess('open'); return; }
+        if (requireAvailability === null || !active) return;
+        let cancelled = false;
+        setAccess(current => (current === 'open' ? 'open' : 'checking'));
+        (async () => {
+            try {
+                const response = await authenticatedFetch(ENDPOINTS.MATCH_CHAT_ACCESS(matchId));
+                if (!response.ok) throw new Error(`MATCH_CHAT_ACCESS failed: ${response.status}`);
+                const body = await response.json();
+                const locked = Boolean(body?.lockedUntilAvailability ?? body?.LockedUntilAvailability);
+                if (!cancelled) setAccess(locked ? 'locked' : 'open');
+            } catch (error) {
+                console.error('[MatchChatPanel] Error checking chat access:', error);
+                if (!cancelled) setAccess(current => (current === 'open' ? 'open' : 'failed'));
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [matchId, active, requireAvailability, accessAttempt]);
+
+    // A locked chat neither loads the conversation nor marks it read: the viewer has not seen it.
     const conversation = useChatConversation<MatchComment>({
-        id: matchId, kind: 'match', active, workspace,
+        id: matchId, kind: 'match', active: active && access === 'open', workspace,
         map: raw => ({
             id: raw.id ?? raw.Id, userId: raw.userId ?? raw.UserId,
             userNickname: raw.userNickname ?? raw.UserNickname ?? t('common:unknown'),
@@ -97,6 +134,44 @@ export function MatchChatPanel({ matchId, active, participantIds = [], avatarsBy
         const isToday = date.toDateString() === new Date().toDateString();
         return isToday ? time : `${date.toLocaleDateString(dateLocale())} ${time}`;
     };
+
+    if (access === 'checking') {
+        return (
+            <View className="flex-1 items-center justify-center" accessibilityRole="progressbar" accessibilityLabel={t('common:loading')}>
+                <ActivityIndicator size="small" color="#10B981" />
+            </View>
+        );
+    }
+
+    if (access === 'failed') {
+        return (
+            <View className="flex-1 justify-center px-5">
+                <LoadFailedState variant="plain" onRetry={() => setAccessAttempt(attempt => attempt + 1)} />
+            </View>
+        );
+    }
+
+    if (access === 'locked') {
+        return (
+            <View className="flex-1 justify-center px-5">
+                <EmptyState
+                    icon="calendar-outline"
+                    title={t('chatPanel.lockedTitle')}
+                    description={t('chatPanel.lockedBody')}
+                    action={onOpenAvailability ? (
+                        <Pressable
+                            onPress={onOpenAvailability}
+                            accessibilityRole="button"
+                            className="h-11 px-5 rounded-xl flex-row items-center justify-center gap-2 bg-emerald-500 active:opacity-80"
+                        >
+                            <Ionicons name="calendar" size={16} color="#fff" />
+                            <Text className="text-sm font-black text-white">{t('chatPanel.lockedAction')}</Text>
+                        </Pressable>
+                    ) : undefined}
+                />
+            </View>
+        );
+    }
 
     return (
         <View className="flex-1 px-5">

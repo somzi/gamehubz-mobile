@@ -153,6 +153,8 @@
     "summaryResultVerification": "Resultados verificados",
     "allowOutsideApp": "Combinado fora do app",
     "allowOutsideAppHint": "Os jogadores podem marcar um horário combinado em outro lugar. Desativado: só pelo calendário do app.",
+    "chatAfterAvailability": "Chat após a disponibilidade",
+    "chatAfterAvailabilityHint": "O chat da partida só abre para cada jogador depois de informar a disponibilidade no calendário, assim os horários são combinados lá primeiro.",
     "summaryCalendarOnly": "Só calendário",
     "visibility": "Visibilidade",
     "visibilityPublic": "Público",

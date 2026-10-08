@@ -153,6 +153,8 @@
     "summaryResultVerification": "Resultados verificados",
     "allowOutsideApp": "Acuerdo fuera de la app",
     "allowOutsideAppHint": "Los jugadores pueden marcar un horario acordado por otro medio. Desactivado: solo con el calendario de la app.",
+    "chatAfterAvailability": "Chat tras la disponibilidad",
+    "chatAfterAvailabilityHint": "El chat del partido se abre para cada jugador solo cuando indica su disponibilidad en el calendario, así los horarios se acuerdan allí primero.",
     "summaryCalendarOnly": "Solo calendario",
     "visibility": "Visibilidad",
     "visibilityPublic": "Público",

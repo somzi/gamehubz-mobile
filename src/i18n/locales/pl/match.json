@@ -375,7 +375,10 @@
     "admin": "Admin",
     "you": "Ty",
     "readOnly": "Mecz zakończony — czat tylko do odczytu",
-    "typeAMessage": "Napisz wiadomość..."
+    "typeAMessage": "Napisz wiadomość...",
+    "lockedTitle": "Ustaw dostępność, aby pisać na czacie",
+    "lockedBody": "W tym turnieju czat meczu otwiera się po zaznaczeniu w kalendarzu godzin, w których możesz grać. Wybierz terminy i od razu napisz do przeciwnika.",
+    "lockedAction": "Otwórz kalendarz"
   },
   "timing": {
     "overdue": "Po terminie",

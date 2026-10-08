@@ -15,7 +15,7 @@ function details(responses) {
         normalizeCondition: v => v, seriesGamesFrom: () => [], normalizeBestOf: v => v,
         setDbHomeUserId: id => { state.home = id; }, setDetailsLoaded: v => { state.loaded = v; },
     };
-    for (const name of ['AllowScheduleOutsideApp', 'SeriesFormat', 'ReportedGames', 'ProposedGames', 'AllowsTiebreak',
+    for (const name of ['AllowScheduleOutsideApp', 'RequireAvailabilityForChat', 'SeriesFormat', 'ReportedGames', 'ProposedGames', 'AllowsTiebreak',
         'CheckInEnabled', 'CheckInGraceMinutes', 'RequireResultVerification', 'HasResultVerifications', 'CheckInState',
         'DbAwayUserId', 'DbHomeUsername', 'DbAwayUsername', 'RequireResultApproval', 'ProposedHomeScore', 'ProposedAwayScore',
         'ProposedByUserId', 'HubOwnerUserId', 'ExistingEvidences', 'AdminHelpRequested', 'AdminHelpRequestedByUserId']) {

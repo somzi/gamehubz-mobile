@@ -152,6 +152,9 @@ export const ENDPOINTS = {
     // Per-thread mute: GET reads the caller's flag, PUT { muted } sets it. Muting stops push,
     // Discord DMs and the aggregate badge for that match; the thread stays in the inbox.
     MATCH_CHAT_MUTED: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/mute`,
+    // { lockedUntilAvailability } — asked only in tournaments that keep the chat shut until the
+    // player's side has offered hours in the availability calendar.
+    MATCH_CHAT_ACCESS: (matchId: string) => `${API_BASE_URL}/api/MatchChat/${matchId}/access`,
     // Per-user notification switches and muted hub/tournament ids (GET / PUT).
     NOTIFICATION_SETTINGS: `${API_BASE_URL}/api/userProfile/notification-settings`,
     NOTIFICATION_SOURCES: (kind: 'hubs' | 'tournaments', page: number, search: string) =>

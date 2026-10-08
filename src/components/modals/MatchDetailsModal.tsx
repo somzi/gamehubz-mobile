@@ -136,6 +136,9 @@ export interface MatchResultDetailDto {
     requireResultVerification?: boolean;
     /** This match already carries verification records — kept visible after the setting goes off. */
     hasResultVerifications?: boolean;
+    /** Tournament setting: a player's chat stays shut until their side has set availability. Whether
+     *  that applies to the viewer is the chat panel's question to the server. */
+    requireAvailabilityForChat?: boolean;
     /** True when this match is one game of a team tie (resolved out of the parent team-match DTO).
      *  Drives the team-aware double-walkover copy — a voided game only counts for neither team;
      *  the tie itself is voided only if NO game ends up played. */
@@ -360,6 +363,10 @@ export function MatchDetailsModal({
     const chatWorkspace = React.useMemo(() => new ChatWorkspace(), [matchId]);
     const streamDraft = React.useMemo(() => ({ current: null as StreamDraft | null }), [matchId]);
     const availabilityDraft = React.useMemo(() => ({ current: null as AvailabilityDraft | null }), [matchId]);
+    /** The locked chat's "Open calendar": the slot editor opens as soon as the picker is on screen. */
+    const [calendarRequested, setCalendarRequested] = useState(false);
+    // A request the picker never got to (closed while loading) must not pop the editor next time.
+    useEffect(() => { if (!visible) setCalendarRequested(false); }, [visible]);
 
     // Delete-result (revert) state — reopens a completed match as Scheduled.
     const [isDeletingResult, setIsDeletingResult] = useState(false);
@@ -543,6 +550,8 @@ export function MatchDetailsModal({
             // Tournament-wide, like the ready check; the nominated player of THIS game verifies it.
             requireResultVerification: data.requireResultVerification ?? data.RequireResultVerification ?? false,
             hasResultVerifications: Boolean(sub?.hasResultVerifications ?? sub?.HasResultVerifications ?? false),
+            // Tournament-wide, so it sits on the parent DTO like the ready check.
+            requireAvailabilityForChat: Boolean(data.requireAvailabilityForChat ?? data.RequireAvailabilityForChat ?? false),
             isTeamSub: true,
         };
     };
@@ -640,6 +649,7 @@ export function MatchDetailsModal({
                         allowsTieBreak: Boolean(data.allowsTieBreak ?? data.AllowsTieBreak ?? false),
                         requireResultVerification: Boolean(data.requireResultVerification ?? data.RequireResultVerification ?? false),
                         hasResultVerifications: Boolean(data.hasResultVerifications ?? data.HasResultVerifications ?? false),
+                        requireAvailabilityForChat: Boolean(data.requireAvailabilityForChat ?? data.RequireAvailabilityForChat ?? false),
                     };
                 setMatchDetails(normalizedData);
                 if (normalizedData.scheduledTime) {
@@ -2248,6 +2258,7 @@ export function MatchDetailsModal({
         setMySlots(myAvailability); setOpponentSlots(opponentAvailability);
         setConfirmedTime(scheduledTime); setConfirmedTimeIso(undefined); setLocalDeadline(deadline);
         setCurrentStatus(status); setActiveTab(defaultTab); setTabOrder(['match']);
+        setCalendarRequested(false);
     }
     const seeded = !!home?.username || !!away?.username;
     const { holding, preview } = matchPresentation({
@@ -2520,6 +2531,8 @@ export function MatchDetailsModal({
                                         initialSlots={mySlots}
                                         draftRef={availabilityDraft}
                                         active={visible}
+                                        openRequested={calendarRequested}
+                                        onOpenRequestHandled={() => setCalendarRequested(false)}
                                         onSubmit={async (slots: string[], dateTimeSlots: string[]) => {
                                             try {
                                                 setIsSubmitting(true);
@@ -2594,6 +2607,16 @@ export function MatchDetailsModal({
                             participantIds={[home?.userId, away?.userId, matchDetails?.homeUserId, matchDetails?.awayUserId]}
                             avatarsByUserId={chatAvatars}
                             readOnly={isChatReadOnly}
+                            // Details kept from an earlier opening may predate an organizer switching
+                            // the lock, so the chat waits (null) until this opening's load settles.
+                            // The server answers the rest: the viewer's side, organizers who are not
+                            // playing, and matches that already have a time.
+                            requireAvailability={isLoadingDetails
+                                ? null
+                                : !!matchDetails?.requireAvailabilityForChat && effectiveStatus !== 'completed'}
+                            // The calendar is the Match tab's own content while a time is pending;
+                            // the slot editor opens straight away.
+                            onOpenAvailability={() => { setCalendarRequested(true); setActiveTab('match'); }}
                         />
                     </View>
                 </>

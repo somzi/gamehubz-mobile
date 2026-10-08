@@ -155,6 +155,8 @@
     "summaryResultVerification": "Weryfikowane wyniki",
     "allowOutsideApp": "Uzgodnienie poza aplikacją",
     "allowOutsideAppHint": "Gracze mogą oznaczyć termin uzgodniony gdzie indziej. Wyłączone: tylko kalendarz w aplikacji.",
+    "chatAfterAvailability": "Czat po podaniu dostępności",
+    "chatAfterAvailabilityHint": "Czat meczu otwiera się dla gracza dopiero po zaznaczeniu wolnych godzin w kalendarzu, więc terminy ustala się najpierw tam.",
     "summaryCalendarOnly": "Tylko kalendarz",
     "visibility": "Widoczność",
     "visibilityPublic": "Publiczny",

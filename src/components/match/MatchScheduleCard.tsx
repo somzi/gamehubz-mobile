@@ -193,6 +193,13 @@ function MatchScheduleCardBase({
     /** Null means the tournament setting is unknown. Scheduling choices appear together after
      *  details and availability load, so adding this shortcut never moves the calendar card. */
     const [allowScheduleOutsideApp, setAllowScheduleOutsideApp] = useState<boolean | null>(null);
+    /** Chat shut until this side has set availability. Null until the details say — the chat panel
+     *  waits rather than showing a conversation it may have to take away. */
+    const [requireAvailabilityForChat, setRequireAvailabilityForChat] = useState<boolean | null>(null);
+    /** The locked chat's "Open calendar": the slot editor opens as soon as the picker is on screen. */
+    const [calendarRequested, setCalendarRequested] = useState(false);
+    // A request the picker never got to (closed while loading) must not pop the editor next time.
+    useEffect(() => { if (!modalVisible) setCalendarRequested(false); }, [modalVisible]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Slots state
@@ -592,6 +599,8 @@ function MatchScheduleCardBase({
                 // Tournament-wide as well — the parent DTO on a team tie carries it. Only an explicit
                 // false turns it off, so a server that predates the setting keeps the shortcut.
                 setAllowScheduleOutsideApp((data.allowScheduleOutsideApp ?? data.AllowScheduleOutsideApp) !== false);
+                // Tournament-wide too. Whether it applies to this player is the chat panel's question.
+                setRequireAvailabilityForChat(Boolean(data.requireAvailabilityForChat ?? data.RequireAvailabilityForChat ?? false));
                 setHasResultVerifications(hasVerifications);
                 setCheckInState({
                     homeCheckedInOn: checkInSource.homeCheckedInOn ?? checkInSource.HomeCheckedInOn ?? null,
@@ -615,10 +624,14 @@ function MatchScheduleCardBase({
                 return homeUserId;
             }
             setAllowScheduleOutsideApp(null);
+            // Still unknown after a failed load: let the chat ask the server, which knows the setting
+            // too and answers "open" for a tournament without it.
+            setRequireAvailabilityForChat(current => current ?? true);
         } catch (error) {
             if (!isCurrent()) return null;
             // A failed refresh must not reuse an earlier permission to skip the calendar.
             setAllowScheduleOutsideApp(null);
+            setRequireAvailabilityForChat(current => current ?? true);
             console.error('[MatchScheduleCard] Error fetching match details for home/away mapping:', error);
         } finally {
             if (!isCurrent()) return null;
@@ -684,7 +697,12 @@ function MatchScheduleCardBase({
         if (!modalVisible) {
             // A trip to a player's profile is not a real close: the sheet comes straight back on
             // this match, so it keeps showing what it had while the fetches below refresh it.
-            if (!reopenOnFocusRef.current) setDetailsLoaded(false);
+            if (!reopenOnFocusRef.current) {
+                setDetailsLoaded(false);
+                // The organizer may switch the chat lock between two openings; the chat waits for
+                // this opening's details instead of trusting the last ones.
+                setRequireAvailabilityForChat(null);
+            }
             // A verification is always started fresh; it never survives the sheet it was opened from.
             setShowVerifySheet(false);
             // The preview lives inside the sheet now: left set, it would be back up on the next opening.
@@ -1488,6 +1506,8 @@ function MatchScheduleCardBase({
                                                         onSubmit={handleAvailabilitySubmit}
                                                         onMarkScheduled={allowScheduleOutsideApp === true ? () => setConfirmMarkScheduled(true) : undefined}
                                                         onOpponentPress={opponentUserId ? () => openPlayerProfile(opponentUserId) : undefined}
+                                                        openRequested={calendarRequested}
+                                                        onOpenRequestHandled={() => setCalendarRequested(false)}
                                                     />
                                                 )}
                                             </View>
@@ -2125,6 +2145,12 @@ function MatchScheduleCardBase({
                                         participantIds={[dbHomeUserId, dbAwayUserId]}
                                         avatarsByUserId={{ [opponentUserId?.toLowerCase() ?? '']: opponentAvatarUrl ?? undefined }}
                                         readOnly={currentStatus === 'completed'}
+                                        // Only a match still waiting for a time can be locked; the
+                                        // server answers whether this player's side has set hours.
+                                        requireAvailability={currentStatus === 'pending_availability' ? requireAvailabilityForChat : false}
+                                        // The calendar is the Match tab's own content while a time is
+                                        // pending; the slot editor opens straight away.
+                                        onOpenAvailability={() => { setCalendarRequested(true); setActiveModalTab('match'); }}
                                     />
                                 </View>
                             </View>

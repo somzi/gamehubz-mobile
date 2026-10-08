@@ -24,6 +24,11 @@ interface HourlyAvailabilityPickerProps {
     /** Opens the opponent's profile from the header row. Only that row: the banner inside the
      *  slot editor stays inert, since leaving from there would drop the unsaved selection. */
     onOpponentPress?: () => void;
+    /** The host asked for the slot editor itself (the locked chat's "Open calendar"), not just this
+     *  card. Opened once, then handed back through onOpenRequestHandled so a later visit to the tab
+     *  does not open it again. */
+    openRequested?: boolean;
+    onOpenRequestHandled?: () => void;
 }
 
 // Generate hours from 00:00 to 23:00
@@ -88,6 +93,8 @@ export function HourlyAvailabilityPicker({
     onSubmit,
     onMarkScheduled,
     onOpponentPress,
+    openRequested = false,
+    onOpenRequestHandled,
 }: HourlyAvailabilityPickerProps) {
     const { t, i18n } = useTranslation('match');
     const insets = useSafeAreaInsets();
@@ -202,6 +209,12 @@ export function HourlyAvailabilityPicker({
     };
 
     const closePicker = () => setPickerVisible(false);
+
+    useEffect(() => {
+        if (!openRequested || !active) return;
+        onOpenRequestHandled?.();
+        openPicker();
+    }, [openRequested, active]);
 
     const toggleDraftSlot = (dayKey: string, hour: number) => {
         // Same predicate the cell is rendered with — a cell that looks tappable always is.
