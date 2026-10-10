@@ -1,0 +1,27 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'dev.codesphere.gamehubz'
+version = '1.0.0'
+
+android {
+  namespace "dev.codesphere.gamehubz.broadcast"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+repositories {
+  // RootEncoder is published on JitPack only.
+  maven { url 'https://www.jitpack.io' }
+}
+
+dependencies {
+  implementation "androidx.core:core-ktx:1.13.1"
+  // Screen + internal-audio capture and the RTMP(S) client. 2.7.0 is the last release built with a
+  // Kotlin (2.2) the Expo SDK 54 compiler (2.1) can still read; 2.7.2+ ship Kotlin 2.3 metadata.
+  implementation "com.github.pedroSG94.RootEncoder:library:2.7.0"
+}

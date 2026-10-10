@@ -6,8 +6,13 @@
 node_modules/
 **/node_modules/
 .expo/
-android/
-ios/
+# Samo generisani native folderi u korenu -- bez kose crte na pocetku pravilo bi
+# iskljucilo i native kod lokalnih modula (modules/*/android, modules/*/ios).
+/android/
+/ios/
+/modules/*/android/build/
+/modules/*/android/.gradle/
+/modules/*/android/.cxx/
 bin/
 obj/
 

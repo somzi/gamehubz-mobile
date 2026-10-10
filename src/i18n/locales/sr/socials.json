@@ -36,5 +36,17 @@
   "startFailed": "Nije uspelo pokretanje povezivanja sa Discordom. Pokušaj ponovo kasnije.",
   "dmUpdateFailed": "Nije uspelo ažuriranje DM obaveštenja. Pokušaj ponovo kasnije.",
   "visibilityUpdateFailed": "Nije uspelo ažuriranje vidljivosti profila. Pokušaj ponovo kasnije.",
-  "unlinkFailed": "Nije uspelo prekidanje veze sa Discordom. Pokušaj ponovo kasnije."
+  "unlinkFailed": "Nije uspelo prekidanje veze sa Discordom. Pokušaj ponovo kasnije.",
+  "streamChannels": {
+    "title": "Kanali za stream",
+    "hint": "Jednom poveži kanal i strimuj bilo koji meč direktno iz GameHubz-a.",
+    "connect": "Poveži",
+    "connected": "Povezano",
+    "needsRelink": "Veza je istekla — poveži ponovo",
+    "unavailable": "Još nije dostupno",
+    "disconnectTitle": "Odveži {{platform}}",
+    "disconnectMessage": "Odvezati @{{name}} od GameHubz-a? Možeš ponovo da ga povežeš kad god hoćeš.",
+    "startFailed": "Povezivanje nije moglo da počne. Pokušaj kasnije.",
+    "unlinkFailed": "Odvezivanje nije uspelo. Pokušaj kasnije."
+  }
 }

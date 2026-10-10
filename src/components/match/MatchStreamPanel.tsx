@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { authenticatedFetch, ENDPOINTS, getErrorMessage } from '../../lib/api';
@@ -14,6 +14,8 @@ import { EmptyState as EmptyStateBase } from '../ui/EmptyState';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { SelectInput } from '../ui/SelectInput';
+import { BroadcastControls } from './BroadcastControls';
+import { endLive, isBroadcastAvailable, useBroadcastStatus } from '../../lib/broadcast';
 
 export type StreamDraft = { startOpen: boolean; platform?: SocialType; handle: string; vodInput: string };
 
@@ -68,16 +70,25 @@ export function MatchStreamPanel({
         setPlayingId(prev => (prev && list.some(s => s.id === prev) ? prev : null));
     };
 
-    const fetchStreams = async () => {
+    // Resolves with the fresh list so the in-app broadcast can keep looking until the backend reflects a
+    // start or a stop. Only the latest request is applied: a slower, older answer (a start's "Live"
+    // landing after a stop's "Ended") is dropped and resolves null, as does a failed load.
+    const fetchSeq = useRef(0);
+    const fetchStreams = async (): Promise<MatchStream[] | null> => {
+        const seq = ++fetchSeq.current;
         try {
             const res = await authenticatedFetch(ENDPOINTS.GET_MATCH_STREAMS(matchId));
             if (res.ok) {
                 const data = await res.json();
-                applyStreams(Array.isArray(data) ? data : []);
+                if (seq !== fetchSeq.current) return null;
+                const list: MatchStream[] = Array.isArray(data) ? data : [];
+                applyStreams(list);
+                return list;
             }
         } catch {
             /* keep whatever we have */
         }
+        return null;
     };
 
     useEffect(() => {
@@ -100,6 +111,14 @@ export function MatchStreamPanel({
         s => s.streamerUserId?.toLowerCase() === currentUserId?.toLowerCase() && s.status === MatchStreamStatus.Live
     );
     const canStartMine = isParticipant && !isCompleted && !myLiveStream;
+
+    // Streaming the phone's own screen from GameHubz (builds that carry the native broadcaster).
+    // The hand-attached flow below stays as the fallback for streams run from another app.
+    const broadcastStatus = useBroadcastStatus();
+    const broadcastHere = broadcastStatus.matchId === matchId
+        && (broadcastStatus.state === 'starting' || broadcastStatus.state === 'live');
+    const showBroadcast = isBroadcastAvailable() && (isParticipant || broadcastHere);
+    const [manualOpen, setManualOpen] = useState(false);
 
     const startStream = async (chosenPlatform: SocialType, chosenHandle?: string) => {
         // Guard: a temporarily disabled platform (e.g. Twitch pending 2FA) can't be streamed yet.
@@ -216,21 +235,35 @@ export function MatchStreamPanel({
                 </View>
             )}
 
+            {showBroadcast && (
+                <BroadcastControls
+                    matchId={matchId}
+                    status={broadcastStatus}
+                    canStart={canStartMine}
+                    onStreamsChanged={fetchStreams}
+                />
+            )}
+
             {streams.length === 0 ? (
                 canStartMine ? (
-                    <StartArea
-                        savedChannels={savedChannels}
-                        platform={platform}
-                        setPlatform={setPlatform}
-                        handle={handle}
-                        setHandle={setHandle}
-                        submitting={submitting}
-                        forceForm={startOpen}
-                        onForceForm={() => setStartOpen(true)}
-                        onStart={startStream}
-                    />
+                    showBroadcast && !manualOpen ? (
+                        <ManualAttachLink onPress={() => setManualOpen(true)} />
+                    ) : (
+                        <StartArea
+                            savedChannels={savedChannels}
+                            platform={platform}
+                            setPlatform={setPlatform}
+                            handle={handle}
+                            setHandle={setHandle}
+                            submitting={submitting}
+                            forceForm={startOpen}
+                            onForceForm={() => setStartOpen(true)}
+                            onStart={startStream}
+                            onCancel={showBroadcast ? () => setManualOpen(false) : undefined}
+                        />
+                    )
                 ) : (
-                    <EmptyState />
+                    !broadcastHere && <EmptyState />
                 )
             ) : (
                 <View className="gap-5">
@@ -248,7 +281,11 @@ export function MatchStreamPanel({
                                 submitting={submitting}
                                 vodInput={vodInput}
                                 setVodInput={setVodInput}
-                                onEnd={() => endStream(s.streamerUserId)}
+                                // The phone's own broadcast is stopped at the source; the backend
+                                // closes the card as part of that.
+                                onEnd={() => (isMine && broadcastHere
+                                    ? endLive(matchId).finally(fetchStreams)
+                                    : endStream(s.streamerUserId))}
                                 onSubmitVod={() => submitVod(s.streamerUserId)}
                                 onDelete={() => deleteStream(s.streamerUserId)}
                             />
@@ -270,6 +307,8 @@ export function MatchStreamPanel({
                                 onStart={startStream}
                                 onCancel={() => setStartOpen(false)}
                             />
+                        ) : showBroadcast ? (
+                            <ManualAttachLink onPress={() => setStartOpen(true)} />
                         ) : (
                             <Pressable
                                 onPress={() => setStartOpen(true)}
@@ -659,6 +698,20 @@ function StartArea({
                 {t('stream.channelSavedHint')}
             </Text>
         </View>
+    );
+}
+
+// With the in-app broadcast on offer, the hand-attached flow (streaming from the Twitch / Kick /
+// YouTube app) folds behind this link.
+function ManualAttachLink({ onPress }: { onPress: () => void }) {
+    const { t } = useTranslation('match');
+    return (
+        <Pressable onPress={onPress} className="flex-row items-center justify-center gap-2 py-3 active:opacity-60">
+            <Ionicons name="link-outline" size={14} color="#64748B" />
+            <Text className="text-xs font-bold text-slate-500 text-center" numberOfLines={2}>
+                {t('broadcast.manualAttach')}
+            </Text>
+        </Pressable>
     );
 }
 

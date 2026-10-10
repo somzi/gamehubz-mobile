@@ -14,7 +14,23 @@ const IS_DEV = process.env.APP_VARIANT === 'development';
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 
-module.exports = ({ config }) => {
+// App Group deljen sa Broadcast Upload ekstenzijom (targets/broadcast): kroz njega aplikacija
+// predaje sesiju streama, a ekstenzija vraca status. Vezan je za bundle ID, pa ga racunamo tek
+// kad je varijanta (prod / .dev) poznata.
+const withBroadcastAppGroup = (config) => ({
+  ...config,
+  ios: {
+    ...config.ios,
+    entitlements: {
+      ...(config.ios?.entitlements ?? {}),
+      'com.apple.security.application-groups': [`group.${config.ios.bundleIdentifier}`],
+    },
+  },
+});
+
+module.exports = ({ config }) => withBroadcastAppGroup(buildConfig(config));
+
+function buildConfig(config) {
   const revisions = JSON.parse(readFileSync(path.join(__dirname, 'ota-revisions.json'), 'utf8'));
   const revision = revisions[config.version] ?? 0;
   if (!Number.isSafeInteger(revision) || revision < 0) {
@@ -62,4 +78,4 @@ module.exports = ({ config }) => {
       },
     },
   };
-};
+}

@@ -19,6 +19,7 @@ import { ConfirmationModal } from '../components/modals/ConfirmationModal';
 import { useAuth } from '../context/AuthContext';
 import { authenticatedFetch, ENDPOINTS } from '../lib/api';
 import { SectionLabel } from '../components/ui/SectionLabel';
+import { StreamChannelsCard } from '../components/profile/StreamChannelsCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { COLORS } from '../lib/theme';
 
@@ -339,6 +340,14 @@ export default function ManageUserSocialsScreen() {
                             )}
                         </View>
                     </View>
+
+                    {/* Twitch / Kick channels for streaming straight from the app */}
+                    <StreamChannelsCard
+                        onError={(message) => {
+                            setStatusModalConfig({ type: 'error', title: t('failed'), message });
+                            setShowStatusModal(true);
+                        }}
+                    />
 
                     {/* Connected Accounts */}
                     <View className="mb-6">

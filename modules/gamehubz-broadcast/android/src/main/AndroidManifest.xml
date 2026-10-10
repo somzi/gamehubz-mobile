@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 14+: a foreground service that holds a screen-capture token must declare this type. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <!-- The microphone keeps recording in the background only from a service of the microphone type. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- Game sound (AudioPlaybackCapture) and the microphone both need it. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <!-- Started as mediaProjection, plus microphone when the player turns the mic on. -->
+        <service
+            android:name="dev.codesphere.gamehubz.broadcast.BroadcastService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection|microphone" />
+    </application>
+</manifest>

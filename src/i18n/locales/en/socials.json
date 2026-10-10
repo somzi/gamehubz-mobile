@@ -36,5 +36,17 @@
   "startFailed": "Could not start the Discord connection. Try again later.",
   "dmUpdateFailed": "Could not update DM notifications. Try again later.",
   "visibilityUpdateFailed": "Could not update profile visibility. Try again later.",
-  "unlinkFailed": "Could not disconnect Discord. Try again later."
+  "unlinkFailed": "Could not disconnect Discord. Try again later.",
+  "streamChannels": {
+    "title": "Streaming channels",
+    "hint": "Link your channel once, then stream any match straight from GameHubz.",
+    "connect": "Connect",
+    "connected": "Connected",
+    "needsRelink": "Connection expired — connect again",
+    "unavailable": "Not available yet",
+    "disconnectTitle": "Disconnect {{platform}}",
+    "disconnectMessage": "Disconnect @{{name}} from GameHubz? You can link it again anytime.",
+    "startFailed": "Could not start the connection. Try again later.",
+    "unlinkFailed": "Could not disconnect. Try again later."
+  }
 }

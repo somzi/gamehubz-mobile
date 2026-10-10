@@ -213,6 +213,16 @@ export const ENDPOINTS = {
     DELETE_MATCH_STREAM: (matchId: string, streamerUserId?: string) =>
         `${API_BASE_URL}/api/match/${matchId}/stream${streamerUserId ? `?streamerUserId=${encodeURIComponent(streamerUserId)}` : ''}`,
 
+    // ─── In-app broadcast to a linked Twitch / Kick channel ─────────────
+    // Linking runs fully on the backend (like Discord); the app just opens authorizeUrl.
+    STREAM_ACCOUNTS: `${API_BASE_URL}/api/StreamAccount`,
+    STREAM_ACCOUNT_LINK_START: (platform: 'twitch' | 'kick') => `${API_BASE_URL}/api/StreamAccount/${platform}/link/start`,
+    STREAM_ACCOUNT_UNLINK: (platform: 'twitch' | 'kick') => `${API_BASE_URL}/api/StreamAccount/${platform}`,
+    BROADCAST_PREPARE: (matchId: string) => `${API_BASE_URL}/api/Broadcast/match/${matchId}/prepare`,
+    BROADCAST_STOP: (matchId: string) => `${API_BASE_URL}/api/Broadcast/match/${matchId}/stop`,
+    // Called by the native broadcaster (no JWT; X-Broadcast-Token header). It appends started/heartbeat/stopped.
+    BROADCAST_SESSION_BASE: `${API_BASE_URL}/api/Broadcast`,
+
     // ─── Match admin help ───────────────────────────────────────────────
     REQUEST_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp`,
     RESOLVE_MATCH_ADMIN_HELP: (matchId: string) => `${API_BASE_URL}/api/match/${matchId}/adminHelp/resolve`,

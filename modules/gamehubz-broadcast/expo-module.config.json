@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["GameHubzBroadcastModule"]
+  },
+  "android": {
+    "modules": ["dev.codesphere.gamehubz.broadcast.GameHubzBroadcastModule"]
+  }
+}

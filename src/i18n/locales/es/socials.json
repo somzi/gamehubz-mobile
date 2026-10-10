@@ -36,5 +36,17 @@
   "startFailed": "No se pudo iniciar la conexión con Discord. Inténtalo más tarde.",
   "dmUpdateFailed": "No se pudieron actualizar las notificaciones por DM. Inténtalo más tarde.",
   "visibilityUpdateFailed": "No se pudo actualizar la visibilidad del perfil. Inténtalo más tarde.",
-  "unlinkFailed": "No se pudo desconectar Discord. Inténtalo más tarde."
+  "unlinkFailed": "No se pudo desconectar Discord. Inténtalo más tarde.",
+  "streamChannels": {
+    "title": "Canales de transmisión",
+    "hint": "Vincula tu canal una vez y transmite cualquier partido directamente desde GameHubz.",
+    "connect": "Conectar",
+    "connected": "Conectado",
+    "needsRelink": "La conexión caducó: vuelve a conectar",
+    "unavailable": "Aún no disponible",
+    "disconnectTitle": "Desconectar {{platform}}",
+    "disconnectMessage": "¿Desconectar @{{name}} de GameHubz? Puedes volver a vincularlo cuando quieras.",
+    "startFailed": "No se pudo iniciar la conexión. Inténtalo más tarde.",
+    "unlinkFailed": "No se pudo desconectar. Inténtalo más tarde."
+  }
 }

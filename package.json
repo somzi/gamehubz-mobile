@@ -17,6 +17,7 @@
     "test:ota": "node --test scripts/ota.test.cjs"
   },
   "dependencies": {
+    "@bacons/apple-targets": "^4.0.6",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",
     "@microsoft/signalr": "^10.0.0",

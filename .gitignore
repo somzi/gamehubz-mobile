@@ -43,6 +43,11 @@ yarn-error.*
 /ios
 /android
 
+# local native modules: Gradle build output
+/modules/*/android/build
+/modules/*/android/.gradle
+/modules/*/android/.cxx
+
 # Firebase / Expo Push
 google-services.json
 GoogleService-Info.plist

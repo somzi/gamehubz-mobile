@@ -180,6 +180,9 @@ export async function routeFromNotification(
         // result is reported. The availability-matched push carries no tournamentId and still falls
         // through to My Matches.
         case 'matchscheduled':
+        // The match is over while the player's in-app stream is still running — back to the match,
+        // where the Stop button is.
+        case 'broadcastmatchended':
             if (tournamentId && matchId) {
                 return go('TournamentDetails', {
                     id: tournamentId,
@@ -250,6 +253,7 @@ type MetaEntry = Pick<NotificationMeta, 'icon' | 'accent'>;
 const META_BY_TYPE: Record<string, MetaEntry> = {
     // Asks the user to do something
     checkin: { icon: 'flash', accent: COLORS.primary },
+    broadcastmatchended: { icon: 'radio', accent: COLORS.live },
     rounddeadline: { icon: 'hourglass', accent: COLORS.warning },
     opponentready: { icon: 'game-controller', accent: COLORS.primary },
     resultproposed: { icon: 'checkmark-circle', accent: COLORS.warning },

@@ -36,5 +36,17 @@
   "startFailed": "Nie udało się rozpocząć łączenia z Discordem. Spróbuj ponownie później.",
   "dmUpdateFailed": "Nie udało się zaktualizować powiadomień DM. Spróbuj ponownie później.",
   "visibilityUpdateFailed": "Nie udało się zaktualizować widoczności profilu. Spróbuj ponownie później.",
-  "unlinkFailed": "Nie udało się odłączyć Discorda. Spróbuj ponownie później."
+  "unlinkFailed": "Nie udało się odłączyć Discorda. Spróbuj ponownie później.",
+  "streamChannels": {
+    "title": "Kanały do transmisji",
+    "hint": "Połącz kanał raz i transmituj każdy mecz prosto z GameHubz.",
+    "connect": "Połącz",
+    "connected": "Połączono",
+    "needsRelink": "Połączenie wygasło — połącz ponownie",
+    "unavailable": "Jeszcze niedostępne",
+    "disconnectTitle": "Odłącz {{platform}}",
+    "disconnectMessage": "Odłączyć @{{name}} od GameHubz? Możesz połączyć go ponownie w każdej chwili.",
+    "startFailed": "Nie udało się rozpocząć łączenia. Spróbuj później.",
+    "unlinkFailed": "Nie udało się odłączyć. Spróbuj później."
+  }
 }
