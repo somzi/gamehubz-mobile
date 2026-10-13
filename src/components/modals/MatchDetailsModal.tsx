@@ -1439,14 +1439,16 @@ export function MatchDetailsModal({
     // Streaming is relevant once a match is scheduled (live POVs) or done (replay). Visible to
     // everyone viewing the match — spectators can watch; the panel gates the streamer-only controls.
     const showStreamTab = effectiveStatus !== 'pending_availability';
-    // Organizer-only tab: who answered the scheduler. Nothing to referee once the match is
-    // played, and the payload itself only reaches a caller who can manage the tournament.
-    const showScheduleTab = isPrivileged && !!adminAvailability && effectiveStatus !== 'completed';
+    // Organizer-only tab: who answered the scheduler and when the pair agreed to play. Stays after
+    // the match is played (read-only then), so an organizer can still answer "when did you agree?".
+    // The payload itself only reaches a caller who can manage the tournament.
+    const showScheduleTab = isPrivileged && !!adminAvailability;
     // Dot on the tab for the one case an organizer has to act on — one side answered and the
     // other never did. "Both answered, no shared hour" is not an alert: nobody is at fault, and
     // flagging it would train organizers to punish it. Slots are what say a side answered; the
     // timestamp is absent on matches older than the column.
     const scheduleNeedsAttention = !!adminAvailability
+        && effectiveStatus !== 'completed'
         && !adminAvailability.confirmedTime
         && sideAnswered(adminAvailability.home) !== sideAnswered(adminAvailability.away);
 
@@ -2489,7 +2491,8 @@ export function MatchDetailsModal({
                         )}
                         <AdminAvailabilityPanel
                             availability={adminAvailability}
-                            onClearSchedule={handleClearSchedule}
+                            // A played match has nothing left to reschedule — read-only.
+                            onClearSchedule={effectiveStatus === 'completed' ? undefined : handleClearSchedule}
                             isClearingSchedule={isClearingSchedule}
                         />
                     </ScrollView>

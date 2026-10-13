@@ -81,9 +81,13 @@ export const ParticipantRow = React.memo(function ParticipantRow({
                 accessibilityRole="button"
                 className="flex-1 flex-row items-center active:opacity-70"
             >
+                {/* Wide enough for three digits, and never wraps: a 4-digit seed shrinks instead. */}
                 <Text
-                    style={[TABULAR, { width: 26, color: isCurrentUser ? COLORS.primaryBright : COLORS.slate500 }]}
-                    className="text-[13px] font-black text-center mr-2"
+                    style={[TABULAR, { width: 32, color: isCurrentUser ? COLORS.primaryBright : COLORS.slate500 }]}
+                    className="text-[13px] font-black text-center mr-1.5"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
                 >
                     {seed}
                 </Text>
@@ -99,7 +103,15 @@ export const ParticipantRow = React.memo(function ParticipantRow({
                     </View>
                 </View>
                 <View className="flex-1 flex-row items-center ml-3" style={{ gap: 6 }}>
-                    <Text className="shrink text-[15px] font-black text-white" numberOfLines={1}>{username}</Text>
+                    {/* Long or decorated names shrink to fit; ordinary ones keep the full size. */}
+                    <Text
+                        className="shrink text-[15px] font-black text-white"
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                    >
+                        {username}
+                    </Text>
                     {isCurrentUser && (
                         <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16,185,129,0.15)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.3)' }}>
                             <Text className="text-[9px] font-black uppercase tracking-wider text-emerald-300">{t('details.youBadge')}</Text>
