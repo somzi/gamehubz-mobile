@@ -96,7 +96,9 @@ export const TournamentCard = React.memo(function TournamentCard({
     const shownDate = readableDate(dateIso, scheduled) ?? date;
     const dateText = scheduled ? t('app.opensOn', { date: shownDate }) : shownDate;
     const statusLabel = t(`status.${status}`);
-    const hubLabel = hubName || t('app.officialHub');
+    // No hub name = the hub was deleted (every tournament is created inside one). The player still
+    // sees the tournament they played — just without a host line, never a made-up one.
+    const hubLabel = hubName || null;
 
     return (
         <PressableScale
@@ -104,7 +106,7 @@ export const TournamentCard = React.memo(function TournamentCard({
             className={className}
             pressedScale={0.98}
             accessibilityRole="button"
-            accessibilityLabel={[name, statusLabel, hubLabel, dateText, region, prizePool].join('. ')}
+            accessibilityLabel={[name, statusLabel, hubLabel, dateText, region, prizePool].filter(Boolean).join('. ')}
         >
             {/* A live tournament's edge takes the live red; every other state stays neutral. */}
             <RaisedCard style={live ? styles.liveEdge : undefined}>
@@ -114,7 +116,7 @@ export const TournamentCard = React.memo(function TournamentCard({
                         <View>
                             <HeroEmblem ringColors={TOURNAMENT_RING} glowColor="transparent" size={EMBLEM}>
                                 {hubAvatarUrl ? (
-                                    <EmblemImage src={hubAvatarUrl} name={hubLabel} size={EMBLEM_IMAGE} radius={EMBLEM_IMAGE_RADIUS} />
+                                    <EmblemImage src={hubAvatarUrl} name={hubLabel || name} size={EMBLEM_IMAGE} radius={EMBLEM_IMAGE_RADIUS} />
                                 ) : (
                                     <LinearGradient
                                         colors={['#1E1B4B', '#0B111D']}
@@ -157,20 +159,22 @@ export const TournamentCard = React.memo(function TournamentCard({
                                 {isPrivate && <PrivateBadge size="sm" />}
                             </View>
                             {/* The host, marked with the hub's planet like on the tournament cover */}
-                            <View className="flex-row items-center" style={{ gap: 4, marginTop: 6 }}>
-                                <Ionicons name="planet" size={12} color={COLORS.primaryBright} />
-                                <Text
-                                    className="shrink text-[10.5px] font-black uppercase tracking-[1.2px]"
-                                    style={{ color: COLORS.primaryBright }}
-                                    numberOfLines={1}
-                                    adjustsFontSizeToFit
-                                    minimumFontScale={0.8}
-                                >
-                                    {hubLabel}
-                                </Text>
-                            </View>
+                            {hubLabel ? (
+                                <View className="flex-row items-center" style={{ gap: 4, marginTop: 6 }}>
+                                    <Ionicons name="planet" size={12} color={COLORS.primaryBright} />
+                                    <Text
+                                        className="shrink text-[10.5px] font-black uppercase tracking-[1.2px]"
+                                        style={{ color: COLORS.primaryBright }}
+                                        numberOfLines={1}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.8}
+                                    >
+                                        {hubLabel}
+                                    </Text>
+                                </View>
+                            ) : null}
                             <Text
-                                className="text-[15.5px] leading-[20px] font-black text-white tracking-tight mt-0.5"
+                                className={`text-[15.5px] leading-[20px] font-black text-white tracking-tight ${hubLabel ? 'mt-0.5' : 'mt-1.5'}`}
                                 numberOfLines={2}
                                 adjustsFontSizeToFit
                                 minimumFontScale={0.8}

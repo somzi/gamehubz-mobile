@@ -92,7 +92,7 @@ import { LoadFailedState } from '../components/ui/EmptyState';
 import { afterScreenTransition, useModalHandoff } from '../lib/modalHandoff';
 import { createModalReturn, getRouteOpenVersion } from '../lib/modalReturn';
 import { useQueryClient } from '@tanstack/react-query';
-import { fetchTournamentResource, tournamentResourceKey, invalidateTournamentLists } from '../lib/queryPolicy';
+import { fetchTournamentResource, tournamentResourceKey, invalidateTournamentLists, invalidateHubAfterTournamentEntry } from '../lib/queryPolicy';
 
 type TournamentDetailsRouteProp = RouteProp<RootStackParamList, 'TournamentDetails'>;
 
@@ -599,6 +599,7 @@ export default function TournamentDetailsScreen() {
 
             const phoneStatus = await enrollPhoneAfterJoin();
             await invalidateTournamentLists(queryClient);
+            await invalidateHubAfterTournamentEntry(queryClient, tournament?.hubId);
             setStatusModalConfig({
                 type: 'success',
                 title: t('details.congratulations'),
@@ -661,6 +662,7 @@ export default function TournamentDetailsScreen() {
             }
             setShowStatusModal(true);
             await invalidateTournamentLists(queryClient);
+            await invalidateHubAfterTournamentEntry(queryClient, tournament?.hubId);
             fetchTournamentDetails(true); // silent refresh
             if (activeTab === 'teams' && teamsTab === 'open') {
                 fetchOpenTeams();
@@ -2001,6 +2003,7 @@ export default function TournamentDetailsScreen() {
 
     const handleTeamJoined = (team: TeamDto) => {
         void invalidateTournamentLists(queryClient);
+        void invalidateHubAfterTournamentEntry(queryClient, tournament?.hubId);
         setUserTeam(team);
         setShowTeamRegistration(false);
         if (tournament?.isTeamTournament) {

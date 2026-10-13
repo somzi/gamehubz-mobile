@@ -36,7 +36,7 @@ import { ENDPOINTS, authenticatedFetch, getErrorMessage, API_BASE_URL } from '..
 import { shareTeam } from '../lib/share';
 import type { TeamDto, TeamJoinRequestDto } from '../types/team';
 import { useQueryClient } from '@tanstack/react-query';
-import { invalidateTournamentData } from '../lib/queryPolicy';
+import { invalidateTournamentData, invalidateHubAfterTournamentEntry } from '../lib/queryPolicy';
 
 type TeamDashboardRouteProp = RouteProp<RootStackParamList, 'TeamDashboard'>;
 
@@ -307,12 +307,16 @@ export default function TeamDashboardScreen() {
             });
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.message || t('errors.registerTeam'));
+                // The server's error body is PascalCase ("Message") — reading only `message` replaced
+                // every reason (a banned member, full, closed…) with the generic text.
+                throw new Error(errData.message || errData.Message || t('errors.registerTeam'));
             }
             // Refresh so isAlreadyRegistered flips to true and the "Registered – Pending"
             // banner replaces the Register button immediately (in case the user stays on /
             // returns to this screen instead of navigating away via the modal).
             await invalidateTournamentData(queryClient, tournamentId);
+            // The hub id isn't loaded on this screen, so every cached hub is marked stale.
+            await invalidateHubAfterTournamentEntry(queryClient);
             await fetchTeam();
             setStatusModalConfig({
                 type: 'success',

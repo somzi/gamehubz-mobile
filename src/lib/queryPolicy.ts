@@ -33,6 +33,22 @@ export async function invalidateHubData(client: QueryClient, hubId: string) {
     ]);
 }
 
+/**
+ * Entering a tournament (sign-up, team create/join/request) also follows its hub on the server —
+ * a join request when the hub is private — so the hub's Follow button, member count and the
+ * joined-hubs list are stale. Without the hub id every cached hub is marked stale instead.
+ */
+export async function invalidateHubAfterTournamentEntry(client: QueryClient, hubId?: string | null) {
+    if (hubId) return invalidateHubData(client, hubId);
+    // As in invalidateHubData: a hub read started before the entry must not land afterwards and
+    // be stored as fresh "not following".
+    await client.cancelQueries({ queryKey: ['hub'] });
+    await Promise.all([
+        client.invalidateQueries({ queryKey: ['hub'], refetchType: 'none' }),
+        client.invalidateQueries({ queryKey: ['hubs'] }),
+    ]);
+}
+
 export const tournamentResourceKey = (id: string, userId?: string, resource?: string): QueryKey =>
     resource ? ['tournament-resource', id, userId, resource] : ['tournament-resource', id];
 
