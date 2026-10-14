@@ -31,6 +31,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.codespheresolutions.gamehubzmobile",
+      "appleTeamId": "3V52TFJAY5",
       "associatedDomains": [
         "applinks:share.codespheresolutions.dev"
       ],
