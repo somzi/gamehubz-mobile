@@ -73,7 +73,9 @@ const ROLE_ACCENTS: Record<number, string> = {
 };
 
 /**
- * Manager-only "hand this spot to someone else" sheet.
+ * Manager-only "hand this spot to someone else" sheet. Sends a swap invite: the chosen member has
+ * to accept before the spot changes hands, and the matches the spot already played stay on the
+ * outgoing player's profile.
  *
  * Two screens in one sheet: pick a replacement from the hub's members, then confirm what carries
  * over. The eligibility verdict is never computed here — the rule depends on the format and on a
@@ -246,7 +248,8 @@ export function SwapParticipantModal({
         setSubmitting(true);
         setSubmitError(null);
         try {
-            const response = await authenticatedFetch(ENDPOINTS.SWAP_PARTICIPANT(tournamentId), {
+            // An invite, not the swap itself: the spot changes hands only when the player accepts.
+            const response = await authenticatedFetch(ENDPOINTS.SEND_SWAP_INVITE(tournamentId), {
                 method: 'POST',
                 body: JSON.stringify({
                     outgoingUserId: outgoing.userId,

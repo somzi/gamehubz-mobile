@@ -319,6 +319,7 @@ export default function ProfileScreen() {
                                                 hubName={row.hubName || row.HubName}
                                                 hubAvatarUrl={row.hubAvatarUrl || row.HubAvatarUrl}
                                                 isPrivate={!!(row.isPrivate ?? row.IsPrivate)}
+                                                isInviteOnly={!!(row.isInviteOnly ?? row.IsInviteOnly)}
                                             />
                                         ))}
                                         {tournamentsError && <LoadFailedState onRetry={loadMoreTournaments} retrying={isLoadingMoreTournaments} />}

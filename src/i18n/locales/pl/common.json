@@ -155,7 +155,8 @@
     "drawResult": "REMIS",
     "private": "Prywatny",
     "showMore": "Pokaż więcej",
-    "showLess": "Pokaż mniej"
+    "showLess": "Pokaż mniej",
+    "inviteOnly": "Tylko na zaproszenie"
   },
   "nav": {
     "home": "Główna",

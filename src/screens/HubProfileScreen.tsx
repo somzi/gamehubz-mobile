@@ -476,6 +476,7 @@ export default function HubProfileScreen() {
                             hubName={hubData.name}
                             hubAvatarUrl={hubData.avatarUrl || hubData.logoUrl}
                             isPrivate={!!tournament.isPrivate}
+                            isInviteOnly={!!tournament.isInviteOnly}
                         />
                     </View>
                 ))}

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RaisedCard } from '../ui/RaisedCard';
 import { HeroEmblem, EmblemImage } from '../ui/HeroCard';
 import { PrivateBadge, PRIVATE_COLORS } from '../ui/PrivateBadge';
+import { InviteOnlyBadge } from '../ui/InviteOnlyBadge';
 import { COLORS } from '../../lib/theme';
 import { parseUtcDate } from '../../lib/utils';
 import { dateLocale } from '../../i18n';
@@ -36,8 +37,10 @@ interface TournamentCardProps {
     hubAvatarUrl?: string;
     /** Pending items the organizer has to approve in this tournament — red corner badge. */
     badgeCount?: number;
-    /** Invite-only tournament: lock on the emblem plus a "Private" pill beside the status. */
+    /** Code-locked tournament: lock on the emblem plus a "Private" pill beside the status. */
     isPrivate?: boolean;
+    /** Invite-only tournament: an "Invite only" pill beside the status. */
+    isInviteOnly?: boolean;
 }
 
 const STATUS_THEME: Record<TournamentCardProps['status'], { main: string; text: string }> = {
@@ -88,6 +91,7 @@ export const TournamentCard = React.memo(function TournamentCard({
     hubAvatarUrl,
     badgeCount = 0,
     isPrivate = false,
+    isInviteOnly = false,
 }: TournamentCardProps) {
     const { t } = useTranslation('common');
     const theme = STATUS_THEME[status] || STATUS_THEME.upcoming;
@@ -157,6 +161,7 @@ export const TournamentCard = React.memo(function TournamentCard({
                                     </Text>
                                 </View>
                                 {isPrivate && <PrivateBadge size="sm" />}
+                                {isInviteOnly && <InviteOnlyBadge size="sm" />}
                             </View>
                             {/* The host, marked with the hub's planet like on the tournament cover */}
                             {hubLabel ? (

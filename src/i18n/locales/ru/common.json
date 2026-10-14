@@ -59,7 +59,8 @@
     "winRate": "% ПОБЕД",
     "private": "Закрытый",
     "showMore": "Показать больше",
-    "showLess": "Свернуть"
+    "showLess": "Свернуть",
+    "inviteOnly": "По приглашению"
   },
   "back": "Назад",
   "cancel": "Отмена",

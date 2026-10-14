@@ -153,7 +153,8 @@
     "drawResult": "EMPATE",
     "private": "Privado",
     "showMore": "Ver mais",
-    "showLess": "Ver menos"
+    "showLess": "Ver menos",
+    "inviteOnly": "Só por convite"
   },
   "nav": {
     "home": "Início",

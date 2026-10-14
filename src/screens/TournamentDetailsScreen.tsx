@@ -81,6 +81,10 @@ import type { TeamDto } from '../types/team';
 import { dateLocale } from '../i18n';
 import { PrivateBadge, PRIVATE_COLORS } from '../components/ui/PrivateBadge';
 import { PrivateInviteCard } from '../components/tournament/PrivateInviteCard';
+import { InviteOnlyBadge, INVITE_COLORS } from '../components/ui/InviteOnlyBadge';
+import { InvitePlayersCard } from '../components/tournament/InvitePlayersCard';
+import { TournamentInviteBanner } from '../components/tournament/TournamentInviteBanner';
+import { fetchMyTournamentInvite, TournamentInviteStatus, type MyTournamentInvite } from '../lib/tournamentInvites';
 import { JoinByCodeModal } from '../components/modals/JoinByCodeModal';
 import { formatJoinCode } from '../lib/share';
 import { isRejectedTournamentJoinCode } from '../lib/tournamentJoinCode';
@@ -448,6 +452,11 @@ export default function TournamentDetailsScreen() {
     } | null>(null);
     // The sheet stays hidden until its data is in; meanwhile the tapped row's swap button spins.
     const [participantSwapLoading, setParticipantSwapLoading] = useState(false);
+    // The signed-in player's latest invite to this tournament (entry or swap), or null. Drives the
+    // Accept / Decline banner; an invite-only tournament has no Join button at all.
+    const [myInvite, setMyInvite] = useState<MyTournamentInvite | null>(null);
+    // Bumped after a swap invite went out from the players tab, so the invites card recounts.
+    const [invitesRefreshKey, setInvitesRefreshKey] = useState(0);
     // Ejecting a participant wipes their entry and any results with it, so it asks first.
     const [removeParticipantTarget, setRemoveParticipantTarget] = useState<{
         userId: string;
@@ -850,6 +859,8 @@ export default function TournamentDetailsScreen() {
                 // Invite-only: hidden from every list, reachable by code or share link. Omitted by the
                 // server when false.
                 isPrivate: rawData.isPrivate ?? rawData.IsPrivate ?? false,
+                // Players get in only by accepting an invite. Omitted by the server when false.
+                isInviteOnly: rawData.isInviteOnly ?? rawData.IsInviteOnly ?? false,
                 // Server (v2 overview) tells us whether the caller passes the exclusivity gate.
                 // Omitted (=> false) when the user lacks access; non-exclusive tournaments don't use it.
                 hasExclusiveAccess: rawData.hasExclusiveAccess ?? rawData.HasExclusiveAccess ?? false,
@@ -1732,20 +1743,35 @@ export default function TournamentDetailsScreen() {
         }
     };
 
-    // A swap rewrites the roster label on every match the outgoing player was in, so the bracket /
-    // standings have to be re-read too — the participant list alone would still show the old name
-    // inside the fixtures.
+    // The swap is an invite now: nothing on the roster changes until the player accepts it, so there
+    // is nothing to re-read yet.
     const handleParticipantSwapped = (incomingUsername: string) => {
-        void invalidateTournamentLists(queryClient);
         setParticipantSwapTarget(null);
+        setInvitesRefreshKey((key) => key + 1);
         setStatusModalConfig({
             type: 'success',
-            title: t('details.playerReplaced'),
-            message: t('details.playerReplacedMessage', { username: incomingUsername })
+            title: t('details.swapInviteSent'),
+            message: t('details.swapInviteSentMessage', { username: incomingUsername })
         });
         setShowStatusModal(true);
-        fetchParticipants();
+    };
+
+    // The player answered their invite on the banner. Accepting made them a participant (or handed
+    // them a spot), so everything that shows the roster reloads.
+    const handleInviteAnswered = (accepted: boolean) => {
+        fetchMyInvite();
+        if (!accepted) return;
+
+        void invalidateTournamentLists(queryClient);
+        void invalidateHubAfterTournamentEntry(queryClient, tournament?.hubId);
+        setStatusModalConfig({
+            type: 'success',
+            title: t('invites.banner.acceptedTitle'),
+            message: t('invites.banner.acceptedMessage'),
+        });
+        setShowStatusModal(true);
         fetchTournamentDetails(true);
+        fetchParticipants();
         fetchBracket(true);
     };
 
@@ -2069,6 +2095,17 @@ export default function TournamentDetailsScreen() {
         setShowTeamMatchDetail(true);
     };
 
+    // Cheap and personal (never cached): re-read on every focus, so an invite opened from the inbox
+    // or answered on another device shows its current state.
+    const fetchMyInvite = useCallback(async () => {
+        if (!id || !user?.id) return;
+        try {
+            setMyInvite(await fetchMyTournamentInvite(id));
+        } catch {
+            // Keeps what it had; the next focus or pull retries.
+        }
+    }, [id, user?.id]);
+
     // Params can change while this route stays focused. Consume each push once; Back still reuses cache.
     const notificationRefreshKey = route.params.notificationRefreshKey;
     const consumedNotification = useRef<number | undefined>(undefined);
@@ -2081,6 +2118,7 @@ export default function TournamentDetailsScreen() {
             consumedNotification.current = notificationRefreshKey;
             const fromNotification = freshNotification || !!(params.focusMatchId || params.focusTeamMatchId);
             fetchTournamentDetails(true, fromNotification);
+            fetchMyInvite();
             // The participants list only feeds the Overview join button and the Players tab.
             // Skip the extra round-trip on refocus when we're on bracket/teams/registrations,
             // which don't use it. The tab-switch effect still fetches it when Players is opened.
@@ -2106,6 +2144,7 @@ export default function TournamentDetailsScreen() {
                 // tab fired two identical requests in parallel, and whichever landed second won — so a
                 // team the first response had already dropped could flicker back in.
                 fetchTournamentDetails(true),
+                fetchMyInvite(),
                 tab === 'bracket' ? fetchBracket(true) : null,
                 tab === 'overview' || tab === 'players' ? fetchParticipants() : null,
             ]);
@@ -3167,7 +3206,19 @@ export default function TournamentDetailsScreen() {
                         const wouldJoin = !isParticipant && !isUserRegistered && isOpenOrUpcoming && !isFull
                             && (!tournament.isTeamTournament ? true : (!userTeam && teamsLoaded));
 
-                        if (wouldJoin && !isEligible) {
+                        // An open invite takes the place of every sign-up button: accepting it is the
+                        // way in (it skips the approval queue, and in an invite-only tournament it is
+                        // the only way). A withdrawn or expired one leaves a quiet note and the
+                        // ordinary flow below.
+                        const hasOpenInvite = !isParticipant && myInvite?.status === TournamentInviteStatus.Pending;
+                        if (!isParticipant && isOpenOrUpcoming && myInvite
+                            && (myInvite.status === TournamentInviteStatus.Expired || myInvite.status === TournamentInviteStatus.Cancelled)) {
+                            buttons.push(<TournamentInviteBanner key="invite-closed" invite={myInvite} onAnswered={handleInviteAnswered} />);
+                        }
+
+                        if (hasOpenInvite && myInvite) {
+                            buttons.push(<TournamentInviteBanner key="invite" invite={myInvite} onAnswered={handleInviteAnswered} />);
+                        } else if (wouldJoin && !isEligible && !(tournament.isInviteOnly && !canManage)) {
                             buttons.push(
                                 <View key="restricted" className="w-full bg-[#0D1525] border border-white/[0.06] rounded-2xl p-4 flex-row items-center gap-3">
                                     <Ionicons name="lock-closed" size={18} color="#64748B" />
@@ -3213,6 +3264,19 @@ export default function TournamentDetailsScreen() {
                                 if (tournament.isPrivate && !canManage && inviteCode) {
                                     buttons.push(renderInviteCodeApplied());
                                 }
+                            }
+                        } else if (tournament.isInviteOnly && !canManage) {
+                            // Invite-only: nobody signs up. Without an open invite there is nothing to
+                            // press, only the rule to read.
+                            if (!isParticipant && !isUserRegistered && isOpenOrUpcoming) {
+                                buttons.push(
+                                    <View key="invite-only" className="w-full rounded-2xl p-4 flex-row items-center gap-3" style={{ backgroundColor: '#0C1822', borderWidth: 1, borderColor: INVITE_COLORS.border }}>
+                                        <Ionicons name="mail" size={18} color={INVITE_COLORS.icon} />
+                                        <Text className="flex-1 text-sm font-medium" style={{ color: INVITE_COLORS.text }}>
+                                            {t('invites.inviteOnlyNotice')}
+                                        </Text>
+                                    </View>
+                                );
                             }
                         } else {
                             // Solo tournament: existing flow
@@ -3261,6 +3325,7 @@ export default function TournamentDetailsScreen() {
                                                 />
                                             )}
                                             {tournament.isPrivate && <PrivateBadge size="pill" />}
+                                            {tournament.isInviteOnly && <InviteOnlyBadge size="pill" />}
                                             {tournament.isExclusive && (
                                                 <CoverPill icon="sparkles" iconColor="#F0ABFC" label={t('hub:role.exclusive')} tint="rgba(232,121,249,0.16)" border="rgba(232,121,249,0.4)" />
                                             )}
@@ -3442,6 +3507,16 @@ export default function TournamentDetailsScreen() {
                                 valueColor: PRIVATE_COLORS.text,
                             });
                         }
+                        if (tournament.isInviteOnly) {
+                            details.push({
+                                key: 'visibility',
+                                icon: 'mail',
+                                color: INVITE_COLORS.icon,
+                                label: t('details.visibilityLabel'),
+                                value: t('invites.inviteOnlyValue'),
+                                valueColor: INVITE_COLORS.text,
+                            });
+                        }
                         if (tournament.isExclusive) {
                             details.push({
                                 key: 'access',
@@ -3460,6 +3535,18 @@ export default function TournamentDetailsScreen() {
                                     how it reaches anyone at all. */}
                                 {canManage && tournament.isPrivate && isPreStart && (
                                     <PrivateInviteCard tournamentId={id} tournamentName={tournament.name} />
+                                )}
+
+                                {/* Invites: in any solo tournament while it still takes players — the only
+                                    way in when it is invite-only, a direct one otherwise. After that, until
+                                    it ends, only while swap invites wait for an answer (to withdraw them). */}
+                                {canManage && !tournament.isTeamTournament && Number(tournament.status) <= 3 && (
+                                    <InvitePlayersCard
+                                        tournamentId={id}
+                                        isInviteOnly={!!tournament.isInviteOnly}
+                                        canInviteNew={Number(tournament.status) === 1 || isWaitingToOpen}
+                                        refreshKey={invitesRefreshKey}
+                                    />
                                 )}
 
                                 {/* Hub Owner Close Registration Button — nothing to close while a

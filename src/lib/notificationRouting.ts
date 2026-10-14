@@ -196,6 +196,12 @@ export async function routeFromNotification(
         // incoming player sees their fixtures and the outgoing one sees they're no longer in it.
         case 'participantswappedin':
         case 'participantswappedout':
+        // An invite into the tournament (or into someone's spot): its screen carries the Accept /
+        // Decline banner. The organizer's "accepted / declined" lands there too.
+        case 'tournamentinvite':
+        case 'swapinvite':
+        case 'tournamentinviteaccepted':
+        case 'tournamentinvitedeclined':
             if (tournamentId) {
                 return go('TournamentDetails', { id: tournamentId });
             }
@@ -266,6 +272,8 @@ const META_BY_TYPE: Record<string, MetaEntry> = {
     hubjoinrequest: { icon: 'person-add', accent: COLORS.info },
     teamjoinrequest: { icon: 'person-add', accent: COLORS.team },
     friend_request: { icon: 'person-add', accent: COLORS.primary },
+    tournamentinvite: { icon: 'mail-open', accent: '#38BDF8' },
+    swapinvite: { icon: 'swap-horizontal', accent: '#38BDF8' },
     schedulecleared: { icon: 'calendar-clear', accent: COLORS.warning },
     matchavailability: { icon: 'time', accent: COLORS.primary },
     direct_message: { icon: 'chatbubble', accent: COLORS.primary },
@@ -281,6 +289,8 @@ const META_BY_TYPE: Record<string, MetaEntry> = {
     promo: { icon: 'megaphone', accent: COLORS.highlight },
     participantswappedin: { icon: 'swap-horizontal', accent: COLORS.info },
     participantswappedout: { icon: 'swap-horizontal', accent: COLORS.slate400 },
+    tournamentinviteaccepted: { icon: 'checkmark-circle', accent: COLORS.primary },
+    tournamentinvitedeclined: { icon: 'close-circle', accent: COLORS.slate400 },
     teamlineupin: { icon: 'swap-horizontal', accent: COLORS.team },
     teamlineupout: { icon: 'swap-horizontal', accent: COLORS.slate400 },
     teamjoinapproved: { icon: 'people', accent: COLORS.team },

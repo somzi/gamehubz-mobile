@@ -27,6 +27,7 @@ import { MatchFormatPicker } from '../match/MatchFormatPicker';
 import { SeriesWinConditionValue, normalizeBestOf, normalizeCondition } from '../../lib/series';
 import { COLORS } from '../../lib/theme';
 import { PRIVATE_COLORS } from '../ui/PrivateBadge';
+import { INVITE_COLORS } from '../ui/InviteOnlyBadge';
 import { useQueryClient } from '@tanstack/react-query';
 import { useKeyboardInset } from '../../hooks/useKeyboardInset';
 import { useFormScroll, FormScrollProvider } from '../ui/FormScroll';
@@ -178,6 +179,9 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
     const [isExclusive, setIsExclusive] = useState(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
     // Invite-only. Editable for the whole life of the tournament — it only changes who can find it.
     const [isPrivate, setIsPrivate] = useState(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
+    // Invite-only (solo). Editable like the code lock: it only changes who can get in from now on —
+    // players already in stay, and open invites keep working in either mode.
+    const [isInviteOnly, setIsInviteOnly] = useState(Boolean(tournament?.isInviteOnly ?? tournament?.IsInviteOnly));
     const [doubleRoundRobin, setDoubleRoundRobin] = useState(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
     const [teamSize, setTeamSize] = useState(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
     // Bench slots on top of the lineup — structural, so only editable before the tournament starts.
@@ -386,6 +390,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
         setRequireAvailabilityForChat(Boolean(tournament?.requireAvailabilityForChat ?? tournament?.RequireAvailabilityForChat));
         setIsExclusive(Boolean(tournament?.isExclusive ?? tournament?.IsExclusive));
         setIsPrivate(Boolean(tournament?.isPrivate ?? tournament?.IsPrivate));
+        setIsInviteOnly(Boolean(tournament?.isInviteOnly ?? tournament?.IsInviteOnly));
         setDoubleRoundRobin(Boolean(tournament?.doubleRoundRobin ?? tournament?.DoubleRoundRobin));
         setTeamSize(String(tournament?.teamSize ?? tournament?.TeamSize ?? ''));
         setAllowReserves(Boolean(tournament?.allowReserves ?? tournament?.AllowReserves));
@@ -598,6 +603,7 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                 IsExclusive: isExclusive,
                 // Always sent by this build; an older one omits it and the server keeps the stored value.
                 IsPrivate: isPrivate,
+                IsInviteOnly: isInviteOnly && !isTeamTournament,
                 DoubleRoundRobin: isLeagueOrGroup ? doubleRoundRobin : false,
                 AllowStructuralEdits: true,
             };
@@ -706,10 +712,25 @@ export function EditTournamentModal({ visible, onClose, tournament, onSaveSucces
                     options={[
                         { value: 'public', icon: 'globe-outline', label: t('form.visibilityPublic') },
                         { value: 'private', icon: 'lock-closed', label: t('form.visibilityPrivate'), color: PRIVATE_COLORS.icon },
+                        { value: 'invite', icon: 'mail', label: t('form.visibilityInvite'), color: INVITE_COLORS.icon, disabled: isTeamTournament, hint: isTeamTournament ? t('form.visibilityInviteSoloOnly') : undefined },
                     ]}
-                    value={isPrivate ? 'private' : 'public'}
-                    onChange={(v) => setIsPrivate(v === 'private')}
+                    value={isInviteOnly && !isTeamTournament ? 'invite' : isPrivate ? 'private' : 'public'}
+                    onChange={(v) => {
+                        setIsPrivate(v === 'private');
+                        setIsInviteOnly(v === 'invite');
+                    }}
                 />
+                {isInviteOnly && !isTeamTournament && (
+                    <View
+                        className="flex-row items-start gap-2 mt-2.5 px-3 py-2.5 rounded-xl"
+                        style={{ backgroundColor: INVITE_COLORS.bg, borderWidth: 1, borderColor: INVITE_COLORS.border }}
+                    >
+                        <Ionicons name="mail" size={13} color={INVITE_COLORS.icon} style={{ marginTop: 1 }} />
+                        <Text className="flex-1 text-[11px] leading-4" style={{ color: INVITE_COLORS.text }}>
+                            {t('form.visibilityInviteEditHint')}
+                        </Text>
+                    </View>
+                )}
                 {isPrivate && (
                     <View
                         className="flex-row items-start gap-2 mt-2.5 px-3 py-2.5 rounded-xl"

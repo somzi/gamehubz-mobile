@@ -35,6 +35,7 @@ import { invalidateHubData } from '../../lib/queryPolicy';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import { PrivateInviteCard } from '../tournament/PrivateInviteCard';
+import { INVITE_COLORS } from '../ui/InviteOnlyBadge';
 import { PRIVATE_COLORS } from '../ui/PrivateBadge';
 
 // Option arrays keep their VALUES at module scope (types below depend on them) but carry
@@ -208,6 +209,9 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
     // Private — invite-only: hidden from the feed, the hub page and every notification. Players get
     // in with the six-digit code or the share link, both handed over on the step after creation.
     const [isPrivate, setIsPrivate] = useState(false);
+    // Invite-only (solo): nobody signs up — the organizer invites players and they accept. The
+    // third of the three registration modes, never together with isPrivate.
+    const [isInviteOnly, setIsInviteOnly] = useState(false);
     // Set once a private tournament is created: the form gives way to its code, because without
     // that code (or the link) nobody will ever find the tournament.
     const [createdPrivate, setCreatedPrivate] = useState<{ id: string; name: string } | null>(null);
@@ -606,6 +610,7 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                 RequireAvailabilityForChat: requireAvailabilityForChat,
                 IsExclusive: isExclusive,
                 IsPrivate: isPrivate,
+                IsInviteOnly: isInviteOnly && !isTeamTournament,
                 DoubleRoundRobin: (selectedFormat === '0' || selectedFormat === '5') ? doubleRoundRobin : false,
             };
 
@@ -750,9 +755,14 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                     options={[
                         { value: 'public', icon: 'globe-outline', label: t('form.visibilityPublic') },
                         { value: 'private', icon: 'lock-closed', label: t('form.visibilityPrivate'), color: PRIVATE_COLORS.icon },
+                        // Solo only: a team gets in through its captain's registration, which no invite covers.
+                        { value: 'invite', icon: 'mail', label: t('form.visibilityInvite'), color: INVITE_COLORS.icon, disabled: isTeamTournament, hint: isTeamTournament ? t('form.visibilityInviteSoloOnly') : undefined },
                     ]}
-                    value={isPrivate ? 'private' : 'public'}
-                    onChange={(v) => setIsPrivate(v === 'private')}
+                    value={isInviteOnly && !isTeamTournament ? 'invite' : isPrivate ? 'private' : 'public'}
+                    onChange={(v) => {
+                        setIsPrivate(v === 'private');
+                        setIsInviteOnly(v === 'invite');
+                    }}
                 />
                 {isPrivate && (
                     <View
@@ -762,6 +772,17 @@ export function CreateTournamentModal({ visible, onClose, hubId }: CreateTournam
                         <Ionicons name="lock-closed" size={13} color={PRIVATE_COLORS.icon} style={{ marginTop: 1 }} />
                         <Text className="flex-1 text-[11px] leading-4" style={{ color: PRIVATE_COLORS.text }}>
                             {t('form.visibilityPrivateHint')}
+                        </Text>
+                    </View>
+                )}
+                {isInviteOnly && !isTeamTournament && (
+                    <View
+                        className="flex-row items-start gap-2 mt-2.5 px-3 py-2.5 rounded-xl"
+                        style={{ backgroundColor: INVITE_COLORS.bg, borderWidth: 1, borderColor: INVITE_COLORS.border }}
+                    >
+                        <Ionicons name="mail" size={13} color={INVITE_COLORS.icon} style={{ marginTop: 1 }} />
+                        <Text className="flex-1 text-[11px] leading-4" style={{ color: INVITE_COLORS.text }}>
+                            {t('form.visibilityInviteHint')}
                         </Text>
                     </View>
                 )}

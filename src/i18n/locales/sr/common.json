@@ -154,7 +154,8 @@
     "drawResult": "NEREŠENO",
     "private": "Privatni",
     "showMore": "Prikaži više",
-    "showLess": "Prikaži manje"
+    "showLess": "Prikaži manje",
+    "inviteOnly": "Samo na poziv"
   },
   "nav": {
     "home": "Početna",

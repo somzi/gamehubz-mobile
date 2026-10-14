@@ -202,6 +202,7 @@ export default function TournamentsScreen() {
                 hubName={tournament.HubName || tournament.hubName}
                 hubAvatarUrl={tournament.HubAvatarUrl || tournament.hubAvatarUrl}
                 isPrivate={!!(tournament.IsPrivate ?? tournament.isPrivate)}
+                isInviteOnly={!!(tournament.IsInviteOnly ?? tournament.isInviteOnly)}
             />
         </View>
         );

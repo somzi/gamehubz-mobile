@@ -60,15 +60,27 @@ export const ENDPOINTS = {
     REJECT_REGISTRATION: `${API_BASE_URL}/api/tournamentRegistration/reject`,
     GET_TOURNAMENT_PARTICIPANTS: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}`,
     REMOVE_PARTICIPANT: (tournamentId: string, userId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/user/${userId}`,
-    // Manager-only participant swap: hand one entrant's spot (seed, group, standings and every
-    // played match) to another hub member. Eligibility depends on the format — knockout/Swiss allow
-    // it only before the player's first match, league/group formats until a configured share of
-    // their fixtures is played, which is why the client asks the backend instead of guessing.
+    // Manager-only participant swap: hand one entrant's spot (seed, group and standings) to another
+    // hub member; matches the spot already played stay with the player who played them.
+    // Eligibility depends on the format — knockout/Swiss allow it only before the player's first
+    // match, league/group formats until a configured share of their fixtures is played, which is
+    // why the client asks the backend instead of guessing.
     PARTICIPANT_SWAP_ELIGIBILITY: (tournamentId: string, userId: string) =>
         `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/user/${userId}/swap-eligibility`,
     PARTICIPANT_SWAP_CANDIDATES: (tournamentId: string, search: string = '', pageNumber: number = 0) =>
         `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/swap-candidates?pageNumber=${pageNumber}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
     SWAP_PARTICIPANT: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/swap`,
+    // Swap with consent: offers the spot to the incoming player, who has to accept it (the plain
+    // SWAP_PARTICIPANT above swaps at once and stays only for older builds).
+    SEND_SWAP_INVITE: (tournamentId: string) => `${API_BASE_URL}/api/TournamentParticipant/tournament/${tournamentId}/swap-invite`,
+    // Tournament invites (solo): a manager invites players, they accept or decline in the app.
+    TOURNAMENT_INVITE_CANDIDATES: (tournamentId: string, search: string = '', onlyEligible: boolean = false, pageNumber: number = 0) =>
+        `${API_BASE_URL}/api/v2/tournaments/${tournamentId}/invite-candidates?pageNumber=${pageNumber}&onlyEligible=${onlyEligible}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+    TOURNAMENT_INVITES: (tournamentId: string) => `${API_BASE_URL}/api/v2/tournaments/${tournamentId}/invites`,
+    MY_TOURNAMENT_INVITE: (tournamentId: string) => `${API_BASE_URL}/api/v2/tournaments/${tournamentId}/my-invite`,
+    ACCEPT_TOURNAMENT_INVITE: (inviteId: string) => `${API_BASE_URL}/api/v2/tournament-invites/${inviteId}/accept`,
+    DECLINE_TOURNAMENT_INVITE: (inviteId: string) => `${API_BASE_URL}/api/v2/tournament-invites/${inviteId}/decline`,
+    CANCEL_TOURNAMENT_INVITE: (inviteId: string) => `${API_BASE_URL}/api/v2/tournament-invites/${inviteId}/cancel`,
     CREATE_BRACKET: `${API_BASE_URL}/api/tournament/createBracket`,
     // Manager-only: what the bracket draw has to fill (modes, bracket size / byes, groups, pots)
     // plus the entrants to place. Read before opening the draw picker.

@@ -165,7 +165,11 @@
     "summaryPrivate": "Privado",
     "createdTitle": "Torneo creado",
     "createdPrivateHint": "Aparece en el hub, pero solo pueden inscribirse los jugadores con el código o el enlace de invitación. Envíaselo a los jugadores que quieras.",
-    "openTournament": "Abrir torneo"
+    "openTournament": "Abrir torneo",
+    "visibilityInvite": "Solo por invitación",
+    "visibilityInviteSoloOnly": "Solo individual",
+    "visibilityInviteHint": "Nadie se inscribe por su cuenta: invitas jugadores desde la página del torneo y ellos aceptan o rechazan en la app. Una invitación no reserva plaza. Los miembros del hub no reciben el aviso de torneo nuevo.",
+    "visibilityInviteEditHint": "A partir de ahora solo pueden entrar jugadores invitados; los que ya están se quedan. Envía las invitaciones desde la página del torneo."
   },
   "validation": {
     "nameAndHubRequired": "El nombre del torneo y el hub son obligatorios",
@@ -371,7 +375,9 @@
     "visibilityLabel": "Visibilidad",
     "privateInviteOnly": "Privado · requiere código",
     "enterCodeToJoin": "Ingresar código para unirte",
-    "privateJoinHint": "Torneo privado: necesitas el código del organizador para inscribirte."
+    "privateJoinHint": "Torneo privado: necesitas el código del organizador para inscribirte.",
+    "swapInviteSent": "Invitación de cambio enviada",
+    "swapInviteSentMessage": "{{username}} ocupa la plaza cuando acepte. Hasta entonces no cambia nada."
   },
   "manage": {
     "title": "Administrar torneo",
@@ -401,9 +407,9 @@
   "swap": {
     "loadMembersFailed": "No se pudieron cargar los miembros",
     "checkEligibilityFailed": "No se pudo verificar la elegibilidad",
-    "swapFailed": "No se pudo hacer el cambio",
+    "swapFailed": "No se pudo enviar la invitación de cambio",
     "replacePlayer": "Reemplazar jugador",
-    "replaceHint": "El reemplazo hereda la plaza, la siembra y todos los resultados hasta ahora.",
+    "replaceHint": "El nuevo jugador ocupa la plaza y su posición en la tabla cuando acepte. Los partidos ya jugados quedan en el perfil del jugador saliente.",
     "leaving": "Sale",
     "limitPercent": "Límite {{limit}}%",
     "mustBeUnplayed": "No debe haber jugado",
@@ -418,19 +424,19 @@
     "noMembersLeft": "No quedan miembros para intercambiar",
     "alreadyInHidden": "Los que ya están en este torneo no aparecen en la lista.",
     "loadMore": "Cargar más",
-    "inheritsSummary_one": "{{name}} hereda {{count}} partido jugado y la clasificación que lo acompaña.",
-    "inheritsSummary_other": "{{name}} hereda {{count}} partidos jugados y la clasificación que los acompaña.",
+    "inheritsSummary_one": "{{name}} toma la posición en la tabla; el {{count}} partido jugado queda en el perfil del jugador saliente.",
+    "inheritsSummary_other": "{{name}} toma la posición en la tabla; los {{count}} partidos jugados quedan en el perfil del jugador saliente.",
     "pickReplacement": "Elige un reemplazo",
-    "swapIn": "Cambiar por {{name}}",
-    "confirmTitle": "Confirmar el reemplazo",
+    "swapIn": "Invitar a {{name}}",
+    "confirmTitle": "¿Enviar la invitación de cambio?",
     "thisPlayer": "este jugador",
-    "takesOver": "{{incoming}} ocupa la plaza de {{outgoing}} en el torneo.",
-    "inheritMatches_one": "\n\nHereda {{count}} partido jugado, la siembra y la clasificación que le corresponden.",
-    "inheritMatches_other": "\n\nHereda {{count}} partidos jugados, la siembra y la clasificación que le corresponden.",
-    "takeSeedOnly": "\n\nToma la siembra y los cruces que corresponden a la plaza.",
-    "outgoingRemoved": "\n\n{{name}} queda fuera de este torneo.",
+    "takesOver": "Se le ofrece a {{incoming}} la plaza de {{outgoing}} en el torneo.",
+    "inheritMatches_one": "\n\nSi acepta, toma la posición de la plaza en la tabla. El {{count}} partido ya jugado queda en el perfil del jugador saliente.",
+    "inheritMatches_other": "\n\nSi acepta, toma la posición de la plaza en la tabla. Los {{count}} partidos ya jugados quedan en el perfil del jugador saliente.",
+    "takeSeedOnly": "\n\nSi acepta, toma la siembra y los cruces que corresponden a la plaza.",
+    "outgoingRemoved": "\n\n{{name}} sale del torneo cuando se acepte la invitación. Hasta entonces no cambia nada.",
     "theOutgoingPlayer": "El jugador saliente",
-    "swapThePlayer": "Hacer el cambio"
+    "swapThePlayer": "Enviar invitación"
   },
   "list": {
     "fetchFailed": "No se pudieron cargar los torneos ({{status}}): {{text}}",
@@ -614,5 +620,84 @@
     "failed": "No se pudo actualizar la solicitud. Inténtalo de nuevo.",
     "refresh": "Actualizar solicitudes",
     "empty": "No hay solicitudes pendientes"
+  },
+  "invites": {
+    "guest": "Invitado",
+    "inviteOnlyNotice": "Solo por invitación: el organizador elige a los jugadores. Solo puedes entrar si te invitan.",
+    "inviteOnlyValue": "Solo por invitación",
+    "status": {
+      "pending": "Pendiente",
+      "accepted": "Aceptada",
+      "declined": "Rechazada",
+      "cancelled": "Retirada",
+      "expired": "Vencida"
+    },
+    "banner": {
+      "title": "Tienes una invitación",
+      "byOrganizer": "{{name}} te invitó a jugar este torneo.",
+      "generic": "Te invitaron a jugar este torneo.",
+      "swapTitle": "Te ofrecen una plaza",
+      "swapSubtitle": "Ocupa la plaza de {{name}} en este torneo.",
+      "swapPlayed_one": "Tomas la posición de la plaza en la tabla. El {{count}} partido ya jugado queda en el perfil de {{name}}; tu historial empieza con tu próximo partido.",
+      "swapPlayed_other": "Tomas la posición de la plaza en la tabla. Los {{count}} partidos ya jugados quedan en el perfil de {{name}}; tu historial empieza con tu próximo partido.",
+      "swapFresh": "Esta plaza todavía no jugó partidos: empiezas desde el primero.",
+      "notOpenYet": "Las inscripciones todavía no abrieron; podrás aceptar cuando abran.",
+      "full": "Ahora mismo no quedan plazas. Tu invitación sigue abierta: acéptala si se libera una.",
+      "noReservation": "Una invitación no reserva plaza: es tuya cuando aceptas.",
+      "accept": "Aceptar",
+      "acceptSpot": "Tomar la plaza",
+      "decline": "Rechazar",
+      "declineTitle": "¿Rechazar la invitación?",
+      "declineMessage": "El organizador no podrá volver a invitarte a este torneo.",
+      "expired": "Tu invitación a este torneo venció.",
+      "cancelled": "El organizador retiró tu invitación.",
+      "acceptedTitle": "¡Estás dentro!",
+      "acceptedMessage": "Aceptaste la invitación. ¡Mucha suerte en el torneo!"
+    },
+    "card": {
+      "title": "Invitar jugadores",
+      "subtitleInviteOnly": "Solo entran los jugadores que invites. Ellos aceptan o rechazan en la app.",
+      "subtitleOpen": "Invita jugadores directamente: cuando aceptan, entran sin esperar aprobación.",
+      "invite": "Invitar jugadores",
+      "subtitleSwaps": "Invitaciones de cambio que todavía esperan respuesta. Retira una si cambiaron tus planes.",
+      "manage": "Invitaciones enviadas"
+    },
+    "modal": {
+      "title": "Invitar jugadores",
+      "subtitle": "Los jugadores entran solo cuando aceptan. Nadie entra sin decir que sí.",
+      "tabInvite": "Invitar",
+      "tabSent": "Enviadas ({{n}})",
+      "searchPlaceholder": "Busca jugadores por usuario…",
+      "filterAll": "Todos",
+      "filterEligible": "Cumplen requisitos",
+      "showingMembers": "Se muestran los miembros del hub. Escribe un usuario para buscar entre todos.",
+      "searchingEveryone": "Buscando entre todos los jugadores.",
+      "sentCount_one": "{{count}} invitación enviada.",
+      "sentCount_other": "{{count}} invitaciones enviadas.",
+      "noMatches": "Ningún jugador coincide con ese nombre",
+      "noMembers": "No quedan miembros del hub para invitar",
+      "alreadyInHidden": "No se muestran los jugadores que ya están en el torneo ni los bloqueados.",
+      "noneSent": "Todavía no enviaste invitaciones",
+      "swapFor": "por la plaza de {{name}}",
+      "cancelInvite": "Retirar",
+      "cancelTitle": "¿Retirar la invitación?",
+      "cancelMessage": "{{name}} ya no podrá aceptarla. Puedes volver a invitar más tarde.",
+      "guestNote_one": "{{count}} jugador elegido está fuera de las reglas de región, país o exclusividad de este torneo y entrará como invitado.",
+      "guestNote_other": "{{count}} jugadores elegidos están fuera de las reglas de región, país o exclusividad de este torneo y entrarán como invitados.",
+      "noReservationNote": "Las invitaciones no reservan plaza: entra quien acepte primero.",
+      "sendCount_one": "Enviar {{count}} invitación",
+      "sendCount_other": "Enviar {{count}} invitaciones",
+      "pickPlayers": "Elige jugadores para invitar",
+      "sentTitle": "Invitaciones enviadas",
+      "sentSubtitle": "Retira una invitación que todavía no tuvo respuesta."
+    },
+    "outcome": {
+      "alreadyInvited": "{{name}} ya tiene una invitación abierta.",
+      "alreadyIn": "{{name}} ya está en el torneo.",
+      "declinedBefore": "{{name}} ya rechazó una invitación y no se puede volver a invitar.",
+      "banned": "{{name}} tiene un bloqueo en este hub.",
+      "needsGuest": "{{name}} no cumple los requisitos: invítalo como invitado.",
+      "notFound": "No se encontró a {{name}}."
+    }
   }
 }

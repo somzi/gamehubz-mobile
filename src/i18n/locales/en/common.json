@@ -153,7 +153,8 @@
     "drawResult": "DRAW",
     "private": "Private",
     "showMore": "Show more",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "inviteOnly": "Invite only"
   },
   "nav": {
     "home": "Home",

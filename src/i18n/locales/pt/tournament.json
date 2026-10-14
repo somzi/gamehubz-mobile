@@ -165,7 +165,11 @@
     "summaryPrivate": "Privado",
     "createdTitle": "Torneio criado",
     "createdPrivateHint": "Ele aparece no hub, mas só se inscreve quem tiver o código ou o link de convite. Mande para os jogadores que você quiser.",
-    "openTournament": "Abrir torneio"
+    "openTournament": "Abrir torneio",
+    "visibilityInvite": "Só por convite",
+    "visibilityInviteSoloOnly": "Só individual",
+    "visibilityInviteHint": "Ninguém se inscreve sozinho: você convida jogadores pela página do torneio e eles aceitam ou recusam no app. Um convite não reserva vaga. Os membros do hub não recebem o aviso de torneio novo.",
+    "visibilityInviteEditHint": "A partir de agora só entram jogadores convidados — quem já está continua. Envie os convites pela página do torneio."
   },
   "validation": {
     "nameAndHubRequired": "Nome do torneio e Hub são obrigatórios",
@@ -371,7 +375,9 @@
     "visibilityLabel": "Visibilidade",
     "privateInviteOnly": "Privado · exige código",
     "enterCodeToJoin": "Inserir código para entrar",
-    "privateJoinHint": "Torneio privado: você precisa do código do organizador para se inscrever."
+    "privateJoinHint": "Torneio privado: você precisa do código do organizador para se inscrever.",
+    "swapInviteSent": "Convite de troca enviado",
+    "swapInviteSentMessage": "{{username}} assume a vaga quando aceitar. Até lá, nada muda."
   },
   "manage": {
     "title": "Gerenciar torneio",
@@ -401,9 +407,9 @@
   "swap": {
     "loadMembersFailed": "Não foi possível carregar os membros",
     "checkEligibilityFailed": "Não foi possível verificar a elegibilidade",
-    "swapFailed": "Não foi possível fazer a troca",
+    "swapFailed": "Não foi possível enviar o convite de troca",
     "replacePlayer": "Substituir jogador",
-    "replaceHint": "O substituto herda a vaga, a cabeça de chave e todos os resultados até agora.",
+    "replaceHint": "O novo jogador assume a vaga e a posição na tabela quando aceitar. As partidas já jogadas ficam no perfil de quem sai.",
     "leaving": "Sai",
     "limitPercent": "Limite {{limit}}%",
     "mustBeUnplayed": "Não pode ter jogado",
@@ -418,19 +424,19 @@
     "noMembersLeft": "Não há mais membros para colocar",
     "alreadyInHidden": "Quem já está neste torneio não aparece na lista.",
     "loadMore": "Carregar mais",
-    "inheritsSummary_one": "{{name}} herda {{count}} partida jogada e a classificação que vem com ela.",
-    "inheritsSummary_other": "{{name}} herda {{count}} partidas jogadas e a classificação que vem com elas.",
+    "inheritsSummary_one": "{{name}} assume a posição na tabela; a {{count}} partida jogada fica no perfil de quem sai.",
+    "inheritsSummary_other": "{{name}} assume a posição na tabela; as {{count}} partidas jogadas ficam no perfil de quem sai.",
     "pickReplacement": "Escolha um substituto",
-    "swapIn": "Colocar {{name}}",
-    "confirmTitle": "Confirmar a substituição",
+    "swapIn": "Convidar {{name}}",
+    "confirmTitle": "Enviar o convite de troca?",
     "thisPlayer": "este jogador",
-    "takesOver": "{{incoming}} assume a vaga de {{outgoing}} no torneio.",
-    "inheritMatches_one": "\n\nEle herda {{count}} partida jogada, a cabeça de chave e a classificação que vêm junto.",
-    "inheritMatches_other": "\n\nEle herda {{count}} partidas jogadas, a cabeça de chave e a classificação que vêm junto.",
-    "takeSeedOnly": "\n\nEle assume a cabeça de chave e os confrontos ligados à vaga.",
-    "outgoingRemoved": "\n\n{{name}} sai deste torneio.",
+    "takesOver": "{{incoming}} recebe a oferta da vaga de {{outgoing}} no torneio.",
+    "inheritMatches_one": "\n\nSe aceitar, assume a posição da vaga na tabela. A {{count}} partida já jogada fica no perfil de quem sai.",
+    "inheritMatches_other": "\n\nSe aceitar, assume a posição da vaga na tabela. As {{count}} partidas já jogadas ficam no perfil de quem sai.",
+    "takeSeedOnly": "\n\nSe aceitar, assume a cabeça de chave e os confrontos ligados à vaga.",
+    "outgoingRemoved": "\n\n{{name}} sai do torneio quando o convite for aceito. Até lá, nada muda.",
     "theOutgoingPlayer": "O jogador que sai",
-    "swapThePlayer": "Trocar o jogador"
+    "swapThePlayer": "Enviar convite"
   },
   "list": {
     "fetchFailed": "Não foi possível carregar os torneios ({{status}}): {{text}}",
@@ -614,5 +620,84 @@
     "failed": "Não foi possível atualizar a solicitação. Tente novamente.",
     "refresh": "Atualizar solicitações",
     "empty": "Nenhuma solicitação pendente"
+  },
+  "invites": {
+    "guest": "Convidado",
+    "inviteOnlyNotice": "Só por convite — o organizador escolhe os jogadores. Você só entra se for convidado.",
+    "inviteOnlyValue": "Só por convite",
+    "status": {
+      "pending": "Pendente",
+      "accepted": "Aceito",
+      "declined": "Recusado",
+      "cancelled": "Retirado",
+      "expired": "Expirado"
+    },
+    "banner": {
+      "title": "Você tem um convite",
+      "byOrganizer": "{{name}} te convidou para jogar este torneio.",
+      "generic": "Você foi convidado para jogar este torneio.",
+      "swapTitle": "Uma vaga para você",
+      "swapSubtitle": "Assuma a vaga de {{name}} neste torneio.",
+      "swapPlayed_one": "Você assume a posição da vaga na tabela. A {{count}} partida já jogada fica no perfil de {{name}} — seu histórico começa na sua próxima partida.",
+      "swapPlayed_other": "Você assume a posição da vaga na tabela. As {{count}} partidas já jogadas ficam no perfil de {{name}} — seu histórico começa na sua próxima partida.",
+      "swapFresh": "Esta vaga ainda não jogou nenhuma partida — você começa pela primeira.",
+      "notOpenYet": "As inscrições ainda não abriram — você pode aceitar quando abrirem.",
+      "full": "No momento todas as vagas estão ocupadas. Seu convite continua aberto — aceite se uma vaga abrir.",
+      "noReservation": "Um convite não reserva vaga — ela é sua quando você aceita.",
+      "accept": "Aceitar",
+      "acceptSpot": "Assumir a vaga",
+      "decline": "Recusar",
+      "declineTitle": "Recusar o convite?",
+      "declineMessage": "O organizador não vai poder te convidar de novo para este torneio.",
+      "expired": "Seu convite para este torneio expirou.",
+      "cancelled": "O organizador retirou seu convite.",
+      "acceptedTitle": "Você está dentro!",
+      "acceptedMessage": "Convite aceito — boa sorte no torneio."
+    },
+    "card": {
+      "title": "Convidar jogadores",
+      "subtitleInviteOnly": "Só entram os jogadores que você convidar. Eles aceitam ou recusam no app.",
+      "subtitleOpen": "Convide jogadores direto — quando aceitam, entram sem esperar aprovação.",
+      "invite": "Convidar jogadores",
+      "subtitleSwaps": "Convites de troca que ainda esperam resposta. Retire um se seus planos mudaram.",
+      "manage": "Convites enviados"
+    },
+    "modal": {
+      "title": "Convidar jogadores",
+      "subtitle": "O jogador só entra quando aceita. Ninguém entra sem dizer sim.",
+      "tabInvite": "Convidar",
+      "tabSent": "Enviados ({{n}})",
+      "searchPlaceholder": "Busque jogadores pelo usuário…",
+      "filterAll": "Todos",
+      "filterEligible": "Cumprem os requisitos",
+      "showingMembers": "Mostrando os membros do hub. Digite um usuário para buscar entre todos.",
+      "searchingEveryone": "Buscando entre todos os jogadores.",
+      "sentCount_one": "{{count}} convite enviado.",
+      "sentCount_other": "{{count}} convites enviados.",
+      "noMatches": "Nenhum jogador com esse nome",
+      "noMembers": "Não há mais membros do hub para convidar",
+      "alreadyInHidden": "Jogadores que já estão no torneio e banidos não aparecem na lista.",
+      "noneSent": "Nenhum convite enviado ainda",
+      "swapFor": "pela vaga de {{name}}",
+      "cancelInvite": "Retirar",
+      "cancelTitle": "Retirar o convite?",
+      "cancelMessage": "{{name}} não vai mais poder aceitar. Você pode convidar de novo depois.",
+      "guestNote_one": "{{count}} jogador escolhido está fora das regras de região, país ou exclusividade deste torneio e entra como convidado.",
+      "guestNote_other": "{{count}} jogadores escolhidos estão fora das regras de região, país ou exclusividade deste torneio e entram como convidados.",
+      "noReservationNote": "Convites não reservam vaga — entra quem aceitar primeiro.",
+      "sendCount_one": "Enviar {{count}} convite",
+      "sendCount_other": "Enviar {{count}} convites",
+      "pickPlayers": "Escolha jogadores para convidar",
+      "sentTitle": "Convites enviados",
+      "sentSubtitle": "Retire um convite que ainda não teve resposta."
+    },
+    "outcome": {
+      "alreadyInvited": "{{name}} já tem um convite aberto.",
+      "alreadyIn": "{{name}} já está no torneio.",
+      "declinedBefore": "{{name}} já recusou um convite e não pode ser chamado de novo.",
+      "banned": "{{name}} tem um banimento neste hub.",
+      "needsGuest": "{{name}} não cumpre os requisitos — convide como convidado.",
+      "notFound": "{{name}} não foi encontrado."
+    }
   }
 }

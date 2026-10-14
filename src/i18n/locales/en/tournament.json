@@ -165,7 +165,11 @@
     "summaryPrivate": "Private",
     "createdTitle": "Tournament created",
     "createdPrivateHint": "It's listed in the hub, but only players with the code or the invite link can register. Send it to the players you want.",
-    "openTournament": "Open tournament"
+    "openTournament": "Open tournament",
+    "visibilityInvite": "Invite only",
+    "visibilityInviteSoloOnly": "Solo only",
+    "visibilityInviteHint": "Nobody signs up on their own: you invite players from the tournament page and they accept or decline in the app. An invite doesn't hold a place. Hub members don't get the new-tournament notification.",
+    "visibilityInviteEditHint": "From now on only invited players can get in — players already in stay. Send invites from the tournament page."
   },
   "validation": {
     "nameAndHubRequired": "Tournament name and Hub are required",
@@ -371,7 +375,9 @@
     "visibilityLabel": "Visibility",
     "privateInviteOnly": "Private · code required",
     "enterCodeToJoin": "Enter code to join",
-    "privateJoinHint": "Private tournament — you need the organizer's code to register."
+    "privateJoinHint": "Private tournament — you need the organizer's code to register.",
+    "swapInviteSent": "Swap invite sent",
+    "swapInviteSentMessage": "{{username}} takes over the spot once they accept. Nothing changes until then."
   },
   "manage": {
     "title": "Manage Tournament",
@@ -401,9 +407,9 @@
   "swap": {
     "loadMembersFailed": "Failed to load members",
     "checkEligibilityFailed": "Failed to check eligibility",
-    "swapFailed": "Swap failed",
+    "swapFailed": "Couldn't send the swap invite",
     "replacePlayer": "Replace player",
-    "replaceHint": "The replacement inherits the spot, the seed and every result so far.",
+    "replaceHint": "The new player takes over the spot and its place in the standings once they accept. Matches already played stay on the outgoing player's profile.",
     "leaving": "Leaving",
     "limitPercent": "Limit {{limit}}%",
     "mustBeUnplayed": "Must be unplayed",
@@ -418,19 +424,19 @@
     "noMembersLeft": "No members left to swap in",
     "alreadyInHidden": "Everyone already in this tournament is hidden from the list.",
     "loadMore": "Load more",
-    "inheritsSummary_one": "{{name}} inherits {{count}} played match and the standings that go with it.",
-    "inheritsSummary_other": "{{name}} inherits {{count}} played matches and the standings that go with them.",
+    "inheritsSummary_one": "{{name}} takes over the place in the table; the {{count}} played match stays on the outgoing player's profile.",
+    "inheritsSummary_other": "{{name}} takes over the place in the table; the {{count}} played matches stay on the outgoing player's profile.",
     "pickReplacement": "Pick a replacement",
-    "swapIn": "Swap in {{name}}",
-    "confirmTitle": "Confirm the replacement",
+    "swapIn": "Invite {{name}}",
+    "confirmTitle": "Send the swap invite?",
     "thisPlayer": "this player",
-    "takesOver": "{{incoming}} takes over {{outgoing}}'s spot in the tournament.",
-    "inheritMatches_one": "\n\nThey inherit {{count}} played match, the seed and the standings that go with them.",
-    "inheritMatches_other": "\n\nThey inherit {{count}} played matches, the seed and the standings that go with them.",
-    "takeSeedOnly": "\n\nThey take the seed and the fixtures that go with the spot.",
-    "outgoingRemoved": "\n\n{{name}} is removed from this tournament.",
+    "takesOver": "{{incoming}} is offered {{outgoing}}'s spot in the tournament.",
+    "inheritMatches_one": "\n\nIf they accept, they take over the spot's place in the table. The {{count}} match already played stays on the outgoing player's profile.",
+    "inheritMatches_other": "\n\nIf they accept, they take over the spot's place in the table. The {{count}} matches already played stay on the outgoing player's profile.",
+    "takeSeedOnly": "\n\nIf they accept, they take the seed and the fixtures that go with the spot.",
+    "outgoingRemoved": "\n\n{{name}} leaves the tournament when the invite is accepted. Nothing changes until then.",
     "theOutgoingPlayer": "The outgoing player",
-    "swapThePlayer": "Swap the player"
+    "swapThePlayer": "Send invite"
   },
   "list": {
     "fetchFailed": "Failed to fetch tournaments ({{status}}): {{text}}",
@@ -614,5 +620,84 @@
     "failed": "Could not update the phone request. Try again.",
     "refresh": "Refresh requests",
     "empty": "No pending requests"
+  },
+  "invites": {
+    "guest": "Guest",
+    "inviteOnlyNotice": "Invite only — the organizer picks the players. You can join only if you're invited.",
+    "inviteOnlyValue": "Invite only",
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "cancelled": "Withdrawn",
+      "expired": "Expired"
+    },
+    "banner": {
+      "title": "You're invited",
+      "byOrganizer": "{{name}} invited you to play in this tournament.",
+      "generic": "You're invited to play in this tournament.",
+      "swapTitle": "A spot is offered to you",
+      "swapSubtitle": "Take over {{name}}'s spot in this tournament.",
+      "swapPlayed_one": "You take over the spot's place in the table. The {{count}} match already played stays on {{name}}'s profile — your record starts with your next match.",
+      "swapPlayed_other": "You take over the spot's place in the table. The {{count}} matches already played stay on {{name}}'s profile — your record starts with your next match.",
+      "swapFresh": "No matches played on this spot yet — you start from the first one.",
+      "notOpenYet": "Registration hasn't opened yet — you can accept once it does.",
+      "full": "Every place is taken right now. Your invite stays open — accept it if a place frees up.",
+      "noReservation": "An invite doesn't hold a place — it's yours once you accept.",
+      "accept": "Accept",
+      "acceptSpot": "Take the spot",
+      "decline": "Decline",
+      "declineTitle": "Decline the invite?",
+      "declineMessage": "The organizer won't be able to invite you to this tournament again.",
+      "expired": "Your invite to this tournament has expired.",
+      "cancelled": "The organizer withdrew your invite.",
+      "acceptedTitle": "You're in!",
+      "acceptedMessage": "You accepted the invite — good luck in the tournament."
+    },
+    "card": {
+      "title": "Invite players",
+      "subtitleInviteOnly": "Only the players you invite can get in. They accept or decline in the app.",
+      "subtitleOpen": "Invite players directly — once they accept, they're in without waiting for approval.",
+      "invite": "Invite players",
+      "subtitleSwaps": "Swap invites still waiting for an answer. Withdraw one if your plans changed.",
+      "manage": "Sent invites"
+    },
+    "modal": {
+      "title": "Invite players",
+      "subtitle": "Players get in only when they accept. Nobody is added without saying yes.",
+      "tabInvite": "Invite",
+      "tabSent": "Sent ({{n}})",
+      "searchPlaceholder": "Search players by username…",
+      "filterAll": "All players",
+      "filterEligible": "Meets requirements",
+      "showingMembers": "Showing hub members. Type a username to search all players.",
+      "searchingEveryone": "Searching all players.",
+      "sentCount_one": "{{count}} invite sent.",
+      "sentCount_other": "{{count}} invites sent.",
+      "noMatches": "No player matches that name",
+      "noMembers": "No hub members left to invite",
+      "alreadyInHidden": "Players already in the tournament and banned players aren't listed.",
+      "noneSent": "No invites sent yet",
+      "swapFor": "for {{name}}'s spot",
+      "cancelInvite": "Withdraw",
+      "cancelTitle": "Withdraw the invite?",
+      "cancelMessage": "{{name}} won't be able to accept it anymore. You can invite them again later.",
+      "guestNote_one": "{{count}} selected player is outside this tournament's region, country or exclusive rules and will be invited as a guest.",
+      "guestNote_other": "{{count}} selected players are outside this tournament's region, country or exclusive rules and will be invited as guests.",
+      "noReservationNote": "Invites don't hold places — whoever accepts first gets in.",
+      "sendCount_one": "Send {{count}} invite",
+      "sendCount_other": "Send {{count}} invites",
+      "pickPlayers": "Pick players to invite",
+      "sentTitle": "Sent invites",
+      "sentSubtitle": "Withdraw an invite that hasn't been answered yet."
+    },
+    "outcome": {
+      "alreadyInvited": "{{name}} already has an open invite.",
+      "alreadyIn": "{{name}} is already in the tournament.",
+      "declinedBefore": "{{name}} declined before and can't be invited again.",
+      "banned": "{{name}} is banned from this hub.",
+      "needsGuest": "{{name}} doesn't meet the requirements — invite as a guest.",
+      "notFound": "{{name}} couldn't be found."
+    }
   }
 }
